@@ -1,0 +1,15 @@
+[package]
+name = "ooxmlsdk-build"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+quick-xml = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+prettyplease = { workspace = true }
+proc-macro2 = { workspace = true }
+heck = { workspace = true }

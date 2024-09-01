@@ -1,0 +1,6 @@
+[package]
+name = "ooxmlsdk"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

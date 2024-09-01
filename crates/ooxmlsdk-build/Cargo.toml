@@ -13,3 +13,4 @@ syn = { workspace = true }
 prettyplease = { workspace = true }
 proc-macro2 = { workspace = true }
 heck = { workspace = true }
+thiserror = { workspace = true }

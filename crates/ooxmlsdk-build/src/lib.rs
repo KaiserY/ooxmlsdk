@@ -1,4 +1,3 @@
-use gen::simple_type::gen_simple_type;
 use heck::ToSnakeCase;
 use models::OpenXmlSchemaEnum;
 use proc_macro2::TokenStream;
@@ -14,6 +13,7 @@ use crate::gen::open_xml_schema::gen_open_xml_schema;
 use crate::models::{OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType};
 
 pub mod gen;
+pub mod includes;
 pub mod models;
 pub mod utils;
 
@@ -161,7 +161,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     fs::write(schema_path, formatted).unwrap();
   }
 
-  let token_stream: TokenStream = gen_simple_type().unwrap();
+  let token_stream: TokenStream = parse_str(include_str!("includes/simple_type.rs")).unwrap();
 
   let syntax_tree = syn::parse2(token_stream).unwrap();
   let formatted = prettyplease::unparse(&syntax_tree);

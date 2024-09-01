@@ -24,9 +24,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
     let mut variants: Vec<TokenStream> = vec![];
 
     for facet in &e.facets {
-      if facet.value == "none" {
-        continue;
-      }
+      let variant_rename = &facet.value;
 
       let variant_ident: Ident = if facet.name.is_empty() {
         parse_str(&escape_upper_camel_case(facet.value.to_upper_camel_case())).unwrap()
@@ -35,6 +33,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       };
 
       variants.push(quote! {
+        #[serde(rename = #variant_rename)]
         #variant_ident,
       })
     }
@@ -95,11 +94,41 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       continue;
     }
 
+    let name_list: Vec<&str> = t.name.split('/').collect();
+
+    let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
+    let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
+
+    let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
     let mut fields: Vec<TokenStream> = vec![];
+
+    if !t.part.is_empty() {
+      fields.push(quote! {
+        #[serde(rename = "@xmlns")]
+        pub xmlns: Option<String>,
+      });
+    }
 
     let mut child_choice_enum_option: Option<TokenStream> = None;
 
     for attr in &t.attributes {
+      let q_name_list: Vec<&str> = attr.q_name.split(':').collect();
+
+      let q_name_local = q_name_list
+        .last()
+        .ok_or(format!("{:?}", attr.r#type))
+        .unwrap();
+
+      let attr_rename_ser_str = if attr.q_name.starts_with(':') {
+        format!("@{}", &attr.q_name[1..attr.q_name.len()])
+      } else {
+        format!("@{}", attr.q_name)
+      };
+
+      let attr_rename_de_str = format!("@{}", q_name_local);
+
       let attr_name_ident: Ident = if attr.property_name.is_empty() {
         parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
       } else {
@@ -162,12 +191,14 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       if required {
         fields.push(quote! {
           #[doc = #property_comments_doc]
+          #[serde(rename(serialize = #attr_rename_ser_str, deserialize = #attr_rename_de_str))]
           pub #attr_name_ident: #type_ident,
         })
       } else {
         fields.push(quote! {
           #[doc = #property_comments_doc]
           #[serde(skip_serializing_if = "Option::is_none")]
+          #[serde(rename(serialize = #attr_rename_ser_str, deserialize = #attr_rename_de_str))]
           pub #attr_name_ident: Option<#type_ident>,
         })
       }
@@ -181,7 +212,8 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       let simple_type_name: Type = parse_str(simple_type_mapping(first_name)).unwrap();
 
       fields.push(quote! {
-        pub child: #simple_type_name,
+        #[serde(rename = "$value")]
+        pub child: Option<#simple_type_name>,
       });
     } else if !t.children.is_empty() {
       let child_choice_enum_ident: Ident = parse_str(&format!(
@@ -191,7 +223,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       .unwrap();
 
       fields.push(quote! {
-        #[serde(default)]
+        #[serde(default, rename = "$value")]
         pub children: Vec<#child_choice_enum_ident>,
       });
 
@@ -210,6 +242,20 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
           .type_name_namespace_map
           .get(child.name.as_str())
           .ok_or(format!("{:?}", child.name))
+          .unwrap();
+
+        let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+        let child_rename_ser_str = child_name_list
+          .last()
+          .ok_or(format!("{:?}", t.name))
+          .unwrap();
+
+        let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+        let child_rename_de_str = child_rename_list
+          .last()
+          .ok_or(format!("{:?}", t.name))
           .unwrap();
 
         let mut child_variant_name: String = if child.property_name.is_empty() {
@@ -245,6 +291,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
         };
 
         variants.push(quote! {
+          #[serde(rename(serialize = #child_rename_ser_str, deserialize = #child_rename_de_str))]
           #child_variant_name_ident(std::boxed::Box<#child_variant_type>),
         });
       }
@@ -265,6 +312,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       token_stream_list.push(quote! {
         #[doc = #summary_doc]
         #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+        #[serde(rename(serialize = #rename_ser_str, deserialize = #rename_de_str))]
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -274,6 +322,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
     } else {
       token_stream_list.push(quote! {
         #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+        #[serde(rename(serialize = #rename_ser_str, deserialize = #rename_de_str))]
         pub struct #struct_name_ident {
           #( #fields )*
         }

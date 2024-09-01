@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build"]
-default-members = ["crates/ooxmlsdk"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,7 +17,7 @@ readme = "README.md"
 [workspace.dependencies]
 ooxmlsdk = { path = "crates/ooxmlsdk" }
 ooxmlsdk-build = { path = "crates/ooxmlsdk-build" }
-quick-xml = "0.36.1"
+quick-xml = { version = "0.36.1", features = ["serialize"] }
 anyhow = "1.0.86"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_derive = "1.0.204"

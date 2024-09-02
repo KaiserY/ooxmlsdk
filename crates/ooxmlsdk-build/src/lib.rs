@@ -8,10 +8,12 @@ use std::{fs, path::Path};
 use syn::{parse_str, Ident, ItemMod};
 
 use crate::gen::context::GenContext;
+use crate::gen::deserializer::gen_deserializer;
 use crate::gen::open_xml_part::gen_open_xml_part;
 use crate::gen::open_xml_schema::gen_open_xml_schema;
 use crate::models::{OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType};
 
+// pub mod deserializers;
 pub mod gen;
 pub mod includes;
 pub mod models;
@@ -21,6 +23,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
   let out_parts_dir_path = &out_dir_path.join("parts");
   let out_schemas_dir_path = &out_dir_path.join("schemas");
+  let out_deserializers_dir_path = &out_dir_path.join("deserializers");
 
   let data_dir_path = Path::new(data_dir);
   let data_parts_dir_path = &data_dir_path.join("parts");
@@ -28,6 +31,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
 
   fs::create_dir_all(out_parts_dir_path).unwrap();
   fs::create_dir_all(out_schemas_dir_path).unwrap();
+  fs::create_dir_all(out_deserializers_dir_path).unwrap();
 
   let mut parts: Vec<OpenXmlPart> = vec![];
   let mut part_mods: Vec<String> = vec![];
@@ -146,7 +150,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     }
   }
 
-  let mut shcemas_mod_use_list: Vec<ItemMod> = vec![];
+  let mut schemas_mod_use_list: Vec<ItemMod> = vec![];
 
   for (i, schema) in context.schemas.iter().enumerate() {
     let schema_mod = &context.schema_mods[i];
@@ -181,12 +185,12 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     )
     .unwrap();
 
-    shcemas_mod_use_list.push(shcemas_mod_use);
+    schemas_mod_use_list.push(shcemas_mod_use);
   }
 
   let token_stream: TokenStream = quote! {
     pub mod simple_type;
-    #( #shcemas_mod_use_list )*
+    #( #schemas_mod_use_list )*
   };
 
   let syntax_tree = syn::parse2(token_stream).unwrap();
@@ -232,9 +236,59 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let syntax_tree = syn::parse2(token_stream).unwrap();
   let formatted = prettyplease::unparse(&syntax_tree);
 
-  let schemas_mod_path = out_parts_dir_path.join("mod.rs");
+  let parts_mod_path = out_parts_dir_path.join("mod.rs");
 
-  fs::write(schemas_mod_path, formatted).unwrap();
+  fs::write(parts_mod_path, formatted).unwrap();
+
+  let mut deserializers_mod_use_list: Vec<ItemMod> = vec![];
+
+  for (i, part) in context.schemas.iter().enumerate() {
+    let schema_mod = &context.schema_mods[i];
+
+    let token_stream = gen_deserializer(part, &context);
+
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+
+    let part_path = out_deserializers_dir_path.join(format!("{}.rs", schema_mod));
+
+    fs::write(part_path, formatted).unwrap();
+  }
+
+  let token_stream: TokenStream = parse_str(include_str!("includes/deserializers.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let deserializers_mod_path = out_deserializers_dir_path.join("deserializers.rs");
+
+  fs::write(deserializers_mod_path, formatted).unwrap();
+
+  for schema_mod in context.schema_mods.iter() {
+    let deserializer_mod_ident: Ident = parse_str(schema_mod).unwrap();
+
+    let deserializer_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #deserializer_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+
+    deserializers_mod_use_list.push(deserializer_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    pub mod deserializers;
+    #( #deserializers_mod_use_list )*
+  };
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let deserializers_mod_path = out_deserializers_dir_path.join("mod.rs");
+
+  fs::write(deserializers_mod_path, formatted).unwrap();
 }
 
 #[cfg(test)]

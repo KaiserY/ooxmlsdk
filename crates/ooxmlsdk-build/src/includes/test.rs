@@ -27,18 +27,42 @@ pub enum SheetStateValues {
 }
 
 impl Sheet {
-  pub fn from_str<'de>(input: &'de str) -> Result<Self, super::deserializers::DeError> {
-    Err(super::deserializers::DeError::UnknownError)
+  #[allow(clippy::should_implement_trait)]
+  pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
+    let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(s));
+
+    Self::deserialize_self(&mut xml_reader)
   }
 
   pub fn from_reader<R: std::io::BufRead>(
     reader: R,
   ) -> Result<Self, super::deserializers::DeError> {
+    let mut xml_reader =
+      super::deserializers::IoReader::new(quick_xml::Reader::from_reader(reader));
+
+    Self::deserialize_self(&mut xml_reader)
+  }
+
+  pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+    xml_reader: &mut R,
+  ) -> Result<Self, super::deserializers::DeError> {
+    if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
+      println!("{:?}", e);
+    } else {
+      Err(super::deserializers::DeError::UnknownError)?;
+    }
+
     Err(super::deserializers::DeError::UnknownError)
   }
 }
 
-pub fn gen() {}
+pub fn gen() {
+  let xml = "visible".trim();
+
+  let value: SheetStateValues = quick_xml::de::from_str(xml).unwrap();
+
+  println!("{:?}", value);
+}
 
 #[cfg(test)]
 mod tests {

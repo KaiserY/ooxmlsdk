@@ -26,6 +26,15 @@ pub struct IoReader<R: BufRead> {
   buf: Vec<u8>,
 }
 
+impl<R: BufRead> IoReader<R> {
+  pub fn new(reader: Reader<R>) -> Self {
+    Self {
+      reader,
+      buf: Vec::new(),
+    }
+  }
+}
+
 impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
   fn next(&mut self) -> Result<Event<'de>, DeError> {
     self.buf.clear();
@@ -42,6 +51,12 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
 
 pub struct SliceReader<'de> {
   reader: Reader<&'de [u8]>,
+}
+
+impl<'de> SliceReader<'de> {
+  pub fn new(reader: Reader<&'de [u8]>) -> Self {
+    Self { reader }
+  }
 }
 
 impl<'de> XmlReader<'de> for SliceReader<'de> {

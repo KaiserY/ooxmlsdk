@@ -13,7 +13,6 @@ use crate::gen::open_xml_part::gen_open_xml_part;
 use crate::gen::open_xml_schema::gen_open_xml_schema;
 use crate::models::{OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType};
 
-// pub mod deserializers;
 pub mod gen;
 pub mod includes;
 pub mod models;

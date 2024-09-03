@@ -1,9 +1,10 @@
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_str, ItemFn, Type};
+use syn::{parse_str, Ident, ItemFn, Type};
 
 use crate::models::OpenXmlSchema;
+use crate::utils::escape_upper_camel_case;
 use crate::GenContext;
 
 pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
@@ -20,6 +21,44 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     .get(schema_namespace.prefix.as_str())
     .ok_or(format!("{:?}", schema_namespace.prefix))
     .unwrap();
+
+  for e in &schema.enums {
+    let enum_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      e.name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    let mut variants: Vec<TokenStream> = vec![];
+
+    for facet in &e.facets {
+      let variant_rename = &facet.value;
+
+      let variant_ident: Ident = if facet.name.is_empty() {
+        parse_str(&escape_upper_camel_case(facet.value.to_upper_camel_case())).unwrap()
+      } else {
+        parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
+      };
+
+      variants.push(quote! {
+        #variant_rename => Ok(Self::#variant_ident),
+      })
+    }
+
+    token_stream_list.push(quote! {
+      impl std::str::FromStr for #enum_type {
+        type Err = super::deserializers::DeError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+          match s {
+            #( #variants )*
+            _ => Err(Self::Err::UnknownError),
+          }
+        }
+      }
+    })
+  }
 
   let from_str_fn = gen_from_str_fn();
 

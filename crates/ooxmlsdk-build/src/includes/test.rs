@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename(serialize = "x:sheet", deserialize = "sheet"))]
 pub struct Sheet {
@@ -24,6 +26,19 @@ pub enum SheetStateValues {
   Hidden,
   #[serde(rename = "veryHidden")]
   VeryHidden,
+}
+
+impl std::str::FromStr for SheetStateValues {
+  type Err = super::deserializers::DeError;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "visible" => Ok(Self::Visible),
+      "hidden" => Ok(Self::Hidden),
+      "veryHidden" => Ok(Self::VeryHidden),
+      _ => Err(Self::Err::UnknownError),
+    }
+  }
 }
 
 impl Sheet {
@@ -53,6 +68,8 @@ impl Sheet {
 
       let mut name = None;
       let mut sheet_id = None;
+      let mut state = None;
+      let mut id = None;
 
       for attr in e.attributes() {
         let attr = attr?;
@@ -72,18 +89,31 @@ impl Sheet {
                 .parse::<super::simple_type::UInt32Value>()?,
             )
           }
+          b"state" => {
+            state = Some(SheetStateValues::from_str(
+              &attr.decode_and_unescape_value(xml_reader.decoder())?,
+            )?)
+          }
+          b"id" => {
+            id = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            )
+          }
           _ => (),
         }
       }
 
       let name = name.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
       let sheet_id = sheet_id.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+      let id = id.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
 
       Ok(Self {
         name,
         sheet_id,
-        state: None,
-        id: "".to_string(),
+        state,
+        id,
       })
     } else {
       Err(super::deserializers::DeError::UnknownError)?

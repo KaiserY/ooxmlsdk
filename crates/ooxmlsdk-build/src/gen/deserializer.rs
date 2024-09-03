@@ -70,8 +70,8 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
 pub fn gen_from_str_fn() -> ItemFn {
   let token_stream = quote! {
-    pub fn from_str(input: &str) -> Result<Self, super::deserializers::DeError> {
-      let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(input));
+    pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
+      let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(s));
 
       Self::deserialize_self(&mut xml_reader)
     }

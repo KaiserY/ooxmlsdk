@@ -47,12 +47,47 @@ impl Sheet {
     xml_reader: &mut R,
   ) -> Result<Self, super::deserializers::DeError> {
     if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
-      println!("{:?}", e);
-    } else {
-      Err(super::deserializers::DeError::UnknownError)?;
-    }
+      if e.name().local_name().as_ref() != b"sheet" {
+        Err(super::deserializers::DeError::UnknownError)?;
+      }
 
-    Err(super::deserializers::DeError::UnknownError)
+      let mut name = None;
+      let mut sheet_id = None;
+
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        match attr.key.as_ref() {
+          b"name" => {
+            name = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            )
+          }
+          b"sheetId" => {
+            sheet_id = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .parse::<super::simple_type::UInt32Value>()?,
+            )
+          }
+          _ => (),
+        }
+      }
+
+      let name = name.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+      let sheet_id = sheet_id.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+
+      Ok(Self {
+        name,
+        sheet_id,
+        state: None,
+        id: "".to_string(),
+      })
+    } else {
+      Err(super::deserializers::DeError::UnknownError)?
+    }
   }
 }
 

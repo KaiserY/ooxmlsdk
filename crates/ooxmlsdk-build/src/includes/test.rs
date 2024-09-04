@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename(serialize = "x:sheet", deserialize = "sheet"))]
 pub struct Sheet {
@@ -62,6 +60,8 @@ impl Sheet {
     xml_reader: &mut R,
   ) -> Result<Self, super::deserializers::DeError> {
     if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
+      use std::str::FromStr;
+
       if e.name().local_name().as_ref() != b"sheet" {
         Err(super::deserializers::DeError::UnknownError)?;
       }

@@ -1,10 +1,10 @@
-use heck::ToUpperCamelCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_str, Ident, ItemFn, Type};
+use syn::{parse_str, Ident, ItemFn, LitByteStr, Type};
 
 use crate::models::OpenXmlSchema;
-use crate::utils::escape_upper_camel_case;
+use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
 
 pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
@@ -81,7 +81,71 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     ))
     .unwrap();
 
-    token_stream_list.push(quote! {
+    let name_list: Vec<&str> = t.name.split('/').collect();
+
+    let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
+    let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
+
+    let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
+    let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
+
+    let mut field_declaration_list: Vec<TokenStream> = vec![];
+    let mut field_match_list: Vec<TokenStream> = vec![];
+    let mut field_unwrap_list: Vec<TokenStream> = vec![];
+    let mut field_init_list: Vec<TokenStream> = vec![];
+
+    for attr in &t.attributes {
+      let attr_rename_ser_str = if attr.q_name.starts_with(':') {
+        &attr.q_name[1..attr.q_name.len()]
+      } else {
+        &attr.q_name
+      };
+
+      let attr_name_ident: Ident = if attr.property_name.is_empty() {
+        parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+      } else {
+        parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+      };
+
+      field_declaration_list.push(quote! {
+        let mut #attr_name_ident = None;
+      });
+
+      let attr_rename_ser_literal: LitByteStr =
+        parse_str(&format!("b\"{}\"", attr_rename_ser_str)).unwrap();
+
+      field_match_list.push(quote! {
+        #attr_rename_ser_literal => {
+          #attr_name_ident = Some(
+            attr
+              .decode_and_unescape_value(xml_reader.decoder())?
+              .to_string(),
+          )
+        }
+      });
+
+      let mut required = false;
+
+      for validator in &attr.validators {
+        if validator.name == "RequiredValidator" {
+          required = true;
+        }
+      }
+
+      if !required {
+        field_unwrap_list.push(quote! {
+          let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+        })
+      }
+
+      field_init_list.push(quote! {
+        #attr_name_ident,
+      })
+    }
+
+    let output = quote! {
       impl #struct_type {
         #from_str_fn
 
@@ -91,15 +155,37 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
           xml_reader: &mut R,
         ) -> Result<Self, super::deserializers::DeError> {
           if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
-            println!("{:?}", e);
-          } else {
-            Err(super::deserializers::DeError::UnknownError)?;
-          }
+            if e.name().local_name().as_ref() != #rename_de_literal {
+              Err(super::deserializers::DeError::UnknownError)?;
+            }
 
-          Err(super::deserializers::DeError::UnknownError)
+            #( #field_declaration_list )*
+
+            for attr in e.attributes() {
+              let attr = attr?;
+
+              match attr.key.as_ref() {
+                #( #field_match_list )*
+                _ => (),
+              }
+            }
+
+            #( #field_unwrap_list )*
+
+            Ok(Self {
+              #( #field_init_list )*
+            })
+          } else {
+            Err(super::deserializers::DeError::UnknownError)?
+          }
         }
       }
-    })
+    };
+
+    let syntax_tree = syn::parse2(output.clone()).unwrap();
+    let _ = prettyplease::unparse(&syntax_tree);
+
+    token_stream_list.push(output);
   }
 
   quote! {

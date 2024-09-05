@@ -2,7 +2,10 @@ use quick_xml::{
   events::{attributes::AttrError, Event},
   Decoder, Reader,
 };
-use std::{io::BufRead, num::ParseIntError};
+use std::{
+  io::BufRead,
+  num::{ParseFloatError, ParseIntError},
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,6 +16,8 @@ pub enum DeError {
   AttrError(#[from] AttrError),
   #[error("ParseIntError")]
   ParseIntError(#[from] ParseIntError),
+  #[error("ParseFloatError")]
+  ParseFloatError(#[from] ParseFloatError),
   #[error("mismatch error (expected {expected:?}, found {found:?})")]
   MismatchError { expected: String, found: String },
   #[error("unknown error")]

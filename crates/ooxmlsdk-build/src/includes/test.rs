@@ -94,7 +94,7 @@ impl Sheet {
               &attr.decode_and_unescape_value(xml_reader.decoder())?,
             )?)
           }
-          b"id" => {
+          b"r:id" => {
             id = Some(
               attr
                 .decode_and_unescape_value(xml_reader.decoder())?
@@ -122,9 +122,12 @@ impl Sheet {
 }
 
 pub fn gen() {
-  let xml = "visible".trim();
+  let xml = r###"
+<sheet r:id="rId7" name="Sheet1" sheetId="1" />
+"###
+    .trim();
 
-  let value: SheetStateValues = quick_xml::de::from_str(xml).unwrap();
+  let value: Sheet = Sheet::from_str(xml).unwrap();
 
   println!("{:?}", value);
 }

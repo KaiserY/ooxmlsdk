@@ -65,15 +65,6 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
   let from_reader_fn = gen_from_reader_fn();
 
   for t in &schema.types {
-    if t.children.is_empty()
-      && t.attributes.is_empty()
-      && context
-        .type_base_class_type_map
-        .contains_key(t.base_class.as_str())
-    {
-      continue;
-    }
-
     let struct_type: Type = parse_str(&format!(
       "crate::schemas::{}::{}",
       scheme_mod,
@@ -95,6 +86,100 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     let mut field_match_list: Vec<TokenStream> = vec![];
     let mut field_unwrap_list: Vec<TokenStream> = vec![];
     let mut field_init_list: Vec<TokenStream> = vec![];
+
+    if t.base_class == "OpenXmlLeafTextElement" {
+      for attr in &t.attributes {
+        let attr_name_ident: Ident = if attr.property_name.is_empty() {
+          parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+        } else {
+          parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+        };
+
+        field_declaration_list.push(quote! {
+          let mut #attr_name_ident = None;
+        });
+
+        field_init_list.push(quote! {
+          #attr_name_ident,
+        })
+      }
+    } else if t.base_class == "OpenXmlLeafElement" {
+      for attr in &t.attributes {
+        let attr_name_ident: Ident = if attr.property_name.is_empty() {
+          parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+        } else {
+          parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+        };
+
+        field_declaration_list.push(quote! {
+          let mut #attr_name_ident = None;
+        });
+
+        field_init_list.push(quote! {
+          #attr_name_ident,
+        })
+      }
+    } else if t.base_class == "OpenXmlCompositeElement"
+      || t.base_class == "CustomXmlElement"
+      || t.base_class == "OpenXmlPartRootElement"
+      || t.base_class == "SdtElement"
+    {
+      for attr in &t.attributes {
+        let attr_name_ident: Ident = if attr.property_name.is_empty() {
+          parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+        } else {
+          parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+        };
+
+        field_declaration_list.push(quote! {
+          let mut #attr_name_ident = None;
+        });
+
+        field_init_list.push(quote! {
+          #attr_name_ident,
+        })
+      }
+    } else if t.is_derived {
+      for attr in &t.attributes {
+        let attr_name_ident: Ident = if attr.property_name.is_empty() {
+          parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+        } else {
+          parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+        };
+
+        field_declaration_list.push(quote! {
+          let mut #attr_name_ident = None;
+        });
+
+        field_init_list.push(quote! {
+          #attr_name_ident,
+        })
+      }
+
+      let base_class_type = context
+        .type_base_class_type_map
+        .get(t.base_class.as_str())
+        .ok_or(format!("{:?}", t.base_class))
+        .unwrap();
+
+      for attr in &base_class_type.attributes {
+        let attr_name_ident: Ident = if attr.property_name.is_empty() {
+          parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+        } else {
+          parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+        };
+
+        field_declaration_list.push(quote! {
+          let mut #attr_name_ident = None;
+        });
+
+        field_init_list.push(quote! {
+          #attr_name_ident,
+        })
+      }
+    } else {
+      panic!("{:?}", t);
+    }
 
     for attr in &t.attributes {
       let attr_rename_ser_str = if attr.q_name.starts_with(':') {

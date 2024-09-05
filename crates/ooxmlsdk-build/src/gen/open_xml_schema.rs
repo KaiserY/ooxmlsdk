@@ -1,7 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use syn::{parse_str, Ident, Type};
 
 use crate::gen::simple_type::simple_type_mapping;
@@ -137,9 +137,17 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
         fields.push(gen_attr(attr, schema_namespace, context));
       }
 
-      let mut children = t.children.clone();
+      let mut children_map: HashMap<&str, OpenXmlSchemaTypeChild> = HashMap::new();
 
-      children.extend(base_class_type.children.clone());
+      for c in &t.children {
+        children_map.insert(&c.name, c.clone());
+      }
+
+      for c in &base_class_type.children {
+        children_map.insert(&c.name, c.clone());
+      }
+
+      let children: Vec<OpenXmlSchemaTypeChild> = children_map.into_values().collect();
 
       let (field_option, enum_option) =
         gen_children(&t.class_name, &children, schema_namespace, context);

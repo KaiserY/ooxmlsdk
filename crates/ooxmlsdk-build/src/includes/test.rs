@@ -1,4 +1,16 @@
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename(serialize = "x:sheets", deserialize = "sheets"))]
+pub struct Sheets {
+  #[serde(default, rename = "$value")]
+  pub children: Vec<SheetsChildChoice>,
+}
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub enum SheetsChildChoice {
+  #[serde(rename(serialize = "x:sheet", deserialize = "sheet"))]
+  Sheet(std::boxed::Box<Sheet>),
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename(serialize = "x:sheet", deserialize = "sheet"))]
 pub struct Sheet {
   /// Sheet Name
@@ -121,13 +133,73 @@ impl Sheet {
   }
 }
 
+impl Sheets {
+  #[allow(clippy::should_implement_trait)]
+  pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
+    let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(s));
+
+    Self::deserialize_self(&mut xml_reader)
+  }
+
+  pub fn from_reader<R: std::io::BufRead>(
+    reader: R,
+  ) -> Result<Self, super::deserializers::DeError> {
+    let mut xml_reader =
+      super::deserializers::IoReader::new(quick_xml::Reader::from_reader(reader));
+
+    Self::deserialize_self(&mut xml_reader)
+  }
+
+  pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+    xml_reader: &mut R,
+  ) -> Result<Self, super::deserializers::DeError> {
+    if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
+      if e.name().local_name().as_ref() != b"sheets" {
+        Err(super::deserializers::DeError::UnknownError)?;
+      }
+
+      let mut children = vec![];
+
+      loop {
+        let peek_event = xml_reader.peek()?;
+
+        match peek_event {
+          quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
+            match e.name().local_name().as_ref() {
+              b"sheet" => {
+                children.push(SheetsChildChoice::Sheet(std::boxed::Box::new(
+                  Sheet::deserialize_self(xml_reader)?,
+                )));
+              }
+              _ => Err(super::deserializers::DeError::UnknownError)?,
+            }
+          }
+          quick_xml::events::Event::End(e) => {
+            if e.name().local_name().as_ref() == b"sheets" {
+              xml_reader.next()?;
+
+              break;
+            }
+          }
+          quick_xml::events::Event::Eof => Err(super::deserializers::DeError::UnknownError)?,
+          _ => (),
+        }
+      }
+
+      Ok(Self { children })
+    } else {
+      Err(super::deserializers::DeError::UnknownError)?
+    }
+  }
+}
+
 pub fn gen() {
   let xml = r###"
-<sheet r:id="rId7" name="Sheet1" sheetId="1" />
+<sheets><sheet r:id="rId7" name="Sheet1" sheetId="1" /></sheets>
 "###
     .trim();
 
-  let value: Sheet = Sheet::from_str(xml).unwrap();
+  let value: Sheets = Sheets::from_str(xml).unwrap();
 
   println!("{:?}", value);
 }

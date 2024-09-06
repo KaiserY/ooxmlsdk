@@ -49,13 +49,11 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     }
 
     token_stream_list.push(quote! {
-      impl std::str::FromStr for #enum_type {
-        type Err = super::deserializers::DeError;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
+      impl #enum_type {
+        pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
           match s {
             #( #variants )*
-            _ => Err(Self::Err::UnknownError),
+            _ => Err(super::deserializers::DeError::UnknownError),
           }
         }
       }

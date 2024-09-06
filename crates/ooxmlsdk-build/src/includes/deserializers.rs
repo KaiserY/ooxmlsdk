@@ -27,31 +27,49 @@ pub enum DeError {
 pub trait XmlReader<'de> {
   fn next(&mut self) -> Result<Event<'de>, DeError>;
 
+  fn peek(&mut self) -> Result<&Event<'de>, DeError>;
+
   fn decoder(&self) -> Decoder;
 }
 
-pub struct IoReader<R: BufRead> {
+pub struct IoReader<'de, R: BufRead> {
   reader: Reader<R>,
-
+  peek: Option<Event<'de>>,
   buf: Vec<u8>,
 }
 
-impl<R: BufRead> IoReader<R> {
+impl<'de, R: BufRead> IoReader<'de, R> {
   pub fn new(reader: Reader<R>) -> Self {
     Self {
       reader,
+      peek: None,
       buf: Vec::new(),
     }
   }
 }
 
-impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
+impl<'de, R: BufRead> XmlReader<'de> for IoReader<'de, R> {
   fn next(&mut self) -> Result<Event<'de>, DeError> {
+    if let Some(e) = self.peek.take() {
+      return Ok(e);
+    }
+
     self.buf.clear();
 
     let event = self.reader.read_event_into(&mut self.buf)?;
 
     Ok(event.into_owned())
+  }
+
+  fn peek(&mut self) -> Result<&Event<'de>, DeError> {
+    if self.peek.is_none() {
+      self.peek = Some(self.next()?);
+    }
+
+    match self.peek.as_ref() {
+      Some(v) => Ok(v),
+      None => Err(DeError::UnknownError),
+    }
   }
 
   fn decoder(&self) -> Decoder {
@@ -61,19 +79,35 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
 
 pub struct SliceReader<'de> {
   reader: Reader<&'de [u8]>,
+  peek: Option<Event<'de>>,
 }
 
 impl<'de> SliceReader<'de> {
   pub fn new(reader: Reader<&'de [u8]>) -> Self {
-    Self { reader }
+    Self { reader, peek: None }
   }
 }
 
 impl<'de> XmlReader<'de> for SliceReader<'de> {
   fn next(&mut self) -> Result<Event<'de>, DeError> {
+    if let Some(e) = self.peek.take() {
+      return Ok(e);
+    }
+
     let event = self.reader.read_event()?;
 
     Ok(event.into_owned())
+  }
+
+  fn peek(&mut self) -> Result<&Event<'de>, DeError> {
+    if self.peek.is_none() {
+      self.peek = Some(self.next()?);
+    }
+
+    match self.peek.as_ref() {
+      Some(v) => Ok(v),
+      None => Err(DeError::UnknownError),
+    }
   }
 
   fn decoder(&self) -> Decoder {

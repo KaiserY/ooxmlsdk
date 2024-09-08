@@ -5,8 +5,7 @@ edition.workspace = true
 
 [dependencies]
 quick-xml = { workspace = true }
-serde = { workspace = true }
-serde_derive = { workspace = true }
+thiserror = { workspace = true }
 
 [build-dependencies]
 ooxmlsdk-build = { workspace = true }

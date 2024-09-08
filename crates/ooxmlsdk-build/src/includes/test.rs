@@ -1,30 +1,21 @@
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename(serialize = "x:sheets", deserialize = "sheets"))]
+#[derive(Clone, Debug)]
 pub struct Sheets {
-  #[serde(default, rename = "$value")]
   pub children: Vec<SheetsChildChoice>,
 }
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug)]
 pub enum SheetsChildChoice {
-  #[serde(rename(serialize = "x:sheet", deserialize = "sheet"))]
   Sheet(std::boxed::Box<Sheet>),
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename(serialize = "x:sheet", deserialize = "sheet"))]
+#[derive(Clone, Debug)]
 pub struct Sheet {
   /// Sheet Name
-  #[serde(rename(serialize = "@name", deserialize = "@name"))]
   pub name: super::simple_type::StringValue,
   /// Sheet Tab Id
-  #[serde(rename(serialize = "@sheetId", deserialize = "@sheetId"))]
   pub sheet_id: super::simple_type::UInt32Value,
   /// Visible State
-  #[serde(skip_serializing_if = "Option::is_none")]
-  #[serde(rename(serialize = "@state", deserialize = "@state"))]
   pub state: Option<SheetStateValues>,
   /// Relationship Id
-  #[serde(rename(serialize = "@r:id", deserialize = "@id"))]
   pub id: super::simple_type::StringValue,
 }
 

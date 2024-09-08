@@ -26,8 +26,7 @@ version = "0.1.0"
 dependencies = [
  "ooxmlsdk-build",
  "quick-xml",
- "serde",
- "serde_derive",
+ "thiserror",
 ]
 
 [[package]]
@@ -72,7 +71,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a05e2e8efddfa51a84ca47cec303fac86c8541b686d37cac5efc0e094417bc"
 dependencies = [
  "memchr",
- "serde",
 ]
 
 [[package]]

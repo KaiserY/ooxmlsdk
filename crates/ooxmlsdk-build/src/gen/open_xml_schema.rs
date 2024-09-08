@@ -1,7 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use syn::{parse_str, Ident, Type};
 
 use crate::gen::simple_type::simple_type_mapping;
@@ -307,8 +307,6 @@ pub fn gen_children(
 
   let mut variants: Vec<TokenStream> = vec![];
 
-  let mut child_variant_name_set: HashSet<String> = HashSet::new();
-
   for child in children {
     let child_type = context
       .type_name_type_map
@@ -336,20 +334,8 @@ pub fn gen_children(
       .ok_or(format!("{:?}", class_name))
       .unwrap();
 
-    let mut child_variant_name: String = if child.property_name.is_empty() {
-      child_type.class_name.to_upper_camel_case()
-    } else {
-      child.property_name.to_upper_camel_case()
-    };
-
-    if child_variant_name_set.contains(child_variant_name.as_str()) {
-      child_variant_name =
-        format!("{}:{}", child_namespace.prefix, child_variant_name).to_upper_camel_case();
-    } else {
-      child_variant_name_set.insert(child_variant_name.clone());
-    }
-
-    let child_variant_name_ident: Ident = parse_str(&child_variant_name).unwrap();
+    let child_variant_name_ident: Ident =
+      parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
 
     let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
       let scheme_mod = context

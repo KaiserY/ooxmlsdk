@@ -254,12 +254,13 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     fs::write(part_path, formatted).unwrap();
   }
 
-  let token_stream: TokenStream = parse_str(include_str!("includes/deserializers.rs")).unwrap();
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/deserializer_common.rs")).unwrap();
 
   let syntax_tree = syn::parse2(token_stream).unwrap();
   let formatted = prettyplease::unparse(&syntax_tree);
 
-  let deserializers_mod_path = out_deserializers_dir_path.join("deserializers.rs");
+  let deserializers_mod_path = out_deserializers_dir_path.join("deserializer_common.rs");
 
   fs::write(deserializers_mod_path, formatted).unwrap();
 
@@ -278,7 +279,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   }
 
   let token_stream: TokenStream = quote! {
-    pub mod deserializers;
+    pub mod deserializer_common;
     #( #deserializers_mod_use_list )*
   };
 

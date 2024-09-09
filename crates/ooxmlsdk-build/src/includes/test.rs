@@ -30,7 +30,7 @@ pub enum SheetStateValues {
 }
 
 impl std::str::FromStr for SheetStateValues {
-  type Err = super::deserializers::DeError;
+  type Err = super::deserializer_common::DeError;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
@@ -44,25 +44,26 @@ impl std::str::FromStr for SheetStateValues {
 
 impl Sheet {
   #[allow(clippy::should_implement_trait)]
-  pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
-    let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(s));
+  pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
+    let mut xml_reader =
+      super::deserializer_common::SliceReader::new(quick_xml::Reader::from_str(s));
 
     Self::deserialize_self(&mut xml_reader, false)
   }
 
   pub fn from_reader<R: std::io::BufRead>(
     reader: R,
-  ) -> Result<Self, super::deserializers::DeError> {
+  ) -> Result<Self, super::deserializer_common::DeError> {
     let mut xml_reader =
-      super::deserializers::IoReader::new(quick_xml::Reader::from_reader(reader));
+      super::deserializer_common::IoReader::new(quick_xml::Reader::from_reader(reader));
 
     Self::deserialize_self(&mut xml_reader, false)
   }
 
-  pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+  pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,
-  ) -> Result<Self, super::deserializers::DeError> {
+  ) -> Result<Self, super::deserializer_common::DeError> {
     let mut with_xmlns = with_xmlns;
 
     if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
@@ -110,15 +111,15 @@ impl Sheet {
 
       if with_xmlns {
         if e.name().as_ref() != b"x:sheet" {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
       } else if e.name().local_name().as_ref() != b"sheet" {
-        Err(super::deserializers::DeError::UnknownError)?;
+        Err(super::deserializer_common::DeError::UnknownError)?;
       }
 
-      let name = name.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
-      let sheet_id = sheet_id.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
-      let id = id.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+      let name = name.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+      let sheet_id = sheet_id.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+      let id = id.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
 
       Ok(Self {
         name,
@@ -127,32 +128,33 @@ impl Sheet {
         id,
       })
     } else {
-      Err(super::deserializers::DeError::UnknownError)?
+      Err(super::deserializer_common::DeError::UnknownError)?
     }
   }
 }
 
 impl Sheets {
   #[allow(clippy::should_implement_trait)]
-  pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
-    let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(s));
+  pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
+    let mut xml_reader =
+      super::deserializer_common::SliceReader::new(quick_xml::Reader::from_str(s));
 
     Self::deserialize_self(&mut xml_reader, false)
   }
 
   pub fn from_reader<R: std::io::BufRead>(
     reader: R,
-  ) -> Result<Self, super::deserializers::DeError> {
+  ) -> Result<Self, super::deserializer_common::DeError> {
     let mut xml_reader =
-      super::deserializers::IoReader::new(quick_xml::Reader::from_reader(reader));
+      super::deserializer_common::IoReader::new(quick_xml::Reader::from_reader(reader));
 
     Self::deserialize_self(&mut xml_reader, false)
   }
 
-  pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+  pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,
-  ) -> Result<Self, super::deserializers::DeError> {
+  ) -> Result<Self, super::deserializer_common::DeError> {
     let mut with_xmlns = with_xmlns;
 
     if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
@@ -168,10 +170,10 @@ impl Sheets {
 
       if with_xmlns {
         if e.name().as_ref() != b"x:sheets" {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
       } else if e.name().local_name().as_ref() != b"sheets" {
-        Err(super::deserializers::DeError::UnknownError)?;
+        Err(super::deserializer_common::DeError::UnknownError)?;
       }
 
       loop {
@@ -186,7 +188,7 @@ impl Sheets {
                     Sheet::deserialize_self(xml_reader, with_xmlns)?,
                   )));
                 }
-                _ => Err(super::deserializers::DeError::UnknownError)?,
+                _ => Err(super::deserializer_common::DeError::UnknownError)?,
               }
             } else {
               match e.name().local_name().as_ref() {
@@ -195,7 +197,7 @@ impl Sheets {
                     Sheet::deserialize_self(xml_reader, with_xmlns)?,
                   )));
                 }
-                _ => Err(super::deserializers::DeError::UnknownError)?,
+                _ => Err(super::deserializer_common::DeError::UnknownError)?,
               }
             }
           }
@@ -212,14 +214,14 @@ impl Sheets {
               break;
             }
           }
-          quick_xml::events::Event::Eof => Err(super::deserializers::DeError::UnknownError)?,
+          quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
           _ => (),
         }
       }
 
       Ok(Self { children })
     } else {
-      Err(super::deserializers::DeError::UnknownError)?
+      Err(super::deserializer_common::DeError::UnknownError)?
     }
   }
 }

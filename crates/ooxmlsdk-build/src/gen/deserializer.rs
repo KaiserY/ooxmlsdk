@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse_str, Arm, Ident, ItemFn, LitByteStr, Stmt, Type};
+use syn::{parse2, parse_str, Arm, Ident, ItemFn, LitByteStr, Stmt, Type};
 
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
@@ -54,10 +54,10 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     token_stream_list.push(quote! {
       impl #enum_type {
         #[allow(clippy::should_implement_trait)]
-        pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
+        pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
           match s {
             #( #variants )*
-            _ => Err(super::deserializers::DeError::UnknownError),
+            _ => Err(super::deserializer_common::DeError::UnknownError),
           }
         }
       }
@@ -117,8 +117,8 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 fn gen_from_str_fn() -> ItemFn {
   let token_stream = quote! {
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Result<Self, super::deserializers::DeError> {
-      let mut xml_reader = super::deserializers::SliceReader::new(quick_xml::Reader::from_str(s));
+    pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
+      let mut xml_reader = super::deserializer_common::SliceReader::new(quick_xml::Reader::from_str(s));
 
       Self::deserialize_self(&mut xml_reader, false)
     }
@@ -131,9 +131,9 @@ fn gen_from_reader_fn() -> ItemFn {
   let token_stream = quote! {
     pub fn from_reader<R: std::io::BufRead>(
       reader: R,
-    ) -> Result<Self, super::deserializers::DeError> {
+    ) -> Result<Self, super::deserializer_common::DeError> {
       let mut xml_reader =
-        super::deserializers::IoReader::new(quick_xml::Reader::from_reader(reader));
+        super::deserializer_common::IoReader::new(quick_xml::Reader::from_reader(reader));
 
       Self::deserialize_self(&mut xml_reader, false)
     }
@@ -160,22 +160,9 @@ fn gen_open_xml_leaf_element_fn(
   let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
 
   let mut field_declaration_list: Vec<TokenStream> = vec![];
-  let mut field_match_list: Vec<Arm> = vec![];
+  let mut attr_match_list: Vec<Arm> = vec![];
   let mut field_unwrap_list: Vec<TokenStream> = vec![];
   let mut field_init_list: Vec<TokenStream> = vec![];
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  field_match_list.push(
-    parse_str(
-      &quote! {
-        #xmlns_literal => with_xmlns = true,
-      }
-      .to_string(),
-    )
-    .unwrap(),
-  );
 
   for attr in &t.attributes {
     let attr_name_ident: Ident = if attr.property_name.is_empty() {
@@ -188,7 +175,7 @@ fn gen_open_xml_leaf_element_fn(
       let mut #attr_name_ident = None;
     });
 
-    field_match_list.push(gen_field_match_arm(attr, context));
+    attr_match_list.push(gen_field_match_arm(attr, context));
 
     let mut required = false;
 
@@ -200,7 +187,7 @@ fn gen_open_xml_leaf_element_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
       })
     }
 
@@ -209,31 +196,53 @@ fn gen_open_xml_leaf_element_fn(
     })
   }
 
-  let token_stream = quote! {
-    pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+  let xmlns_literal: LitByteStr =
+    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
+
+  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        if attr.key.as_ref() == #xmlns_literal {
+          with_xmlns = true
+        }
+      }
+    })
+    .unwrap()
+  } else {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        match attr.key.as_ref() {
+          #( #attr_match_list )*
+          #xmlns_literal => with_xmlns = true,
+          _ => (),
+        }
+      }
+    })
+    .unwrap()
+  };
+
+  parse2(quote! {
+    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializers::DeError> {
+    ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
         #( #field_declaration_list )*
 
-        for attr in e.attributes() {
-          let attr = attr?;
-
-          match attr.key.as_ref() {
-            #( #field_match_list )*
-            _ => (),
-          }
-        }
+        #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializers::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::UnknownError)?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         #( #field_unwrap_list )*
@@ -242,12 +251,11 @@ fn gen_open_xml_leaf_element_fn(
           #( #field_init_list )*
         })
       } else {
-        Err(super::deserializers::DeError::UnknownError)?
+        Err(super::deserializer_common::DeError::UnknownError)?
       }
     }
-  };
-
-  parse_str(&token_stream.to_string()).unwrap()
+  })
+  .unwrap()
 }
 
 fn gen_open_xml_leaf_text_element_fn(
@@ -268,22 +276,9 @@ fn gen_open_xml_leaf_text_element_fn(
   let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
 
   let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut field_match_list: Vec<Arm> = vec![];
+  let mut attr_match_list: Vec<Arm> = vec![];
   let mut field_unwrap_list: Vec<TokenStream> = vec![];
   let mut field_init_list: Vec<TokenStream> = vec![];
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  field_match_list.push(
-    parse_str(
-      &quote! {
-        #xmlns_literal => with_xmlns = true,
-      }
-      .to_string(),
-    )
-    .unwrap(),
-  );
 
   for attr in &t.attributes {
     let attr_name_ident: Ident = if attr.property_name.is_empty() {
@@ -293,16 +288,13 @@ fn gen_open_xml_leaf_text_element_fn(
     };
 
     field_declaration_list.push(
-      parse_str(
-        &quote! {
-          let mut #attr_name_ident = None;
-        }
-        .to_string(),
-      )
+      parse2(quote! {
+        let mut #attr_name_ident = None;
+      })
       .unwrap(),
     );
 
-    field_match_list.push(gen_field_match_arm(attr, context));
+    attr_match_list.push(gen_field_match_arm(attr, context));
 
     let mut required = false;
 
@@ -314,7 +306,7 @@ fn gen_open_xml_leaf_text_element_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
       })
     }
 
@@ -324,12 +316,9 @@ fn gen_open_xml_leaf_text_element_fn(
   }
 
   field_declaration_list.push(
-    parse_str(
-      &quote! {
-        let mut child = None;
-      }
-      .to_string(),
-    )
+    parse2(quote! {
+      let mut child = None;
+    })
     .unwrap(),
   );
 
@@ -359,19 +348,16 @@ fn gen_open_xml_leaf_text_element_fn(
     ))
     .unwrap();
 
-    parse_str(
-      &quote! {
-        quick_xml::events::Event::Text(t) => {
-          child = Some(#simple_type_name::from_str(&t.unescape()?)?);
-        }
+    parse2(quote! {
+      quick_xml::events::Event::Text(t) => {
+        child = Some(#simple_type_name::from_str(&t.unescape()?)?);
       }
-      .to_string(),
-    )
+    })
     .unwrap()
   } else {
     let simple_type_str = simple_type_mapping(first_name);
 
-    let token_stream: TokenStream = match simple_type_str {
+    parse2(match simple_type_str {
       "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
       | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
         quick_xml::events::Event::Text(t) => {
@@ -385,7 +371,7 @@ fn gen_open_xml_leaf_text_element_fn(
             {
               "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
               "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(super::deserializers::DeError::UnknownError)?,
+              _ => Err(super::deserializer_common::DeError::UnknownError)?,
             }
           );
         }
@@ -402,40 +388,61 @@ fn gen_open_xml_leaf_text_element_fn(
         }
       }
       _ => panic!("{}", simple_type_str),
-    };
-
-    parse_str(&token_stream.to_string()).unwrap()
+    })
+    .unwrap()
   };
 
-  let token_stream = quote! {
-    pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+  let xmlns_literal: LitByteStr =
+    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
+
+  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        if attr.key.as_ref() == #xmlns_literal {
+          with_xmlns = true
+        }
+      }
+    })
+    .unwrap()
+  } else {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        match attr.key.as_ref() {
+          #( #attr_match_list )*
+          #xmlns_literal => with_xmlns = true,
+          _ => (),
+        }
+      }
+    })
+    .unwrap()
+  };
+
+  parse2(quote! {
+    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializers::DeError> {
+    ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
         if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         #( #field_declaration_list )*
 
-        for attr in e.attributes() {
-          let attr = attr?;
-
-          match attr.key.as_ref() {
-            #( #field_match_list )*
-            _ => (),
-          }
-        }
+        #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializers::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::UnknownError)?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         loop {
@@ -456,7 +463,7 @@ fn gen_open_xml_leaf_text_element_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializers::DeError::UnknownError)?,
+            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
             _ => (),
           }
         }
@@ -467,12 +474,11 @@ fn gen_open_xml_leaf_text_element_fn(
           #( #field_init_list )*
         })
       } else {
-        Err(super::deserializers::DeError::UnknownError)?
+        Err(super::deserializer_common::DeError::UnknownError)?
       }
     }
-  };
-
-  parse_str(&token_stream.to_string()).unwrap()
+  })
+  .unwrap()
 }
 
 fn gen_open_xml_composite_element_fn(
@@ -493,23 +499,10 @@ fn gen_open_xml_composite_element_fn(
   let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
 
   let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut field_match_list: Vec<Arm> = vec![];
+  let mut attr_match_list: Vec<Arm> = vec![];
   let mut field_unwrap_list: Vec<TokenStream> = vec![];
   let mut field_init_list: Vec<TokenStream> = vec![];
   let mut child_ser_match_list: Vec<Arm> = vec![];
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  field_match_list.push(
-    parse_str(
-      &quote! {
-        #xmlns_literal => with_xmlns = true,
-      }
-      .to_string(),
-    )
-    .unwrap(),
-  );
 
   for attr in &t.attributes {
     let attr_name_ident: Ident = if attr.property_name.is_empty() {
@@ -519,16 +512,13 @@ fn gen_open_xml_composite_element_fn(
     };
 
     field_declaration_list.push(
-      parse_str(
-        &quote! {
-          let mut #attr_name_ident = None;
-        }
-        .to_string(),
-      )
+      parse2(quote! {
+        let mut #attr_name_ident = None;
+      })
       .unwrap(),
     );
 
-    field_match_list.push(gen_field_match_arm(attr, context));
+    attr_match_list.push(gen_field_match_arm(attr, context));
 
     let mut required = false;
 
@@ -540,7 +530,7 @@ fn gen_open_xml_composite_element_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
       })
     }
 
@@ -551,12 +541,9 @@ fn gen_open_xml_composite_element_fn(
 
   if !t.children.is_empty() {
     field_declaration_list.push(
-      parse_str(
-        &quote! {
-          let mut children = vec![];
-        }
-        .to_string(),
-      )
+      parse2(quote! {
+        let mut children = vec![];
+      })
       .unwrap(),
     );
 
@@ -618,47 +605,69 @@ fn gen_open_xml_composite_element_fn(
         if with_xmlns {
           match e.name().as_ref() {
             #( #child_ser_match_list )*
-            _ => Err(super::deserializers::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::UnknownError)?,
           }
         } else {
           match e.name().local_name().as_ref() {
             #( #child_de_match_list )*
-            _ => Err(super::deserializers::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::UnknownError)?,
           }
         }
       }
     }
   };
 
-  let token_stream = quote! {
-    pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+  let xmlns_literal: LitByteStr =
+    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
+
+  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        if attr.key.as_ref() == #xmlns_literal {
+          with_xmlns = true
+        }
+      }
+    })
+    .unwrap()
+  } else {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        match attr.key.as_ref() {
+          #( #attr_match_list )*
+          #xmlns_literal => with_xmlns = true,
+          _ => (),
+        }
+      }
+    })
+    .unwrap()
+  };
+
+  parse2(quote! {
+    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializers::DeError> {
+    ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
         if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         #( #field_declaration_list )*
 
-        for attr in e.attributes() {
-          let attr = attr?;
-
-          match attr.key.as_ref() {
-            #( #field_match_list )*
-            _ => (),
-          }
-        }
+        #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializers::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::UnknownError)?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         loop {
@@ -679,7 +688,7 @@ fn gen_open_xml_composite_element_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializers::DeError::UnknownError)?,
+            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
             _ => (),
           }
         }
@@ -690,12 +699,11 @@ fn gen_open_xml_composite_element_fn(
           #( #field_init_list )*
         })
       } else {
-        Err(super::deserializers::DeError::UnknownError)?
+        Err(super::deserializer_common::DeError::UnknownError)?
       }
     }
-  };
-
-  parse_str(&token_stream.to_string()).unwrap()
+  })
+  .unwrap()
 }
 
 fn gen_derived_fn(
@@ -722,23 +730,10 @@ fn gen_derived_fn(
   let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
 
   let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut field_match_list: Vec<Arm> = vec![];
+  let mut attr_match_list: Vec<Arm> = vec![];
   let mut field_unwrap_list: Vec<TokenStream> = vec![];
   let mut field_init_list: Vec<TokenStream> = vec![];
   let mut child_ser_match_list: Vec<Arm> = vec![];
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  field_match_list.push(
-    parse_str(
-      &quote! {
-        #xmlns_literal => with_xmlns = true,
-      }
-      .to_string(),
-    )
-    .unwrap(),
-  );
 
   let mut attributes: Vec<&OpenXmlSchemaTypeAttribute> = vec![];
 
@@ -758,16 +753,13 @@ fn gen_derived_fn(
     };
 
     field_declaration_list.push(
-      parse_str(
-        &quote! {
-          let mut #attr_name_ident = None;
-        }
-        .to_string(),
-      )
+      parse2(quote! {
+        let mut #attr_name_ident = None;
+      })
       .unwrap(),
     );
 
-    field_match_list.push(gen_field_match_arm(attr, context));
+    attr_match_list.push(gen_field_match_arm(attr, context));
 
     let mut required = false;
 
@@ -779,7 +771,7 @@ fn gen_derived_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializers::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
       })
     }
 
@@ -800,12 +792,9 @@ fn gen_derived_fn(
 
   if !children.is_empty() {
     field_declaration_list.push(
-      parse_str(
-        &quote! {
-          let mut children = vec![];
-        }
-        .to_string(),
-      )
+      parse2(quote! {
+        let mut children = vec![];
+      })
       .unwrap(),
     );
 
@@ -867,47 +856,69 @@ fn gen_derived_fn(
         if with_xmlns {
           match e.name().as_ref() {
             #( #child_ser_match_list )*
-            _ => Err(super::deserializers::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::UnknownError)?,
           }
         } else {
           match e.name().local_name().as_ref() {
             #( #child_de_match_list )*
-            _ => Err(super::deserializers::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::UnknownError)?,
           }
         }
       }
     }
   };
 
-  let token_stream = quote! {
-    pub fn deserialize_self<'de, R: super::deserializers::XmlReader<'de>>(
+  let xmlns_literal: LitByteStr =
+    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
+
+  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        if attr.key.as_ref() == #xmlns_literal {
+          with_xmlns = true
+        }
+      }
+    })
+    .unwrap()
+  } else {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        match attr.key.as_ref() {
+          #( #attr_match_list )*
+          #xmlns_literal => with_xmlns = true,
+          _ => (),
+        }
+      }
+    })
+    .unwrap()
+  };
+
+  parse2(quote! {
+    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializers::DeError> {
+    ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
         if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         #( #field_declaration_list )*
 
-        for attr in e.attributes() {
-          let attr = attr?;
-
-          match attr.key.as_ref() {
-            #( #field_match_list )*
-            _ => (),
-          }
-        }
+        #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializers::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::UnknownError)?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializers::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::UnknownError)?;
         }
 
         loop {
@@ -928,7 +939,7 @@ fn gen_derived_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializers::DeError::UnknownError)?,
+            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
             _ => (),
           }
         }
@@ -939,12 +950,11 @@ fn gen_derived_fn(
           #( #field_init_list )*
         })
       } else {
-        Err(super::deserializers::DeError::UnknownError)?
+        Err(super::deserializer_common::DeError::UnknownError)?
       }
     }
-  };
-
-  parse_str(&token_stream.to_string()).unwrap()
+  })
+  .unwrap()
 }
 
 fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) -> Arm {
@@ -963,7 +973,7 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
   let attr_rename_ser_literal: LitByteStr =
     parse_str(&format!("b\"{}\"", attr_rename_ser_str)).unwrap();
 
-  let token_stream: TokenStream = if attr.r#type.starts_with("ListValue<") {
+  parse2(if attr.r#type.starts_with("ListValue<") {
     quote! {
       #attr_rename_ser_literal => {
         #attr_name_ident = Some(
@@ -1035,7 +1045,7 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
             {
               "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
               "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(super::deserializers::DeError::UnknownError)?,
+              _ => Err(super::deserializer_common::DeError::UnknownError)?,
             }
           )
         }
@@ -1057,9 +1067,8 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
       }
       _ => panic!("{}", attr.r#type),
     }
-  };
-
-  parse_str(&token_stream.to_string()).unwrap()
+  })
+  .unwrap()
 }
 
 fn gen_child_match_arm(
@@ -1115,24 +1124,23 @@ fn gen_child_match_arm(
   ))
   .unwrap();
 
-  let ser_token_stream: TokenStream = quote! {
+  let ser_arm: Arm = parse2(quote! {
     #child_rename_ser_literal => {
       children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
         #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
       )));
     }
-  };
+  })
+  .unwrap();
 
-  let de_token_stream: TokenStream = quote! {
+  let de_arm: Arm = parse2(quote! {
     #child_rename_de_literal => {
       children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
         #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
       )));
     }
-  };
+  })
+  .unwrap();
 
-  (
-    parse_str(&ser_token_stream.to_string()).unwrap(),
-    parse_str(&de_token_stream.to_string()).unwrap(),
-  )
+  (ser_arm, de_arm)
 }

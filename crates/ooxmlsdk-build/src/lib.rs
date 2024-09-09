@@ -46,6 +46,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let enum_type_enum_map: HashMap<&str, &OpenXmlSchemaEnum> = HashMap::new();
   let enum_type_namespace_map: HashMap<&str, &OpenXmlNamespace> = HashMap::new();
   let enum_name_enum_map: HashMap<&str, &OpenXmlSchemaEnum> = HashMap::new();
+  let part_name_type_map: HashMap<&str, &OpenXmlSchemaType> = HashMap::new();
 
   for entry in fs::read_dir(data_parts_dir_path).unwrap() {
     let entry = entry.unwrap();
@@ -105,6 +106,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     enum_type_enum_map,
     enum_type_namespace_map,
     enum_name_enum_map,
+    part_name_type_map,
   };
 
   for namespace in context.namespaces.iter() {
@@ -138,6 +140,10 @@ pub fn gen(data_dir: &str, out_dir: &str) {
       context.type_name_namespace_map.insert(&ty.name, namespace);
 
       context.type_base_class_type_map.insert(&ty.class_name, ty);
+
+      if !ty.part.is_empty() {
+        context.part_name_type_map.insert(&ty.part, ty);
+      }
     }
 
     for e in schema.enums.iter() {
@@ -204,7 +210,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   for (i, part) in context.parts.iter().enumerate() {
     let part_mod = &context.part_mods[i];
 
-    let token_stream = gen_open_xml_part(part, &context).unwrap();
+    let token_stream = gen_open_xml_part(part, &context);
 
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);

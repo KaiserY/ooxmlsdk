@@ -165,11 +165,13 @@ fn gen_open_xml_leaf_element_fn(
   let mut field_init_list: Vec<TokenStream> = vec![];
 
   for attr in &t.attributes {
-    let attr_name_ident: Ident = if attr.property_name.is_empty() {
-      parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+    let attr_name_str = if attr.property_name.is_empty() {
+      escape_snake_case(attr.q_name.to_snake_case())
     } else {
-      parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+      escape_snake_case(attr.property_name.to_snake_case())
     };
+
+    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
 
     field_declaration_list.push(quote! {
       let mut #attr_name_ident = None;
@@ -187,7 +189,8 @@ fn gen_open_xml_leaf_element_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident
+          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -239,10 +242,16 @@ fn gen_open_xml_leaf_element_fn(
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::MismatchError {
+              expected: #rename_ser_str.to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::MismatchError {
+            expected: #rename_de_str.to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
         }
 
         #( #field_unwrap_list )*
@@ -281,11 +290,13 @@ fn gen_open_xml_leaf_text_element_fn(
   let mut field_init_list: Vec<TokenStream> = vec![];
 
   for attr in &t.attributes {
-    let attr_name_ident: Ident = if attr.property_name.is_empty() {
-      parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+    let attr_name_str = if attr.property_name.is_empty() {
+      escape_snake_case(attr.q_name.to_snake_case())
     } else {
-      parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+      escape_snake_case(attr.property_name.to_snake_case())
     };
+
+    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
 
     field_declaration_list.push(
       parse2(quote! {
@@ -306,7 +317,8 @@ fn gen_open_xml_leaf_text_element_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident
+          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -429,20 +441,22 @@ fn gen_open_xml_leaf_text_element_fn(
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-        if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
-        }
-
         #( #field_declaration_list )*
 
         #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::MismatchError {
+              expected: #rename_ser_str.to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::MismatchError {
+            expected: #rename_de_str.to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
         }
 
         loop {
@@ -505,11 +519,13 @@ fn gen_open_xml_composite_element_fn(
   let mut child_ser_match_list: Vec<Arm> = vec![];
 
   for attr in &t.attributes {
-    let attr_name_ident: Ident = if attr.property_name.is_empty() {
-      parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+    let attr_name_str = if attr.property_name.is_empty() {
+      escape_snake_case(attr.q_name.to_snake_case())
     } else {
-      parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+      escape_snake_case(attr.property_name.to_snake_case())
     };
+
+    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
 
     field_declaration_list.push(
       parse2(quote! {
@@ -530,7 +546,8 @@ fn gen_open_xml_composite_element_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident
+          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -654,20 +671,22 @@ fn gen_open_xml_composite_element_fn(
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-        if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
-        }
-
         #( #field_declaration_list )*
 
         #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::MismatchError {
+              expected: #rename_ser_str.to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::MismatchError {
+            expected: #rename_de_str.to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
         }
 
         loop {
@@ -746,11 +765,13 @@ fn gen_derived_fn(
   }
 
   for attr in attributes {
-    let attr_name_ident: Ident = if attr.property_name.is_empty() {
-      parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+    let attr_name_str = if attr.property_name.is_empty() {
+      escape_snake_case(attr.q_name.to_snake_case())
     } else {
-      parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+      escape_snake_case(attr.property_name.to_snake_case())
     };
+
+    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
 
     field_declaration_list.push(
       parse2(quote! {
@@ -771,7 +792,8 @@ fn gen_derived_fn(
 
     if required {
       field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+        let #attr_name_ident = #attr_name_ident
+          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -905,20 +927,22 @@ fn gen_derived_fn(
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-        if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
-        }
-
         #( #field_declaration_list )*
 
         #attr_match_stmt
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::UnknownError)?;
+            Err(super::deserializer_common::DeError::MismatchError {
+              expected: #rename_ser_str.to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::MismatchError {
+            expected: #rename_de_str.to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
         }
 
         loop {

@@ -20,6 +20,8 @@ pub enum DeError {
   ParseFloatError(#[from] ParseFloatError),
   #[error("mismatch error (expected {expected:?}, found {found:?})")]
   MismatchError { expected: String, found: String },
+  #[error("`{0}` is missing")]
+  MissingError(String),
   #[error("unknown error")]
   UnknownError,
 }

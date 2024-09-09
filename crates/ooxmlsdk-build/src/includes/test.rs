@@ -111,15 +111,24 @@ impl Sheet {
 
       if with_xmlns {
         if e.name().as_ref() != b"x:sheet" {
-          Err(super::deserializer_common::DeError::UnknownError)?;
+          Err(super::deserializer_common::DeError::MismatchError {
+            expected: "x:sheet".to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
         }
       } else if e.name().local_name().as_ref() != b"sheet" {
-        Err(super::deserializer_common::DeError::UnknownError)?;
+        Err(super::deserializer_common::DeError::MismatchError {
+          expected: "sheet".to_string(),
+          found: String::from_utf8_lossy(e.name().into_inner()).to_string(),
+        })?;
       }
 
-      let name = name.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
-      let sheet_id = sheet_id.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
-      let id = id.ok_or_else(|| super::deserializer_common::DeError::UnknownError)?;
+      let name = name
+        .ok_or_else(|| super::deserializer_common::DeError::MissingError("name".to_string()))?;
+      let sheet_id = sheet_id
+        .ok_or_else(|| super::deserializer_common::DeError::MissingError("sheet_id".to_string()))?;
+      let id =
+        id.ok_or_else(|| super::deserializer_common::DeError::MissingError("id".to_string()))?;
 
       Ok(Self {
         name,

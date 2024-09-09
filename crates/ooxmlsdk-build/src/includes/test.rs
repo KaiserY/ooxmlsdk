@@ -145,8 +145,17 @@ impl Sheet {
 impl Sheets {
   #[allow(clippy::should_implement_trait)]
   pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
-    let mut xml_reader =
-      super::deserializer_common::SliceReader::new(quick_xml::Reader::from_str(s));
+    use crate::includes::deserializer_common::XmlReader;
+
+    let mut xml_reader = quick_xml::Reader::from_str(s);
+
+    xml_reader.config_mut().trim_text(true);
+
+    let mut xml_reader = super::deserializer_common::SliceReader::new(xml_reader);
+
+    if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
+      xml_reader.next()?;
+    }
 
     Self::deserialize_self(&mut xml_reader, false)
   }
@@ -154,8 +163,17 @@ impl Sheets {
   pub fn from_reader<R: std::io::BufRead>(
     reader: R,
   ) -> Result<Self, super::deserializer_common::DeError> {
-    let mut xml_reader =
-      super::deserializer_common::IoReader::new(quick_xml::Reader::from_reader(reader));
+    use crate::includes::deserializer_common::XmlReader;
+
+    let mut xml_reader = quick_xml::Reader::from_reader(reader);
+
+    xml_reader.config_mut().trim_text(true);
+
+    let mut xml_reader = super::deserializer_common::IoReader::new(xml_reader);
+
+    if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
+      xml_reader.next()?;
+    }
 
     Self::deserialize_self(&mut xml_reader, false)
   }
@@ -166,25 +184,37 @@ impl Sheets {
   ) -> Result<Self, super::deserializer_common::DeError> {
     let mut with_xmlns = with_xmlns;
 
-    if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-      let mut children = vec![];
+    let mut empty_tag = false;
 
-      for attr in e.attributes() {
-        let attr = attr?;
+    let e = match xml_reader.next()? {
+      quick_xml::events::Event::Start(e) => e,
+      quick_xml::events::Event::Empty(e) => {
+        empty_tag = true;
 
-        if attr.key.as_ref() == b"xmlns:x" {
-          with_xmlns = true
-        }
+        e
       }
+      _ => Err(super::deserializer_common::DeError::UnknownError)?,
+    };
 
-      if with_xmlns {
-        if e.name().as_ref() != b"x:sheets" {
-          Err(super::deserializer_common::DeError::UnknownError)?;
-        }
-      } else if e.name().local_name().as_ref() != b"sheets" {
+    let mut children = vec![];
+
+    for attr in e.attributes() {
+      let attr = attr?;
+
+      if attr.key.as_ref() == b"xmlns:x" {
+        with_xmlns = true
+      }
+    }
+
+    if with_xmlns {
+      if e.name().as_ref() != b"x:sheets" {
         Err(super::deserializer_common::DeError::UnknownError)?;
       }
+    } else if e.name().local_name().as_ref() != b"sheets" {
+      Err(super::deserializer_common::DeError::UnknownError)?;
+    }
 
+    if !empty_tag {
       loop {
         let peek_event = xml_reader.peek()?;
 
@@ -227,11 +257,9 @@ impl Sheets {
           _ => (),
         }
       }
-
-      Ok(Self { children })
-    } else {
-      Err(super::deserializer_common::DeError::UnknownError)?
     }
+
+    Ok(Self { children })
   }
 }
 

@@ -118,7 +118,17 @@ fn gen_from_str_fn() -> ItemFn {
   let token_stream = quote! {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
-      let mut xml_reader = super::deserializer_common::SliceReader::new(quick_xml::Reader::from_str(s));
+      use crate::deserializers::deserializer_common::XmlReader;
+
+      let mut xml_reader = quick_xml::Reader::from_str(s);
+
+      xml_reader.config_mut().trim_text(true);
+
+      let mut xml_reader = super::deserializer_common::SliceReader::new(xml_reader);
+
+      if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
+        xml_reader.next()?;
+      }
 
       Self::deserialize_self(&mut xml_reader, false)
     }
@@ -132,8 +142,17 @@ fn gen_from_reader_fn() -> ItemFn {
     pub fn from_reader<R: std::io::BufRead>(
       reader: R,
     ) -> Result<Self, super::deserializer_common::DeError> {
-      let mut xml_reader =
-        super::deserializer_common::IoReader::new(quick_xml::Reader::from_reader(reader));
+      use crate::deserializers::deserializer_common::XmlReader;
+
+      let mut xml_reader = quick_xml::Reader::from_reader(reader);
+
+      xml_reader.config_mut().trim_text(true);
+
+      let mut xml_reader = super::deserializer_common::IoReader::new(xml_reader);
+
+      if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
+        xml_reader.next()?;
+      }
 
       Self::deserialize_self(&mut xml_reader, false)
     }
@@ -363,6 +382,8 @@ fn gen_open_xml_leaf_text_element_fn(
     parse2(quote! {
       quick_xml::events::Event::Text(t) => {
         child = Some(#simple_type_name::from_str(&t.unescape()?)?);
+
+        xml_reader.next()?;
       }
     })
     .unwrap()
@@ -374,6 +395,8 @@ fn gen_open_xml_leaf_text_element_fn(
       | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
         quick_xml::events::Event::Text(t) => {
           child = Some(t.unescape()?.to_string());
+
+          xml_reader.next()?;
         }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
@@ -386,6 +409,8 @@ fn gen_open_xml_leaf_text_element_fn(
               _ => Err(super::deserializer_common::DeError::UnknownError)?,
             }
           );
+
+          xml_reader.next()?;
         }
       },
       "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
@@ -396,6 +421,8 @@ fn gen_open_xml_leaf_text_element_fn(
         quote! {
           quick_xml::events::Event::Text(t) => {
             child = Some(t.unescape()?.parse::<#e_type>()?);
+
+            xml_reader.next()?;
           }
         }
       }
@@ -440,25 +467,37 @@ fn gen_open_xml_leaf_text_element_fn(
     ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
-      if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-        #( #field_declaration_list )*
+      let mut empty_tag = false;
 
-        #attr_match_stmt
+      let e = match xml_reader.next()? {
+        quick_xml::events::Event::Start(e) => e,
+        quick_xml::events::Event::Empty(e) => {
+          empty_tag = true;
 
-        if with_xmlns {
-          if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::MismatchError {
-              expected: #rename_ser_str.to_string(),
-              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-            })?;
-          }
-        } else if e.name().local_name().as_ref() != #rename_de_literal {
+          e
+        }
+        _ => Err(super::deserializer_common::DeError::UnknownError)?,
+      };
+
+      #( #field_declaration_list )*
+
+      #attr_match_stmt
+
+      if with_xmlns {
+        if e.name().as_ref() != #rename_ser_literal {
           Err(super::deserializer_common::DeError::MismatchError {
-            expected: #rename_de_str.to_string(),
+            expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
+      } else if e.name().local_name().as_ref() != #rename_de_literal {
+        Err(super::deserializer_common::DeError::MismatchError {
+          expected: #rename_de_str.to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
 
+      if !empty_tag {
         loop {
           let peek_event = xml_reader.peek()?;
 
@@ -481,15 +520,13 @@ fn gen_open_xml_leaf_text_element_fn(
             _ => (),
           }
         }
-
-        #( #field_unwrap_list )*
-
-        Ok(Self {
-          #( #field_init_list )*
-        })
-      } else {
-        Err(super::deserializer_common::DeError::UnknownError)?
       }
+
+      #( #field_unwrap_list )*
+
+      Ok(Self {
+        #( #field_init_list )*
+      })
     }
   })
   .unwrap()
@@ -670,25 +707,37 @@ fn gen_open_xml_composite_element_fn(
     ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
-      if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-        #( #field_declaration_list )*
+      let mut empty_tag = false;
 
-        #attr_match_stmt
+      let e = match xml_reader.next()? {
+        quick_xml::events::Event::Start(e) => e,
+        quick_xml::events::Event::Empty(e) => {
+          empty_tag = true;
 
-        if with_xmlns {
-          if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::MismatchError {
-              expected: #rename_ser_str.to_string(),
-              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-            })?;
-          }
-        } else if e.name().local_name().as_ref() != #rename_de_literal {
+          e
+        }
+        _ => Err(super::deserializer_common::DeError::UnknownError)?,
+      };
+
+      #( #field_declaration_list )*
+
+      #attr_match_stmt
+
+      if with_xmlns {
+        if e.name().as_ref() != #rename_ser_literal {
           Err(super::deserializer_common::DeError::MismatchError {
-            expected: #rename_de_str.to_string(),
+            expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
+      } else if e.name().local_name().as_ref() != #rename_de_literal {
+        Err(super::deserializer_common::DeError::MismatchError {
+          expected: #rename_de_str.to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
 
+      if !empty_tag {
         loop {
           let peek_event = xml_reader.peek()?;
 
@@ -711,15 +760,13 @@ fn gen_open_xml_composite_element_fn(
             _ => (),
           }
         }
-
-        #( #field_unwrap_list )*
-
-        Ok(Self {
-          #( #field_init_list )*
-        })
-      } else {
-        Err(super::deserializer_common::DeError::UnknownError)?
       }
+
+      #( #field_unwrap_list )*
+
+      Ok(Self {
+        #( #field_init_list )*
+      })
     }
   })
   .unwrap()
@@ -926,25 +973,37 @@ fn gen_derived_fn(
     ) -> Result<Self, super::deserializer_common::DeError> {
       let mut with_xmlns = with_xmlns;
 
-      if let quick_xml::events::Event::Start(e) = xml_reader.next()? {
-        #( #field_declaration_list )*
+      let mut empty_tag = false;
 
-        #attr_match_stmt
+      let e = match xml_reader.next()? {
+        quick_xml::events::Event::Start(e) => e,
+        quick_xml::events::Event::Empty(e) => {
+          empty_tag = true;
 
-        if with_xmlns {
-          if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::MismatchError {
-              expected: #rename_ser_str.to_string(),
-              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-            })?;
-          }
-        } else if e.name().local_name().as_ref() != #rename_de_literal {
+          e
+        }
+        _ => Err(super::deserializer_common::DeError::UnknownError)?,
+      };
+
+      #( #field_declaration_list )*
+
+      #attr_match_stmt
+
+      if with_xmlns {
+        if e.name().as_ref() != #rename_ser_literal {
           Err(super::deserializer_common::DeError::MismatchError {
-            expected: #rename_de_str.to_string(),
+            expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
+      } else if e.name().local_name().as_ref() != #rename_de_literal {
+        Err(super::deserializer_common::DeError::MismatchError {
+          expected: #rename_de_str.to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
 
+      if !empty_tag {
         loop {
           let peek_event = xml_reader.peek()?;
 
@@ -967,15 +1026,13 @@ fn gen_derived_fn(
             _ => (),
           }
         }
-
-        #( #field_unwrap_list )*
-
-        Ok(Self {
-          #( #field_init_list )*
-        })
-      } else {
-        Err(super::deserializer_common::DeError::UnknownError)?
       }
+
+      #( #field_unwrap_list )*
+
+      Ok(Self {
+        #( #field_init_list )*
+      })
     }
   })
   .unwrap()

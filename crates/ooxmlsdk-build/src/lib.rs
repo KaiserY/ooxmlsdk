@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use heck::ToSnakeCase;
 use models::OpenXmlSchemaEnum;
 use proc_macro2::TokenStream;
@@ -17,6 +19,9 @@ pub mod gen;
 pub mod includes;
 pub mod models;
 pub mod utils;
+
+// pub mod deserializers;
+// pub mod schemas;
 
 pub fn gen(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
@@ -305,4 +310,63 @@ mod tests {
   fn test_gen() {
     gen("../ooxmlsdk/data", "src");
   }
+
+  //   #[test]
+  //   fn test_1() {
+  //     use crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Endnotes;
+
+  //     let xml = r###"
+  // <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  // <w:endnotes xmlns:ve="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  //     xmlns:o="urn:schemas-microsoft-com:office:office"
+  //     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  //     xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+  //     xmlns:v="urn:schemas-microsoft-com:vml"
+  //     xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  //     xmlns:w10="urn:schemas-microsoft-com:office:word"
+  //     xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  //     xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml">
+  //     <w:endnote w:type="separator" w:id="0">
+  //         <w:p w:rsidR="00EC6052" w:rsidRDefault="00EC6052" w:rsidP="00E7307D">
+  //             <w:pPr>
+  //                 <w:spacing w:line="240" w:lineRule="auto" />
+  //             </w:pPr>
+  //             <w:r>
+  //                 <w:separator />
+  //             </w:r>
+  //         </w:p>
+  //     </w:endnote>
+  //     <w:endnote w:type="continuationSeparator" w:id="1">
+  //         <w:p w:rsidR="00EC6052" w:rsidRDefault="00EC6052" w:rsidP="00E7307D">
+  //             <w:pPr>
+  //                 <w:spacing w:line="240" w:lineRule="auto" />
+  //             </w:pPr>
+  //             <w:r>
+  //                 <w:continuationSeparator />
+  //             </w:r>
+  //         </w:p>
+  //     </w:endnote>
+  //     <w:endnote w:id="2">
+  //         <w:p w:rsidR="00E7307D" w:rsidRDefault="00E7307D">
+  //             <w:pPr>
+  //                 <w:pStyle w:val="EndnoteText" />
+  //             </w:pPr>
+  //             <w:r>
+  //                 <w:rPr>
+  //                     <w:rStyle w:val="EndnoteReference" />
+  //                 </w:rPr>
+  //                 <w:endnoteRef />
+  //             </w:r>
+  //             <w:r>
+  //                 <w:t xml:space="preserve"> Endnotes are typically used for longer notes, they remain endnotes when converted into ebook form, except that they have an additional backlink to make it easy to return to the current position after reading the note.</w:t>
+  //             </w:r>
+  //         </w:p>
+  //     </w:endnote>
+  // </w:endnotes>
+  //       "###.trim();
+
+  //     let value = Endnotes::from_str(xml).unwrap();
+
+  //     println!("{:?}", value);
+  //   }
 }

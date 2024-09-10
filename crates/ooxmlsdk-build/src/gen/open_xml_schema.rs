@@ -6,7 +6,8 @@ use syn::{parse_str, Ident, Type};
 
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
-  OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild,
+  OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
+  OpenXmlSchemaTypeChild,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
@@ -55,40 +56,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
         fields.push(gen_attr(attr, schema_namespace, context));
       }
 
-      let name_list: Vec<&str> = t.name.split('/').collect();
-
-      let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
-
-      let simple_type_name: Type = if let Some(e) = context.enum_type_enum_map.get(first_name) {
-        let e_namespace = context
-          .enum_type_namespace_map
-          .get(e.r#type.as_str())
-          .ok_or(format!("{:?}", e.r#type))
-          .unwrap();
-
-        if e_namespace.prefix != schema_namespace.prefix {
-          let scheme_mod = context
-            .prefix_schema_mod_map
-            .get(e_namespace.prefix.as_str())
-            .ok_or(format!("{:?}", e_namespace.prefix))
-            .unwrap();
-
-          parse_str(&format!(
-            "crate::schemas::{}::{}",
-            scheme_mod,
-            e.name.to_upper_camel_case()
-          ))
-          .unwrap()
-        } else {
-          parse_str(&e.name.to_upper_camel_case()).unwrap()
-        }
-      } else {
-        parse_str(&format!(
-          "crate::schemas::simple_type::{}",
-          simple_type_mapping(first_name)
-        ))
-        .unwrap()
-      };
+      let simple_type_name = gen_child_type(t, schema_namespace, context);
 
       fields.push(quote! {
         pub child: Option<#simple_type_name>,
@@ -149,6 +117,14 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       }
 
       child_choice_enum_option = enum_option;
+
+      if children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
+        let simple_type_name = gen_child_type(base_class_type, schema_namespace, context);
+
+        fields.push(quote! {
+          pub child: Option<#simple_type_name>,
+        });
+      }
     } else {
       panic!("{:?}", t);
     }
@@ -331,4 +307,45 @@ pub fn gen_children(
   });
 
   (field_option, enum_option)
+}
+
+pub fn gen_child_type(
+  t: &OpenXmlSchemaType,
+  schema_namespace: &OpenXmlNamespace,
+  context: &GenContext,
+) -> Type {
+  let name_list: Vec<&str> = t.name.split('/').collect();
+
+  let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
+
+  if let Some(e) = context.enum_type_enum_map.get(first_name) {
+    let e_namespace = context
+      .enum_type_namespace_map
+      .get(e.r#type.as_str())
+      .ok_or(format!("{:?}", e.r#type))
+      .unwrap();
+
+    if e_namespace.prefix != schema_namespace.prefix {
+      let scheme_mod = context
+        .prefix_schema_mod_map
+        .get(e_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", e_namespace.prefix))
+        .unwrap();
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        e.name.to_upper_camel_case()
+      ))
+      .unwrap()
+    } else {
+      parse_str(&e.name.to_upper_camel_case()).unwrap()
+    }
+  } else {
+    parse_str(&format!(
+      "crate::schemas::simple_type::{}",
+      simple_type_mapping(first_name)
+    ))
+    .unwrap()
+  }
 }

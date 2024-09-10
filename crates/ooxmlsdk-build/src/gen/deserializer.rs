@@ -57,7 +57,7 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
         pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
           match s {
             #( #variants )*
-            _ => Err(super::deserializer_common::DeError::UnknownError),
+            _ => Err(super::deserializer_common::DeError::CommonError(s.to_string())),
           }
         }
       }
@@ -166,6 +166,8 @@ fn gen_open_xml_leaf_element_fn(
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
 ) -> ItemFn {
+  let t_name_str = t.class_name.to_upper_camel_case();
+
   let name_list: Vec<&str> = t.name.split('/').collect();
 
   let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
@@ -209,7 +211,7 @@ fn gen_open_xml_leaf_element_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -279,7 +281,7 @@ fn gen_open_xml_leaf_element_fn(
           #( #field_init_list )*
         })
       } else {
-        Err(super::deserializer_common::DeError::UnknownError)?
+        Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?
       }
     }
   })
@@ -291,6 +293,8 @@ fn gen_open_xml_leaf_text_element_fn(
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
 ) -> ItemFn {
+  let t_name_str = t.class_name.to_upper_camel_case();
+
   let name_list: Vec<&str> = t.name.split('/').collect();
 
   let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
@@ -337,7 +341,7 @@ fn gen_open_xml_leaf_text_element_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -359,77 +363,7 @@ fn gen_open_xml_leaf_text_element_fn(
 
   let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
 
-  let child_match_arm: Arm = if let Some(e) = context.enum_type_enum_map.get(first_name) {
-    let e_namespace = context
-      .enum_type_namespace_map
-      .get(e.r#type.as_str())
-      .ok_or(format!("{:?}", e.r#type))
-      .unwrap();
-
-    let scheme_mod = context
-      .prefix_schema_mod_map
-      .get(e_namespace.prefix.as_str())
-      .ok_or(format!("{:?}", e_namespace.prefix))
-      .unwrap();
-
-    let simple_type_name: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      scheme_mod,
-      e.name.to_upper_camel_case()
-    ))
-    .unwrap();
-
-    parse2(quote! {
-      quick_xml::events::Event::Text(t) => {
-        child = Some(#simple_type_name::from_str(&t.unescape()?)?);
-
-        xml_reader.next()?;
-      }
-    })
-    .unwrap()
-  } else {
-    let simple_type_str = simple_type_mapping(first_name);
-
-    parse2(match simple_type_str {
-      "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
-      | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
-        quick_xml::events::Event::Text(t) => {
-          child = Some(t.unescape()?.to_string());
-
-          xml_reader.next()?;
-        }
-      },
-      "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
-        quick_xml::events::Event::Text(t) => {
-          child = Some(
-            match t.unescape()?.as_ref()
-            {
-              "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
-              "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(super::deserializer_common::DeError::UnknownError)?,
-            }
-          );
-
-          xml_reader.next()?;
-        }
-      },
-      "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
-      | "UInt64Value" | "DoubleValue" | "SingleValue" => {
-        let e_type: Type =
-          parse_str(&format!("crate::schemas::simple_type::{}", simple_type_str)).unwrap();
-
-        quote! {
-          quick_xml::events::Event::Text(t) => {
-            child = Some(t.unescape()?.parse::<#e_type>()?);
-
-            xml_reader.next()?;
-          }
-        }
-      }
-      _ => panic!("{}", simple_type_str),
-    })
-    .unwrap()
-  };
+  let child_match_arm = gen_simple_child_match_arm(first_name, context);
 
   let xmlns_literal: LitByteStr =
     parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
@@ -476,7 +410,7 @@ fn gen_open_xml_leaf_text_element_fn(
 
           e
         }
-        _ => Err(super::deserializer_common::DeError::UnknownError)?,
+        _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
       };
 
       #( #field_declaration_list )*
@@ -516,7 +450,7 @@ fn gen_open_xml_leaf_text_element_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
+            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
             _ => (),
           }
         }
@@ -537,6 +471,8 @@ fn gen_open_xml_composite_element_fn(
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
 ) -> ItemFn {
+  let t_name_str = t.class_name.to_upper_camel_case();
+
   let name_list: Vec<&str> = t.name.split('/').collect();
 
   let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
@@ -584,7 +520,7 @@ fn gen_open_xml_composite_element_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -659,12 +595,12 @@ fn gen_open_xml_composite_element_fn(
         if with_xmlns {
           match e.name().as_ref() {
             #( #child_ser_match_list )*
-            _ => Err(super::deserializer_common::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
           }
         } else {
           match e.name().local_name().as_ref() {
             #( #child_de_match_list )*
-            _ => Err(super::deserializer_common::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
           }
         }
       }
@@ -716,7 +652,7 @@ fn gen_open_xml_composite_element_fn(
 
           e
         }
-        _ => Err(super::deserializer_common::DeError::UnknownError)?,
+        _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
       };
 
       #( #field_declaration_list )*
@@ -777,6 +713,8 @@ fn gen_derived_fn(
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
 ) -> ItemFn {
+  let t_name_str = t.class_name.to_upper_camel_case();
+
   let base_class_type = context
     .type_base_class_type_map
     .get(t.base_class.as_str())
@@ -840,7 +778,7 @@ fn gen_derived_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::MissingError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -869,6 +807,17 @@ fn gen_derived_fn(
 
     field_init_list.push(quote! {
       children,
+    });
+  } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut child = None;
+      })
+      .unwrap(),
+    );
+
+    field_init_list.push(quote! {
+      child,
     });
   }
 
@@ -918,19 +867,32 @@ fn gen_derived_fn(
   let child_de_match_list: Vec<Arm> = child_de_match_map.into_values().collect();
 
   let child_match_arm: TokenStream = if children.is_empty() {
-    quote! {}
+    if base_class_type.base_class == "OpenXmlLeafTextElement" {
+      let base_name_list: Vec<&str> = base_class_type.name.split('/').collect();
+
+      let base_first_name = base_name_list
+        .first()
+        .ok_or(format!("{:?}", base_class_type.name))
+        .unwrap();
+
+      let child_match_arm = gen_simple_child_match_arm(base_first_name, context);
+
+      quote! {#child_match_arm}
+    } else {
+      quote! {}
+    }
   } else {
     quote! {
       quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
         if with_xmlns {
           match e.name().as_ref() {
             #( #child_ser_match_list )*
-            _ => Err(super::deserializer_common::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
           }
         } else {
           match e.name().local_name().as_ref() {
             #( #child_de_match_list )*
-            _ => Err(super::deserializer_common::DeError::UnknownError)?,
+            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
           }
         }
       }
@@ -982,7 +944,7 @@ fn gen_derived_fn(
 
           e
         }
-        _ => Err(super::deserializer_common::DeError::UnknownError)?,
+        _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
       };
 
       #( #field_declaration_list )*
@@ -1126,7 +1088,7 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
             {
               "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
               "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(super::deserializer_common::DeError::UnknownError)?,
+              _ => Err(super::deserializer_common::DeError::CommonError(attr.decode_and_unescape_value(xml_reader.decoder())?.to_string()))?,
             }
           )
         }
@@ -1224,4 +1186,78 @@ fn gen_child_match_arm(
   .unwrap();
 
   (ser_arm, de_arm)
+}
+
+fn gen_simple_child_match_arm(first_name: &str, context: &GenContext) -> Arm {
+  if let Some(e) = context.enum_type_enum_map.get(first_name) {
+    let e_namespace = context
+      .enum_type_namespace_map
+      .get(e.r#type.as_str())
+      .ok_or(format!("{:?}", e.r#type))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(e_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", e_namespace.prefix))
+      .unwrap();
+
+    let simple_type_name: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      e.name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    parse2(quote! {
+      quick_xml::events::Event::Text(t) => {
+        child = Some(#simple_type_name::from_str(&t.unescape()?)?);
+
+        xml_reader.next()?;
+      }
+    })
+    .unwrap()
+  } else {
+    let simple_type_str = simple_type_mapping(first_name);
+
+    parse2(match simple_type_str {
+      "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
+      | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
+        quick_xml::events::Event::Text(t) => {
+          child = Some(t.unescape()?.to_string());
+
+          xml_reader.next()?;
+        }
+      },
+      "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
+        quick_xml::events::Event::Text(t) => {
+          child = Some(
+            match t.unescape()?.as_ref()
+            {
+              "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
+              "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
+              _ => Err(super::deserializer_common::DeError::CommonError(t.unescape()?.to_string()))?,
+            }
+          );
+
+          xml_reader.next()?;
+        }
+      },
+      "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
+      | "UInt64Value" | "DoubleValue" | "SingleValue" => {
+        let e_type: Type =
+          parse_str(&format!("crate::schemas::simple_type::{}", simple_type_str)).unwrap();
+
+        quote! {
+          quick_xml::events::Event::Text(t) => {
+            child = Some(t.unescape()?.parse::<#e_type>()?);
+
+            xml_reader.next()?;
+          }
+        }
+      }
+      _ => panic!("{}", simple_type_str),
+    })
+    .unwrap()
+  }
 }

@@ -123,12 +123,12 @@ impl Sheet {
         })?;
       }
 
-      let name = name
-        .ok_or_else(|| super::deserializer_common::DeError::MissingError("name".to_string()))?;
+      let name =
+        name.ok_or_else(|| super::deserializer_common::DeError::CommonError("name".to_string()))?;
       let sheet_id = sheet_id
-        .ok_or_else(|| super::deserializer_common::DeError::MissingError("sheet_id".to_string()))?;
+        .ok_or_else(|| super::deserializer_common::DeError::CommonError("sheet_id".to_string()))?;
       let id =
-        id.ok_or_else(|| super::deserializer_common::DeError::MissingError("id".to_string()))?;
+        id.ok_or_else(|| super::deserializer_common::DeError::CommonError("id".to_string()))?;
 
       Ok(Self {
         name,
@@ -137,7 +137,9 @@ impl Sheet {
         id,
       })
     } else {
-      Err(super::deserializer_common::DeError::UnknownError)?
+      Err(super::deserializer_common::DeError::CommonError(
+        "Sheet".to_string(),
+      ))?
     }
   }
 }

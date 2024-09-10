@@ -140,3 +140,10 @@ pub struct OpenXmlNamespace {
   pub uri: String,
   pub version: String,
 }
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct TypedNamespace {
+  pub prefix: String,
+  pub namespace: String,
+}

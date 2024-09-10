@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::models::{
   OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaEnum, OpenXmlSchemaType,
+  TypedNamespace,
 };
 
 #[derive(Debug)]
@@ -9,6 +10,7 @@ pub struct GenContext<'a> {
   pub parts: Vec<OpenXmlPart>,
   pub schemas: Vec<OpenXmlSchema>,
   pub namespaces: Vec<OpenXmlNamespace>,
+  pub typed_namespaces: Vec<TypedNamespace>,
   pub schema_mods: Vec<String>,
   pub part_mods: Vec<String>,
   pub prefix_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,

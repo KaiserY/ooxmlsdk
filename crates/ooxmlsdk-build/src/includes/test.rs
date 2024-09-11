@@ -42,6 +42,40 @@ impl std::str::FromStr for SheetStateValues {
   }
 }
 
+impl SheetStateValues {
+  #[allow(clippy::inherent_to_string)]
+  pub fn to_string(&self) -> String {
+    match self {
+      Self::Visible => "visible".to_string(),
+      Self::Hidden => "hidden".to_string(),
+      Self::VeryHidden => "veryHidden".to_string(),
+    }
+  }
+}
+
+impl Sheet {
+  #[allow(clippy::inherent_to_string)]
+  pub fn to_string(&self, with_xmlns: bool) -> Result<String, super::serializer_common::SeError> {
+    use std::fmt::Write;
+
+    let mut writer = String::new();
+
+    writer.write_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
+
+    writer.write_char('<')?;
+
+    if with_xmlns {
+      writer.write_str("x:sheet")?;
+    } else {
+      writer.write_str("sheet")?;
+    }
+
+    writer.write_char('<')?;
+
+    Ok(writer)
+  }
+}
+
 impl Sheet {
   #[allow(clippy::should_implement_trait)]
   pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
@@ -141,6 +175,19 @@ impl Sheet {
         "Sheet".to_string(),
       ))?
     }
+  }
+}
+
+impl Sheets {
+  #[allow(clippy::inherent_to_string)]
+  pub fn to_string(&self) -> Result<String, super::serializer_common::SeError> {
+    use std::fmt::Write;
+
+    let mut writer = String::new();
+
+    writer.write_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
+
+    Ok(writer)
   }
 }
 
@@ -267,13 +314,16 @@ impl Sheets {
 
 pub fn gen() {
   let xml = r###"
-<x:sheets xmlns:x="aa"><x:sheet r:id="rId7" name="Sheet1" sheetId="1" /></x:sheets>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sheets><sheet r:id="rId7" name="Sheet1" sheetId="1" /></sheets>
 "###
     .trim();
 
   let value: Sheets = Sheets::from_str(xml).unwrap();
 
   println!("{:?}", value);
+
+  println!("{}", value.to_string().unwrap());
 }
 
 #[cfg(test)]

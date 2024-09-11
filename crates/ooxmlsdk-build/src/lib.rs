@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 
+use gen::serializer::gen_serializer;
 use heck::ToSnakeCase;
 use models::OpenXmlSchemaEnum;
 use proc_macro2::TokenStream;
@@ -27,6 +28,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let out_parts_dir_path = &out_dir_path.join("parts");
   let out_schemas_dir_path = &out_dir_path.join("schemas");
   let out_deserializers_dir_path = &out_dir_path.join("deserializers");
+  let out_serializers_dir_path = &out_dir_path.join("serializers");
 
   let data_dir_path = Path::new(data_dir);
   let data_parts_dir_path = &data_dir_path.join("parts");
@@ -35,6 +37,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   fs::create_dir_all(out_parts_dir_path).unwrap();
   fs::create_dir_all(out_schemas_dir_path).unwrap();
   fs::create_dir_all(out_deserializers_dir_path).unwrap();
+  fs::create_dir_all(out_serializers_dir_path).unwrap();
 
   let mut parts: Vec<OpenXmlPart> = vec![];
   let mut part_mods: Vec<String> = vec![];
@@ -308,6 +311,56 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let deserializers_mod_path = out_deserializers_dir_path.join("mod.rs");
 
   fs::write(deserializers_mod_path, formatted).unwrap();
+
+  let mut serializers_mod_use_list: Vec<ItemMod> = vec![];
+
+  for (i, part) in context.schemas.iter().enumerate() {
+    let schema_mod = &context.schema_mods[i];
+
+    let token_stream = gen_serializer(part, &context);
+
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+
+    let part_path = out_serializers_dir_path.join(format!("{}.rs", schema_mod));
+
+    fs::write(part_path, formatted).unwrap();
+  }
+
+  let token_stream: TokenStream = parse_str(include_str!("includes/serializer_common.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let serializers_mod_path = out_serializers_dir_path.join("serializer_common.rs");
+
+  fs::write(serializers_mod_path, formatted).unwrap();
+
+  for schema_mod in context.schema_mods.iter() {
+    let serializer_mod_ident: Ident = parse_str(schema_mod).unwrap();
+
+    let serializer_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #serializer_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+
+    serializers_mod_use_list.push(serializer_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    pub mod serializer_common;
+    #( #serializers_mod_use_list )*
+  };
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let serializers_mod_path = out_serializers_dir_path.join("mod.rs");
+
+  fs::write(serializers_mod_path, formatted).unwrap();
 }
 
 #[cfg(test)]

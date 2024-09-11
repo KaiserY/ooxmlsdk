@@ -1,14 +1,10 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
-use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type};
 
-use crate::gen::simple_type::simple_type_mapping;
-use crate::models::{
-  OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
-  OpenXmlSchemaTypeChild,
-};
+use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Type};
+
+use crate::models::{OpenXmlSchema, OpenXmlSchemaTypeAttribute};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
 
@@ -81,34 +77,25 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
     ))
     .unwrap();
 
-    let mut attr_writer = quote! {};
+    let name_list: Vec<&str> = t.name.split('/').collect();
 
-    let mut children_writer = quote! {};
+    let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
 
-    let mut end_writer = quote! {};
+    let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
+
+    let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
+    let children_writer = quote! {};
+
+    let end_writer = quote! {};
+
+    let mut variants: Vec<TokenStream> = vec![];
+
+    for attr in &t.attributes {
+      variants.push(gen_attr(attr));
+    }
 
     if t.base_class == "OpenXmlLeafTextElement" {
-      let t_name_str = t.class_name.to_upper_camel_case();
-
-      let name_list: Vec<&str> = t.name.split('/').collect();
-
-      let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-      let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
-
-      let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-      let mut variants: Vec<TokenStream> = vec![];
-
-      for attr in &t.attributes {
-        variants.push(quote! {
-          writer.write_char(' ')?;
-          writer.write_str(#rename_ser_str)?;
-          writer.write_str("=\"")?;
-
-          writer.write_char('"')?;
-        });
-      }
     } else if t.base_class == "OpenXmlLeafElement" {
     } else if t.base_class == "OpenXmlCompositeElement"
       || t.base_class == "CustomXmlElement"
@@ -116,8 +103,21 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       || t.base_class == "SdtElement"
     {
     } else if t.is_derived {
+      let base_class_type = context
+        .type_base_class_type_map
+        .get(t.base_class.as_str())
+        .ok_or(format!("{:?}", t.base_class))
+        .unwrap();
+
+      for attr in &base_class_type.attributes {
+        variants.push(gen_attr(attr));
+      }
     } else {
       panic!("{:?}", t);
+    };
+
+    let attr_writer = quote! {
+      #( #variants )*
     };
 
     token_stream_list.push(
@@ -132,9 +132,9 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             writer.write_char('<')?;
 
             if with_xmlns {
-              writer.write_str("x:sheet")?;
+              writer.write_str(#rename_ser_str)?;
             } else {
-              writer.write_str("sheet")?;
+              writer.write_str(#rename_de_str)?;
             }
 
             #attr_writer
@@ -155,5 +155,47 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
 
   quote! {
     #( #token_stream_list )*
+  }
+}
+
+pub fn gen_attr(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
+  let attr_rename_ser_str = if attr.q_name.starts_with(':') {
+    &attr.q_name[1..attr.q_name.len()]
+  } else {
+    &attr.q_name
+  };
+
+  let attr_name_ident: Ident = if attr.property_name.is_empty() {
+    parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+  } else {
+    parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+  };
+
+  let mut required = false;
+
+  for validator in &attr.validators {
+    if validator.name == "RequiredValidator" {
+      required = true;
+    }
+  }
+
+  if required {
+    quote! {
+      writer.write_char(' ')?;
+      writer.write_str(#attr_rename_ser_str)?;
+      writer.write_str("=\"")?;
+      writer.write_str(&quick_xml::escape::escape(&self.#attr_name_ident.to_string()))?;
+      writer.write_char('"')?;
+    }
+  } else {
+    quote! {
+      if let Some(#attr_name_ident) = &self.#attr_name_ident {
+        writer.write_char(' ')?;
+        writer.write_str(#attr_rename_ser_str)?;
+        writer.write_str("=\"")?;
+        writer.write_str(&quick_xml::escape::escape(&#attr_name_ident.to_string()))?;
+        writer.write_char('"')?;
+      }
+    }
   }
 }

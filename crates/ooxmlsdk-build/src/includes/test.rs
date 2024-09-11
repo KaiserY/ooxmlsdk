@@ -70,6 +70,12 @@ impl Sheet {
       writer.write_str("sheet")?;
     }
 
+    writer.write_str(&quick_xml::escape::escape(&self.sheet_id.to_string()))?;
+
+    if let Some(state) = &self.state {
+      writer.write_str(&quick_xml::escape::escape(&state.to_string()))?;
+    }
+
     writer.write_char('<')?;
 
     Ok(writer)

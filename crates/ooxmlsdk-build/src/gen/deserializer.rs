@@ -1027,24 +1027,33 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
       }
     }
   } else if attr.r#type.starts_with("EnumValue<") {
-    let type_list: Vec<&str> = attr.r#type.split('.').collect();
+    let e_typed_namespace_str =
+      &attr.r#type[attr.r#type.find("<").unwrap() + 1..attr.r#type.rfind(".").unwrap()];
 
-    let enum_name = type_list
-      .last()
-      .ok_or(format!("{:?}", attr.r#type))
-      .unwrap();
-    let enum_name = &enum_name[0..enum_name.len() - 1];
+    let enum_name = &attr.r#type[attr.r#type.rfind(".").unwrap() + 1..attr.r#type.len() - 1];
 
-    let e = context
-      .enum_name_enum_map
-      .get(enum_name)
-      .ok_or(format!("{:?}", enum_name))
-      .unwrap();
+    let mut e_prefix = "";
+
+    for typed_namespace in &context.typed_namespaces {
+      if e_typed_namespace_str == typed_namespace.namespace {
+        let e_schema = context
+          .prefix_schema_map
+          .get(typed_namespace.prefix.as_str())
+          .ok_or(format!("{:?}", typed_namespace))
+          .unwrap();
+
+        for e in &e_schema.enums {
+          if e.name == enum_name {
+            e_prefix = &typed_namespace.prefix;
+          }
+        }
+      }
+    }
 
     let e_namespace = context
-      .enum_type_namespace_map
-      .get(e.r#type.as_str())
-      .ok_or(format!("{:?}", e.r#type))
+      .prefix_namespace_map
+      .get(e_prefix)
+      .ok_or(format!("{:?}", e_prefix))
       .unwrap();
 
     let scheme_mod = context
@@ -1056,7 +1065,7 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
     let e_type: Type = parse_str(&format!(
       "crate::schemas::{}::{}",
       scheme_mod,
-      e.name.to_upper_camel_case()
+      enum_name.to_upper_camel_case()
     ))
     .unwrap();
 

@@ -22,9 +22,6 @@ pub mod includes;
 pub mod models;
 pub mod utils;
 
-// pub mod deserializers;
-// pub mod schemas;
-
 pub fn gen(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
   let out_parts_dir_path = &out_dir_path.join("parts");
@@ -54,6 +51,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let enum_type_namespace_map: HashMap<&str, &OpenXmlNamespace> = HashMap::new();
   let enum_name_enum_map: HashMap<&str, &OpenXmlSchemaEnum> = HashMap::new();
   let part_name_type_map: HashMap<&str, &OpenXmlSchemaType> = HashMap::new();
+  let prefix_schema_map: HashMap<&str, &OpenXmlSchema> = HashMap::new();
 
   for entry in fs::read_dir(data_parts_dir_path).unwrap() {
     let entry = entry.unwrap();
@@ -119,6 +117,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     enum_type_namespace_map,
     enum_name_enum_map,
     part_name_type_map,
+    prefix_schema_map,
   };
 
   for namespace in context.namespaces.iter() {
@@ -165,6 +164,8 @@ pub fn gen(data_dir: &str, out_dir: &str) {
 
       context.enum_name_enum_map.insert(&e.name, e);
     }
+
+    context.prefix_schema_map.insert(&namespace.prefix, schema);
   }
 
   let mut schemas_mod_use_list: Vec<ItemMod> = vec![];
@@ -317,18 +318,4 @@ mod tests {
   fn test_gen() {
     gen("../ooxmlsdk/data", "src");
   }
-
-  //   #[test]
-  //   fn test_1() {
-  //     use crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document;
-
-  //     let xml = r###"
-  // <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-
-  //         "###.trim();
-
-  //     let value = Document::from_str(xml).unwrap();
-
-  //     println!("{:?}", value);
-  //   }
 }

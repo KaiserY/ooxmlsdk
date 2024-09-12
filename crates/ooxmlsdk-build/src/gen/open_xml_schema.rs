@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{parse_str, Ident, Type};
+use syn::{parse2, parse_str, Ident, ItemEnum, Type, Variant};
 
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
@@ -24,7 +24,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
   for e in &schema.enums {
     let e_enum_name_ident: Ident = parse_str(&e.name.to_upper_camel_case()).unwrap();
 
-    let mut variants: Vec<TokenStream> = vec![];
+    let mut variants: Vec<Variant> = vec![];
 
     for facet in &e.facets {
       let variant_ident: Ident = if facet.name.is_empty() {
@@ -33,15 +33,18 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
         parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
       };
 
-      variants.push(quote! {
-        #variant_ident,
-      })
+      variants.push(
+        parse2(quote! {
+          #variant_ident
+        })
+        .unwrap(),
+      )
     }
 
     token_stream_list.push(quote! {
       #[derive(Clone, Debug)]
       pub enum #e_enum_name_ident {
-        #( #variants )*
+        #( #variants, )*
       }
     })
   }
@@ -49,7 +52,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
   for t in &schema.types {
     let mut fields: Vec<TokenStream> = vec![];
 
-    let mut child_choice_enum_option: Option<TokenStream> = None;
+    let mut child_choice_enum_option: Option<ItemEnum> = None;
 
     if t.base_class == "OpenXmlLeafTextElement" {
       for attr in &t.attributes {
@@ -249,7 +252,7 @@ pub fn gen_children(
   children: &Vec<OpenXmlSchemaTypeChild>,
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
-) -> (Option<TokenStream>, Option<TokenStream>) {
+) -> (Option<TokenStream>, Option<ItemEnum>) {
   if children.is_empty() {
     return (None, None);
   }
@@ -308,12 +311,15 @@ pub fn gen_children(
     });
   }
 
-  let enum_option = Some(quote! {
-    #[derive(Clone, Debug)]
-    pub enum #child_choice_enum_ident {
-      #( #variants )*
-    }
-  });
+  let enum_option = Some(
+    parse2(quote! {
+      #[derive(Clone, Debug)]
+      pub enum #child_choice_enum_ident {
+        #( #variants )*
+      }
+    })
+    .unwrap(),
+  );
 
   (field_option, enum_option)
 }

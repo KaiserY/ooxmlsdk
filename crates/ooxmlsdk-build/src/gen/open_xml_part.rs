@@ -1,17 +1,19 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, parse_str, Ident, ItemStruct, Type};
+use syn::{parse2, parse_str, Ident, ItemFn, ItemImpl, ItemStruct, Type};
 
 use crate::models::OpenXmlPart;
 use crate::GenContext;
 
 pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStream {
-  let mut token_stream_list: Vec<ItemStruct> = vec![];
-
   let struct_name_ident: Ident = parse_str(&part.name.to_upper_camel_case()).unwrap();
 
   let mut fields: Vec<TokenStream> = vec![];
+
+  fields.push(quote! {
+    pub path: String,
+  });
 
   if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
     let root_element_type_namespace = context
@@ -35,7 +37,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     fields.push(quote! {
       pub root_element: std::boxed::Box<#field_type>,
-    })
+    });
   }
 
   for child in &part.children {
@@ -67,17 +69,31 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     }
   }
 
-  token_stream_list.push(
-    parse2(quote! {
-      #[derive(Clone, Debug)]
-      pub struct #struct_name_ident {
-        #( #fields )*
-      }
-    })
-    .unwrap(),
-  );
+  let part_struct: ItemStruct = parse2(quote! {
+    #[derive(Clone, Debug)]
+    pub struct #struct_name_ident {
+      #( #fields )*
+    }
+  })
+  .unwrap();
+
+  let part_new_fn: ItemFn = parse2(quote! {
+    pub fn new(_path: &str) -> Result<Self, crate::common::SdkError> {
+      Err(crate::common::SdkError::UnknownError)
+    }
+  })
+  .unwrap();
+
+  let part_impl: ItemImpl = parse2(quote! {
+    impl #struct_name_ident {
+      #part_new_fn
+    }
+  })
+  .unwrap();
 
   quote! {
-    #( #token_stream_list )*
+    #part_struct
+
+    #part_impl
   }
 }

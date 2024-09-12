@@ -278,7 +278,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       parse2(quote! {
         impl #struct_type {
           #[allow(clippy::inherent_to_string)]
-          pub fn to_string(&self, with_xmlns: bool) -> Result<String, super::serializer_common::SeError> {
+          pub fn to_string(&self, with_xmlns: bool) -> Result<String, crate::common::SdkError> {
             use std::fmt::Write;
 
             let mut writer = String::new();

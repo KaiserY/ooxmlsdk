@@ -9,7 +9,7 @@ use std::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum DeError {
+pub enum SdkError {
   #[error("quick_xml error")]
   QuickXmlError(#[from] quick_xml::Error),
   #[error("quick_xml attr error")]
@@ -18,6 +18,8 @@ pub enum DeError {
   ParseIntError(#[from] ParseIntError),
   #[error("ParseFloatError")]
   ParseFloatError(#[from] ParseFloatError),
+  #[error("StdFmtError")]
+  StdFmtError(#[from] std::fmt::Error),
   #[error("mismatch error (expected {expected:?}, found {found:?})")]
   MismatchError { expected: String, found: String },
   #[error("`{0}` common error")]
@@ -27,9 +29,9 @@ pub enum DeError {
 }
 
 pub trait XmlReader<'de> {
-  fn next(&mut self) -> Result<Event<'de>, DeError>;
+  fn next(&mut self) -> Result<Event<'de>, SdkError>;
 
-  fn peek(&mut self) -> Result<&Event<'de>, DeError>;
+  fn peek(&mut self) -> Result<&Event<'de>, SdkError>;
 
   fn decoder(&self) -> Decoder;
 }
@@ -51,7 +53,7 @@ impl<'de, R: BufRead> IoReader<'de, R> {
 }
 
 impl<'de, R: BufRead> XmlReader<'de> for IoReader<'de, R> {
-  fn next(&mut self) -> Result<Event<'de>, DeError> {
+  fn next(&mut self) -> Result<Event<'de>, SdkError> {
     if let Some(e) = self.peek.take() {
       return Ok(e);
     }
@@ -63,14 +65,14 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<'de, R> {
     Ok(event.into_owned())
   }
 
-  fn peek(&mut self) -> Result<&Event<'de>, DeError> {
+  fn peek(&mut self) -> Result<&Event<'de>, SdkError> {
     if self.peek.is_none() {
       self.peek = Some(self.next()?);
     }
 
     match self.peek.as_ref() {
       Some(v) => Ok(v),
-      None => Err(DeError::UnknownError),
+      None => Err(SdkError::UnknownError),
     }
   }
 
@@ -91,7 +93,7 @@ impl<'de> SliceReader<'de> {
 }
 
 impl<'de> XmlReader<'de> for SliceReader<'de> {
-  fn next(&mut self) -> Result<Event<'de>, DeError> {
+  fn next(&mut self) -> Result<Event<'de>, SdkError> {
     if let Some(e) = self.peek.take() {
       return Ok(e);
     }
@@ -101,14 +103,14 @@ impl<'de> XmlReader<'de> for SliceReader<'de> {
     Ok(event.into_owned())
   }
 
-  fn peek(&mut self) -> Result<&Event<'de>, DeError> {
+  fn peek(&mut self) -> Result<&Event<'de>, SdkError> {
     if self.peek.is_none() {
       self.peek = Some(self.next()?);
     }
 
     match self.peek.as_ref() {
       Some(v) => Ok(v),
-      None => Err(DeError::UnknownError),
+      None => Err(SdkError::UnknownError),
     }
   }
 

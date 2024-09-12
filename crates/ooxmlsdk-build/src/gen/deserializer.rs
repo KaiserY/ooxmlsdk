@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse2, parse_str, Arm, Ident, ItemFn, LitByteStr, Stmt, Type};
+use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type};
 
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
@@ -13,7 +13,7 @@ use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
 
 pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
-  let mut token_stream_list: Vec<TokenStream> = vec![];
+  let mut token_stream_list: Vec<ItemImpl> = vec![];
 
   let schema_namespace = context
     .uri_namespace_map
@@ -51,17 +51,20 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
       })
     }
 
-    token_stream_list.push(quote! {
-      impl #enum_type {
-        #[allow(clippy::should_implement_trait)]
-        pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
-          match s {
-            #( #variants )*
-            _ => Err(super::deserializer_common::DeError::CommonError(s.to_string())),
+    token_stream_list.push(
+      parse2(quote! {
+        impl #enum_type {
+          #[allow(clippy::should_implement_trait)]
+          pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
+            match s {
+              #( #variants )*
+              _ => Err(crate::common::SdkError::CommonError(s.to_string())),
+            }
           }
         }
-      }
-    })
+      })
+      .unwrap(),
+    )
   }
 
   let from_str_fn = gen_from_str_fn();
@@ -96,17 +99,18 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
       panic!("{:?}", t);
     };
 
-    let output = quote! {
-      impl #struct_type {
-        #from_str_fn
+    token_stream_list.push(
+      parse2(quote! {
+        impl #struct_type {
+          #from_str_fn
 
-        #from_reader_fn
+          #from_reader_fn
 
-        #deserialize_self_fn
-      }
-    };
-
-    token_stream_list.push(output);
+          #deserialize_self_fn
+        }
+      })
+      .unwrap(),
+    );
   }
 
   quote! {
@@ -117,14 +121,14 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 fn gen_from_str_fn() -> ItemFn {
   let token_stream = quote! {
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Result<Self, super::deserializer_common::DeError> {
-      use crate::deserializers::deserializer_common::XmlReader;
+    pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
+      use crate::common::XmlReader;
 
       let mut xml_reader = quick_xml::Reader::from_str(s);
 
       xml_reader.config_mut().trim_text(true);
 
-      let mut xml_reader = super::deserializer_common::SliceReader::new(xml_reader);
+      let mut xml_reader = crate::common::SliceReader::new(xml_reader);
 
       if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
         xml_reader.next()?;
@@ -141,14 +145,14 @@ fn gen_from_reader_fn() -> ItemFn {
   let token_stream = quote! {
     pub fn from_reader<R: std::io::BufRead>(
       reader: R,
-    ) -> Result<Self, super::deserializer_common::DeError> {
-      use crate::deserializers::deserializer_common::XmlReader;
+    ) -> Result<Self, crate::common::SdkError> {
+      use crate::common::XmlReader;
 
       let mut xml_reader = quick_xml::Reader::from_reader(reader);
 
       xml_reader.config_mut().trim_text(true);
 
-      let mut xml_reader = super::deserializer_common::IoReader::new(xml_reader);
+      let mut xml_reader = crate::common::IoReader::new(xml_reader);
 
       if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
         xml_reader.next()?;
@@ -211,7 +215,7 @@ fn gen_open_xml_leaf_element_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -250,10 +254,10 @@ fn gen_open_xml_leaf_element_fn(
   };
 
   parse2(quote! {
-    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
+    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializer_common::DeError> {
+    ) -> Result<Self, crate::common::SdkError> {
       let mut with_xmlns = with_xmlns;
 
       if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
@@ -263,13 +267,13 @@ fn gen_open_xml_leaf_element_fn(
 
         if with_xmlns {
           if e.name().as_ref() != #rename_ser_literal {
-            Err(super::deserializer_common::DeError::MismatchError {
+            Err(crate::common::SdkError::MismatchError {
               expected: #rename_ser_str.to_string(),
               found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
             })?;
           }
         } else if e.name().local_name().as_ref() != #rename_de_literal {
-          Err(super::deserializer_common::DeError::MismatchError {
+          Err(crate::common::SdkError::MismatchError {
             expected: #rename_de_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
@@ -281,7 +285,7 @@ fn gen_open_xml_leaf_element_fn(
           #( #field_init_list )*
         })
       } else {
-        Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?
+        Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?
       }
     }
   })
@@ -341,7 +345,7 @@ fn gen_open_xml_leaf_text_element_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -395,10 +399,10 @@ fn gen_open_xml_leaf_text_element_fn(
   };
 
   parse2(quote! {
-    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
+    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializer_common::DeError> {
+    ) -> Result<Self, crate::common::SdkError> {
       let mut with_xmlns = with_xmlns;
 
       let mut empty_tag = false;
@@ -410,7 +414,7 @@ fn gen_open_xml_leaf_text_element_fn(
 
           e
         }
-        _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
       };
 
       #( #field_declaration_list )*
@@ -419,13 +423,13 @@ fn gen_open_xml_leaf_text_element_fn(
 
       if with_xmlns {
         if e.name().as_ref() != #rename_ser_literal {
-          Err(super::deserializer_common::DeError::MismatchError {
+          Err(crate::common::SdkError::MismatchError {
             expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
       } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(super::deserializer_common::DeError::MismatchError {
+        Err(crate::common::SdkError::MismatchError {
           expected: #rename_de_str.to_string(),
           found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
         })?;
@@ -450,7 +454,7 @@ fn gen_open_xml_leaf_text_element_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+            quick_xml::events::Event::Eof => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
             _ => (),
           }
         }
@@ -520,7 +524,7 @@ fn gen_open_xml_composite_element_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -595,12 +599,12 @@ fn gen_open_xml_composite_element_fn(
         if with_xmlns {
           match e.name().as_ref() {
             #( #child_ser_match_list )*
-            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
           }
         } else {
           match e.name().local_name().as_ref() {
             #( #child_de_match_list )*
-            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
           }
         }
       }
@@ -637,10 +641,10 @@ fn gen_open_xml_composite_element_fn(
   };
 
   parse2(quote! {
-    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
+    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializer_common::DeError> {
+    ) -> Result<Self, crate::common::SdkError> {
       let mut with_xmlns = with_xmlns;
 
       let mut empty_tag = false;
@@ -652,7 +656,7 @@ fn gen_open_xml_composite_element_fn(
 
           e
         }
-        _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
       };
 
       #( #field_declaration_list )*
@@ -661,13 +665,13 @@ fn gen_open_xml_composite_element_fn(
 
       if with_xmlns {
         if e.name().as_ref() != #rename_ser_literal {
-          Err(super::deserializer_common::DeError::MismatchError {
+          Err(crate::common::SdkError::MismatchError {
             expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
       } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(super::deserializer_common::DeError::MismatchError {
+        Err(crate::common::SdkError::MismatchError {
           expected: #rename_de_str.to_string(),
           found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
         })?;
@@ -692,7 +696,7 @@ fn gen_open_xml_composite_element_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
+            quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
             _ => (),
           }
         }
@@ -778,7 +782,7 @@ fn gen_derived_fn(
     if required {
       field_unwrap_list.push(quote! {
         let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| super::deserializer_common::DeError::CommonError(#attr_name_str.to_string()))?;
+          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
       })
     }
 
@@ -887,12 +891,12 @@ fn gen_derived_fn(
         if with_xmlns {
           match e.name().as_ref() {
             #( #child_ser_match_list )*
-            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
           }
         } else {
           match e.name().local_name().as_ref() {
             #( #child_de_match_list )*
-            _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
           }
         }
       }
@@ -929,10 +933,10 @@ fn gen_derived_fn(
   };
 
   parse2(quote! {
-    pub fn deserialize_self<'de, R: super::deserializer_common::XmlReader<'de>>(
+    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
       xml_reader: &mut R,
       with_xmlns: bool,
-    ) -> Result<Self, super::deserializer_common::DeError> {
+    ) -> Result<Self, crate::common::SdkError> {
       let mut with_xmlns = with_xmlns;
 
       let mut empty_tag = false;
@@ -944,7 +948,7 @@ fn gen_derived_fn(
 
           e
         }
-        _ => Err(super::deserializer_common::DeError::CommonError(#t_name_str.to_string()))?,
+        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
       };
 
       #( #field_declaration_list )*
@@ -953,13 +957,13 @@ fn gen_derived_fn(
 
       if with_xmlns {
         if e.name().as_ref() != #rename_ser_literal {
-          Err(super::deserializer_common::DeError::MismatchError {
+          Err(crate::common::SdkError::MismatchError {
             expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
       } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(super::deserializer_common::DeError::MismatchError {
+        Err(crate::common::SdkError::MismatchError {
           expected: #rename_de_str.to_string(),
           found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
         })?;
@@ -984,7 +988,7 @@ fn gen_derived_fn(
                 break;
               }
             }
-            quick_xml::events::Event::Eof => Err(super::deserializer_common::DeError::UnknownError)?,
+            quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
             _ => (),
           }
         }
@@ -1097,7 +1101,7 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) 
             {
               "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
               "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(super::deserializer_common::DeError::CommonError(attr.decode_and_unescape_value(xml_reader.decoder())?.to_string()))?,
+              _ => Err(crate::common::SdkError::CommonError(attr.decode_and_unescape_value(xml_reader.decoder())?.to_string()))?,
             }
           )
         }
@@ -1245,7 +1249,7 @@ fn gen_simple_child_match_arm(first_name: &str, context: &GenContext) -> Arm {
             {
               "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
               "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(super::deserializer_common::DeError::CommonError(t.unescape()?.to_string()))?,
+              _ => Err(crate::common::SdkError::CommonError(t.unescape()?.to_string()))?,
             }
           );
 

@@ -5,13 +5,13 @@ members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.61"
 authors = ["KaiserY"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/KaiserY/ooxmlsdk"
 description = "Open XML SDK for Rust"
 keywords = ["xml", "office", "docx", "pptx", "xlsx"]
-categories = ["compilers"]
+categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]

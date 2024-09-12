@@ -1,7 +1,7 @@
 pub fn escape_snake_case(name: String) -> String {
   match name.as_str() {
     "if" | "else" | "ref" | "type" | "macro" | "loop" | "mod" | "override" | "for" | "in"
-    | "final" => {
+    | "box" | "final" => {
       format!("r#{}", name)
     }
     _ => name,

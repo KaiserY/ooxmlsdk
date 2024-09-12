@@ -16,4 +16,4 @@ quick-xml = { workspace = true }
 thiserror = { workspace = true }
 
 [build-dependencies]
-ooxmlsdk-build = { workspace = true }
+ooxmlsdk-build = "0.1.0"

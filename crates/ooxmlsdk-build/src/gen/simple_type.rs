@@ -91,6 +91,6 @@ pub fn simple_type_mapping(name: &str) -> &str {
     "xfpb:CT_BoolFeatureProperty" => "BooleanValue",
     "xfpb:CT_DecimalFeatureProperty" => "DoubleValue",
     "xfpb:CT_RelFeatureProperty" => "StringValue",
-    _ => "StringValue", // FIXME: e.g. MoveWithCells
+    _ => name,
   }
 }

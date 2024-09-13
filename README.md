@@ -10,6 +10,11 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 - All Rust structs and ser/de code are generated from metadata (`crates/ooxmlsdk/data`)
 - Documentation for Rust structs
 
+## What's missing
+
+- No validation
+- No Particle: all xml children is in a flattern `children` vector of enum
+
 ## Project Structure
 
 - `crates/ooxmlsdk`: generated code for deserialize & serialize OOXML

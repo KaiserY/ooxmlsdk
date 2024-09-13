@@ -11,9 +11,15 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let mut fields: Vec<TokenStream> = vec![];
 
-  fields.push(quote! {
-    pub path: String,
-  });
+  if part.base != "OpenXmlPackage" {
+    fields.push(quote! {
+      pub inner_path: String,
+    });
+
+    fields.push(quote! {
+      pub outer_path: String,
+    });
+  }
 
   if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
     let root_element_type_namespace = context
@@ -84,7 +90,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   })
   .unwrap();
 
-  let part_impl: ItemImpl = parse2(quote! {
+  let _part_impl: ItemImpl = parse2(quote! {
     impl #struct_name_ident {
       #part_new_fn
     }
@@ -93,7 +99,5 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   quote! {
     #part_struct
-
-    #part_impl
   }
 }

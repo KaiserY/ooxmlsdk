@@ -35,7 +35,7 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     ))
     .unwrap();
 
-    let mut variants: Vec<TokenStream> = vec![];
+    let mut variants: Vec<Arm> = vec![];
 
     for facet in &e.facets {
       let variant_rename = &facet.value;
@@ -46,9 +46,12 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
         parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
       };
 
-      variants.push(quote! {
-        #variant_rename => Ok(Self::#variant_ident),
-      })
+      variants.push(
+        parse2(quote! {
+          #variant_rename => Ok(Self::#variant_ident),
+        })
+        .unwrap(),
+      )
     }
 
     token_stream_list.push(
@@ -184,10 +187,10 @@ fn gen_open_xml_leaf_element_fn(
 
   let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
 
-  let mut field_declaration_list: Vec<TokenStream> = vec![];
+  let mut field_declaration_list: Vec<Stmt> = vec![];
   let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<TokenStream> = vec![];
-  let mut field_init_list: Vec<TokenStream> = vec![];
+  let mut field_unwrap_list: Vec<Stmt> = vec![];
+  let mut field_init_list: Vec<Ident> = vec![];
 
   for attr in &t.attributes {
     let attr_name_str = if attr.property_name.is_empty() {
@@ -198,9 +201,12 @@ fn gen_open_xml_leaf_element_fn(
 
     let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
 
-    field_declaration_list.push(quote! {
-      let mut #attr_name_ident = None;
-    });
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut #attr_name_ident = None;
+      })
+      .unwrap(),
+    );
 
     attr_match_list.push(gen_field_match_arm(attr, context));
 
@@ -213,15 +219,16 @@ fn gen_open_xml_leaf_element_fn(
     }
 
     if required {
-      field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-      })
+      field_unwrap_list.push(
+        parse2(quote! {
+          let #attr_name_ident = #attr_name_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
+        })
+        .unwrap(),
+      )
     }
 
-    field_init_list.push(quote! {
-      #attr_name_ident,
-    })
+    field_init_list.push(attr_name_ident);
   }
 
   let xmlns_literal: LitByteStr =
@@ -282,7 +289,7 @@ fn gen_open_xml_leaf_element_fn(
         #( #field_unwrap_list )*
 
         Ok(Self {
-          #( #field_init_list )*
+          #( #field_init_list, )*
         })
       } else {
         Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?
@@ -313,8 +320,8 @@ fn gen_open_xml_leaf_text_element_fn(
 
   let mut field_declaration_list: Vec<Stmt> = vec![];
   let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<TokenStream> = vec![];
-  let mut field_init_list: Vec<TokenStream> = vec![];
+  let mut field_unwrap_list: Vec<Stmt> = vec![];
+  let mut field_init_list: Vec<Ident> = vec![];
 
   for attr in &t.attributes {
     let attr_name_str = if attr.property_name.is_empty() {
@@ -343,15 +350,16 @@ fn gen_open_xml_leaf_text_element_fn(
     }
 
     if required {
-      field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-      })
+      field_unwrap_list.push(
+        parse2(quote! {
+          let #attr_name_ident = #attr_name_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
+        })
+        .unwrap(),
+      )
     }
 
-    field_init_list.push(quote! {
-      #attr_name_ident,
-    })
+    field_init_list.push(attr_name_ident)
   }
 
   field_declaration_list.push(
@@ -361,9 +369,12 @@ fn gen_open_xml_leaf_text_element_fn(
     .unwrap(),
   );
 
-  field_init_list.push(quote! {
-    child,
-  });
+  field_init_list.push(
+    parse2(quote! {
+      child
+    })
+    .unwrap(),
+  );
 
   let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
 
@@ -463,7 +474,7 @@ fn gen_open_xml_leaf_text_element_fn(
       #( #field_unwrap_list )*
 
       Ok(Self {
-        #( #field_init_list )*
+        #( #field_init_list, )*
       })
     }
   })
@@ -491,8 +502,8 @@ fn gen_open_xml_composite_element_fn(
 
   let mut field_declaration_list: Vec<Stmt> = vec![];
   let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<TokenStream> = vec![];
-  let mut field_init_list: Vec<TokenStream> = vec![];
+  let mut field_unwrap_list: Vec<Stmt> = vec![];
+  let mut field_init_list: Vec<Ident> = vec![];
   let mut child_ser_match_list: Vec<Arm> = vec![];
 
   for attr in &t.attributes {
@@ -522,15 +533,16 @@ fn gen_open_xml_composite_element_fn(
     }
 
     if required {
-      field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-      })
+      field_unwrap_list.push(
+        parse2(quote! {
+          let #attr_name_ident = #attr_name_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
+        })
+        .unwrap(),
+      );
     }
 
-    field_init_list.push(quote! {
-      #attr_name_ident,
-    })
+    field_init_list.push(attr_name_ident);
   }
 
   if !t.children.is_empty() {
@@ -541,9 +553,12 @@ fn gen_open_xml_composite_element_fn(
       .unwrap(),
     );
 
-    field_init_list.push(quote! {
-      children,
-    });
+    field_init_list.push(
+      parse2(quote! {
+        children
+      })
+      .unwrap(),
+    );
   }
 
   let scheme_mod = context
@@ -705,7 +720,7 @@ fn gen_open_xml_composite_element_fn(
       #( #field_unwrap_list )*
 
       Ok(Self {
-        #( #field_init_list )*
+        #( #field_init_list, )*
       })
     }
   })
@@ -739,8 +754,8 @@ fn gen_derived_fn(
 
   let mut field_declaration_list: Vec<Stmt> = vec![];
   let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<TokenStream> = vec![];
-  let mut field_init_list: Vec<TokenStream> = vec![];
+  let mut field_unwrap_list: Vec<Stmt> = vec![];
+  let mut field_init_list: Vec<Ident> = vec![];
   let mut child_ser_match_list: Vec<Arm> = vec![];
 
   let mut attributes: Vec<&OpenXmlSchemaTypeAttribute> = vec![];
@@ -780,15 +795,16 @@ fn gen_derived_fn(
     }
 
     if required {
-      field_unwrap_list.push(quote! {
-        let #attr_name_ident = #attr_name_ident
-          .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-      })
+      field_unwrap_list.push(
+        parse2(quote! {
+          let #attr_name_ident = #attr_name_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
+        })
+        .unwrap(),
+      );
     }
 
-    field_init_list.push(quote! {
-      #attr_name_ident,
-    })
+    field_init_list.push(attr_name_ident);
   }
 
   let mut children: Vec<&OpenXmlSchemaTypeChild> = vec![];
@@ -809,9 +825,12 @@ fn gen_derived_fn(
       .unwrap(),
     );
 
-    field_init_list.push(quote! {
-      children,
-    });
+    field_init_list.push(
+      parse2(quote! {
+        children
+      })
+      .unwrap(),
+    );
   } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
     field_declaration_list.push(
       parse2(quote! {
@@ -820,9 +839,12 @@ fn gen_derived_fn(
       .unwrap(),
     );
 
-    field_init_list.push(quote! {
-      child,
-    });
+    field_init_list.push(
+      parse2(quote! {
+        child
+      })
+      .unwrap(),
+    );
   }
 
   let scheme_mod = context
@@ -997,7 +1019,7 @@ fn gen_derived_fn(
       #( #field_unwrap_list )*
 
       Ok(Self {
-        #( #field_init_list )*
+        #( #field_init_list, )*
       })
     }
   })

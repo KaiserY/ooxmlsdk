@@ -3,9 +3,9 @@ resolver = "2"
 members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
-rust-version = "1.61"
+rust-version = "1.73"
 authors = ["KaiserY"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/KaiserY/ooxmlsdk"
@@ -15,8 +15,8 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { version = "0.1.0", path = "crates/ooxmlsdk" }
-ooxmlsdk-build = { version = "0.1.0", path = "crates/ooxmlsdk-build" }
+ooxmlsdk = { version = "0.1.2", path = "crates/ooxmlsdk" }
+ooxmlsdk-build = { version = "0.1.2", path = "crates/ooxmlsdk-build" }
 quick-xml = "0.36.1"
 anyhow = "1.0.88"
 serde = { version = "1.0.210", features = ["derive"] }

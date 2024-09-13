@@ -1,7 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, parse_str, Ident, ItemFn, ItemImpl, ItemStruct, Type};
+use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
 
 use crate::models::OpenXmlPart;
 use crate::GenContext;
@@ -83,21 +83,65 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   })
   .unwrap();
 
-  let part_new_fn: ItemFn = parse2(quote! {
-    pub fn new(_path: &str) -> Result<Self, crate::common::SdkError> {
-      Err(crate::common::SdkError::UnknownError)
-    }
-  })
-  .unwrap();
+  if part.base == "_OpenXmlPackage" {
+    let field_declaration_list: Vec<Stmt> = vec![];
+    let field_match_list: Vec<Arm> = vec![];
+    let field_unwrap_list: Vec<Stmt> = vec![];
+    let field_init_list: Vec<Stmt> = vec![];
+    let field_ident_list: Vec<Ident> = vec![];
 
-  let _part_impl: ItemImpl = parse2(quote! {
-    impl #struct_name_ident {
-      #part_new_fn
-    }
-  })
-  .unwrap();
+    let part_new_fn: ItemFn = parse2(quote! {
+      pub fn new(_path: &str) -> Result<Self, crate::common::SdkError> {
+        let zip_file = std::fs::File::open(path)?;
 
-  quote! {
-    #part_struct
+        let reader = std::io::BufReader::new(zip_file);
+
+        let mut archive = zip::ZipArchive::new(reader)?;
+
+        #( #field_declaration_list )*
+
+        for i in 0..archive.len() {
+          let file = archive.by_index(i).unwrap();
+
+          let file_path = match file.enclosed_name() {
+            Some(path) => path.to_string_lossy().to_string(),
+            None => {
+              continue;
+            }
+          };
+
+          match file_path.as_str() {
+            #( #field_match_list, )*
+            _ => (),
+          }
+        }
+
+        #( #field_unwrap_list, )*
+
+        #( #field_init_list, )*
+
+        Self {
+          #( #field_ident_list, )*
+        }
+      }
+    })
+    .unwrap();
+
+    let part_impl: ItemImpl = parse2(quote! {
+      impl #struct_name_ident {
+        #part_new_fn
+      }
+    })
+    .unwrap();
+
+    quote! {
+      #part_struct
+
+      #part_impl
+    }
+  } else {
+    quote! {
+      #part_struct
+    }
   }
 }

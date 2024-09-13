@@ -14,6 +14,7 @@ readme = { workspace = true }
 [dependencies]
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
+zip = { workspace = true }
 
 [build-dependencies]
 ooxmlsdk-build = { workspace = true }

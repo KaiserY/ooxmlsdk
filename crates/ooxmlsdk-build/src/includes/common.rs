@@ -20,6 +20,8 @@ pub enum SdkError {
   ParseFloatError(#[from] ParseFloatError),
   #[error("StdFmtError")]
   StdFmtError(#[from] std::fmt::Error),
+  #[error("StdIoError")]
+  StdIoError(#[from] std::io::Error),
   #[error("mismatch error (expected {expected:?}, found {found:?})")]
   MismatchError { expected: String, found: String },
   #[error("`{0}` common error")]

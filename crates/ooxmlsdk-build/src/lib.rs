@@ -23,6 +23,10 @@ pub mod includes;
 pub mod models;
 pub mod utils;
 
+// pub mod common;
+// pub mod schemas;
+// pub mod parts;
+
 pub fn gen(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
   let out_parts_dir_path = &out_dir_path.join("parts");
@@ -57,6 +61,8 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let enum_name_enum_map: HashMap<&str, &OpenXmlSchemaEnum> = HashMap::new();
   let part_name_type_map: HashMap<&str, &OpenXmlSchemaType> = HashMap::new();
   let prefix_schema_map: HashMap<&str, &OpenXmlSchema> = HashMap::new();
+  let part_name_part_map: HashMap<&str, &OpenXmlPart> = HashMap::new();
+  let part_name_part_mod_map: HashMap<&str, &str> = HashMap::new();
 
   for entry in fs::read_dir(data_parts_dir_path).unwrap() {
     let entry = entry.unwrap();
@@ -123,6 +129,8 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     enum_name_enum_map,
     part_name_type_map,
     prefix_schema_map,
+    part_name_part_map,
+    part_name_part_mod_map,
   };
 
   for namespace in context.namespaces.iter() {
@@ -131,6 +139,14 @@ pub fn gen(data_dir: &str, out_dir: &str) {
       .insert(&namespace.prefix, namespace);
 
     context.uri_namespace_map.insert(&namespace.uri, namespace);
+  }
+
+  for (i, part) in context.parts.iter().enumerate() {
+    context.part_name_part_map.insert(&part.name, part);
+
+    let part_mod = &context.part_mods[i];
+
+    context.part_name_part_mod_map.insert(&part.name, part_mod);
   }
 
   for (i, schema) in context.schemas.iter().enumerate() {

@@ -1,5 +1,8 @@
 # Open XML SDK for Rust
 
+[![crates.io](https://img.shields.io/crates/v/ooxmlsdk.svg)](https://crates.io/crates/ooxmlsdk)
+[![docs](https://docs.rs/ooxmlsdk/badge.svg)](https://docs.rs/ooxmlsdk)
+
 Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word, Excel, and PowerPoint documents. The basic idea is inspired by .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK).
 
 ## Features

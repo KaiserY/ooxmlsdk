@@ -735,8 +735,8 @@ fn gen_derived_fn(
   let t_name_str = t.class_name.to_upper_camel_case();
 
   let base_class_type = context
-    .type_base_class_type_map
-    .get(t.base_class.as_str())
+    .type_name_type_map
+    .get(&t.name[0..t.name.find('/').unwrap() + 1])
     .ok_or(format!("{:?}", t.base_class))
     .unwrap();
 

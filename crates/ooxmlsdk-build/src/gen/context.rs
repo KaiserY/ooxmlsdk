@@ -19,7 +19,6 @@ pub struct GenContext<'a> {
   pub uri_schema_mod_map: HashMap<&'a str, &'a str>,
   pub type_name_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
   pub type_name_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
-  pub type_base_class_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
   pub enum_type_enum_map: HashMap<&'a str, &'a OpenXmlSchemaEnum>,
   pub enum_type_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
   pub enum_name_enum_map: HashMap<&'a str, &'a OpenXmlSchemaEnum>,

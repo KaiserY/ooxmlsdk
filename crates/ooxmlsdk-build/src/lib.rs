@@ -51,7 +51,6 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let uri_schema_mod_map: HashMap<&str, &str> = HashMap::new();
   let type_name_type_map: HashMap<&str, &OpenXmlSchemaType> = HashMap::new();
   let type_name_namespace_map: HashMap<&str, &OpenXmlNamespace> = HashMap::new();
-  let type_base_class_type_map: HashMap<&str, &OpenXmlSchemaType> = HashMap::new();
   let enum_type_enum_map: HashMap<&str, &OpenXmlSchemaEnum> = HashMap::new();
   let enum_type_namespace_map: HashMap<&str, &OpenXmlNamespace> = HashMap::new();
   let enum_name_enum_map: HashMap<&str, &OpenXmlSchemaEnum> = HashMap::new();
@@ -119,7 +118,6 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     uri_schema_mod_map,
     type_name_type_map,
     type_name_namespace_map,
-    type_base_class_type_map,
     enum_type_enum_map,
     enum_type_namespace_map,
     enum_name_enum_map,
@@ -166,8 +164,6 @@ pub fn gen(data_dir: &str, out_dir: &str) {
       context.type_name_type_map.insert(&ty.name, ty);
 
       context.type_name_namespace_map.insert(&ty.name, namespace);
-
-      context.type_base_class_type_map.insert(&ty.class_name, ty);
 
       if !ty.part.is_empty() {
         context.part_name_type_map.insert(&ty.part, ty);

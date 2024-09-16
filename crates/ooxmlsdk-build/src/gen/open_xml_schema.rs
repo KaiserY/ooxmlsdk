@@ -87,8 +87,8 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       child_choice_enum_option = enum_option;
     } else if t.is_derived {
       let base_class_type = context
-        .type_base_class_type_map
-        .get(t.base_class.as_str())
+        .type_name_type_map
+        .get(&t.name[0..t.name.find('/').unwrap() + 1])
         .ok_or(format!("{:?}", t.base_class))
         .unwrap();
 

@@ -217,8 +217,6 @@ fn gen_child_part_fields(
   field_match_list: &mut Vec<Arm>,
   child_field_stmt_list: &mut Vec<Stmt>,
 ) {
-  println!("{}", part_child.name);
-
   let mut child_field_value_list: Vec<FieldValue> = vec![];
 
   let child_part = context
@@ -226,6 +224,15 @@ fn gen_child_part_fields(
     .get(part_child.name.as_str())
     .ok_or(format!("{:?}", part_child.name))
     .unwrap();
+
+  let init_ident: Ident = parse_str(&format!("Init{}", part_prefix).to_snake_case()).unwrap();
+
+  field_declaration_list.push(
+    parse2(quote! {
+      let mut #init_ident = false;
+    })
+    .unwrap(),
+  );
 
   if let Some(root_element_type) = context.part_name_type_map.get(child_part.name.as_str()) {
     let root_element_type_namespace = context
@@ -260,17 +267,10 @@ fn gen_child_part_fields(
       .unwrap(),
     );
 
-    child_field_stmt_list.push(
-      parse2(quote! {
-        let #prefix_root_element_ident = #prefix_root_element_ident
-          .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_root_element.to_string()))?;
-      })
-      .unwrap(),
-    );
-
     child_field_value_list.push(
       parse2(quote! {
         #root_element_ident: #prefix_root_element_ident
+        .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_root_element.to_string()))?
       })
       .unwrap(),
     );
@@ -287,6 +287,7 @@ fn gen_child_part_fields(
     field_match_list.push(
       parse2(quote! {
         #root_element_path => {
+          #init_ident = true;
           #prefix_root_element_ident = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?));
         }
       })
@@ -294,7 +295,7 @@ fn gen_child_part_fields(
     );
   }
 
-  if !child_part.children.is_empty() && !part_child.max_occurs_great_than_one {
+  if !part_child.max_occurs_great_than_one {
     if part_child.has_fixed_content {
       for child in &child_part.children {
         if child.is_data_part_reference {
@@ -399,9 +400,11 @@ fn gen_child_part_fields(
 
     child_field_stmt_list.push(
       parse2(quote! {
-        #prefix_ident = Some(std::boxed::Box::new(#child_type {
-          #( #child_field_value_list, )*
-        }));
+        if #init_ident {
+          #prefix_ident = Some(std::boxed::Box::new(#child_type {
+            #( #child_field_value_list, )*
+          }));
+        }
       })
       .unwrap(),
     );

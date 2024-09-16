@@ -23,10 +23,6 @@ pub mod includes;
 pub mod models;
 pub mod utils;
 
-// pub mod common;
-// pub mod schemas;
-// pub mod parts;
-
 pub fn gen(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
   let out_parts_dir_path = &out_dir_path.join("parts");

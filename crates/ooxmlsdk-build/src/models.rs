@@ -31,6 +31,7 @@ pub struct OpenXmlPartChild {
   pub name: String,
   pub has_fixed_content: bool,
   pub is_data_part_reference: bool,
+  pub is_special_embedded_part: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

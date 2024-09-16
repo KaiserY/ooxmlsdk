@@ -22,6 +22,8 @@ pub enum SdkError {
   StdFmtError(#[from] std::fmt::Error),
   #[error("StdIoError")]
   StdIoError(#[from] std::io::Error),
+  #[error("ZipError")]
+  ZipError(#[from] zip::result::ZipError),
   #[error("mismatch error (expected {expected:?}, found {found:?})")]
   MismatchError { expected: String, found: String },
   #[error("`{0}` common error")]

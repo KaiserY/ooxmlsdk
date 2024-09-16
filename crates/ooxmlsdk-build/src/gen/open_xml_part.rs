@@ -1,4 +1,5 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
+use path_clean::clean;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse2, parse_str, Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
@@ -85,16 +86,15 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         continue;
       }
 
-      if !child.has_fixed_content {
-        gen_child_part_fields(
-          child,
-          &child.api_name,
-          &part.paths.general,
-          context,
-          &mut field_declaration_list,
-          &mut child_field_stmt_list,
-        )
-      }
+      gen_child_part_fields(
+        child,
+        &child.api_name,
+        &part.paths.general,
+        context,
+        &mut field_declaration_list,
+        &mut field_match_list,
+        &mut child_field_stmt_list,
+      );
 
       let child_name_str = child.api_name.to_snake_case();
 
@@ -164,7 +164,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         #( #field_declaration_list )*
 
         for i in 0..archive.len() {
-          let file = archive.by_index(i).unwrap();
+          let file = archive.by_index(i)?;
 
           let file_path = match file.enclosed_name() {
             Some(path) => path.to_string_lossy().to_string(),
@@ -214,8 +214,11 @@ fn gen_child_part_fields(
   path_prefix: &str,
   context: &GenContext,
   field_declaration_list: &mut Vec<Stmt>,
+  field_match_list: &mut Vec<Arm>,
   child_field_stmt_list: &mut Vec<Stmt>,
 ) {
+  println!("{}", part_child.name);
+
   let mut child_field_value_list: Vec<FieldValue> = vec![];
 
   let child_part = context
@@ -271,77 +274,120 @@ fn gen_child_part_fields(
       })
       .unwrap(),
     );
-  }
 
-  for child in &child_part.children {
-    if child.is_data_part_reference {
-      continue;
-    }
+    let root_element_path_str = format!(
+      "{}{}/{}.xml",
+      path_prefix, child_part.paths.general, child_part.target
+    );
 
-    if !child.has_fixed_content {
-      gen_child_part_fields(
-        child,
-        &format!("{}{}", part_prefix, child.api_name),
-        &format!("{}{}/", path_prefix, child_part.paths.general),
-        context,
-        field_declaration_list,
-        child_field_stmt_list,
-      )
-    }
+    let root_element_path = clean(root_element_path_str);
 
-    let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+    let root_element_path = root_element_path.to_string_lossy().replace("\\", "/");
 
-    let prefix_child_name_str = format!("{}{}", part_prefix, child.api_name).to_snake_case();
-
-    let prefix_child_name_ident: Ident = parse_str(&prefix_child_name_str).unwrap();
-
-    let child_type: Type = parse_str(&format!(
-      "crate::parts::{}::{}",
-      child.name.to_snake_case(),
-      child.name.to_upper_camel_case(),
-    ))
-    .unwrap();
-
-    child_field_value_list.push(
+    field_match_list.push(
       parse2(quote! {
-        #child_name_ident: #prefix_child_name_ident
+        #root_element_path => {
+          #prefix_root_element_ident = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?));
+        }
       })
       .unwrap(),
     );
-
-    if child.max_occurs_great_than_one {
-      field_declaration_list.push(
-        parse2(quote! {
-          let mut #prefix_child_name_ident: Vec<#child_type> = vec![];
-        })
-        .unwrap(),
-      );
-    } else if child.min_occurs_is_non_zero {
-      field_declaration_list.push(
-        parse2(quote! {
-          let mut #prefix_child_name_ident: Option<std::boxed::Box<#child_type>> = None;
-        })
-        .unwrap(),
-      );
-
-      child_field_stmt_list.push(
-        parse2(quote! {
-          let #prefix_child_name_ident = #prefix_child_name_ident
-            .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_child_name_str.to_string()))?;
-        })
-        .unwrap(),
-      );
-    } else {
-      field_declaration_list.push(
-        parse2(quote! {
-          let mut #prefix_child_name_ident: Option<std::boxed::Box<#child_type>> = None;
-        })
-        .unwrap(),
-      );
-    }
   }
 
   if !child_part.children.is_empty() && !part_child.max_occurs_great_than_one {
+    if part_child.has_fixed_content {
+      for child in &child_part.children {
+        if child.is_data_part_reference {
+          continue;
+        }
+
+        let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+
+        if child.max_occurs_great_than_one {
+          child_field_value_list.push(
+            parse2(quote! {
+              #child_name_ident: vec![]
+            })
+            .unwrap(),
+          );
+        } else {
+          child_field_value_list.push(
+            parse2(quote! {
+              #child_name_ident: None
+            })
+            .unwrap(),
+          );
+        }
+      }
+    } else {
+      for child in &child_part.children {
+        if child.is_data_part_reference {
+          continue;
+        }
+
+        gen_child_part_fields(
+          child,
+          &format!("{}{}", part_prefix, child.api_name),
+          &format!("{}{}/", path_prefix, child_part.paths.general),
+          context,
+          field_declaration_list,
+          field_match_list,
+          child_field_stmt_list,
+        );
+
+        let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+
+        let prefix_child_name_str = format!("{}{}", part_prefix, child.api_name).to_snake_case();
+
+        let prefix_child_name_ident: Ident = parse_str(&prefix_child_name_str).unwrap();
+
+        let child_type: Type = parse_str(&format!(
+          "crate::parts::{}::{}",
+          child.name.to_snake_case(),
+          child.name.to_upper_camel_case(),
+        ))
+        .unwrap();
+
+        child_field_value_list.push(
+          parse2(quote! {
+            #child_name_ident: #prefix_child_name_ident
+          })
+          .unwrap(),
+        );
+
+        if child.max_occurs_great_than_one {
+          field_declaration_list.push(
+            parse2(quote! {
+              let mut #prefix_child_name_ident: Vec<#child_type> = vec![];
+            })
+            .unwrap(),
+          );
+        } else if child.min_occurs_is_non_zero {
+          field_declaration_list.push(
+            parse2(quote! {
+              let mut #prefix_child_name_ident: Option<std::boxed::Box<#child_type>> = None;
+            })
+            .unwrap(),
+          );
+
+          child_field_stmt_list.push(
+          parse2(quote! {
+            let #prefix_child_name_ident = #prefix_child_name_ident
+              .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_child_name_str.to_string()))?;
+          })
+          .unwrap(),
+        );
+        } else {
+          field_declaration_list.push(
+            parse2(quote! {
+              let mut #prefix_child_name_ident: Option<std::boxed::Box<#child_type>> = None;
+            })
+            .unwrap(),
+          );
+        }
+      }
+    }
+
     let prefix_ident: Ident = parse_str(&part_prefix.to_snake_case()).unwrap();
 
     let child_type: Type = parse_str(&format!(

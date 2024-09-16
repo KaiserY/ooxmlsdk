@@ -20,6 +20,9 @@ pub struct OpenXmlPart {
 #[serde(default, rename_all = "PascalCase")]
 pub struct OpenXmlPartPaths {
   pub general: String,
+  pub word: String,
+  pub excel: String,
+  pub power_point: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

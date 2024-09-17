@@ -136,9 +136,21 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
 
     let summary_doc = format!(" {}", t.summary);
 
+    let qualified_doc = if t.name.ends_with('/') {
+      " When the object is serialized out as xml, it's qualified name is .".to_string()
+    } else {
+      let qualified_str = &t.name[t.name.find('/').unwrap() + 1..t.name.len()];
+
+      format!(
+        " When the object is serialized out as xml, it's qualified name is {}.",
+        qualified_str
+      )
+    };
+
     if let Some(child_choice_enum) = child_choice_enum_option {
       token_stream_list.push(quote! {
         #[doc = #summary_doc]
+        #[doc = #qualified_doc]
         #[derive(Clone, Debug)]
         pub struct #struct_name_ident {
           #( #fields )*
@@ -148,6 +160,8 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       });
     } else {
       token_stream_list.push(quote! {
+        #[doc = #summary_doc]
+        #[doc = #qualified_doc]
         #[derive(Clone, Debug)]
         pub struct #struct_name_ident {
           #( #fields )*
@@ -234,14 +248,21 @@ pub fn gen_attr(
 
   let property_comments_doc = format!(" {}", attr.property_comments);
 
+  let qualified_doc = format!(
+    " Represents the following attribute in the schema: {}",
+    attr.q_name
+  );
+
   if required {
     quote! {
       #[doc = #property_comments_doc]
+      #[doc = #qualified_doc]
       pub #attr_name_ident: #type_ident,
     }
   } else {
     quote! {
       #[doc = #property_comments_doc]
+      #[doc = #qualified_doc]
       pub #attr_name_ident: Option<#type_ident>,
     }
   }

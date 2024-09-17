@@ -248,179 +248,347 @@ fn gen_child_part_fields(
 
   let init_ident: Ident = parse_str(&format!("Init{}", part_prefix).to_snake_case()).unwrap();
 
-  if let Some(root_element_type) = context.part_name_type_map.get(child_part.name.as_str()) {
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #init_ident = false;
-      })
-      .unwrap(),
-    );
+  if part_child.max_occurs_great_than_one {
+    if let Some(root_element_type) = context.part_name_type_map.get(child_part.name.as_str()) {
+      let root_element_type_namespace = context
+        .type_name_namespace_map
+        .get(root_element_type.name.as_str())
+        .ok_or(format!("{:?}", root_element_type.name))
+        .unwrap();
 
-    let root_element_type_namespace = context
-      .type_name_namespace_map
-      .get(root_element_type.name.as_str())
-      .ok_or(format!("{:?}", root_element_type.name))
+      let scheme_mod = context
+        .prefix_schema_mod_map
+        .get(root_element_type_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", root_element_type_namespace.prefix))
+        .unwrap();
+
+      let field_type: Type = parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        root_element_type.class_name.to_upper_camel_case()
+      ))
       .unwrap();
 
-    let scheme_mod = context
-      .prefix_schema_mod_map
-      .get(root_element_type_namespace.prefix.as_str())
-      .ok_or(format!("{:?}", root_element_type_namespace.prefix))
-      .unwrap();
+      let root_element_ident: Ident = parse_str("root_element").unwrap();
 
-    let field_type: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      scheme_mod,
-      root_element_type.class_name.to_upper_camel_case()
-    ))
-    .unwrap();
-
-    let root_element_ident: Ident = parse_str("root_element").unwrap();
-
-    let prefix_root_element = format!("{}_root_element", part_prefix.to_snake_case());
-
-    let prefix_root_element_ident: Ident = parse_str(&prefix_root_element).unwrap();
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #prefix_root_element_ident: Option<std::boxed::Box<#field_type>> = None;
-      })
-      .unwrap(),
-    );
-
-    child_field_value_list.push(
-      parse2(quote! {
-        #root_element_ident: #prefix_root_element_ident
-        .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_root_element.to_string()))?
-      })
-      .unwrap(),
-    );
-
-    let root_element_path_str = format!(
-      "{}{}/{}.xml",
-      path_prefix, child_part.paths.general, child_part.target
-    );
-
-    let root_element_path = clean(root_element_path_str);
-
-    let root_element_path = root_element_path.to_string_lossy().replace("\\", "/");
-
-    field_match_list.push(
-      parse2(quote! {
-        #root_element_path => {
-          #init_ident = true;
-
-          #prefix_root_element_ident = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?));
-        }
-      })
-      .unwrap(),
-    );
-  } else if !child_part.extension.is_empty() {
-    if part_child.max_occurs_great_than_one {
-      let target_path_str = format!(
-        "{}{}/{}",
+      let root_element_path_str = format!(
+        "{}{}/{}.xml",
         path_prefix, child_part.paths.general, child_part.target
       );
 
-      let target_path = clean(target_path_str);
+      let root_element_path = clean(root_element_path_str);
 
-      let target_path = target_path.to_string_lossy().replace("\\", "/");
-
-      match_default_expr_list.push(
-        parse2(quote! {
-          file_path.starts_with(#target_path)
-        })
-        .unwrap(),
-      );
+      let root_element_path = root_element_path.to_string_lossy().replace("\\", "/");
 
       let mut child_init_list: Vec<FieldValue> = vec![];
 
       for child in &child_part.children {
-        if child.max_occurs_great_than_one {
-          let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+        if child.is_data_part_reference {
+          continue;
+        }
 
+        let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+
+        if child.max_occurs_great_than_one {
           child_init_list.push(
             parse2(quote! {
               #child_name_ident: vec![]
             })
             .unwrap(),
           );
+        } else {
+          child_init_list.push(
+            parse2(quote! {
+              #child_name_ident: None
+            })
+            .unwrap(),
+          );
         }
       }
 
-      match_default_block_list.push(
-        parse2(quote! {{
-          #prefix_ident.push(#child_type {
-            path: file_path.to_string(),
-            #( #child_init_list, )*
-          });
-        }})
-        .unwrap(),
-      );
-    } else {
-      field_declaration_list.push(
+      field_match_list.push(
         parse2(quote! {
-          let mut #init_ident = false;
+          #root_element_path => {
+            #prefix_ident.push(#child_type {
+              #root_element_ident: std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?),
+              #( #child_init_list, )*
+            });
+          }
         })
         .unwrap(),
       );
+    } else if !child_part.extension.is_empty() {
+      if part_child.max_occurs_great_than_one {
+        let target_path_str = format!(
+          "{}{}/{}",
+          path_prefix, child_part.paths.general, child_part.target
+        );
 
-      let target_path_ident: Ident = parse_str("path").unwrap();
+        let target_path = clean(target_path_str);
 
-      let prefix_target_path = format!("{}_path", part_prefix.to_snake_case());
+        let target_path = target_path.to_string_lossy().replace("\\", "/");
 
-      let prefix_target_path_ident: Ident = parse_str(&prefix_target_path).unwrap();
+        match_default_expr_list.push(
+          parse2(quote! {
+            file_path.starts_with(#target_path)
+          })
+          .unwrap(),
+        );
+
+        let mut child_init_list: Vec<FieldValue> = vec![];
+
+        for child in &child_part.children {
+          if child.is_data_part_reference {
+            continue;
+          }
+
+          let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+
+          if child.max_occurs_great_than_one {
+            child_init_list.push(
+              parse2(quote! {
+                #child_name_ident: vec![]
+              })
+              .unwrap(),
+            );
+          } else {
+            child_init_list.push(
+              parse2(quote! {
+                #child_name_ident: None
+              })
+              .unwrap(),
+            );
+          }
+        }
+
+        match_default_block_list.push(
+          parse2(quote! {{
+            #prefix_ident.push(#child_type {
+              path: file_path.to_string(),
+              #( #child_init_list, )*
+            });
+          }})
+          .unwrap(),
+        );
+      } else {
+        let target_path_ident: Ident = parse_str("path").unwrap();
+
+        let prefix_target_path = format!("{}_path", part_prefix.to_snake_case());
+
+        let prefix_target_path_ident: Ident = parse_str(&prefix_target_path).unwrap();
+
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #prefix_target_path_ident: Option<String> = None;
+          })
+          .unwrap(),
+        );
+
+        child_field_value_list.push(
+          parse2(quote! {
+            #target_path_ident: #prefix_target_path_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_target_path.to_string()))?
+          })
+          .unwrap(),
+        );
+
+        let target_path_str = format!(
+          "{}{}/{}",
+          path_prefix, child_part.paths.general, child_part.target
+        );
+
+        let target_path = clean(target_path_str);
+
+        let target_path = target_path.to_string_lossy().replace("\\", "/");
+
+        match_default_expr_list.push(
+          parse2(quote! {
+            file_path.starts_with(#target_path)
+          })
+          .unwrap(),
+        );
+
+        match_default_block_list.push(
+          parse2(quote! {{
+            #init_ident = true;
+
+            #prefix_target_path_ident = Some(file_path.to_string());
+          }})
+          .unwrap(),
+        );
+      }
+    }
+  } else {
+    field_declaration_list.push(
+      parse2(quote! {
+        #[allow(unused_mut)]
+        let mut #init_ident = false;
+      })
+      .unwrap(),
+    );
+
+    if let Some(root_element_type) = context.part_name_type_map.get(child_part.name.as_str()) {
+      let root_element_type_namespace = context
+        .type_name_namespace_map
+        .get(root_element_type.name.as_str())
+        .ok_or(format!("{:?}", root_element_type.name))
+        .unwrap();
+
+      let scheme_mod = context
+        .prefix_schema_mod_map
+        .get(root_element_type_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", root_element_type_namespace.prefix))
+        .unwrap();
+
+      let field_type: Type = parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        root_element_type.class_name.to_upper_camel_case()
+      ))
+      .unwrap();
+
+      let root_element_ident: Ident = parse_str("root_element").unwrap();
+
+      let prefix_root_element = format!("{}_root_element", part_prefix.to_snake_case());
+
+      let prefix_root_element_ident: Ident = parse_str(&prefix_root_element).unwrap();
 
       field_declaration_list.push(
         parse2(quote! {
-          let mut #prefix_target_path_ident: Option<String> = None;
+          let mut #prefix_root_element_ident: Option<std::boxed::Box<#field_type>> = None;
         })
         .unwrap(),
       );
 
       child_field_value_list.push(
         parse2(quote! {
-          #target_path_ident: #prefix_target_path_ident
-          .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_target_path.to_string()))?
+          #root_element_ident: #prefix_root_element_ident
+          .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_root_element.to_string()))?
         })
         .unwrap(),
       );
 
-      let target_path_str = format!(
-        "{}{}/{}",
+      let root_element_path_str = format!(
+        "{}{}/{}.xml",
         path_prefix, child_part.paths.general, child_part.target
       );
 
-      let target_path = clean(target_path_str);
+      let root_element_path = clean(root_element_path_str);
 
-      let target_path = target_path.to_string_lossy().replace("\\", "/");
+      let root_element_path = root_element_path.to_string_lossy().replace("\\", "/");
 
-      match_default_expr_list.push(
+      field_match_list.push(
         parse2(quote! {
-          file_path.starts_with(#target_path)
+          #root_element_path => {
+            #init_ident = true;
+
+            #prefix_root_element_ident = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?));
+          }
         })
         .unwrap(),
       );
+    } else if !child_part.extension.is_empty() {
+      if part_child.max_occurs_great_than_one {
+        let target_path_str = format!(
+          "{}{}/{}",
+          path_prefix, child_part.paths.general, child_part.target
+        );
 
-      match_default_block_list.push(
-        parse2(quote! {{
-          #init_ident = true;
+        let target_path = clean(target_path_str);
 
-          #prefix_target_path_ident = Some(file_path.to_string());
-        }})
-        .unwrap(),
-      );
+        let target_path = target_path.to_string_lossy().replace("\\", "/");
+
+        match_default_expr_list.push(
+          parse2(quote! {
+            file_path.starts_with(#target_path)
+          })
+          .unwrap(),
+        );
+
+        let mut child_init_list: Vec<FieldValue> = vec![];
+
+        for child in &child_part.children {
+          if child.is_data_part_reference {
+            continue;
+          }
+
+          let child_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+
+          if child.max_occurs_great_than_one {
+            child_init_list.push(
+              parse2(quote! {
+                #child_name_ident: vec![]
+              })
+              .unwrap(),
+            );
+          } else {
+            child_init_list.push(
+              parse2(quote! {
+                #child_name_ident: None
+              })
+              .unwrap(),
+            );
+          }
+        }
+
+        match_default_block_list.push(
+          parse2(quote! {{
+            #prefix_ident.push(#child_type {
+              path: file_path.to_string(),
+              #( #child_init_list, )*
+            });
+          }})
+          .unwrap(),
+        );
+      } else {
+        let target_path_ident: Ident = parse_str("path").unwrap();
+
+        let prefix_target_path = format!("{}_path", part_prefix.to_snake_case());
+
+        let prefix_target_path_ident: Ident = parse_str(&prefix_target_path).unwrap();
+
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #prefix_target_path_ident: Option<String> = None;
+          })
+          .unwrap(),
+        );
+
+        child_field_value_list.push(
+          parse2(quote! {
+            #target_path_ident: #prefix_target_path_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_target_path.to_string()))?
+          })
+          .unwrap(),
+        );
+
+        let target_path_str = format!(
+          "{}{}/{}",
+          path_prefix, child_part.paths.general, child_part.target
+        );
+
+        let target_path = clean(target_path_str);
+
+        let target_path = target_path.to_string_lossy().replace("\\", "/");
+
+        match_default_expr_list.push(
+          parse2(quote! {
+            file_path.starts_with(#target_path)
+          })
+          .unwrap(),
+        );
+
+        match_default_block_list.push(
+          parse2(quote! {{
+            #init_ident = true;
+
+            #prefix_target_path_ident = Some(file_path.to_string());
+          }})
+          .unwrap(),
+        );
+      }
     }
-  } else {
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #init_ident = false;
-      })
-      .unwrap(),
-    );
-  }
 
-  if !part_child.max_occurs_great_than_one {
     if part_child.has_fixed_content {
       for child in &child_part.children {
         if child.is_data_part_reference {
@@ -486,6 +654,7 @@ fn gen_child_part_fields(
         if child.max_occurs_great_than_one {
           field_declaration_list.push(
             parse2(quote! {
+              #[allow(unused_mut)]
               let mut #prefix_child_name_ident: Vec<#child_type> = vec![];
             })
             .unwrap(),

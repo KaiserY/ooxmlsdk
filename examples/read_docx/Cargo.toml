@@ -1,5 +1,5 @@
 [package]
-name = "ooxmlsdk"
+name = "read_docx"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,9 +12,4 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
-quick-xml = { workspace = true }
-thiserror = { workspace = true }
-zip = { workspace = true }
-
-[build-dependencies]
-ooxmlsdk-build = { workspace = true }
+ooxmlsdk = { workspace = true }

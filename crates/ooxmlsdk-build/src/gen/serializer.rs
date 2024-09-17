@@ -1,7 +1,8 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Type};
 
 use crate::models::{
@@ -272,7 +273,49 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       #( #variants )*
     };
 
-    let xmlns_attr_writer = gen_xmlns(t);
+    let xmlns_attr_writer: TokenStream = if t.part.is_empty() {
+      quote! {}
+    } else {
+      let mut prefix_set: HashSet<&str> = HashSet::new();
+      let mut name_set: HashSet<&str> = HashSet::new();
+
+      gen_xmlns_prefix_list(t, context, &mut prefix_set, &mut name_set);
+
+      let mut xmlns_str = String::new();
+
+      for prefix in prefix_set {
+        let prefix_namespace = context
+          .prefix_namespace_map
+          .get(prefix)
+          .ok_or(format!("{:?}", t.base_class))
+          .unwrap();
+
+        match schema_namespace.prefix.as_str() {
+          "x" => {
+            if prefix == schema_namespace.prefix {
+              xmlns_str.write_str(" xmlns").unwrap();
+            } else {
+              xmlns_str.write_str(" xmlns:").unwrap();
+              xmlns_str.write_str(prefix).unwrap();
+            }
+          }
+          _ => {
+            xmlns_str.write_str(" xmlns:").unwrap();
+            xmlns_str.write_str(prefix).unwrap();
+          }
+        }
+
+        xmlns_str.write_str("=\"").unwrap();
+        xmlns_str.write_str(&prefix_namespace.uri).unwrap();
+        xmlns_str.write_str("\"").unwrap();
+      }
+
+      xmlns_str.write_str(" mc:Ignorable=\"x14ac\"").unwrap();
+
+      quote! {
+        writer.write_str(#xmlns_str)?;
+      }
+    };
 
     token_stream_list.push(
       parse2(quote! {
@@ -356,12 +399,32 @@ fn gen_attr(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
   }
 }
 
-fn gen_xmlns(t: &OpenXmlSchemaType) -> TokenStream {
-  match t.part.as_str() {
-    "WorkbookPart" => quote! {
-      writer.write_str(r#" mc:Ignorable="x15" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision""#)?;
-    },
-    _ => quote! {},
+fn gen_xmlns_prefix_list<'a>(
+  t: &'a OpenXmlSchemaType,
+  context: &'a GenContext,
+  prefix_set: &mut HashSet<&'a str>,
+  name_set: &mut HashSet<&'a str>,
+) {
+  prefix_set.insert(&t.name[0..t.name.find(':').unwrap()]);
+
+  name_set.insert(&t.name);
+
+  for attr in &t.attributes {
+    if !attr.q_name.starts_with(':') {
+      prefix_set.insert(&attr.q_name[0..attr.q_name.find(':').unwrap()]);
+    }
+  }
+
+  for child in &t.children {
+    let child_type = context
+      .type_name_type_map
+      .get(child.name.as_str())
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    if !name_set.contains(child.name.as_str()) {
+      gen_xmlns_prefix_list(child_type, context, prefix_set, name_set);
+    }
   }
 }
 

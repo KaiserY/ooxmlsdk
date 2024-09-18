@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
-use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Type};
+use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Stmt, Type};
 
 use crate::models::{
   OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild,
@@ -144,17 +144,92 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       || t.base_class == "OpenXmlPartRootElement"
       || t.base_class == "SdtElement"
     {
-      for child in &t.children {
-        child_arms.push(gen_child_arm(child, &child_choice_enum_type));
-      }
-
-      if child_arms.is_empty() {
+      if t.children.is_empty() {
         end_tag_writer = quote! {};
 
         end_writer = quote! {
           writer.write_str("/>")?;
         };
+      } else if t.is_one_sequence_flatten() {
+        let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+        for child in &t.children {
+          child_map.insert(&child.name, child);
+        }
+
+        let mut child_stmt_list: Vec<Stmt> = vec![];
+
+        for p in &t.particle.items {
+          let child = child_map
+            .get(p.name.as_str())
+            .ok_or(format!("{:?}", p.name))
+            .unwrap();
+
+          let child_name_ident: Ident = if child.property_name.is_empty() {
+            let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+            let child_rename_ser_str = child_name_list
+              .last()
+              .ok_or(format!("{:?}", child.name))
+              .unwrap();
+
+            parse_str(&child_rename_ser_str.to_snake_case()).unwrap()
+          } else {
+            parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
+          };
+
+          if p.occurs.is_empty() {
+            child_stmt_list.push(parse2(quote! {
+                if let Some(#child_name_ident) = &self.#child_name_ident {
+                  writer.write_str(&quick_xml::escape::escape(&#child_name_ident.to_string(with_xmlns)?))?;
+                }
+              }).unwrap());
+          } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+            child_stmt_list.push(parse2(quote! {
+                writer.write_str(&quick_xml::escape::escape(&self.#child_name_ident.to_string(with_xmlns)?))?;
+              }).unwrap());
+          } else if p.occurs[0].max > 1 {
+            child_stmt_list.push(
+              parse2(quote! {
+                for child in &self.#child_name_ident {
+                  writer.write_str(&quick_xml::escape::escape(&child.to_string(with_xmlns)?))?;
+                }
+              })
+              .unwrap(),
+            );
+          } else {
+            child_stmt_list.push(parse2(quote! {
+                if let Some(#child_name_ident) = &self.#child_name_ident {
+                  writer.write_str(&quick_xml::escape::escape(&#child_name_ident.to_string(with_xmlns)?))?;
+                }
+              }).unwrap());
+          }
+        }
+
+        children_writer = quote! {
+          #( #child_stmt_list )*
+        };
+
+        end_tag_writer = quote! {
+          writer.write_char('>')?;
+        };
+
+        end_writer = quote! {
+          writer.write_str("</")?;
+
+          if with_xmlns {
+            writer.write_str(#rename_ser_str)?;
+          } else {
+            writer.write_str(#rename_de_str)?;
+          }
+
+          writer.write_char('>')?;
+        };
       } else {
+        for child in &t.children {
+          child_arms.push(gen_child_arm(child, &child_choice_enum_type));
+        }
+
         children_writer = quote! {
           for child in &self.children {
             let child_str = match child {

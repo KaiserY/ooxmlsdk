@@ -1,5 +1,3 @@
-#![recursion_limit = "256"]
-
 use gen::serializer::gen_serializer;
 use heck::ToSnakeCase;
 use models::OpenXmlSchemaEnum;

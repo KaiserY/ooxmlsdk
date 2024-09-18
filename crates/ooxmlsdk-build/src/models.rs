@@ -63,6 +63,23 @@ pub struct OpenXmlSchemaType {
   pub particle: OpenXmlSchemaTypeParticle,
 }
 
+impl OpenXmlSchemaType {
+  pub fn is_one_sequence_flatten(&self) -> bool {
+    if self.composite_type == "OneSequence" && !self.is_derived && self.particle.kind == "Sequence"
+    {
+      for p in &self.particle.items {
+        if !p.kind.is_empty() || !p.items.is_empty() {
+          return false;
+        }
+      }
+
+      true
+    } else {
+      false
+    }
+  }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct OpenXmlSchemaTypeAttribute {
@@ -105,21 +122,21 @@ pub struct OpenXmlSchemaTypeChild {
 #[serde(default, rename_all = "PascalCase")]
 pub struct OpenXmlSchemaTypeParticle {
   pub kind: String,
-  pub items: Vec<OpenXmlSchemaTypeParticleItem>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct OpenXmlSchemaTypeParticleItem {
   pub name: String,
-  pub occurs: Vec<OpenXmlSchemaTypeParticleItemOccur>,
+  pub occurs: Vec<OpenXmlSchemaTypeParticleOccur>,
+  pub items: Vec<OpenXmlSchemaTypeParticle>,
+  pub initial_version: String,
+  pub require_filter: bool,
+  pub namespace: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
-pub struct OpenXmlSchemaTypeParticleItemOccur {
+pub struct OpenXmlSchemaTypeParticleOccur {
   pub max: u64,
   pub min: u64,
+  pub include_version: bool,
+  pub version: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

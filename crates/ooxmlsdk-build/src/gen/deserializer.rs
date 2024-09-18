@@ -7,7 +7,7 @@ use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Typ
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
-  OpenXmlSchemaTypeChild,
+  OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
@@ -545,7 +545,64 @@ fn gen_open_xml_composite_element_fn(
     field_init_list.push(attr_name_ident);
   }
 
-  if !t.children.is_empty() {
+  let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+  for child in &t.children {
+    child_map.insert(&child.name, child);
+  }
+
+  if t.is_one_sequence_flatten() {
+    for p in &t.particle.items {
+      let child = child_map
+        .get(p.name.as_str())
+        .ok_or(format!("{:?}", p.name))
+        .unwrap();
+
+      let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+      let child_rename_ser_str = child_name_list
+        .last()
+        .ok_or(format!("{:?}", child.name))
+        .unwrap();
+
+      let child_name_str = if child.property_name.is_empty() {
+        child_rename_ser_str
+      } else {
+        child.property_name.as_str()
+      };
+
+      let child_name_ident: Ident =
+        parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
+
+      if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = vec![];
+          })
+          .unwrap(),
+        );
+      } else {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = None;
+          })
+          .unwrap(),
+        );
+      }
+
+      if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+        field_unwrap_list.push(
+          parse2(quote! {
+            let #child_name_ident = #child_name_ident
+              .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+          })
+          .unwrap(),
+        );
+      }
+
+      field_init_list.push(child_name_ident);
+    }
+  } else if !t.children.is_empty() {
     field_declaration_list.push(
       parse2(quote! {
         let mut children = vec![];
@@ -578,9 +635,14 @@ fn gen_open_xml_composite_element_fn(
 
   let mut child_de_match_map: HashMap<&str, Arm> = HashMap::new();
 
-  for child in &t.children {
-    if !child_variant_name_set.contains(child.name.as_str()) {
-      let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
+  if t.is_one_sequence_flatten() {
+    for p in &t.particle.items {
+      let child = child_map
+        .get(p.name.as_str())
+        .ok_or(format!("{:?}", p.name))
+        .unwrap();
+
+      let (ser_arm, de_arm) = gen_one_sequence_match_arm(p, child, context);
 
       child_ser_match_list.push(ser_arm);
 
@@ -599,8 +661,32 @@ fn gen_open_xml_composite_element_fn(
         .unwrap();
 
       child_de_match_map.insert(child_rename_de_str, de_arm);
+    }
+  } else {
+    for child in &t.children {
+      if !child_variant_name_set.contains(child.name.as_str()) {
+        let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
 
-      child_variant_name_set.insert(child.name.clone());
+        child_ser_match_list.push(ser_arm);
+
+        let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+        let child_rename_ser_str = child_name_list
+          .last()
+          .ok_or(format!("{:?}", child.name))
+          .unwrap();
+
+        let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+        let child_rename_de_str = child_rename_list
+          .last()
+          .ok_or(format!("{:?}", child.name))
+          .unwrap();
+
+        child_de_match_map.insert(child_rename_de_str, de_arm);
+
+        child_variant_name_set.insert(child.name.clone());
+      }
     }
   }
 
@@ -1219,6 +1305,112 @@ fn gen_child_match_arm(
     }
   })
   .unwrap();
+
+  (ser_arm, de_arm)
+}
+
+fn gen_one_sequence_match_arm(
+  p: &OpenXmlSchemaTypeParticle,
+  child: &OpenXmlSchemaTypeChild,
+  context: &GenContext,
+) -> (Arm, Arm) {
+  let child_type = context
+    .type_name_type_map
+    .get(child.name.as_str())
+    .ok_or(format!("{:?}", child.name))
+    .unwrap();
+
+  let child_namespace = context
+    .type_name_namespace_map
+    .get(child.name.as_str())
+    .ok_or(format!("{:?}", child.name))
+    .unwrap();
+
+  let child_name_ident: Ident = if child.property_name.is_empty() {
+    let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+    let child_rename_ser_str = child_name_list
+      .last()
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    parse_str(&child_rename_ser_str.to_snake_case()).unwrap()
+  } else {
+    parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
+  };
+
+  let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+  let child_rename_ser_str = child_name_list
+    .last()
+    .ok_or(format!("{:?}", child.name))
+    .unwrap();
+
+  let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+  let child_rename_de_str = child_rename_list
+    .last()
+    .ok_or(format!("{:?}", child.name))
+    .unwrap();
+
+  let child_rename_ser_literal: LitByteStr =
+    parse_str(&format!("b\"{}\"", child_rename_ser_str)).unwrap();
+
+  let child_rename_de_literal: LitByteStr =
+    parse_str(&format!("b\"{}\"", child_rename_de_str)).unwrap();
+
+  let scheme_mod = context
+    .prefix_schema_mod_map
+    .get(child_namespace.prefix.as_str())
+    .ok_or(format!("{:?}", child_namespace.prefix))
+    .unwrap();
+
+  let child_variant_type: Type = parse_str(&format!(
+    "crate::schemas::{}::{}",
+    scheme_mod,
+    child_type.class_name.to_upper_camel_case()
+  ))
+  .unwrap();
+
+  let ser_arm: Arm = if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+    parse2(quote! {
+      #child_rename_ser_literal => {
+        #child_name_ident.push(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        );
+      }
+    })
+    .unwrap()
+  } else {
+    parse2(quote! {
+      #child_rename_ser_literal => {
+        #child_name_ident = Some(std::boxed::Box::new(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        ));
+      }
+    })
+    .unwrap()
+  };
+
+  let de_arm: Arm = if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+    parse2(quote! {
+      #child_rename_de_literal => {
+        #child_name_ident.push(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        );
+      }
+    })
+    .unwrap()
+  } else {
+    parse2(quote! {
+      #child_rename_de_literal => {
+        #child_name_ident = Some(std::boxed::Box::new(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        ));
+      }
+    })
+    .unwrap()
+  };
 
   (ser_arm, de_arm)
 }

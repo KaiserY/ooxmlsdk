@@ -77,14 +77,20 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
         fields.push(gen_attr(attr, schema_namespace, context));
       }
 
-      let (field_option, enum_option) =
-        gen_children(&t.class_name, &t.children, schema_namespace, context);
+      if t.is_one_sequence_flatten() {
+        let one_sequence_fields = gen_one_sequence_fields(t, schema_namespace, context);
 
-      if let Some(field) = field_option {
-        fields.push(field);
+        fields.extend(one_sequence_fields);
+      } else {
+        let (field_option, enum_option) =
+          gen_children(&t.class_name, &t.children, schema_namespace, context);
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        child_choice_enum_option = enum_option;
       }
-
-      child_choice_enum_option = enum_option;
     } else if t.is_derived {
       let base_class_type = context
         .type_name_type_map
@@ -384,4 +390,97 @@ pub fn gen_child_type(
     ))
     .unwrap()
   }
+}
+
+pub fn gen_one_sequence_fields(
+  t: &OpenXmlSchemaType,
+  schema_namespace: &OpenXmlNamespace,
+  context: &GenContext,
+) -> Vec<TokenStream> {
+  let mut fields: Vec<TokenStream> = vec![];
+
+  let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+  for child in &t.children {
+    child_map.insert(&child.name, child);
+  }
+
+  for p in &t.particle.items {
+    let child = child_map
+      .get(p.name.as_str())
+      .ok_or(format!("{:?}", p.name))
+      .unwrap();
+
+    let child_type = context
+      .type_name_type_map
+      .get(child.name.as_str())
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_namespace = context
+      .type_name_namespace_map
+      .get(child.name.as_str())
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
+      let scheme_mod = context
+        .prefix_schema_mod_map
+        .get(child_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", child_namespace.prefix))
+        .unwrap();
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        child_type.class_name.to_upper_camel_case()
+      ))
+      .unwrap()
+    } else {
+      parse_str(&child_type.class_name.to_upper_camel_case()).unwrap()
+    };
+
+    let child_name_ident: Ident = if child.property_name.is_empty() {
+      let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+      let child_rename_ser_str = child_name_list
+        .last()
+        .ok_or(format!("{:?}", child.name))
+        .unwrap();
+
+      parse_str(&child_rename_ser_str.to_snake_case()).unwrap()
+    } else {
+      parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
+    };
+
+    let property_comments = if child.property_comments.is_empty() {
+      " _"
+    } else {
+      &child.property_comments
+    };
+
+    if p.occurs.is_empty() {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+      });
+    } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: std::boxed::Box<#child_variant_type>,
+      });
+    } else if p.occurs[0].max > 1 {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: Vec<#child_variant_type>,
+      });
+    } else {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+      });
+    }
+  }
+
+  fields
 }

@@ -17,7 +17,7 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 ## What's missing
 
 - No validation
-- No Particle: all xml children is in a flattern `children` vector of enum
+- No Particle: all xml children is in a flattern `children` vector of enum (`OneSequence` is supported, xml children are represented as struct's fields)
 
 ## Project Structure
 

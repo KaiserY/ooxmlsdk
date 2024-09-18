@@ -198,9 +198,18 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     })
     .unwrap();
 
+    let part_save_fn: ItemFn = parse2(quote! {
+      pub fn save(&self, _path: &str) -> Result<(), crate::common::SdkError> {
+        Ok(())
+      }
+    })
+    .unwrap();
+
     let part_impl: ItemImpl = parse2(quote! {
       impl #struct_name_ident {
         #part_new_fn
+
+        #part_save_fn
       }
     })
     .unwrap();
@@ -413,6 +422,75 @@ fn gen_child_part_fields(
             #init_ident = true;
 
             #prefix_target_path_ident = Some(file_path.to_string());
+          }})
+          .unwrap(),
+        );
+      }
+    } else if child_part.children.len() == 1 {
+      let child_part_child = context
+        .part_name_part_map
+        .get(child_part.children[0].name.as_str())
+        .ok_or(format!("{:?}", child_part.children[0].name))
+        .unwrap();
+
+      let child_part_child_name_ident: Ident =
+        parse_str(&child_part.children[0].api_name.to_snake_case()).unwrap();
+
+      let child_part_child_type: Type = parse_str(&format!(
+        "crate::parts::{}::{}",
+        child_part_child.name.to_snake_case(),
+        child_part_child.name.to_upper_camel_case(),
+      ))
+      .unwrap();
+
+      if let Some(root_element_type) = context
+        .part_name_type_map
+        .get(child_part_child.name.as_str())
+      {
+        let root_element_type_namespace = context
+          .type_name_namespace_map
+          .get(root_element_type.name.as_str())
+          .ok_or(format!("{:?}", root_element_type.name))
+          .unwrap();
+
+        let scheme_mod = context
+          .prefix_schema_mod_map
+          .get(root_element_type_namespace.prefix.as_str())
+          .ok_or(format!("{:?}", root_element_type_namespace.prefix))
+          .unwrap();
+
+        let field_type: Type = parse_str(&format!(
+          "crate::schemas::{}::{}",
+          scheme_mod,
+          root_element_type.class_name.to_upper_camel_case()
+        ))
+        .unwrap();
+
+        let root_element_ident: Ident = parse_str("root_element").unwrap();
+
+        let target_path_str = format!(
+          "{}{}/{}/{}",
+          path_prefix, child_part.paths.general, child_part.target, child_part_child.target
+        );
+
+        let target_path = clean(target_path_str);
+
+        let target_path = target_path.to_string_lossy().replace("\\", "/");
+
+        match_default_expr_list.push(
+          parse2(quote! {
+            file_path.starts_with(#target_path)
+          })
+          .unwrap(),
+        );
+
+        match_default_block_list.push(
+          parse2(quote! {{
+            #prefix_ident.push(#child_type {
+              #child_part_child_name_ident: Some(std::boxed::Box::new(#child_part_child_type {
+                #root_element_ident: std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?),
+              })),
+            });
           }})
           .unwrap(),
         );

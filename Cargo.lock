@@ -487,6 +487,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "read_pptx"
+version = "0.1.5"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
 name = "read_xlsx"
 version = "0.1.5"
 dependencies = [

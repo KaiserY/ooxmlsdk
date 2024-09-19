@@ -1016,7 +1016,7 @@ fn gen_child_writer_stmt_list(
 
       writer_stmt_list.push(
         parse2(quote! {
-          zip.write_all(&self.#child_ident.root_element.to_string(#with_xmlns)?.as_bytes())?;
+          zip.write_all(self.#child_ident.root_element.to_string(#with_xmlns)?.as_bytes())?;
         })
         .unwrap(),
       );

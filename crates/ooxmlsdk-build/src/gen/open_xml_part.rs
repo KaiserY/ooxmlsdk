@@ -41,6 +41,14 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub path: String,
     });
+  } else if part.name == "CoreFilePropertiesPart" {
+    fields.push(quote! {
+      pub content: String,
+    });
+  } else if part.base == "StylesPart" {
+    fields.push(quote! {
+      pub root_element: std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles>,
+    });
   }
 
   for child in &part.children {
@@ -158,6 +166,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     let part_new_fn: ItemFn = parse2(quote! {
       pub fn new(path: &str) -> Result<Self, crate::common::SdkError> {
+        use std::io::Read;
+
         let zip_file = std::fs::File::open(path)?;
 
         let reader = std::io::BufReader::new(zip_file);
@@ -167,7 +177,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         #( #field_declaration_list )*
 
         for i in 0..archive.len() {
-          let file = archive.by_index(i)?;
+          let mut file = archive.by_index(i)?;
 
           let file_path = match file.enclosed_name() {
             Some(path) => path.to_string_lossy().to_string(),
@@ -426,7 +436,7 @@ fn gen_child_part_fields(
           .unwrap(),
         );
       }
-    } else if child_part.children.len() == 1 {
+    } else if part_child.api_name == "CustomXmlParts" {
       let child_part_child = context
         .part_name_part_map
         .get(child_part.children[0].name.as_str())
@@ -496,6 +506,93 @@ fn gen_child_part_fields(
         );
       }
     }
+  } else if part_child.name == "CoreFilePropertiesPart" {
+    let content_path_str = format!(
+      "{}{}/{}.xml",
+      path_prefix, child_part.paths.general, child_part.target
+    );
+
+    let content_path = clean(content_path_str);
+
+    let content_path = content_path.to_string_lossy().replace("\\", "/");
+
+    field_match_list.push(
+      parse2(quote! {
+        #content_path => {
+          let mut buffer = String::new();
+
+          file.read_to_string(&mut buffer)?;
+
+          #prefix_ident = Some(std::boxed::Box::new(#child_type {
+            content: buffer,
+          }));
+        }
+      })
+      .unwrap(),
+    );
+  } else if child_part.base == "StylesPart" {
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut #init_ident = false;
+      })
+      .unwrap(),
+    );
+
+    let field_type: Type =
+      parse_str("crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles")
+        .unwrap();
+
+    let root_element_ident: Ident = parse_str("root_element").unwrap();
+
+    let prefix_root_element = format!("{}_root_element", part_prefix.to_snake_case());
+
+    let prefix_root_element_ident: Ident = parse_str(&prefix_root_element).unwrap();
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut #prefix_root_element_ident: Option<std::boxed::Box<#field_type>> = None;
+      })
+      .unwrap(),
+    );
+
+    child_field_value_list.push(
+      parse2(quote! {
+        #root_element_ident: #prefix_root_element_ident
+        .ok_or_else(|| crate::common::SdkError::CommonError(#prefix_root_element.to_string()))?
+      })
+      .unwrap(),
+    );
+
+    let root_element_path_str = format!(
+      "{}{}/{}.xml",
+      path_prefix, child_part.paths.general, child_part.target
+    );
+
+    let root_element_path = clean(root_element_path_str);
+
+    let root_element_path = root_element_path.to_string_lossy().replace("\\", "/");
+
+    field_match_list.push(
+        parse2(quote! {
+          #root_element_path => {
+            #init_ident = true;
+
+            #prefix_root_element_ident = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(file))?));
+          }
+        })
+        .unwrap(),
+      );
+
+    child_field_stmt_list.push(
+      parse2(quote! {
+        if #init_ident {
+          #prefix_ident = Some(std::boxed::Box::new(#child_type {
+            #( #child_field_value_list, )*
+          }));
+        }
+      })
+      .unwrap(),
+    );
   } else {
     field_declaration_list.push(
       parse2(quote! {

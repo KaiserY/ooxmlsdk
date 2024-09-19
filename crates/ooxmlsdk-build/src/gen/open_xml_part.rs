@@ -2,6 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use path_clean::clean;
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::collections::HashSet;
 use syn::{
   parse2, parse_str, Arm, Block, Expr, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type,
 };
@@ -104,6 +105,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
       gen_child_part_fields(
         child,
+        &part.name,
         &child.api_name,
         &part.paths.general,
         context,
@@ -208,8 +210,62 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     })
     .unwrap();
 
+    let mut directory_set: HashSet<String> = HashSet::new();
+
+    let mut writer_stmt_list: Vec<Stmt> = vec![];
+
+    for child in &part.children {
+      if child.is_data_part_reference {
+        continue;
+      }
+
+      gen_child_writer_stmt_list(
+        child,
+        &part.name,
+        "",
+        "",
+        true,
+        context,
+        &mut directory_set,
+        &mut writer_stmt_list,
+      );
+    }
+
+    let add_directory_stmt_list: Vec<Stmt> = directory_set
+      .iter()
+      .map(|d| {
+        parse2(quote! {
+          zip.add_directory(#d, zip::write::SimpleFileOptions::default())?;
+        })
+        .unwrap()
+      })
+      .collect();
+
     let part_save_fn: ItemFn = parse2(quote! {
-      pub fn save(&self, _path: &str) -> Result<(), crate::common::SdkError> {
+      pub fn save(&self, path: &str) -> Result<(), crate::common::SdkError> {
+        use std::io::prelude::*;
+
+        let path = std::path::Path::new(path);
+
+        let file = std::fs::File::create(path)?;
+
+        let mut zip = zip::ZipWriter::new(file);
+
+        zip.add_directory("test/", zip::write::SimpleFileOptions::default())?;
+
+        #( #add_directory_stmt_list )*
+
+        let options = zip::write::SimpleFileOptions::default()
+          .compression_method(zip::CompressionMethod::Stored)
+          .unix_permissions(0o755);
+
+        zip.start_file("test/aa.txt", options)?;
+        zip.write_all(b"Hello, World!\n")?;
+
+        #( #writer_stmt_list )*
+
+        zip.finish()?;
+
         Ok(())
       }
     })
@@ -239,6 +295,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 #[allow(clippy::too_many_arguments)]
 fn gen_child_part_fields(
   part_child: &OpenXmlPartChild,
+  package: &str,
   part_prefix: &str,
   path_prefix: &str,
   context: &GenContext,
@@ -643,10 +700,28 @@ fn gen_child_part_fields(
         .unwrap(),
       );
 
-      let root_element_path_str = format!(
-        "{}{}/{}.xml",
-        path_prefix, child_part.paths.general, child_part.target
-      );
+      let root_element_path_str =
+        if !child_part.paths.word.is_empty() && package == "WordprocessingDocument" {
+          format!(
+            "{}{}/{}.xml",
+            path_prefix, child_part.paths.word, child_part.target
+          )
+        } else if !child_part.paths.excel.is_empty() && package == "SpreadsheetDocument" {
+          format!(
+            "{}{}/{}.xml",
+            path_prefix, child_part.paths.excel, child_part.target
+          )
+        } else if !child_part.paths.power_point.is_empty() && package == "PresentationDocument" {
+          format!(
+            "{}{}/{}.xml",
+            path_prefix, child_part.paths.power_point, child_part.target
+          )
+        } else {
+          format!(
+            "{}{}/{}.xml",
+            path_prefix, child_part.paths.general, child_part.target
+          )
+        };
 
       let root_element_path = clean(root_element_path_str);
 
@@ -796,6 +871,7 @@ fn gen_child_part_fields(
 
         gen_child_part_fields(
           child,
+          package,
           &format!("{}{}", part_prefix, child.api_name),
           &format!("{}{}/", path_prefix, child_part.paths.general),
           context,
@@ -870,5 +946,91 @@ fn gen_child_part_fields(
       })
       .unwrap(),
     );
+  }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn gen_child_writer_stmt_list(
+  part_child: &OpenXmlPartChild,
+  package: &str,
+  _part_prefix: &str,
+  path_prefix: &str,
+  with_xmlns: bool,
+  context: &GenContext,
+  directory_set: &mut HashSet<String>,
+  writer_stmt_list: &mut Vec<Stmt>,
+) {
+  let child_part = context
+    .part_name_part_map
+    .get(part_child.name.as_str())
+    .ok_or(format!("{:?}", part_child.name))
+    .unwrap();
+
+  if context
+    .part_name_type_map
+    .contains_key(child_part.name.as_str())
+  {
+    let child_ident: Ident = parse_str(&part_child.api_name.to_snake_case()).unwrap();
+
+    let root_element_path_str =
+      if !child_part.paths.word.is_empty() && package == "WordprocessingDocument" {
+        format!("{}{}/", path_prefix, child_part.paths.word)
+      } else if !child_part.paths.excel.is_empty() && package == "SpreadsheetDocument" {
+        format!("{}{}/", path_prefix, child_part.paths.excel)
+      } else if !child_part.paths.power_point.is_empty() && package == "PresentationDocument" {
+        format!("{}{}/", path_prefix, child_part.paths.power_point)
+      } else {
+        format!("{}{}/", path_prefix, child_part.paths.general)
+      };
+
+    let root_element_file_str = format!("{}{}.xml", root_element_path_str, child_part.target);
+
+    let root_element_path = clean(root_element_path_str)
+      .to_string_lossy()
+      .replace("\\", "/");
+
+    let root_element_file_path = clean(root_element_file_str)
+      .to_string_lossy()
+      .replace("\\", "/");
+
+    directory_set.insert(root_element_path);
+
+    if part_child.max_occurs_great_than_one {
+      writer_stmt_list.push(
+        parse2(quote! {
+          for child in &self.#child_ident {
+            zip.start_file(#root_element_file_path, options)?;
+
+            zip.write_all(child.root_element.to_string(#with_xmlns)?.as_bytes())?;
+          }
+        })
+        .unwrap(),
+      );
+    } else if part_child.min_occurs_is_non_zero {
+      writer_stmt_list.push(
+        parse2(quote! {
+          zip.start_file(#root_element_file_path, options)?;
+        })
+        .unwrap(),
+      );
+
+      writer_stmt_list.push(
+        parse2(quote! {
+          zip.write_all(&self.#child_ident.root_element.to_string(#with_xmlns)?.as_bytes())?;
+        })
+        .unwrap(),
+      );
+    } else {
+      writer_stmt_list.push(
+        parse2(quote! {
+          if let Some(#child_ident) = &self.#child_ident {
+            zip.start_file(#root_element_file_path, options)?;
+
+            zip.write_all(#child_ident.root_element.to_string(#with_xmlns)?.as_bytes())?;
+          }
+        })
+        .unwrap(),
+      );
+    }
   }
 }

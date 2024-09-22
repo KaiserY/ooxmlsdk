@@ -10,7 +10,7 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 - Deserialize/serialize OOXML (basically all of them) to/from Rust structs
 - Support namespace
 - Read `docx`, `xlsx` and `pptx` file
-- Write `docx`, `xlsx` and `pptx` file (WIP)
+- Write `docx`, `xlsx` and `pptx` file
 - All Rust structs and ser/de code are generated from metadata (`crates/ooxmlsdk/data`)
 - Documentation for Rust structs
 
@@ -27,7 +27,7 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 
 ## Known Issues
 
-- This library raise recursion limit by `#![recursion_limit = "1024"]`, be cautious when use.
+- This library raise recursion limit by `#![recursion_limit = "768"]` for `cargo doc`, you may neet to add it too, be cautious when use.
 
 ## License
 

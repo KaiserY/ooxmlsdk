@@ -570,6 +570,166 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   })
   .unwrap();
 
+  let mut writer_stmt_list: Vec<Stmt> = vec![];
+
+  let mut children_writer_stmt_list: Vec<Stmt> = vec![];
+
+  let part_xml = format!("{}/{}.xml", part.paths.general, part.target);
+
+  let part_path = format!("{}/{}", part.paths.general, part.target);
+
+  let part_name_file_path_ident: Ident =
+    parse_str(&format!("{}_file_path", part.name).to_snake_case()).unwrap();
+
+  if context.part_name_type_map.contains_key(part.name.as_str())
+    || part.base == "StylesPart"
+    || part.base == "CustomUIPart"
+  {
+    writer_stmt_list.push(
+      parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
+          &format!("{}{}", parent_path, #part_xml),
+        );
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let options = zip::write::SimpleFileOptions::default()
+          .compression_method(zip::CompressionMethod::Stored)
+          .unix_permissions(0o755);
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.start_file(&#part_name_file_path_ident, options)?;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.write_all(self.root_element.to_string(with_xmlns)?.as_bytes())?;
+      })
+      .unwrap(),
+    );
+  } else if !part.extension.is_empty()
+    || part.name == "CustomDataPart"
+    || part.name == "CustomXmlPart"
+    || part.name == "InternationalMacroSheetPart"
+  {
+  } else if part.name == "CoreFilePropertiesPart"
+    || part.name == "XmlSignaturePart"
+    || part.name == "MailMergeRecipientDataPart"
+  {
+    writer_stmt_list.push(
+      parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
+          &format!("{}{}", parent_path, #part_path),
+        );
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let options = zip::write::SimpleFileOptions::default()
+          .compression_method(zip::CompressionMethod::Stored)
+          .unix_permissions(0o755);
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.start_file(&#part_name_file_path_ident, options)?;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.write_all(self.content.as_bytes())?;
+      })
+      .unwrap(),
+    );
+  }
+
+  if !part.children.is_empty() {
+    writer_stmt_list.push(
+      parse2(quote! {
+        let child_parent_path = format!("{}{}", parent_path, #path_str);
+      })
+      .unwrap(),
+    );
+  }
+
+  for child in &part.children {
+    if child.is_data_part_reference {
+      continue;
+    }
+
+    let child_api_name_ident: Ident = parse_str(&child.api_name.to_snake_case()).unwrap();
+
+    let child_name_ident: Ident = parse_str(&child.name.to_snake_case()).unwrap();
+
+    if child.max_occurs_great_than_one {
+      children_writer_stmt_list.push(
+        parse2(quote! {
+          for #child_name_ident in &self.#child_api_name_ident {
+            #child_name_ident.save_zip(&child_parent_path, with_xmlns, zip)?;
+          }
+        })
+        .unwrap(),
+      );
+    } else if child.min_occurs_is_non_zero {
+      children_writer_stmt_list.push(
+        parse2(quote! {
+          self.#child_api_name_ident.save_zip(&child_parent_path, with_xmlns, zip)?;
+        })
+        .unwrap(),
+      );
+    } else {
+      children_writer_stmt_list.push(
+        parse2(quote! {
+          if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
+            #child_api_name_ident.save_zip(&child_parent_path, with_xmlns, zip)?;
+          }
+        })
+        .unwrap(),
+      );
+    }
+  }
+
+  let part_save_zip_fn: ItemFn = parse2(quote! {
+    #[allow(unused_variables)]
+    pub(crate) fn save_zip(&self, parent_path: &str, with_xmlns: bool, zip: &mut zip::ZipWriter<std::fs::File>) -> Result<(), crate::common::SdkError> {
+      #( #writer_stmt_list )*
+
+      #( #children_writer_stmt_list )*
+
+      Ok(())
+    }
+  })
+  .unwrap();
+
   if part.base == "OpenXmlPackage" {
     let part_new_fn: ItemFn = parse2(quote! {
       pub fn new(path: &str) -> Result<Self, crate::common::SdkError> {
@@ -599,11 +759,32 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     })
     .unwrap();
 
+    let part_save_fn: ItemFn = parse2(quote! {
+      pub fn save(&self, path: &str) -> Result<(), crate::common::SdkError> {
+        let path = std::path::Path::new(path);
+
+        let file = std::fs::File::create(path)?;
+
+        let mut zip = zip::ZipWriter::new(file);
+
+        self.save_zip("", false, &mut zip)?;
+
+        zip.finish()?;
+
+        Ok(())
+      }
+    })
+    .unwrap();
+
     let part_impl: ItemImpl = parse2(quote! {
       impl #struct_name_ident {
         #part_new_fn
 
         #part_new_from_archive_fn
+
+        #part_save_fn
+
+        #part_save_zip_fn
       }
     })
     .unwrap();
@@ -617,6 +798,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     let part_impl: ItemImpl = parse2(quote! {
       impl #struct_name_ident {
         #part_new_from_archive_fn
+
+        #part_save_zip_fn
       }
     })
     .unwrap();

@@ -42,7 +42,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
     }
 
     token_stream_list.push(quote! {
-      #[derive(Clone, Debug)]
+      #[derive(Clone)]
       pub enum #e_enum_name_ident {
         #( #variants, )*
       }
@@ -157,7 +157,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       token_stream_list.push(quote! {
         #[doc = #summary_doc]
         #[doc = #qualified_doc]
-        #[derive(Clone, Debug)]
+        #[derive(Clone)]
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -168,7 +168,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       token_stream_list.push(quote! {
         #[doc = #summary_doc]
         #[doc = #qualified_doc]
-        #[derive(Clone, Debug)]
+        #[derive(Clone)]
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -340,7 +340,7 @@ pub fn gen_children(
 
   let enum_option = Some(
     parse2(quote! {
-      #[derive(Clone, Debug)]
+      #[derive(Clone)]
       pub enum #child_choice_enum_ident {
         #( #variants )*
       }

@@ -122,3 +122,25 @@ impl<'de> XmlReader<'de> for SliceReader<'de> {
     self.reader.decoder()
   }
 }
+
+pub fn resolve_zip_file_path(path: &str) -> String {
+  let mut stack = Vec::new();
+
+  for component in path.split('/') {
+    match component {
+      "" | "." => {
+        // Ignore empty components and current directory symbol
+      }
+      ".." => {
+        // Go up one directory if possible
+        stack.pop();
+      }
+      _ => {
+        // Add the component to the path
+        stack.push(component);
+      }
+    }
+  }
+  // Join the components back into a path
+  stack.join("/")
+}

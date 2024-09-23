@@ -1,4 +1,5 @@
 use gen::serializer::gen_serializer;
+use gen::validator::gen_validator;
 use heck::ToSnakeCase;
 use models::OpenXmlSchemaEnum;
 use proc_macro2::TokenStream;
@@ -28,6 +29,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let out_deserializers_dir_path = &out_dir_path.join("deserializers");
   let out_serializers_dir_path = &out_dir_path.join("serializers");
   let out_common_dir_path = &out_dir_path.join("common");
+  let out_validators_dir_path = &out_dir_path.join("validators");
 
   let data_dir_path = Path::new(data_dir);
   let data_parts_dir_path = &data_dir_path.join("parts");
@@ -38,6 +40,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   fs::create_dir_all(out_deserializers_dir_path).unwrap();
   fs::create_dir_all(out_serializers_dir_path).unwrap();
   fs::create_dir_all(out_common_dir_path).unwrap();
+  fs::create_dir_all(out_validators_dir_path).unwrap();
 
   let mut parts: Vec<OpenXmlPart> = vec![];
   let mut part_mods: Vec<String> = vec![];
@@ -357,6 +360,46 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let serializers_mod_path = out_serializers_dir_path.join("mod.rs");
 
   fs::write(serializers_mod_path, formatted).unwrap();
+
+  let mut validators_mod_use_list: Vec<ItemMod> = vec![];
+
+  for (i, part) in context.schemas.iter().enumerate() {
+    let schema_mod = &context.schema_mods[i];
+
+    let token_stream = gen_validator(part, &context);
+
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+
+    let part_path = out_validators_dir_path.join(format!("{}.rs", schema_mod));
+
+    fs::write(part_path, formatted).unwrap();
+  }
+
+  for schema_mod in context.schema_mods.iter() {
+    let validator_mod_ident: Ident = parse_str(schema_mod).unwrap();
+
+    let validator_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #validator_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+
+    validators_mod_use_list.push(validator_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    #( #validators_mod_use_list )*
+  };
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let validators_mod_path = out_validators_dir_path.join("mod.rs");
+
+  fs::write(validators_mod_path, formatted).unwrap();
 }
 
 #[cfg(test)]

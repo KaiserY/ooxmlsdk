@@ -619,7 +619,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     writer_stmt_list.push(
       parse2(quote! {
-        zip.write_all(self.root_element.to_string(with_xmlns)?.as_bytes())?;
+        zip.write_all(self.root_element.to_string()?.as_bytes())?;
       })
       .unwrap(),
     );
@@ -694,7 +694,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       children_writer_stmt_list.push(
         parse2(quote! {
           for #child_name_ident in &self.#child_api_name_ident {
-            #child_name_ident.save_zip(&child_parent_path, with_xmlns, zip)?;
+            #child_name_ident.save_zip(&child_parent_path, zip)?;
           }
         })
         .unwrap(),
@@ -702,7 +702,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     } else if child.min_occurs_is_non_zero {
       children_writer_stmt_list.push(
         parse2(quote! {
-          self.#child_api_name_ident.save_zip(&child_parent_path, with_xmlns, zip)?;
+          self.#child_api_name_ident.save_zip(&child_parent_path, zip)?;
         })
         .unwrap(),
       );
@@ -710,7 +710,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       children_writer_stmt_list.push(
         parse2(quote! {
           if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
-            #child_api_name_ident.save_zip(&child_parent_path, with_xmlns, zip)?;
+            #child_api_name_ident.save_zip(&child_parent_path, zip)?;
           }
         })
         .unwrap(),
@@ -720,7 +720,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let part_save_zip_fn: ItemFn = parse2(quote! {
     #[allow(unused_variables)]
-    pub(crate) fn save_zip(&self, parent_path: &str, with_xmlns: bool, zip: &mut zip::ZipWriter<std::fs::File>) -> Result<(), crate::common::SdkError> {
+    pub(crate) fn save_zip(&self, parent_path: &str, zip: &mut zip::ZipWriter<std::fs::File>) -> Result<(), crate::common::SdkError> {
       #( #writer_stmt_list )*
 
       #( #children_writer_stmt_list )*
@@ -767,7 +767,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
         let mut zip = zip::ZipWriter::new(file);
 
-        self.save_zip("", false, &mut zip)?;
+        self.save_zip("", &mut zip)?;
 
         zip.finish()?;
 

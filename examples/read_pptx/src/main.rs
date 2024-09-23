@@ -4,7 +4,7 @@ fn main() {
   let pptx = PresentationDocument::new("examples/read_pptx/samples/demo.pptx").unwrap();
 
   println!(
-    "{:?}",
-    pptx.presentation_part.root_element.compatibility_mode
+    "{}",
+    pptx.presentation_part.root_element.to_string().unwrap()
   );
 }

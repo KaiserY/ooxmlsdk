@@ -19,3 +19,7 @@ pub mod schemas {
 pub mod serializers {
   include!(concat!(env!("OUT_DIR"), "/serializers/mod.rs"));
 }
+
+pub mod validators {
+  include!(concat!(env!("OUT_DIR"), "/validators/mod.rs"));
+}

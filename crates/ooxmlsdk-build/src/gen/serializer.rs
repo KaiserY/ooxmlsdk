@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Stmt, Type};
+use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, Stmt, Type};
 
 use crate::models::{OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -176,30 +176,39 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
           };
 
           if p.occurs.is_empty() {
-            child_stmt_list.push(parse2(quote! {
+            child_stmt_list.push(
+              parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&quick_xml::escape::escape(&#child_name_ident.to_string(with_xmlns)?))?;
+                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
                 }
-              }).unwrap());
+              })
+              .unwrap(),
+            );
           } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-            child_stmt_list.push(parse2(quote! {
-                writer.write_str(&quick_xml::escape::escape(&self.#child_name_ident.to_string(with_xmlns)?))?;
-              }).unwrap());
+            child_stmt_list.push(
+              parse2(quote! {
+                writer.write_str(&self.#child_name_ident.to_string_inner(with_xmlns)?)?;
+              })
+              .unwrap(),
+            );
           } else if p.occurs[0].max > 1 {
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&quick_xml::escape::escape(&child.to_string(with_xmlns)?))?;
+                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
                 }
               })
               .unwrap(),
             );
           } else {
-            child_stmt_list.push(parse2(quote! {
+            child_stmt_list.push(
+              parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&quick_xml::escape::escape(&#child_name_ident.to_string(with_xmlns)?))?;
+                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
                 }
-              }).unwrap());
+              })
+              .unwrap(),
+            );
           }
         }
 
@@ -384,11 +393,38 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       );
     }
 
+    let xmlns_uri_str = &schema_namespace.uri;
+
+    let to_string_fn: ItemFn = if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+      parse2(quote! {
+        #[allow(clippy::inherent_to_string)]
+        pub fn to_string(&self) -> Result<String, crate::common::SdkError> {
+          self.to_string_inner(
+            if let Some(xmlns) = &self.xmlns {
+              xmlns != #xmlns_uri_str
+            } else {
+              true
+            }
+          )
+        }
+      })
+      .unwrap()
+    } else {
+      parse2(quote! {
+        #[allow(clippy::inherent_to_string)]
+        pub fn to_string(&self) -> Result<String, crate::common::SdkError> {
+          self.to_string_inner(false)
+        }
+      })
+      .unwrap()
+    };
+
     token_stream_list.push(
       parse2(quote! {
         impl #struct_type {
-          #[allow(clippy::inherent_to_string)]
-          pub fn to_string(&self, with_xmlns: bool) -> Result<String, crate::common::SdkError> {
+          #to_string_fn
+
+          pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, crate::common::SdkError> {
             use std::fmt::Write;
 
             let mut writer = String::new();
@@ -478,7 +514,7 @@ fn gen_child_arm(child: &OpenXmlSchemaTypeChild, child_choice_enum_type: &Type) 
     parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
 
   parse2(quote! {
-    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_string(with_xmlns)?,
+    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_string_inner(with_xmlns)?,
   })
   .unwrap()
 }

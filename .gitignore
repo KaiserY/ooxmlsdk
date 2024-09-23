@@ -25,3 +25,4 @@ crates/ooxmlsdk-build/src/parts
 crates/ooxmlsdk-build/src/deserializers
 crates/ooxmlsdk-build/src/serializers
 crates/ooxmlsdk-build/src/common
+crates/ooxmlsdk-build/src/validators

@@ -73,6 +73,20 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       || t.base_class == "OpenXmlPartRootElement"
       || t.base_class == "SdtElement"
     {
+      if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+        fields.push(quote! {
+          pub xmlns: Option<String>,
+        });
+
+        fields.push(quote! {
+          pub xmlns_map: std::collections::HashMap<String, String>,
+        });
+
+        fields.push(quote! {
+          pub mc_ignorable: Option<String>,
+        });
+      }
+
       for attr in &t.attributes {
         fields.push(gen_attr(attr, schema_namespace, context));
       }

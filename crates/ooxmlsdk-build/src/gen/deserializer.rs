@@ -506,6 +506,33 @@ fn gen_open_xml_composite_element_fn(
   let mut field_init_list: Vec<Ident> = vec![];
   let mut child_ser_match_list: Vec<Arm> = vec![];
 
+  if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut xmlns = None;
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut mc_ignorable = None;
+      })
+      .unwrap(),
+    );
+
+    field_init_list.push(parse_str("xmlns").unwrap());
+    field_init_list.push(parse_str("xmlns_map").unwrap());
+    field_init_list.push(parse_str("mc_ignorable").unwrap());
+  }
+
   for attr in &t.attributes {
     let attr_name_str = if attr.property_name.is_empty() {
       escape_snake_case(attr.q_name.to_snake_case())
@@ -715,13 +742,42 @@ fn gen_open_xml_composite_element_fn(
   let xmlns_literal: LitByteStr =
     parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
 
-  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
+  let attr_match_stmt: Stmt = if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+    parse2(quote! {
+      for attr in e.attributes() {
+        let attr = attr?;
+
+        match attr.key.as_ref() {
+          #( #attr_match_list )*
+          b"xmlns" => xmlns = Some(
+            attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
+          ),
+          b"mc:Ignorable" => mc_ignorable = Some(
+            attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
+          ),
+          key => {
+            if key.starts_with(b"xmlns:") {
+              xmlns_map.insert(
+                String::from_utf8_lossy(&key[6..]).to_string(),
+                attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
+              );
+
+              if key == #xmlns_literal {
+                with_xmlns = true;
+              }
+            }
+          },
+        }
+      }
+    })
+    .unwrap()
+  } else if attr_match_list.is_empty() {
     parse2(quote! {
       for attr in e.attributes() {
         let attr = attr?;
 
         if attr.key.as_ref() == #xmlns_literal {
-          with_xmlns = true
+          with_xmlns = true;
         }
       }
     })

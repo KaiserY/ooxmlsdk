@@ -1,13 +1,10 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Write;
+use std::collections::HashMap;
 use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Stmt, Type};
 
-use crate::models::{
-  OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild,
-};
+use crate::models::{OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
 
@@ -348,49 +345,44 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       #( #variants )*
     };
 
-    let xmlns_attr_writer: TokenStream = if t.part.is_empty() {
-      quote! {}
-    } else {
-      let mut prefix_set: HashSet<&str> = HashSet::new();
-      let mut name_set: HashSet<&str> = HashSet::new();
+    let mut xmlns_attr_writer_list: Vec<Stmt> = vec![];
 
-      gen_xmlns_prefix_list(t, context, &mut prefix_set, &mut name_set);
-
-      let mut xmlns_str = String::new();
-
-      for prefix in prefix_set {
-        let prefix_namespace = context
-          .prefix_namespace_map
-          .get(prefix)
-          .ok_or(format!("{:?}", t.base_class))
-          .unwrap();
-
-        match schema_namespace.prefix.as_str() {
-          "x" => {
-            if prefix == schema_namespace.prefix {
-              xmlns_str.write_str(" xmlns").unwrap();
-            } else {
-              xmlns_str.write_str(" xmlns:").unwrap();
-              xmlns_str.write_str(prefix).unwrap();
-            }
+    if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+      xmlns_attr_writer_list.push(
+        parse2(quote! {
+          if let Some(xmlns) = &self.xmlns {
+            writer.write_str(r#" xmlns=""#)?;
+            writer.write_str(xmlns)?;
+            writer.write_str("\"")?;
           }
-          _ => {
-            xmlns_str.write_str(" xmlns:").unwrap();
-            xmlns_str.write_str(prefix).unwrap();
+        })
+        .unwrap(),
+      );
+
+      xmlns_attr_writer_list.push(
+        parse2(quote! {
+          for (k, v) in &self.xmlns_map {
+            writer.write_str(" xmlns:")?;
+            writer.write_str(k)?;
+            writer.write_str("=\"")?;
+            writer.write_str(v)?;
+            writer.write_str("\"")?;
           }
-        }
+        })
+        .unwrap(),
+      );
 
-        xmlns_str.write_str("=\"").unwrap();
-        xmlns_str.write_str(&prefix_namespace.uri).unwrap();
-        xmlns_str.write_str("\"").unwrap();
-      }
-
-      xmlns_str.write_str(" mc:Ignorable=\"x14ac\"").unwrap();
-
-      quote! {
-        writer.write_str(#xmlns_str)?;
-      }
-    };
+      xmlns_attr_writer_list.push(
+        parse2(quote! {
+          if let Some(mc_ignorable) = &self.mc_ignorable {
+            writer.write_str(r#" mc:Ignorable=""#)?;
+            writer.write_str(mc_ignorable)?;
+            writer.write_str("\"")?;
+          }
+        })
+        .unwrap(),
+      );
+    }
 
     token_stream_list.push(
       parse2(quote! {
@@ -409,7 +401,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
               writer.write_str(#rename_de_str)?;
             }
 
-            #xmlns_attr_writer
+            #( #xmlns_attr_writer_list )*
 
             #attr_writer
 
@@ -470,35 +462,6 @@ fn gen_attr(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
         writer.write_str(&quick_xml::escape::escape(&#attr_name_ident.to_string()))?;
         writer.write_char('"')?;
       }
-    }
-  }
-}
-
-fn gen_xmlns_prefix_list<'a>(
-  t: &'a OpenXmlSchemaType,
-  context: &'a GenContext,
-  prefix_set: &mut HashSet<&'a str>,
-  name_set: &mut HashSet<&'a str>,
-) {
-  prefix_set.insert(&t.name[0..t.name.find(':').unwrap()]);
-
-  name_set.insert(&t.name);
-
-  for attr in &t.attributes {
-    if !attr.q_name.starts_with(':') {
-      prefix_set.insert(&attr.q_name[0..attr.q_name.find(':').unwrap()]);
-    }
-  }
-
-  for child in &t.children {
-    let child_type = context
-      .type_name_type_map
-      .get(child.name.as_str())
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
-
-    if !name_set.contains(child.name.as_str()) {
-      gen_xmlns_prefix_list(child_type, context, prefix_set, name_set);
     }
   }
 }

@@ -26,4 +26,5 @@ pub struct GenContext<'a> {
   pub prefix_schema_map: HashMap<&'a str, &'a OpenXmlSchema>,
   pub part_name_part_map: HashMap<&'a str, &'a OpenXmlPart>,
   pub part_name_part_mod_map: HashMap<&'a str, &'a str>,
+  pub target_type_map: HashMap<String, &'a OpenXmlSchemaType>,
 }

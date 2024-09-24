@@ -59,6 +59,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let prefix_schema_map: HashMap<&str, &OpenXmlSchema> = HashMap::new();
   let part_name_part_map: HashMap<&str, &OpenXmlPart> = HashMap::new();
   let part_name_part_mod_map: HashMap<&str, &str> = HashMap::new();
+  let target_type_map: HashMap<String, &OpenXmlSchemaType> = HashMap::new();
 
   for entry in fs::read_dir(data_parts_dir_path).unwrap() {
     let entry = entry.unwrap();
@@ -126,6 +127,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
     prefix_schema_map,
     part_name_part_map,
     part_name_part_mod_map,
+    target_type_map,
   };
 
   for namespace in context.namespaces.iter() {
@@ -168,6 +170,13 @@ pub fn gen(data_dir: &str, out_dir: &str) {
 
       if !ty.part.is_empty() {
         context.part_name_type_map.insert(&ty.part, ty);
+      }
+
+      if ty.base_class == "OpenXmlPartRootElement" {
+        context.target_type_map.insert(
+          ty.name[ty.name.rfind(':').unwrap() + 1..ty.name.len()].to_string(),
+          ty,
+        );
       }
     }
 

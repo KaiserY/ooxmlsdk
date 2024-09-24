@@ -959,7 +959,64 @@ fn gen_derived_fn(
     children.push(child);
   }
 
-  if !children.is_empty() {
+  let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+  for child in &t.children {
+    child_map.insert(&child.name, child);
+  }
+
+  if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+    for p in &t.particle.items {
+      let child = child_map
+        .get(p.name.as_str())
+        .ok_or(format!("{:?}", p.name))
+        .unwrap();
+
+      let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+      let child_rename_ser_str = child_name_list
+        .last()
+        .ok_or(format!("{:?}", child.name))
+        .unwrap();
+
+      let child_name_str = if child.property_name.is_empty() {
+        child_rename_ser_str
+      } else {
+        child.property_name.as_str()
+      };
+
+      let child_name_ident: Ident =
+        parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
+
+      if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = vec![];
+          })
+          .unwrap(),
+        );
+      } else {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = None;
+          })
+          .unwrap(),
+        );
+      }
+
+      if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+        field_unwrap_list.push(
+          parse2(quote! {
+            let #child_name_ident = #child_name_ident
+              .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+          })
+          .unwrap(),
+        );
+      }
+
+      field_init_list.push(child_name_ident);
+    }
+  } else if !children.is_empty() {
     field_declaration_list.push(
       parse2(quote! {
         let mut children = vec![];
@@ -1006,9 +1063,14 @@ fn gen_derived_fn(
 
   let mut child_de_match_map: HashMap<&str, Arm> = HashMap::new();
 
-  for child in children.iter() {
-    if !child_variant_name_set.contains(child.name.as_str()) {
-      let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
+  if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+    for p in &t.particle.items {
+      let child = child_map
+        .get(p.name.as_str())
+        .ok_or(format!("{:?}", p.name))
+        .unwrap();
+
+      let (ser_arm, de_arm) = gen_one_sequence_match_arm(p, child, context);
 
       child_ser_match_list.push(ser_arm);
 
@@ -1027,8 +1089,32 @@ fn gen_derived_fn(
         .unwrap();
 
       child_de_match_map.insert(child_rename_de_str, de_arm);
+    }
+  } else {
+    for child in children.iter() {
+      if !child_variant_name_set.contains(child.name.as_str()) {
+        let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
 
-      child_variant_name_set.insert(&child.name);
+        child_ser_match_list.push(ser_arm);
+
+        let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+        let child_rename_ser_str = child_name_list
+          .last()
+          .ok_or(format!("{:?}", child.name))
+          .unwrap();
+
+        let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+        let child_rename_de_str = child_rename_list
+          .last()
+          .ok_or(format!("{:?}", child.name))
+          .unwrap();
+
+        child_de_match_map.insert(child_rename_de_str, de_arm);
+
+        child_variant_name_set.insert(&child.name);
+      }
     }
   }
 

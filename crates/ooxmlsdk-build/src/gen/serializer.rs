@@ -319,6 +319,90 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             writer.write_str("/>")?;
           };
         }
+      } else if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+        let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+        for child in &t.children {
+          child_map.insert(&child.name, child);
+        }
+
+        let mut child_stmt_list: Vec<Stmt> = vec![];
+
+        for p in &t.particle.items {
+          let child = child_map
+            .get(p.name.as_str())
+            .ok_or(format!("{:?}", p.name))
+            .unwrap();
+
+          let child_name_ident: Ident = if child.property_name.is_empty() {
+            let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+            let child_rename_ser_str = child_name_list
+              .last()
+              .ok_or(format!("{:?}", child.name))
+              .unwrap();
+
+            parse_str(&child_rename_ser_str.to_snake_case()).unwrap()
+          } else {
+            parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
+          };
+
+          if p.occurs.is_empty() {
+            child_stmt_list.push(
+              parse2(quote! {
+                if let Some(#child_name_ident) = &self.#child_name_ident {
+                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
+                }
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+            child_stmt_list.push(
+              parse2(quote! {
+                writer.write_str(&self.#child_name_ident.to_string_inner(with_xmlns)?)?;
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].max > 1 {
+            child_stmt_list.push(
+              parse2(quote! {
+                for child in &self.#child_name_ident {
+                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
+                }
+              })
+              .unwrap(),
+            );
+          } else {
+            child_stmt_list.push(
+              parse2(quote! {
+                if let Some(#child_name_ident) = &self.#child_name_ident {
+                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
+                }
+              })
+              .unwrap(),
+            );
+          }
+        }
+
+        children_writer = quote! {
+          #( #child_stmt_list )*
+        };
+
+        end_tag_writer = quote! {
+          writer.write_char('>')?;
+        };
+
+        end_writer = quote! {
+          writer.write_str("</")?;
+
+          if with_xmlns {
+            writer.write_str(#rename_ser_str)?;
+          } else {
+            writer.write_str(#rename_de_str)?;
+          }
+
+          writer.write_char('>')?;
+        };
       } else {
         children_writer = quote! {
           for child in &self.children {

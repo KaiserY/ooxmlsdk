@@ -42,20 +42,42 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub path: String,
     });
-  } else if part.name == "CoreFilePropertiesPart"
-    || part.name == "XmlSignaturePart"
-    || part.name == "MailMergeRecipientDataPart"
+  } else if context.target_type_map.contains_key(&part.root_element)
+    || context.target_type_map.contains_key(&part.target)
   {
+    let target_type = if let Some(target_type) = context.target_type_map.get(&part.root_element) {
+      target_type
+    } else if let Some(target_type) = context.target_type_map.get(&part.target) {
+      target_type
+    } else {
+      panic!("{:?}", part);
+    };
+
+    let target_type_namespace = context
+      .type_name_namespace_map
+      .get(target_type.name.as_str())
+      .ok_or(format!("{:?}", target_type.name))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(target_type_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", target_type_namespace.prefix))
+      .unwrap();
+
+    let field_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      target_type.class_name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    fields.push(quote! {
+      pub root_element: std::boxed::Box<#field_type>,
+    });
+  } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
     fields.push(quote! {
       pub content: String,
-    });
-  } else if part.base == "StylesPart" {
-    fields.push(quote! {
-      pub root_element: std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles>,
-    });
-  } else if part.base == "CustomUIPart" {
-    fields.push(quote! {
-      pub root_element: std::boxed::Box<crate::schemas::schemas_microsoft_com_office_2006_01_customui::CustomUi>,
     });
   }
 
@@ -150,10 +172,55 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
-  } else if part.name == "CoreFilePropertiesPart"
-    || part.name == "XmlSignaturePart"
-    || part.name == "MailMergeRecipientDataPart"
+  } else if context.target_type_map.contains_key(&part.root_element)
+    || context.target_type_map.contains_key(&part.target)
   {
+    let target_type = if let Some(target_type) = context.target_type_map.get(&part.root_element) {
+      target_type
+    } else if let Some(target_type) = context.target_type_map.get(&part.target) {
+      target_type
+    } else {
+      panic!("{:?}", part);
+    };
+
+    let target_type_namespace = context
+      .type_name_namespace_map
+      .get(target_type.name.as_str())
+      .ok_or(format!("{:?}", target_type.name))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(target_type_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", target_type_namespace.prefix))
+      .unwrap();
+
+    let field_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      target_type.class_name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    field_init_list.push(parse2(quote! {
+      let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
+    }).unwrap());
+
+    field_unwrap_list.push(
+      parse2(quote! {
+        let root_element = root_element
+          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        root_element
+      })
+      .unwrap(),
+    );
+  } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
     field_declaration_list.push(
       parse2(quote! {
         use std::io::Read;
@@ -185,48 +252,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     self_field_value_list.push(
       parse2(quote! {
         content
-      })
-      .unwrap(),
-    );
-  } else if part.base == "StylesPart" {
-    field_init_list.push(parse2(quote! {
-      let root_element = Some(std::boxed::Box::new(
-        crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles::from_reader(std::io::BufReader::new(archive.by_name(path)?))?,
-      ));
-    }).unwrap());
-
-    field_unwrap_list.push(
-      parse2(quote! {
-        let root_element = root_element
-          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        root_element
-      })
-      .unwrap(),
-    );
-  } else if part.base == "CustomUIPart" {
-    field_init_list.push(parse2(quote! {
-      let root_element = Some(std::boxed::Box::new(
-        crate::schemas::schemas_microsoft_com_office_2006_01_customui::CustomUi::from_reader(std::io::BufReader::new(archive.by_name(path)?))?,
-      ));
-    }).unwrap());
-
-    field_unwrap_list.push(
-      parse2(quote! {
-        let root_element = root_element
-          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        root_element
       })
       .unwrap(),
     );
@@ -283,6 +308,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     if context
       .part_name_type_map
       .contains_key(child_part.name.as_str())
+      || context
+        .target_type_map
+        .contains_key(&child_part.root_element)
+      || context.target_type_map.contains_key(&child_part.target)
     {
       field_init_list.push(
         parse2(quote! {
@@ -439,9 +468,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
           .unwrap(),
         );
       }
-    } else if child_part.name == "CoreFilePropertiesPart"
-      || child_part.name == "MailMergeRecipientDataPart"
-    {
+    } else if child_part.name == "CoreFilePropertiesPart" {
       field_init_list.push(
         parse2(quote! {
           let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
@@ -497,31 +524,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
               #child_api_name_ident.push(#child_name_ident);
             }
           }
-        })
-        .unwrap(),
-      );
-    } else if child_part.base == "StylesPart" || child_part.base == "CustomUIPart" {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_xml),
-          );
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-            Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              file_path,
-              file_path_set,
-              archive,
-            )?))
-          } else {
-            None
-          };
         })
         .unwrap(),
       );
@@ -582,8 +584,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     parse_str(&format!("{}_file_path", part.name).to_snake_case()).unwrap();
 
   if context.part_name_type_map.contains_key(part.name.as_str())
-    || part.base == "StylesPart"
-    || part.base == "CustomUIPart"
+    || context.target_type_map.contains_key(&part.root_element)
+    || context.target_type_map.contains_key(&part.target)
   {
     writer_stmt_list.push(
       parse2(quote! {
@@ -628,10 +630,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     || part.name == "CustomXmlPart"
     || part.name == "InternationalMacroSheetPart"
   {
-  } else if part.name == "CoreFilePropertiesPart"
-    || part.name == "XmlSignaturePart"
-    || part.name == "MailMergeRecipientDataPart"
-  {
+  } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
     writer_stmt_list.push(
       parse2(quote! {
         use std::io::Write;

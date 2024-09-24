@@ -132,14 +132,20 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
 
       let children: Vec<OpenXmlSchemaTypeChild> = children_map.into_values().collect();
 
-      let (field_option, enum_option) =
-        gen_children(&t.class_name, &children, schema_namespace, context);
+      if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+        let one_sequence_fields = gen_one_sequence_fields(t, schema_namespace, context);
 
-      if let Some(field) = field_option {
-        fields.push(field);
+        fields.extend(one_sequence_fields);
+      } else {
+        let (field_option, enum_option) =
+          gen_children(&t.class_name, &children, schema_namespace, context);
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        child_choice_enum_option = enum_option;
       }
-
-      child_choice_enum_option = enum_option;
 
       if children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
         let simple_type_name = gen_child_type(base_class_type, schema_namespace, context);

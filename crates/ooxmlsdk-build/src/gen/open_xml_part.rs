@@ -11,6 +11,12 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let mut fields: Vec<TokenStream> = vec![];
 
+  if part.base == "OpenXmlPackage" {
+    fields.push(quote! {
+      pub content_types: String,
+    });
+  }
+
   if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
     let root_element_type_namespace = context
       .type_name_namespace_map
@@ -34,9 +40,16 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub root_element: std::boxed::Box<#field_type>,
     });
+  } else if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
+    fields.push(quote! {
+      pub prefix: String,
+    });
+
+    fields.push(quote! {
+      pub content: String,
+    });
   } else if !part.extension.is_empty()
     || part.name == "CustomDataPart"
-    || part.name == "CustomXmlPart"
     || part.name == "InternationalMacroSheetPart"
   {
     fields.push(quote! {
@@ -161,9 +174,54 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
+  } else if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
+    field_declaration_list.push(
+      parse2(quote! {
+        use std::io::Read;
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut content = String::new();
+      })
+      .unwrap(),
+    );
+
+    field_init_list.push(
+      parse2(quote! {
+        {
+          let mut file = std::io::BufReader::new(archive.by_name(path)?);
+
+          file.read_to_string(&mut content)?;
+        };
+      })
+      .unwrap(),
+    );
+
+    field_init_list.push(
+      parse2(quote! {
+        let prefix = path.replace(parent_path, "").replace(".xml", "");
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        prefix
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        content
+      })
+      .unwrap(),
+    );
   } else if !part.extension.is_empty()
     || part.name == "CustomDataPart"
-    || part.name == "CustomXmlPart"
     || part.name == "InternationalMacroSheetPart"
   {
     self_field_value_list.push(
@@ -388,9 +446,76 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
           .unwrap(),
         );
       }
+    } else if child_part.name == "CustomXmlPart" {
+      field_init_list.push(
+        parse2(quote! {
+          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
+            &format!("{}{}", child_parent_path, #child_path),
+          );
+        })
+        .unwrap(),
+      );
+
+      field_init_list.push(
+        parse2(quote! {
+          let item_props_path = crate::common::resolve_zip_file_path(
+            &format!("{}../customXml/itemProps", child_parent_path),
+          );
+        })
+        .unwrap(),
+      );
+
+      field_declaration_list.push(
+        parse2(quote! {
+          let mut #child_api_name_ident: Vec<#child_type> = vec![];
+        })
+        .unwrap(),
+      );
+
+      field_init_list.push(
+        parse2(quote! {
+          for file_path in file_path_set.iter() {
+            if file_path.starts_with(&#child_api_name_file_path_ident) && !file_path.starts_with(&item_props_path) {
+              let #child_name_ident = #child_type::new_from_archive(
+                &child_parent_path,
+                file_path,
+                file_path_set,
+                archive,
+              )?;
+
+              #child_api_name_ident.push(#child_name_ident);
+            }
+          }
+        })
+        .unwrap(),
+      );
+    } else if child_part.name == "CustomXmlPropertiesPart" {
+      field_init_list.push(
+        parse2(quote! {
+          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
+            &format!("{}{}{}.xml", child_parent_path, #child_path, self.prefix),
+          );
+        })
+        .unwrap(),
+      );
+
+      field_init_list.push(
+        parse2(quote! {
+          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
+            Some(std::boxed::Box::new(#child_type::new_from_archive(
+              &child_parent_path,
+              file_path,
+              file_path_set,
+              archive,
+            )?))
+          } else {
+            None
+          };
+        })
+        .unwrap(),
+      );
     } else if !child_part.extension.is_empty()
       || child_part.name == "CustomDataPart"
-      || child_part.name == "CustomXmlPart"
       || child_part.name == "InternationalMacroSheetPart"
     {
       field_init_list.push(
@@ -551,6 +676,32 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     );
   }
 
+  if part.base == "OpenXmlPackage" {
+    field_declaration_list.push(
+      parse2(quote! {
+        let content_types = {
+          use std::io::Read;
+
+          let mut content = String::new();
+
+          let mut file = std::io::BufReader::new(archive.by_name("[Content_Types].xml")?);
+
+          file.read_to_string(&mut content)?;
+
+          content
+        };
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        content_types
+      })
+      .unwrap(),
+    );
+  }
+
   let part_new_from_archive_fn: ItemFn = parse2(quote! {
     #[allow(unused_variables)]
     pub(crate) fn new_from_archive(
@@ -625,9 +776,47 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
+  } else if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
+    writer_stmt_list.push(
+      parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
+          &format!("{}{}{}.xml", parent_path, #part_path, self.prefix),
+        );
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let options = zip::write::SimpleFileOptions::default()
+          .compression_method(zip::CompressionMethod::Stored)
+          .unix_permissions(0o755);
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.start_file(&#part_name_file_path_ident, options)?;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.write_all(self.content.as_bytes())?;
+      })
+      .unwrap(),
+    );
   } else if !part.extension.is_empty()
     || part.name == "CustomDataPart"
-    || part.name == "CustomXmlPart"
     || part.name == "InternationalMacroSheetPart"
   {
   } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
@@ -760,11 +949,21 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     let part_save_fn: ItemFn = parse2(quote! {
       pub fn save(&self, path: &str) -> Result<(), crate::common::SdkError> {
+        use std::io::Write;
+
         let path = std::path::Path::new(path);
 
         let file = std::fs::File::create(path)?;
 
         let mut zip = zip::ZipWriter::new(file);
+
+        let options = zip::write::SimpleFileOptions::default()
+          .compression_method(zip::CompressionMethod::Stored)
+          .unix_permissions(0o755);
+
+        zip.start_file("[Content_Types].xml", options)?;
+
+        zip.write_all(self.content_types.as_bytes())?;
 
         self.save_zip("", &mut zip)?;
 

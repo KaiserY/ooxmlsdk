@@ -17,30 +17,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     });
   }
 
-  if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
-    let root_element_type_namespace = context
-      .type_name_namespace_map
-      .get(root_element_type.name.as_str())
-      .ok_or(format!("{:?}", root_element_type.name))
-      .unwrap();
-
-    let scheme_mod = context
-      .prefix_schema_mod_map
-      .get(root_element_type_namespace.prefix.as_str())
-      .ok_or(format!("{:?}", root_element_type_namespace.prefix))
-      .unwrap();
-
-    let field_type: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      scheme_mod,
-      root_element_type.class_name.to_upper_camel_case()
-    ))
-    .unwrap();
-
-    fields.push(quote! {
-      pub root_element: std::boxed::Box<#field_type>,
-    });
-  } else if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
+  if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
     fields.push(quote! {
       pub prefix: String,
     });
@@ -92,6 +69,29 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub content: String,
     });
+  } else if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
+    let root_element_type_namespace = context
+      .type_name_namespace_map
+      .get(root_element_type.name.as_str())
+      .ok_or(format!("{:?}", root_element_type.name))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(root_element_type_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", root_element_type_namespace.prefix))
+      .unwrap();
+
+    let field_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      root_element_type.class_name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    fields.push(quote! {
+      pub root_element: std::boxed::Box<#field_type>,
+    });
   }
 
   for child in &part.children {
@@ -136,45 +136,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   let mut self_field_value_list: Vec<FieldValue> = vec![];
   let mut field_init_list: Vec<Stmt> = vec![];
 
-  if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
-    let root_element_type_namespace = context
-      .type_name_namespace_map
-      .get(root_element_type.name.as_str())
-      .ok_or(format!("{:?}", root_element_type.name))
-      .unwrap();
-
-    let scheme_mod = context
-      .prefix_schema_mod_map
-      .get(root_element_type_namespace.prefix.as_str())
-      .ok_or(format!("{:?}", root_element_type_namespace.prefix))
-      .unwrap();
-
-    let field_type: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      scheme_mod,
-      root_element_type.class_name.to_upper_camel_case()
-    ))
-    .unwrap();
-
-    field_init_list.push(parse2(quote! {
-      let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
-    }).unwrap());
-
-    field_unwrap_list.push(
-      parse2(quote! {
-        let root_element = root_element
-          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        root_element
-      })
-      .unwrap(),
-    );
-  } else if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
+  if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
     field_declaration_list.push(
       parse2(quote! {
         use std::io::Read;
@@ -202,7 +164,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     field_init_list.push(
       parse2(quote! {
-        let prefix = path.replace(parent_path, "").replace(".xml", "");
+        let prefix = path.replace("customXml/item", "").replace(".xml", "");
       })
       .unwrap(),
     );
@@ -313,6 +275,44 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
+  } else if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
+    let root_element_type_namespace = context
+      .type_name_namespace_map
+      .get(root_element_type.name.as_str())
+      .ok_or(format!("{:?}", root_element_type.name))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(root_element_type_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", root_element_type_namespace.prefix))
+      .unwrap();
+
+    let field_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      root_element_type.class_name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    field_init_list.push(parse2(quote! {
+      let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
+    }).unwrap());
+
+    field_unwrap_list.push(
+      parse2(quote! {
+        let root_element = root_element
+          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        root_element
+      })
+      .unwrap(),
+    );
   }
 
   let path_str = if part.paths.general.is_empty() {
@@ -363,90 +363,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     ))
     .unwrap();
 
-    if context
-      .part_name_type_map
-      .contains_key(child_part.name.as_str())
-      || context
-        .target_type_map
-        .contains_key(&child_part.root_element)
-      || context.target_type_map.contains_key(&child_part.target)
-    {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_xml),
-          );
-        })
-        .unwrap(),
-      );
-
-      if child.max_occurs_great_than_one {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_api_name_ident: Vec<#child_type> = vec![];
-          })
-          .unwrap(),
-        );
-
-        field_init_list.push(
-          parse2(quote! {
-            for file_path in file_path_set.iter() {
-              if file_path.starts_with(&#child_api_name_file_path_ident) {
-                let #child_name_ident = #child_type::new_from_archive(
-                  &child_parent_path,
-                  file_path,
-                  file_path_set,
-                  archive,
-                )?;
-
-                #child_api_name_ident.push(#child_name_ident);
-              }
-            }
-          })
-          .unwrap(),
-        );
-      } else if child.min_occurs_is_non_zero {
-        field_init_list.push(
-          parse2(quote! {
-            let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-              Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?))
-            } else {
-              None
-            };
-          })
-          .unwrap(),
-        );
-
-        field_unwrap_list.push(
-          parse2(quote! {
-            let #child_api_name_ident = #child_api_name_ident
-              .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
-          })
-          .unwrap(),
-        );
-      } else {
-        field_init_list.push(
-          parse2(quote! {
-            let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-              Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?))
-            } else {
-              None
-            };
-          })
-          .unwrap(),
-        );
-      }
-    } else if child_part.name == "CustomXmlPart" {
+    if child_part.name == "CustomXmlPart" {
       field_init_list.push(
         parse2(quote! {
           let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
@@ -493,7 +410,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       field_init_list.push(
         parse2(quote! {
           let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}{}.xml", child_parent_path, #child_path, self.prefix),
+            &format!("{}{}{}.xml", child_parent_path, #child_path, prefix),
           );
         })
         .unwrap(),
@@ -652,6 +569,89 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         })
         .unwrap(),
       );
+    } else if context
+      .part_name_type_map
+      .contains_key(child_part.name.as_str())
+      || context
+        .target_type_map
+        .contains_key(&child_part.root_element)
+      || context.target_type_map.contains_key(&child_part.target)
+    {
+      field_init_list.push(
+        parse2(quote! {
+          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
+            &format!("{}{}", child_parent_path, #child_xml),
+          );
+        })
+        .unwrap(),
+      );
+
+      if child.max_occurs_great_than_one {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_api_name_ident: Vec<#child_type> = vec![];
+          })
+          .unwrap(),
+        );
+
+        field_init_list.push(
+          parse2(quote! {
+            for file_path in file_path_set.iter() {
+              if file_path.starts_with(&#child_api_name_file_path_ident) {
+                let #child_name_ident = #child_type::new_from_archive(
+                  &child_parent_path,
+                  file_path,
+                  file_path_set,
+                  archive,
+                )?;
+
+                #child_api_name_ident.push(#child_name_ident);
+              }
+            }
+          })
+          .unwrap(),
+        );
+      } else if child.min_occurs_is_non_zero {
+        field_init_list.push(
+        parse2(quote! {
+          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
+            Some(std::boxed::Box::new(#child_type::new_from_archive(
+              &child_parent_path,
+              file_path,
+              file_path_set,
+              archive,
+            )?))
+          } else {
+            None
+          };
+        })
+        .unwrap(),
+      );
+
+        field_unwrap_list.push(
+        parse2(quote! {
+          let #child_api_name_ident = #child_api_name_ident
+            .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
+        })
+        .unwrap(),
+      );
+      } else {
+        field_init_list.push(
+        parse2(quote! {
+          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
+            Some(std::boxed::Box::new(#child_type::new_from_archive(
+              &child_parent_path,
+              file_path,
+              file_path_set,
+              archive,
+            )?))
+          } else {
+            None
+          };
+        })
+        .unwrap(),
+      );
+      }
     } else if child.max_occurs_great_than_one {
       field_declaration_list.push(
         parse2(quote! {
@@ -734,49 +734,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   let part_name_file_path_ident: Ident =
     parse_str(&format!("{}_file_path", part.name).to_snake_case()).unwrap();
 
-  if context.part_name_type_map.contains_key(part.name.as_str())
-    || context.target_type_map.contains_key(&part.root_element)
-    || context.target_type_map.contains_key(&part.target)
-  {
-    writer_stmt_list.push(
-      parse2(quote! {
-        use std::io::Write;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}{}", parent_path, #part_xml),
-        );
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        let options = zip::write::SimpleFileOptions::default()
-          .compression_method(zip::CompressionMethod::Stored)
-          .unix_permissions(0o755);
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.start_file(&#part_name_file_path_ident, options)?;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.write_all(self.root_element.to_string()?.as_bytes())?;
-      })
-      .unwrap(),
-    );
-  } else if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
+  if part.name == "CustomXmlPart" || part.name == "CustomXmlPropertiesPart" {
     writer_stmt_list.push(
       parse2(quote! {
         use std::io::Write;
@@ -855,6 +813,48 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     writer_stmt_list.push(
       parse2(quote! {
         zip.write_all(self.content.as_bytes())?;
+      })
+      .unwrap(),
+    );
+  } else if context.part_name_type_map.contains_key(part.name.as_str())
+    || context.target_type_map.contains_key(&part.root_element)
+    || context.target_type_map.contains_key(&part.target)
+  {
+    writer_stmt_list.push(
+      parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
+          &format!("{}{}", parent_path, #part_xml),
+        );
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        let options = zip::write::SimpleFileOptions::default()
+          .compression_method(zip::CompressionMethod::Stored)
+          .unix_permissions(0o755);
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.start_file(&#part_name_file_path_ident, options)?;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
+        zip.write_all(self.root_element.to_string()?.as_bytes())?;
       })
       .unwrap(),
     );

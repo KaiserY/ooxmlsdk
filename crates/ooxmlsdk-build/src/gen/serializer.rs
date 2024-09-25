@@ -440,7 +440,16 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
 
     let mut xmlns_attr_writer_list: Vec<Stmt> = vec![];
 
+    let mut xml_header_writer: Option<Stmt> = None;
+
     if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+      xml_header_writer = Some(
+        parse2(quote! {
+          writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
+        })
+        .unwrap(),
+      );
+
       xmlns_attr_writer_list.push(
         parse2(quote! {
           if let Some(xmlns) = &self.xmlns {
@@ -512,6 +521,8 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             use std::fmt::Write;
 
             let mut writer = String::new();
+
+            #xml_header_writer
 
             writer.write_char('<')?;
 

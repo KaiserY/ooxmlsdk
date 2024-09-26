@@ -1,7 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, parse_str, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
+use syn::{parse2, parse_str, Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
 
 use crate::models::OpenXmlPart;
 use crate::GenContext;
@@ -10,8 +10,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   let relationship_type_str = &part.relationship_type;
 
   let relationship_type_stmt: Stmt = parse2(quote! {
-    #[allow(dead_code)]
-    const RELATIONSHIP_TYPE: &'static str = #relationship_type_str;
+    pub const RELATIONSHIP_TYPE: &'static str = #relationship_type_str;
   })
   .unwrap();
 
@@ -23,9 +22,11 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub content_types: std::boxed::Box<crate::packages::opc_content_types::Types>,
     });
+  }
 
+  if !part.children.is_empty() {
     fields.push(quote! {
-      pub relationships: std::boxed::Box<crate::packages::opc_relationships::Relationships>,
+      pub relationships: Option<std::boxed::Box<crate::packages::opc_relationships::Relationships>>,
     });
   }
 
@@ -156,7 +157,91 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   let mut field_declaration_list: Vec<Stmt> = vec![];
   let mut field_unwrap_list: Vec<Stmt> = vec![];
   let mut self_field_value_list: Vec<FieldValue> = vec![];
-  let mut field_init_list: Vec<Stmt> = vec![];
+  let mut children_stmt: Option<Stmt> = None;
+  let mut children_arm_list: Vec<Arm> = vec![];
+
+  let path_str = if part.paths.general.is_empty() {
+    ""
+  } else {
+    &format!("{}/", part.paths.general)
+  };
+
+  let part_rels_path_ident: Ident =
+    parse_str(&format!("{}_rels_path", part.name.to_snake_case())).unwrap();
+
+  if part.base == "OpenXmlPackage" {
+    field_declaration_list.push(
+      parse2(quote! {
+        let content_types = std::boxed::Box::new(
+          crate::packages::opc_content_types::Types::from_reader(
+            std::io::BufReader::new(archive.by_name("[Content_Types].xml")?,
+          ))?,
+        );
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        content_types
+      })
+      .unwrap(),
+    );
+  }
+
+  if !part.children.is_empty() {
+    field_declaration_list.push(
+      parse2(quote! {
+        let child_parent_path = format!("{}{}", parent_path, #path_str);
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let part_target_str = if path.ends_with(".xml") {
+          &path[path
+            .rfind('/')
+            .ok_or_else(|| crate::common::SdkError::CommonError(path.to_string()))?
+            + 1..path.len()]
+        } else {
+          ""
+        };
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let #part_rels_path_ident = crate::common::resolve_zip_file_path(
+          &format!("{}_rels/{}.rels", child_parent_path, part_target_str),
+        );
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let relationships = if let Some(file_path) = file_path_set.get(&#part_rels_path_ident) {
+          Some(std::boxed::Box::new(
+            crate::packages::opc_relationships::Relationships::from_reader(
+              std::io::BufReader::new(archive.by_name(file_path)?,
+            ))?,
+          ))
+        } else {
+          None
+        };
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        relationships
+      })
+      .unwrap(),
+    );
+  }
 
   if part.name == "CustomXmlPart" {
     field_declaration_list.push(
@@ -173,7 +258,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       .unwrap(),
     );
 
-    field_init_list.push(
+    field_declaration_list.push(
       parse2(quote! {
         {
           let mut file = std::io::BufReader::new(archive.by_name(path)?);
@@ -184,7 +269,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       .unwrap(),
     );
 
-    field_init_list.push(
+    field_declaration_list.push(
       parse2(quote! {
         let prefix = path.replace("customXml/item", "").replace(".xml", "");
       })
@@ -251,7 +336,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     ))
     .unwrap();
 
-    field_init_list.push(parse2(quote! {
+    field_declaration_list.push(parse2(quote! {
       let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
     }).unwrap());
 
@@ -284,14 +369,14 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       .unwrap(),
     );
 
-    field_init_list.push(
+    field_declaration_list.push(
       parse2(quote! {
         let mut file = std::io::BufReader::new(archive.by_name(path)?);
       })
       .unwrap(),
     );
 
-    field_init_list.push(
+    field_declaration_list.push(
       parse2(quote! {
         file.read_to_string(&mut content)?;
       })
@@ -312,7 +397,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         &format!("{}/{}", part.paths.general, part.target)
       };
 
-      field_init_list.push(
+      field_declaration_list.push(
         parse2(quote! {
           let prefix = path.replace(
             &crate::common::resolve_zip_file_path(&format!("{}{}", parent_path, #part_path_str)),
@@ -349,7 +434,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     ))
     .unwrap();
 
-    field_init_list.push(parse2(quote! {
+    field_declaration_list.push(parse2(quote! {
       let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
     }).unwrap());
 
@@ -369,69 +454,17 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     );
   }
 
-  let path_str = if part.paths.general.is_empty() {
-    ""
-  } else {
-    &format!("{}/", part.paths.general)
-  };
-
-  if part.base == "OpenXmlPackage" {
-    field_declaration_list.push(
-      parse2(quote! {
-        let content_types = std::boxed::Box::new(
-          crate::packages::opc_content_types::Types::from_reader(
-            std::io::BufReader::new(archive.by_name("[Content_Types].xml")?,
-          ))?,
-        );
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        content_types
-      })
-      .unwrap(),
-    );
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let relationships = std::boxed::Box::new(
-          crate::packages::opc_relationships::Relationships::from_reader(
-            std::io::BufReader::new(archive.by_name("_rels/.rels")?,
-          ))?,
-        );
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        relationships
-      })
-      .unwrap(),
-    );
-  }
-
-  if !part.children.is_empty() {
-    field_init_list.push(
-      parse2(quote! {
-        let child_parent_path = format!("{}{}", parent_path, #path_str);
-      })
-      .unwrap(),
-    );
-  }
-
   for child in &part.children {
     if child.is_data_part_reference {
       continue;
     }
 
-    let child_part = context
-      .part_name_part_map
-      .get(child.name.as_str())
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
+    let child_type: Type = parse_str(&format!(
+      "crate::parts::{}::{}",
+      child.name.to_snake_case(),
+      child.name.to_upper_camel_case(),
+    ))
+    .unwrap();
 
     let child_api_name_str = child.api_name.to_snake_case();
 
@@ -441,39 +474,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     let child_name_ident: Ident = parse_str(&child_name_str).unwrap();
 
-    let child_xml = format!("{}/{}.xml", child_part.paths.general, child_part.target);
-
-    let child_path = format!("{}/{}", child_part.paths.general, child_part.target);
-
-    let child_api_name_file_path_ident: Ident =
-      parse_str(&format!("{}_file_path", child_api_name_str)).unwrap();
-
-    let child_type: Type = parse_str(&format!(
-      "crate::parts::{}::{}",
+    let relationship_type_ty: Type = parse_str(&format!(
+      "crate::parts::{}::RELATIONSHIP_TYPE",
       child.name.to_snake_case(),
-      child.name.to_upper_camel_case(),
     ))
     .unwrap();
 
-    if child_part.name == "CustomXmlPart" {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_path),
-          );
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          let item_props_path = crate::common::resolve_zip_file_path(
-            &format!("{}../customXml/itemProps", child_parent_path),
-          );
-        })
-        .unwrap(),
-      );
-
+    if child.max_occurs_great_than_one {
       field_declaration_list.push(
         parse2(quote! {
           let mut #child_api_name_ident: Vec<#child_type> = vec![];
@@ -481,307 +488,22 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         .unwrap(),
       );
 
-      field_init_list.push(
+      children_arm_list.push(
         parse2(quote! {
-          for file_path in file_path_set.iter() {
-            if file_path.starts_with(&#child_api_name_file_path_ident) && !file_path.starts_with(&item_props_path) {
-              let #child_name_ident = #child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?;
+          #relationship_type_ty => {
+            let target_path = crate::common::resolve_zip_file_path(
+              &format!("{}{}", child_parent_path, relationship.target),
+            );
 
-              #child_api_name_ident.push(#child_name_ident);
-            }
+            let #child_name_ident = #child_type::new_from_archive(
+              &child_parent_path,
+              &target_path,
+              file_path_set,
+              archive,
+            )?;
+
+            #child_api_name_ident.push(#child_name_ident);
           }
-        })
-        .unwrap(),
-      );
-    } else if child_part.name == "CustomXmlPropertiesPart" {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}{}.xml", child_parent_path, #child_path, prefix),
-          );
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-            Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              file_path,
-              file_path_set,
-              archive,
-            )?))
-          } else {
-            None
-          };
-        })
-        .unwrap(),
-      );
-    } else if child_part.name == "ThemePart" {
-      field_declaration_list.push(
-        parse2(quote! {
-          let mut #child_api_name_ident: Option<std::boxed::Box<#child_type>> = None;
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_path),
-          );
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          for file_path in file_path_set.iter() {
-            if file_path.starts_with(&#child_api_name_file_path_ident) {
-              #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?));
-
-              break;
-            }
-          }
-        })
-        .unwrap(),
-      );
-    } else if !child_part.extension.is_empty()
-      || child_part.name == "CustomDataPart"
-      || child_part.name == "InternationalMacroSheetPart"
-    {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_path),
-          );
-        })
-        .unwrap(),
-      );
-
-      if child.max_occurs_great_than_one {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_api_name_ident: Vec<#child_type> = vec![];
-          })
-          .unwrap(),
-        );
-
-        field_init_list.push(
-          parse2(quote! {
-            for file_path in file_path_set.iter() {
-              if file_path.starts_with(&#child_api_name_file_path_ident) {
-                let #child_name_ident = #child_type::new_from_archive(
-                  &child_parent_path,
-                  file_path,
-                  file_path_set,
-                  archive,
-                )?;
-
-                #child_api_name_ident.push(#child_name_ident);
-              }
-            }
-          })
-          .unwrap(),
-        );
-      } else if child.min_occurs_is_non_zero {
-        field_init_list.push(
-          parse2(quote! {
-            let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-              Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?))
-            } else {
-              None
-            };
-          })
-          .unwrap(),
-        );
-
-        field_unwrap_list.push(
-          parse2(quote! {
-            let #child_api_name_ident = #child_api_name_ident
-              .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
-          })
-          .unwrap(),
-        );
-      } else {
-        field_init_list.push(
-          parse2(quote! {
-            let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-              Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?))
-            } else {
-              None
-            };
-          })
-          .unwrap(),
-        );
-      }
-    } else if child_part.name == "CoreFilePropertiesPart" {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_xml),
-          );
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-            Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              file_path,
-              file_path_set,
-              archive,
-            )?))
-          } else {
-            None
-          };
-        })
-        .unwrap(),
-      );
-    } else if child_part.name == "XmlSignaturePart" {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_path),
-          );
-        })
-        .unwrap(),
-      );
-
-      field_declaration_list.push(
-        parse2(quote! {
-          let mut #child_api_name_ident: Vec<#child_type> = vec![];
-        })
-        .unwrap(),
-      );
-
-      field_init_list.push(
-        parse2(quote! {
-          for file_path in file_path_set.iter() {
-            if file_path.starts_with(&#child_api_name_file_path_ident) {
-              let #child_name_ident = #child_type::new_from_archive(
-                &child_parent_path,
-                file_path,
-                file_path_set,
-                archive,
-              )?;
-
-              #child_api_name_ident.push(#child_name_ident);
-            }
-          }
-        })
-        .unwrap(),
-      );
-    } else if context
-      .part_name_type_map
-      .contains_key(child_part.name.as_str())
-      || context
-        .target_type_map
-        .contains_key(&child_part.root_element)
-      || context.target_type_map.contains_key(&child_part.target)
-    {
-      field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_file_path_ident = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, #child_xml),
-          );
-        })
-        .unwrap(),
-      );
-
-      if child.max_occurs_great_than_one {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_api_name_ident: Vec<#child_type> = vec![];
-          })
-          .unwrap(),
-        );
-
-        field_init_list.push(
-          parse2(quote! {
-            for file_path in file_path_set.iter() {
-              if file_path.starts_with(&#child_api_name_file_path_ident) {
-                let #child_name_ident = #child_type::new_from_archive(
-                  &child_parent_path,
-                  file_path,
-                  file_path_set,
-                  archive,
-                )?;
-
-                #child_api_name_ident.push(#child_name_ident);
-              }
-            }
-          })
-          .unwrap(),
-        );
-      } else if child.min_occurs_is_non_zero {
-        field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-            Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              file_path,
-              file_path_set,
-              archive,
-            )?))
-          } else {
-            None
-          };
-        })
-        .unwrap(),
-      );
-
-        field_unwrap_list.push(
-        parse2(quote! {
-          let #child_api_name_ident = #child_api_name_ident
-            .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
-        })
-        .unwrap(),
-      );
-      } else {
-        field_init_list.push(
-        parse2(quote! {
-          let #child_api_name_ident = if let Some(file_path) = file_path_set.get(&#child_api_name_file_path_ident) {
-            Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              file_path,
-              file_path_set,
-              archive,
-            )?))
-          } else {
-            None
-          };
-        })
-        .unwrap(),
-      );
-      }
-    } else if child.max_occurs_great_than_one {
-      field_declaration_list.push(
-        parse2(quote! {
-          let mut #child_api_name_ident: Vec<#child_type> = vec![];
         })
         .unwrap(),
       );
@@ -792,11 +514,61 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         })
         .unwrap(),
       );
+
+      children_arm_list.push(
+        parse2(quote! {
+          #relationship_type_ty => {
+            let target_path = crate::common::resolve_zip_file_path(
+              &format!("{}{}", child_parent_path, relationship.target),
+            );
+
+            #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
+              &child_parent_path,
+              &target_path,
+              file_path_set,
+              archive,
+            )?));
+          }
+        })
+        .unwrap(),
+      );
+
+      if child.min_occurs_is_non_zero {
+        field_unwrap_list.push(
+          parse2(quote! {
+            let #child_api_name_ident = #child_api_name_ident
+                .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
+          })
+          .unwrap(),
+        );
+      }
     }
 
     self_field_value_list.push(
       parse2(quote! {
         #child_api_name_ident
+      })
+      .unwrap(),
+    );
+  }
+
+  if !part.children.is_empty() {
+    children_arm_list.push(
+      parse2(quote! {
+        _ => ()
+      })
+      .unwrap(),
+    );
+
+    children_stmt = Some(
+      parse2(quote! {
+        if let Some(relationships) = &relationships {
+          for relationship in &relationships.relationship {
+            match relationship.r#type.as_str() {
+              #( #children_arm_list, )*
+            }
+          }
+        }
       })
       .unwrap(),
     );
@@ -812,7 +584,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     ) -> Result<Self, crate::common::SdkError> {
       #( #field_declaration_list )*
 
-      #( #field_init_list )*
+      #children_stmt
 
       #( #field_unwrap_list )*
 

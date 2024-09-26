@@ -269,92 +269,62 @@ impl Default {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut with_xmlns = with_xmlns;
 
-    let mut empty_tag = false;
+    if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
+      let mut extension = None;
 
-    let e = match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => e,
-      quick_xml::events::Event::Empty(e) => {
-        empty_tag = true;
-        e
-      }
-      _ => Err(super::super::common::SdkError::CommonError(
-        "Default".to_string(),
-      ))?,
-    };
+      let mut content_type = None;
 
-    let mut extension = None;
-
-    let mut content_type = None;
-
-    for attr in e.attributes() {
-      let attr = attr?;
-      match attr.key.as_ref() {
-        b"Extension" => {
-          extension = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"ContentType" => {
-          content_type = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"xmlns:w" => with_xmlns = true,
-        _ => {}
-      }
-    }
-
-    if with_xmlns {
-      if e.name().as_ref() != b"w:Default" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Default".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-    } else if e.name().local_name().as_ref() != b"Default" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "Default".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
-    }
-
-    if !empty_tag {
-      loop {
-        let peek_event = xml_reader.peek()?;
-        match peek_event {
-          quick_xml::events::Event::End(e) => {
-            if with_xmlns {
-              if e.name().as_ref() == b"w:Default" {
-                xml_reader.next()?;
-
-                break;
-              }
-            } else if e.name().local_name().as_ref() == b"Default" {
-              xml_reader.next()?;
-
-              break;
-            }
+      for attr in e.attributes() {
+        let attr = attr?;
+        match attr.key.as_ref() {
+          b"Extension" => {
+            extension = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
           }
-          quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
+          b"ContentType" => {
+            content_type = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
+          }
+          b"xmlns:w" => with_xmlns = true,
           _ => {}
         }
       }
+
+      if with_xmlns {
+        if e.name().as_ref() != b"w:Default" {
+          Err(super::super::common::SdkError::MismatchError {
+            expected: "w:Default".to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
+        }
+      } else if e.name().local_name().as_ref() != b"Default" {
+        Err(super::super::common::SdkError::MismatchError {
+          expected: "Default".to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
+
+      let extension = extension
+        .ok_or_else(|| super::super::common::SdkError::CommonError("extension".to_string()))?;
+
+      let content_type = content_type
+        .ok_or_else(|| super::super::common::SdkError::CommonError("content_type".to_string()))?;
+
+      Ok(Self {
+        extension,
+        content_type,
+      })
+    } else {
+      Err(super::super::common::SdkError::CommonError(
+        "Default".to_string(),
+      ))?
     }
-
-    let extension = extension
-      .ok_or_else(|| super::super::common::SdkError::CommonError("extension".to_string()))?;
-
-    let content_type = content_type
-      .ok_or_else(|| super::super::common::SdkError::CommonError("content_type".to_string()))?;
-
-    Ok(Self {
-      extension,
-      content_type,
-    })
   }
 }
 
@@ -426,92 +396,62 @@ impl Override {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut with_xmlns = with_xmlns;
 
-    let mut empty_tag = false;
+    if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
+      let mut content_type = None;
 
-    let e = match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => e,
-      quick_xml::events::Event::Empty(e) => {
-        empty_tag = true;
-        e
-      }
-      _ => Err(super::super::common::SdkError::CommonError(
-        "Override".to_string(),
-      ))?,
-    };
+      let mut part_name = None;
 
-    let mut content_type = None;
-
-    let mut part_name = None;
-
-    for attr in e.attributes() {
-      let attr = attr?;
-      match attr.key.as_ref() {
-        b"ContentType" => {
-          content_type = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"PartName" => {
-          part_name = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"xmlns:w" => with_xmlns = true,
-        _ => {}
-      }
-    }
-
-    if with_xmlns {
-      if e.name().as_ref() != b"w:Override" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Override".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-    } else if e.name().local_name().as_ref() != b"Override" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "Override".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
-    }
-
-    if !empty_tag {
-      loop {
-        let peek_event = xml_reader.peek()?;
-        match peek_event {
-          quick_xml::events::Event::End(e) => {
-            if with_xmlns {
-              if e.name().as_ref() == b"w:Override" {
-                xml_reader.next()?;
-
-                break;
-              }
-            } else if e.name().local_name().as_ref() == b"Override" {
-              xml_reader.next()?;
-
-              break;
-            }
+      for attr in e.attributes() {
+        let attr = attr?;
+        match attr.key.as_ref() {
+          b"ContentType" => {
+            content_type = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
           }
-          quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
+          b"PartName" => {
+            part_name = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
+          }
+          b"xmlns:w" => with_xmlns = true,
           _ => {}
         }
       }
+
+      if with_xmlns {
+        if e.name().as_ref() != b"w:Override" {
+          Err(super::super::common::SdkError::MismatchError {
+            expected: "w:Override".to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
+        }
+      } else if e.name().local_name().as_ref() != b"Override" {
+        Err(super::super::common::SdkError::MismatchError {
+          expected: "Override".to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
+
+      let content_type = content_type
+        .ok_or_else(|| super::super::common::SdkError::CommonError("content_type".to_string()))?;
+
+      let part_name = part_name
+        .ok_or_else(|| super::super::common::SdkError::CommonError("part_name".to_string()))?;
+
+      Ok(Self {
+        content_type,
+        part_name,
+      })
+    } else {
+      Err(super::super::common::SdkError::CommonError(
+        "Override".to_string(),
+      ))?
     }
-
-    let content_type = content_type
-      .ok_or_else(|| super::super::common::SdkError::CommonError("content_type".to_string()))?;
-
-    let part_name = part_name
-      .ok_or_else(|| super::super::common::SdkError::CommonError("part_name".to_string()))?;
-
-    Ok(Self {
-      content_type,
-      part_name,
-    })
   }
 }
 

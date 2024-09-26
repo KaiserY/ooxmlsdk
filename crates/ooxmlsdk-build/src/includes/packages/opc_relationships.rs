@@ -37,7 +37,7 @@ impl Relationships {
         e
       }
       _ => Err(super::super::common::SdkError::CommonError(
-        "Types".to_string(),
+        "Relationships".to_string(),
       ))?,
     };
 
@@ -83,15 +83,15 @@ impl Relationships {
     }
 
     if with_xmlns {
-      if e.name().as_ref() != b"w:Types" {
+      if e.name().as_ref() != b"w:Relationships" {
         Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Types".to_string(),
+          expected: "w:Relationships".to_string(),
           found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
         })?;
       }
-    } else if e.name().local_name().as_ref() != b"Types" {
+    } else if e.name().local_name().as_ref() != b"Relationships" {
       Err(super::super::common::SdkError::MismatchError {
-        expected: "Types".to_string(),
+        expected: "Relationships".to_string(),
         found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
       })?;
     }
@@ -107,7 +107,7 @@ impl Relationships {
                   relationship.push(Relationship::deserialize_self(xml_reader, with_xmlns)?);
                 }
                 _ => Err(super::super::common::SdkError::CommonError(
-                  "Types".to_string(),
+                  "Relationships".to_string(),
                 ))?,
               }
             } else {
@@ -116,19 +116,19 @@ impl Relationships {
                   relationship.push(Relationship::deserialize_self(xml_reader, with_xmlns)?);
                 }
                 _ => Err(super::super::common::SdkError::CommonError(
-                  "Types".to_string(),
+                  "Relationships".to_string(),
                 ))?,
               }
             }
           }
           quick_xml::events::Event::End(e) => {
             if with_xmlns {
-              if e.name().as_ref() == b"w:Types" {
+              if e.name().as_ref() == b"w:Relationships" {
                 xml_reader.next()?;
 
                 break;
               }
-            } else if e.name().local_name().as_ref() == b"Types" {
+            } else if e.name().local_name().as_ref() == b"Relationships" {
               xml_reader.next()?;
 
               break;
@@ -172,9 +172,9 @@ impl Relationships {
     writer.write_char('<')?;
 
     if with_xmlns {
-      writer.write_str("w:Types")?;
+      writer.write_str("w:Relationships")?;
     } else {
-      writer.write_str("Types")?;
+      writer.write_str("Relationships")?;
     }
 
     if let Some(xmlns) = &self.xmlns {
@@ -208,9 +208,9 @@ impl Relationships {
     writer.write_str("</")?;
 
     if with_xmlns {
-      writer.write_str("w:Types")?;
+      writer.write_str("w:Relationships")?;
     } else {
-      writer.write_str("Types")?;
+      writer.write_str("Relationships")?;
     }
 
     writer.write_char('>')?;
@@ -249,112 +249,82 @@ impl Relationship {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut with_xmlns = with_xmlns;
 
-    let mut empty_tag = false;
+    if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
+      let mut target_mode = None;
 
-    let e = match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => e,
-      quick_xml::events::Event::Empty(e) => {
-        empty_tag = true;
-        e
-      }
-      _ => Err(super::super::common::SdkError::CommonError(
-        "Override".to_string(),
-      ))?,
-    };
+      let mut target = None;
 
-    let mut target_mode = None;
+      let mut r#type = None;
 
-    let mut target = None;
+      let mut id = None;
 
-    let mut r#type = None;
-
-    let mut id = None;
-
-    for attr in e.attributes() {
-      let attr = attr?;
-      match attr.key.as_ref() {
-        b"TargetMode" => {
-          target_mode = Some(TargetMode::from_str(
-            &attr.decode_and_unescape_value(xml_reader.decoder())?,
-          )?);
-        }
-        b"Target" => {
-          target = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"Type" => {
-          r#type = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"Id" => {
-          id = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
-        }
-        b"xmlns:w" => with_xmlns = true,
-        _ => {}
-      }
-    }
-
-    if with_xmlns {
-      if e.name().as_ref() != b"w:Override" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Override".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-    } else if e.name().local_name().as_ref() != b"Override" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "Override".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
-    }
-
-    if !empty_tag {
-      loop {
-        let peek_event = xml_reader.peek()?;
-        match peek_event {
-          quick_xml::events::Event::End(e) => {
-            if with_xmlns {
-              if e.name().as_ref() == b"w:Override" {
-                xml_reader.next()?;
-
-                break;
-              }
-            } else if e.name().local_name().as_ref() == b"Override" {
-              xml_reader.next()?;
-
-              break;
-            }
+      for attr in e.attributes() {
+        let attr = attr?;
+        match attr.key.as_ref() {
+          b"TargetMode" => {
+            target_mode = Some(TargetMode::from_str(
+              &attr.decode_and_unescape_value(xml_reader.decoder())?,
+            )?);
           }
-          quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
+          b"Target" => {
+            target = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
+          }
+          b"Type" => {
+            r#type = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
+          }
+          b"Id" => {
+            id = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .to_string(),
+            );
+          }
+          b"xmlns:w" => with_xmlns = true,
           _ => {}
         }
       }
+
+      if with_xmlns {
+        if e.name().as_ref() != b"w:Relationship" {
+          Err(super::super::common::SdkError::MismatchError {
+            expected: "w:Relationship".to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
+        }
+      } else if e.name().local_name().as_ref() != b"Relationship" {
+        Err(super::super::common::SdkError::MismatchError {
+          expected: "Relationship".to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
+
+      let target =
+        target.ok_or_else(|| super::super::common::SdkError::CommonError("target".to_string()))?;
+
+      let r#type =
+        r#type.ok_or_else(|| super::super::common::SdkError::CommonError("type".to_string()))?;
+
+      let id = id.ok_or_else(|| super::super::common::SdkError::CommonError("id".to_string()))?;
+
+      Ok(Self {
+        target_mode,
+        target,
+        r#type,
+        id,
+      })
+    } else {
+      Err(super::super::common::SdkError::CommonError(
+        "FrameProperties".to_string(),
+      ))?
     }
-
-    let target =
-      target.ok_or_else(|| super::super::common::SdkError::CommonError("target".to_string()))?;
-
-    let r#type =
-      r#type.ok_or_else(|| super::super::common::SdkError::CommonError("type".to_string()))?;
-
-    let id = id.ok_or_else(|| super::super::common::SdkError::CommonError("id".to_string()))?;
-
-    Ok(Self {
-      target_mode,
-      target,
-      r#type,
-      id,
-    })
   }
 }
 

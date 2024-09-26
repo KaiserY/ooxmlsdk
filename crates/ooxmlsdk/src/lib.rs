@@ -23,3 +23,7 @@ pub mod serializers {
 pub mod validators {
   include!(concat!(env!("OUT_DIR"), "/validators/mod.rs"));
 }
+
+pub mod packages {
+  include!(concat!(env!("OUT_DIR"), "/packages/mod.rs"));
+}

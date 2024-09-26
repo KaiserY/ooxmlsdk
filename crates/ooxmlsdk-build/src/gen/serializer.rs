@@ -445,7 +445,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
     if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
       xml_header_writer = Some(
         parse2(quote! {
-          writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
+          writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
         })
         .unwrap(),
       );

@@ -144,3 +144,33 @@ pub fn resolve_zip_file_path(path: &str) -> String {
   // Join the components back into a path
   stack.join("/")
 }
+
+#[inline]
+pub fn from_reader_inner<'de, R: BufRead>(reader: R) -> Result<IoReader<'de, R>, SdkError> {
+  let mut xml_reader = quick_xml::Reader::from_reader(reader);
+
+  xml_reader.config_mut().trim_text(true);
+
+  let mut xml_reader = IoReader::new(xml_reader);
+
+  if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
+    xml_reader.next()?;
+  }
+
+  Ok(xml_reader)
+}
+
+#[inline]
+pub fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
+  let mut xml_reader = quick_xml::Reader::from_str(s);
+
+  xml_reader.config_mut().trim_text(true);
+
+  let mut xml_reader = SliceReader::new(xml_reader);
+
+  if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
+    xml_reader.next()?;
+  }
+
+  Ok(xml_reader)
+}

@@ -30,6 +30,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let out_serializers_dir_path = &out_dir_path.join("serializers");
   let out_common_dir_path = &out_dir_path.join("common");
   let out_validators_dir_path = &out_dir_path.join("validators");
+  let out_packages_dir_path = &out_dir_path.join("packages");
 
   let data_dir_path = Path::new(data_dir);
   let data_parts_dir_path = &data_dir_path.join("parts");
@@ -41,6 +42,7 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   fs::create_dir_all(out_serializers_dir_path).unwrap();
   fs::create_dir_all(out_common_dir_path).unwrap();
   fs::create_dir_all(out_validators_dir_path).unwrap();
+  fs::create_dir_all(out_packages_dir_path).unwrap();
 
   let mut parts: Vec<OpenXmlPart> = vec![];
   let mut part_mods: Vec<String> = vec![];
@@ -409,6 +411,35 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let validators_mod_path = out_validators_dir_path.join("mod.rs");
 
   fs::write(validators_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream = parse_str(include_str!("includes/packages/mod.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_packages_dir_path.join("mod.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/packages/opc_content_types.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_packages_dir_path.join("opc_content_types.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/packages/opc_relationships.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_packages_dir_path.join("opc_relationships.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
 }
 
 #[cfg(test)]

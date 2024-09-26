@@ -12,7 +12,7 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
-quick-xml = { workspace = true }
+quick-xml = { workspace = true, features = ["serialize"] }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 serde_json = { workspace = true }
@@ -24,3 +24,10 @@ heck = { workspace = true }
 thiserror = { workspace = true }
 zip = { workspace = true }
 path-clean = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "serde_bench"
+harness = false

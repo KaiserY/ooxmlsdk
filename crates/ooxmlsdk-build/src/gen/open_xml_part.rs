@@ -7,13 +7,25 @@ use crate::models::OpenXmlPart;
 use crate::GenContext;
 
 pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStream {
+  let relationship_type_str = &part.relationship_type;
+
+  let relationship_type_stmt: Stmt = parse2(quote! {
+    #[allow(dead_code)]
+    const RELATIONSHIP_TYPE: &'static str = #relationship_type_str;
+  })
+  .unwrap();
+
   let struct_name_ident: Ident = parse_str(&part.name.to_upper_camel_case()).unwrap();
 
   let mut fields: Vec<TokenStream> = vec![];
 
   if part.base == "OpenXmlPackage" {
     fields.push(quote! {
-      pub content_types: String,
+      pub content_types: std::boxed::Box<crate::packages::opc_content_types::Types>,
+    });
+
+    fields.push(quote! {
+      pub relationships: std::boxed::Box<crate::packages::opc_relationships::Relationships>,
     });
   }
 
@@ -362,6 +374,44 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   } else {
     &format!("{}/", part.paths.general)
   };
+
+  if part.base == "OpenXmlPackage" {
+    field_declaration_list.push(
+      parse2(quote! {
+        let content_types = std::boxed::Box::new(
+          crate::packages::opc_content_types::Types::from_reader(
+            std::io::BufReader::new(archive.by_name("[Content_Types].xml")?,
+          ))?,
+        );
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        content_types
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let relationships = std::boxed::Box::new(
+          crate::packages::opc_relationships::Relationships::from_reader(
+            std::io::BufReader::new(archive.by_name("_rels/.rels")?,
+          ))?,
+        );
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        relationships
+      })
+      .unwrap(),
+    );
+  }
 
   if !part.children.is_empty() {
     field_init_list.push(
@@ -752,32 +802,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     );
   }
 
-  if part.base == "OpenXmlPackage" {
-    field_declaration_list.push(
-      parse2(quote! {
-        let content_types = {
-          use std::io::Read;
-
-          let mut content = String::new();
-
-          let mut file = std::io::BufReader::new(archive.by_name("[Content_Types].xml")?);
-
-          file.read_to_string(&mut content)?;
-
-          content
-        };
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        content_types
-      })
-      .unwrap(),
-    );
-  }
-
   let part_new_from_archive_fn: ItemFn = parse2(quote! {
     #[allow(unused_variables)]
     pub(crate) fn new_from_archive(
@@ -1135,7 +1159,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
         zip.start_file("[Content_Types].xml", options)?;
 
-        zip.write_all(self.content_types.as_bytes())?;
+        zip.write_all(self.content_types.to_string()?.as_bytes())?;
 
         self.save_zip("", &mut zip)?;
 
@@ -1160,6 +1184,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     .unwrap();
 
     quote! {
+      #relationship_type_stmt
+
       #part_struct
 
       #part_impl
@@ -1175,6 +1201,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     .unwrap();
 
     quote! {
+      #relationship_type_stmt
+
       #part_struct
 
       #part_impl

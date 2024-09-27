@@ -455,18 +455,18 @@ fn gen_open_xml_leaf_text_element_fn(
             quick_xml::events::Event::End(e) => {
               if with_xmlns {
                 if e.name().as_ref() == #rename_ser_literal {
-                  xml_reader.next()?;
-
                   break;
                 }
               } else if e.name().local_name().as_ref() == #rename_de_literal {
-                xml_reader.next()?;
-
                 break;
               }
+
+              xml_reader.next()?;
             }
             quick_xml::events::Event::Eof => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-            _ => (),
+            _ => {
+              xml_reader.next()?;
+            },
           }
         }
       }
@@ -843,18 +843,18 @@ fn gen_open_xml_composite_element_fn(
             quick_xml::events::Event::End(e) => {
               if with_xmlns {
                 if e.name().as_ref() == #rename_ser_literal {
-                  xml_reader.next()?;
-
                   break;
                 }
               } else if e.name().local_name().as_ref() == #rename_de_literal {
-                xml_reader.next()?;
-
                 break;
               }
+
+              xml_reader.next()?;
             }
             quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
-            _ => (),
+            _ => {
+              xml_reader.next()?;
+            },
           }
         }
       }
@@ -1228,18 +1228,18 @@ fn gen_derived_fn(
             quick_xml::events::Event::End(e) => {
               if with_xmlns {
                 if e.name().as_ref() == #rename_ser_literal {
-                  xml_reader.next()?;
-
                   break;
                 }
               } else if e.name().local_name().as_ref() == #rename_de_literal {
-                xml_reader.next()?;
-
                 break;
               }
+
+              xml_reader.next()?;
             }
             quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
-            _ => (),
+            _ => {
+              xml_reader.next()?;
+            },
           }
         }
       }

@@ -124,18 +124,18 @@ impl Relationships {
           quick_xml::events::Event::End(e) => {
             if with_xmlns {
               if e.name().as_ref() == b"w:Relationships" {
-                xml_reader.next()?;
-
                 break;
               }
             } else if e.name().local_name().as_ref() == b"Relationships" {
-              xml_reader.next()?;
-
               break;
             }
+
+            xml_reader.next()?;
           }
           quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => {}
+          _ => {
+            xml_reader.next()?;
+          }
         }
       }
     }

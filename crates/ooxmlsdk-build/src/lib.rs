@@ -440,6 +440,16 @@ pub fn gen(data_dir: &str, out_dir: &str) {
   let schemas_mod_path = out_packages_dir_path.join("opc_relationships.rs");
 
   fs::write(schemas_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/packages/opc_core_properties.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_packages_dir_path.join("opc_core_properties.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
 }
 
 #[cfg(test)]

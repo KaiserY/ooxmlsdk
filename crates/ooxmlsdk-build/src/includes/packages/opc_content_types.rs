@@ -144,18 +144,18 @@ impl Types {
           quick_xml::events::Event::End(e) => {
             if with_xmlns {
               if e.name().as_ref() == b"w:Types" {
-                xml_reader.next()?;
-
                 break;
               }
             } else if e.name().local_name().as_ref() == b"Types" {
-              xml_reader.next()?;
-
               break;
             }
+
+            xml_reader.next()?;
           }
           quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => {}
+          _ => {
+            xml_reader.next()?;
+          }
         }
       }
     }

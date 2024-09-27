@@ -604,6 +604,11 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let part_path = format!("{}/{}", part.paths.general, part.target);
 
+  let part_paths_general = &part.paths.general;
+
+  let part_name_dir_path_ident: Ident =
+    parse_str(&format!("{}_dir_path", part.name).to_snake_case()).unwrap();
+
   let part_name_file_path_ident: Ident =
     parse_str(&format!("{}_file_path", part.name).to_snake_case()).unwrap();
 
@@ -619,6 +624,44 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Stored)
         .unix_permissions(0o755);
+    })
+    .unwrap(),
+  );
+
+  writer_stmt_list.push(
+    parse2(quote! {
+      let directory_path = crate::common::resolve_zip_file_path(parent_path);
+    })
+    .unwrap(),
+  );
+
+  writer_stmt_list.push(
+    parse2(quote! {
+      if !directory_path.is_empty() && !directory_set.contains(&directory_path) {
+        zip.add_directory(&directory_path, zip::write::SimpleFileOptions::default())?;
+
+        directory_set.insert(directory_path);
+      }
+    })
+    .unwrap(),
+  );
+
+  writer_stmt_list.push(
+    parse2(quote! {
+      let #part_name_dir_path_ident = crate::common::resolve_zip_file_path(
+        &format!("{}{}/", parent_path, #part_paths_general),
+      );
+    })
+    .unwrap(),
+  );
+
+  writer_stmt_list.push(
+    parse2(quote! {
+      if !#part_name_dir_path_ident.is_empty() && !directory_set.contains(&#part_name_dir_path_ident) {
+        zip.add_directory(&#part_name_dir_path_ident, zip::write::SimpleFileOptions::default())?;
+
+        directory_set.insert(#part_name_dir_path_ident);
+      }
     })
     .unwrap(),
   );
@@ -791,31 +834,31 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     writer_stmt_list.push(
       parse2(quote! {
-        let part_target_str = if self.inner_path.ends_with(".xml") {
-          &self.inner_path[self.inner_path
-            .rfind('/')
-            .ok_or_else(|| crate::common::SdkError::CommonError(self.inner_path.to_string()))?
-            + 1..self.inner_path.len()]
-        } else {
-          ""
-        };
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        let #part_rels_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}_rels/{}.rels", child_parent_path, part_target_str),
-        );
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
         if let Some(relationships) = &self.relationships {
-          zip.start_file(&#part_rels_path_ident, options)?;
+          let part_target_str = if self.inner_path.ends_with(".xml") {
+            &self.inner_path[self.inner_path
+              .rfind('/')
+              .ok_or_else(|| crate::common::SdkError::CommonError(self.inner_path.to_string()))?
+              + 1..self.inner_path.len()]
+          } else {
+            ""
+          };
+
+          let rels_dir_path = crate::common::resolve_zip_file_path(
+            &format!("{}_rels", child_parent_path),
+          );
+
+          let rels_file_path = crate::common::resolve_zip_file_path(
+            &format!("{}_rels/{}.rels", child_parent_path, part_target_str),
+          );
+
+          if !rels_dir_path.is_empty() && !directory_set.contains(&rels_dir_path) {
+            zip.add_directory(&rels_dir_path, zip::write::SimpleFileOptions::default())?;
+
+            directory_set.insert(rels_dir_path);
+          }
+
+          zip.start_file(&rels_file_path, options)?;
 
           zip.write_all(relationships.to_string()?.as_bytes())?;
         }
@@ -837,7 +880,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       children_writer_stmt_list.push(
         parse2(quote! {
           for #child_name_ident in &self.#child_api_name_ident {
-            #child_name_ident.save_zip(&child_parent_path, zip)?;
+            #child_name_ident.save_zip(&child_parent_path, zip, directory_set)?;
           }
         })
         .unwrap(),
@@ -845,7 +888,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     } else if child.min_occurs_is_non_zero {
       children_writer_stmt_list.push(
         parse2(quote! {
-          self.#child_api_name_ident.save_zip(&child_parent_path, zip)?;
+          self.#child_api_name_ident.save_zip(&child_parent_path, zip, directory_set)?;
         })
         .unwrap(),
       );
@@ -853,7 +896,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       children_writer_stmt_list.push(
         parse2(quote! {
           if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
-            #child_api_name_ident.save_zip(&child_parent_path, zip)?;
+            #child_api_name_ident.save_zip(&child_parent_path, zip, directory_set)?;
           }
         })
         .unwrap(),
@@ -863,7 +906,12 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let part_save_zip_fn: ItemFn = parse2(quote! {
     #[allow(unused_variables)]
-    pub(crate) fn save_zip(&self, parent_path: &str, zip: &mut zip::ZipWriter<std::fs::File>) -> Result<(), crate::common::SdkError> {
+    pub(crate) fn save_zip(
+      &self,
+      parent_path: &str,
+      zip: &mut zip::ZipWriter<std::fs::File>,
+      directory_set: &mut std::collections::HashSet<String>,
+    ) -> Result<(), crate::common::SdkError> {
       #( #writer_stmt_list )*
 
       #( #children_writer_stmt_list )*
@@ -906,6 +954,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       pub fn save(&self, path: &str) -> Result<(), crate::common::SdkError> {
         use std::io::Write;
 
+        let mut directory_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+
         let path = std::path::Path::new(path);
 
         let file = std::fs::File::create(path)?;
@@ -920,7 +970,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
         zip.write_all(self.content_types.to_string()?.as_bytes())?;
 
-        self.save_zip("", &mut zip)?;
+        self.save_zip("", &mut zip, &mut directory_set)?;
 
         zip.finish()?;
 

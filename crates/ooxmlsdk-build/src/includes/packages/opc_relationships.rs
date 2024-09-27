@@ -153,7 +153,7 @@ impl Relationships {
   #[allow(clippy::inherent_to_string)]
   pub fn to_string(&self) -> Result<String, super::super::common::SdkError> {
     self.to_string_inner(if let Some(xmlns) = &self.xmlns {
-      xmlns != "http://schemas.openxmlformats.org/package/2006/content-types"
+      xmlns != "http://schemas.openxmlformats.org/package/2006/relationships"
     } else {
       true
     })

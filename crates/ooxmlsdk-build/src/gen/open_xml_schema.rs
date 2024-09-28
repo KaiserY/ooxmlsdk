@@ -73,7 +73,11 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       || t.base_class == "OpenXmlPartRootElement"
       || t.base_class == "SdtElement"
     {
-      if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+      if !t.part.is_empty()
+        || t.base_class == "OpenXmlPartRootElement"
+        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
+        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+      {
         fields.push(quote! {
           pub xmlns: Option<String>,
         });
@@ -482,14 +486,14 @@ pub fn gen_one_sequence_fields(
     if p.occurs.is_empty() {
       fields.push(quote! {
         #[doc = #property_comments]
-        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+        pub #child_name_ident: Vec<#child_variant_type>,
       });
     } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
       fields.push(quote! {
         #[doc = #property_comments]
         pub #child_name_ident: std::boxed::Box<#child_variant_type>,
       });
-    } else if p.occurs[0].max > 1 {
+    } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
       fields.push(quote! {
         #[doc = #property_comments]
         pub #child_name_ident: Vec<#child_variant_type>,

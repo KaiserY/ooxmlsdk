@@ -125,17 +125,7 @@ fn gen_from_str_fn() -> ItemFn {
   let token_stream = quote! {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
-      use crate::common::XmlReader;
-
-      let mut xml_reader = quick_xml::Reader::from_str(s);
-
-      xml_reader.config_mut().trim_text(true);
-
-      let mut xml_reader = crate::common::SliceReader::new(xml_reader);
-
-      if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
-        xml_reader.next()?;
-      }
+      let mut xml_reader = crate::common::from_str_inner(s)?;
 
       Self::deserialize_self(&mut xml_reader, false)
     }
@@ -149,17 +139,7 @@ fn gen_from_reader_fn() -> ItemFn {
     pub fn from_reader<R: std::io::BufRead>(
       reader: R,
     ) -> Result<Self, crate::common::SdkError> {
-      use crate::common::XmlReader;
-
-      let mut xml_reader = quick_xml::Reader::from_reader(reader);
-
-      xml_reader.config_mut().trim_text(true);
-
-      let mut xml_reader = crate::common::IoReader::new(xml_reader);
-
-      if let quick_xml::events::Event::Decl(_) = xml_reader.peek()? {
-        xml_reader.next()?;
-      }
+      let mut xml_reader = crate::common::from_reader_inner(reader)?;
 
       Self::deserialize_self(&mut xml_reader, false)
     }
@@ -267,33 +247,65 @@ fn gen_open_xml_leaf_element_fn(
     ) -> Result<Self, crate::common::SdkError> {
       let mut with_xmlns = with_xmlns;
 
-      if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
-        #( #field_declaration_list )*
+      let mut empty_tag = false;
 
-        #attr_match_stmt
+      let e = match xml_reader.next()? {
+        quick_xml::events::Event::Start(e) => e,
+        quick_xml::events::Event::Empty(e) => {
+          empty_tag = true;
 
-        if with_xmlns {
-          if e.name().as_ref() != #rename_ser_literal {
-            Err(crate::common::SdkError::MismatchError {
-              expected: #rename_ser_str.to_string(),
-              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-            })?;
-          }
-        } else if e.name().local_name().as_ref() != #rename_de_literal {
+          e
+        }
+        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
+      };
+
+      #( #field_declaration_list )*
+
+      #attr_match_stmt
+
+      if with_xmlns {
+        if e.name().as_ref() != #rename_ser_literal {
           Err(crate::common::SdkError::MismatchError {
-            expected: #rename_de_str.to_string(),
+            expected: #rename_ser_str.to_string(),
             found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
           })?;
         }
-
-        #( #field_unwrap_list )*
-
-        Ok(Self {
-          #( #field_init_list, )*
-        })
-      } else {
-        Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?
+      } else if e.name().local_name().as_ref() != #rename_de_literal {
+        Err(crate::common::SdkError::MismatchError {
+          expected: #rename_de_str.to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
       }
+
+      if !empty_tag {
+        loop {
+          let peek_event = xml_reader.peek()?;
+
+          match peek_event {
+            quick_xml::events::Event::End(e) => {
+              if with_xmlns {
+                if e.name().as_ref() == #rename_ser_literal {
+                  break;
+                }
+              } else if e.name().local_name().as_ref() == #rename_de_literal {
+                break;
+              }
+
+              xml_reader.next()?;
+            }
+            quick_xml::events::Event::Eof => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
+            _ => {
+              xml_reader.next()?;
+            },
+          }
+        }
+      }
+
+      #( #field_unwrap_list )*
+
+      Ok(Self {
+        #( #field_init_list, )*
+      })
     }
   })
   .unwrap()
@@ -506,7 +518,11 @@ fn gen_open_xml_composite_element_fn(
   let mut field_init_list: Vec<Ident> = vec![];
   let mut child_ser_match_list: Vec<Arm> = vec![];
 
-  if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+  if !t.part.is_empty()
+    || t.base_class == "OpenXmlPartRootElement"
+    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
+    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+  {
     field_declaration_list.push(
       parse2(quote! {
         let mut xmlns = None;
@@ -601,7 +617,21 @@ fn gen_open_xml_composite_element_fn(
       let child_name_ident: Ident =
         parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
 
-      if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+      if p.occurs.is_empty() {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = vec![];
+          })
+          .unwrap(),
+        );
+      } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = None;
+          })
+          .unwrap(),
+        );
+      } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
         field_declaration_list.push(
           parse2(quote! {
             let mut #child_name_ident = vec![];
@@ -742,7 +772,11 @@ fn gen_open_xml_composite_element_fn(
   let xmlns_literal: LitByteStr =
     parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
 
-  let attr_match_stmt: Stmt = if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+  let attr_match_stmt: Stmt = if !t.part.is_empty()
+    || t.base_class == "OpenXmlPartRootElement"
+    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
+    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+  {
     parse2(quote! {
       for attr in e.attributes() {
         let attr = attr?;
@@ -988,7 +1022,21 @@ fn gen_derived_fn(
       let child_name_ident: Ident =
         parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
 
-      if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+      if p.occurs.is_empty() {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = vec![];
+          })
+          .unwrap(),
+        );
+      } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut #child_name_ident = None;
+          })
+          .unwrap(),
+        );
+      } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
         field_declaration_list.push(
           parse2(quote! {
             let mut #child_name_ident = vec![];
@@ -1514,7 +1562,25 @@ fn gen_one_sequence_match_arm(
   ))
   .unwrap();
 
-  let ser_arm: Arm = if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+  let ser_arm: Arm = if p.occurs.is_empty() {
+    parse2(quote! {
+      #child_rename_ser_literal => {
+        #child_name_ident.push(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        );
+      }
+    })
+    .unwrap()
+  } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+    parse2(quote! {
+      #child_rename_ser_literal => {
+        #child_name_ident = Some(std::boxed::Box::new(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        ));
+      }
+    })
+    .unwrap()
+  } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
     parse2(quote! {
       #child_rename_ser_literal => {
         #child_name_ident.push(
@@ -1534,7 +1600,25 @@ fn gen_one_sequence_match_arm(
     .unwrap()
   };
 
-  let de_arm: Arm = if !p.occurs.is_empty() && p.occurs[0].max > 1 {
+  let de_arm: Arm = if p.occurs.is_empty() {
+    parse2(quote! {
+      #child_rename_de_literal => {
+        #child_name_ident.push(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        );
+      }
+    })
+    .unwrap()
+  } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+    parse2(quote! {
+      #child_rename_de_literal => {
+        #child_name_ident = Some(std::boxed::Box::new(
+          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
+        ));
+      }
+    })
+    .unwrap()
+  } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
     parse2(quote! {
       #child_rename_de_literal => {
         #child_name_ident.push(

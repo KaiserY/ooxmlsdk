@@ -49,39 +49,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub path: String,
     });
-  } else if context.target_type_map.contains_key(&part.root_element)
-    || context.target_type_map.contains_key(&part.target)
-  {
-    let target_type = if let Some(target_type) = context.target_type_map.get(&part.root_element) {
-      target_type
-    } else if let Some(target_type) = context.target_type_map.get(&part.target) {
-      target_type
-    } else {
-      panic!("{:?}", part);
-    };
-
-    let target_type_namespace = context
-      .type_name_namespace_map
-      .get(target_type.name.as_str())
-      .ok_or(format!("{:?}", target_type.name))
-      .unwrap();
-
-    let scheme_mod = context
-      .prefix_schema_mod_map
-      .get(target_type_namespace.prefix.as_str())
-      .ok_or(format!("{:?}", target_type_namespace.prefix))
-      .unwrap();
-
-    let field_type: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      scheme_mod,
-      target_type.class_name.to_upper_camel_case()
-    ))
-    .unwrap();
-
-    fields.push(quote! {
-      pub root_element: std::boxed::Box<#field_type>,
-    });
   } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
     fields.push(quote! {
       pub content: String,
@@ -109,6 +76,39 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       "crate::schemas::{}::{}",
       scheme_mod,
       root_element_type.class_name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    fields.push(quote! {
+      pub root_element: std::boxed::Box<#field_type>,
+    });
+  } else if context.target_type_map.contains_key(&part.root_element)
+    || context.target_type_map.contains_key(&part.target)
+  {
+    let target_type = if let Some(target_type) = context.target_type_map.get(&part.root_element) {
+      target_type
+    } else if let Some(target_type) = context.target_type_map.get(&part.target) {
+      target_type
+    } else {
+      panic!("{:?}", part);
+    };
+
+    let target_type_namespace = context
+      .type_name_namespace_map
+      .get(target_type.name.as_str())
+      .ok_or(format!("{:?}", target_type.name))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(target_type_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", target_type_namespace.prefix))
+      .unwrap();
+
+    let field_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      target_type.class_name.to_upper_camel_case()
     ))
     .unwrap();
 
@@ -306,54 +306,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
-  } else if context.target_type_map.contains_key(&part.root_element)
-    || context.target_type_map.contains_key(&part.target)
-  {
-    let target_type = if let Some(target_type) = context.target_type_map.get(&part.root_element) {
-      target_type
-    } else if let Some(target_type) = context.target_type_map.get(&part.target) {
-      target_type
-    } else {
-      panic!("{:?}", part);
-    };
-
-    let target_type_namespace = context
-      .type_name_namespace_map
-      .get(target_type.name.as_str())
-      .ok_or(format!("{:?}", target_type.name))
-      .unwrap();
-
-    let scheme_mod = context
-      .prefix_schema_mod_map
-      .get(target_type_namespace.prefix.as_str())
-      .ok_or(format!("{:?}", target_type_namespace.prefix))
-      .unwrap();
-
-    let field_type: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      scheme_mod,
-      target_type.class_name.to_upper_camel_case()
-    ))
-    .unwrap();
-
-    field_declaration_list.push(parse2(quote! {
-      let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
-    }).unwrap());
-
-    field_unwrap_list.push(
-      parse2(quote! {
-        let root_element = root_element
-          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        root_element
-      })
-      .unwrap(),
-    );
   } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
     field_declaration_list.push(
       parse2(quote! {
@@ -437,6 +389,54 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     field_declaration_list.push(parse2(quote! {
       let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
     }).unwrap());
+
+    field_unwrap_list.push(
+      parse2(quote! {
+        let root_element = root_element
+          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        root_element
+      })
+      .unwrap(),
+    );
+  } else if context.target_type_map.contains_key(&part.root_element)
+    || context.target_type_map.contains_key(&part.target)
+  {
+    let target_type = if let Some(target_type) = context.target_type_map.get(&part.root_element) {
+      target_type
+    } else if let Some(target_type) = context.target_type_map.get(&part.target) {
+      target_type
+    } else {
+      panic!("{:?}", part);
+    };
+
+    let target_type_namespace = context
+      .type_name_namespace_map
+      .get(target_type.name.as_str())
+      .ok_or(format!("{:?}", target_type.name))
+      .unwrap();
+
+    let scheme_mod = context
+      .prefix_schema_mod_map
+      .get(target_type_namespace.prefix.as_str())
+      .ok_or(format!("{:?}", target_type_namespace.prefix))
+      .unwrap();
+
+    let field_type: Type = parse_str(&format!(
+      "crate::schemas::{}::{}",
+      scheme_mod,
+      target_type.class_name.to_upper_camel_case()
+    ))
+    .unwrap();
+
+    field_declaration_list.push(parse2(quote! {
+    let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
+  }).unwrap());
 
     field_unwrap_list.push(
       parse2(quote! {

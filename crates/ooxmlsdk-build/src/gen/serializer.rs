@@ -178,8 +178,8 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
           if p.occurs.is_empty() {
             child_stmt_list.push(
               parse2(quote! {
-                if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
+                for child in &self.#child_name_ident {
+                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
                 }
               })
               .unwrap(),
@@ -191,7 +191,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
               })
               .unwrap(),
             );
-          } else if p.occurs[0].max > 1 {
+          } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
@@ -350,8 +350,8 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
           if p.occurs.is_empty() {
             child_stmt_list.push(
               parse2(quote! {
-                if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
+                for child in &self.#child_name_ident {
+                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
                 }
               })
               .unwrap(),
@@ -363,7 +363,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
               })
               .unwrap(),
             );
-          } else if p.occurs[0].max > 1 {
+          } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
@@ -449,7 +449,17 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         })
         .unwrap(),
       );
+    }
 
+    if !t.part.is_empty()
+      || t.base_class == "OpenXmlPartRootElement"
+      || ((t.base_class == "OpenXmlCompositeElement"
+        || t.base_class == "CustomXmlElement"
+        || t.base_class == "OpenXmlPartRootElement"
+        || t.base_class == "SdtElement")
+        && (schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
+          || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"))
+    {
       xmlns_attr_writer_list.push(
         parse2(quote! {
           if let Some(xmlns) = &self.xmlns {
@@ -488,7 +498,15 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
 
     let xmlns_uri_str = &schema_namespace.uri;
 
-    let to_string_fn: ItemFn = if !t.part.is_empty() || t.base_class == "OpenXmlPartRootElement" {
+    let to_string_fn: ItemFn = if !t.part.is_empty()
+      || t.base_class == "OpenXmlPartRootElement"
+      || ((t.base_class == "OpenXmlCompositeElement"
+        || t.base_class == "CustomXmlElement"
+        || t.base_class == "OpenXmlPartRootElement"
+        || t.base_class == "SdtElement")
+        && (schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
+          || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"))
+    {
       parse2(quote! {
         #[allow(clippy::inherent_to_string)]
         pub fn to_string(&self) -> Result<String, crate::common::SdkError> {

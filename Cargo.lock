@@ -561,7 +561,7 @@ checksum = "b410bbe7e14ab526a0e86877eb47c6996a2bd7746f027ba551028c925390e4e9"
 
 [[package]]
 name = "ooxmlsdk"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ooxmlsdk-build",
  "quick-xml",
@@ -571,7 +571,7 @@ dependencies = [
 
 [[package]]
 name = "ooxmlsdk-build"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "criterion",
  "heck",
@@ -743,28 +743,28 @@ dependencies = [
 
 [[package]]
 name = "read_docx"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ooxmlsdk",
 ]
 
 [[package]]
 name = "read_pptx"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ooxmlsdk",
 ]
 
 [[package]]
 name = "read_write_xml"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ooxmlsdk",
 ]
 
 [[package]]
 name = "read_xlsx"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ooxmlsdk",
 ]
@@ -1126,7 +1126,21 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "write_docx"
-version = "0.1.12"
+version = "0.1.13"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "write_pptx"
+version = "0.1.13"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "write_xlsx"
+version = "0.1.13"
 dependencies = [
  "ooxmlsdk",
 ]

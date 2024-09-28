@@ -22,6 +22,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub content_types: std::boxed::Box<crate::packages::opc_content_types::Types>,
     });
+  } else {
+    fields.push(quote! {
+      pub r_id: String,
+    });
   }
 
   if !part.children.is_empty() {
@@ -184,6 +188,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     self_field_value_list.push(
       parse2(quote! {
         content_types
+      })
+      .unwrap(),
+    );
+  } else {
+    self_field_value_list.push(
+      parse2(quote! {
+        r_id: r_id.to_string()
       })
       .unwrap(),
     );
@@ -498,6 +509,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
             let #child_name_ident = #child_type::new_from_archive(
               &child_parent_path,
               &target_path,
+              &relationship.id,
               file_path_set,
               archive,
             )?;
@@ -525,6 +537,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
             #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
               &child_parent_path,
               &target_path,
+              &relationship.id,
               file_path_set,
               archive,
             )?));
@@ -580,6 +593,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     pub(crate) fn new_from_archive(
       parent_path: &str,
       path: &str,
+      r_id: &str,
       file_path_set: &std::collections::HashSet<String>,
       archive: &mut zip::ZipArchive<std::io::BufReader<std::fs::File>>,
     ) -> Result<Self, crate::common::SdkError> {
@@ -945,7 +959,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
           file_path_set.insert(file_path);
         }
 
-        Self::new_from_archive("", "", &file_path_set, &mut archive)
+        Self::new_from_archive("", "", "", &file_path_set, &mut archive)
       }
     })
     .unwrap();

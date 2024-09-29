@@ -38,11 +38,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     pub inner_path: String,
   });
 
-  if part.name == "CustomXmlPart" {
-    fields.push(quote! {
-      pub prefix: String,
-    });
-
+  if part.name == "CustomXmlPart" || part.name == "XmlSignaturePart" {
     fields.push(quote! {
       pub content: String,
     });
@@ -53,17 +49,11 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub path: String,
     });
-  } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
+  } else if part.name == "CoreFilePropertiesPart" {
     fields.push(quote! {
-      pub content: String,
+      pub root_element: std::boxed::Box<crate::packages::opc_core_properties::CoreProperties>,
     });
   } else if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
-    if part.name == "CustomXmlPropertiesPart" || part.name == "ThemePart" {
-      fields.push(quote! {
-        pub prefix: String,
-      });
-    }
-
     let root_element_type_namespace = context
       .type_name_namespace_map
       .get(root_element_type.name.as_str())
@@ -261,7 +251,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     .unwrap(),
   );
 
-  if part.name == "CustomXmlPart" {
+  if part.name == "CustomXmlPart" || part.name == "XmlSignaturePart" {
     field_declaration_list.push(
       parse2(quote! {
         use std::io::Read;
@@ -287,20 +277,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       .unwrap(),
     );
 
-    field_declaration_list.push(
-      parse2(quote! {
-        let prefix = path.replace("customXml/item", "").replace(".xml", "");
-      })
-      .unwrap(),
-    );
-
-    self_field_value_list.push(
-      parse2(quote! {
-        prefix
-      })
-      .unwrap(),
-    );
-
     self_field_value_list.push(
       parse2(quote! {
         content
@@ -317,67 +293,28 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
-  } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
-    field_declaration_list.push(
-      parse2(quote! {
-        use std::io::Read;
-      })
-      .unwrap(),
-    );
+  } else if part.name == "CoreFilePropertiesPart" {
+    field_declaration_list.push(parse2(quote! {
+      let root_element = Some(std::boxed::Box::new(
+        crate::packages::opc_core_properties::CoreProperties::from_reader(std::io::BufReader::new(archive.by_name(path)?))?,
+      ));
+    }).unwrap());
 
-    field_declaration_list.push(
+    field_unwrap_list.push(
       parse2(quote! {
-        let mut content = String::new();
-      })
-      .unwrap(),
-    );
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut file = std::io::BufReader::new(archive.by_name(path)?);
-      })
-      .unwrap(),
-    );
-
-    field_declaration_list.push(
-      parse2(quote! {
-        file.read_to_string(&mut content)?;
+        let root_element = root_element
+          .ok_or_else(|| crate::common::SdkError::CommonError("root_element".to_string()))?;
       })
       .unwrap(),
     );
 
     self_field_value_list.push(
       parse2(quote! {
-        content
+        root_element
       })
       .unwrap(),
     );
   } else if let Some(root_element_type) = context.part_name_type_map.get(part.name.as_str()) {
-    if part.name == "CustomXmlPropertiesPart" || part.name == "ThemePart" {
-      let part_path_str = if part.paths.general.is_empty() {
-        &part.target
-      } else {
-        &format!("{}/{}", part.paths.general, part.target)
-      };
-
-      field_declaration_list.push(
-        parse2(quote! {
-          let prefix = path.replace(
-            &crate::common::resolve_zip_file_path(&format!("{}{}", parent_path, #part_path_str)),
-            "",
-          ).replace(".xml", "");
-        })
-        .unwrap(),
-      );
-
-      self_field_value_list.push(
-        parse2(quote! {
-          prefix
-        })
-        .unwrap(),
-      );
-    }
-
     let root_element_type_namespace = context
       .type_name_namespace_map
       .get(root_element_type.name.as_str())
@@ -446,8 +383,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     .unwrap();
 
     field_declaration_list.push(parse2(quote! {
-    let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
-  }).unwrap());
+      let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
+    }).unwrap());
 
     field_unwrap_list.push(
       parse2(quote! {
@@ -614,17 +551,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let mut children_writer_stmt_list: Vec<Stmt> = vec![];
 
-  let part_xml = format!("{}/{}.xml", part.paths.general, part.target);
-
-  let part_path = format!("{}/{}", part.paths.general, part.target);
-
   let part_paths_general = &part.paths.general;
 
   let part_name_dir_path_ident: Ident =
     parse_str(&format!("{}_dir_path", part.name).to_snake_case()).unwrap();
-
-  let part_name_file_path_ident: Ident =
-    parse_str(&format!("{}_file_path", part.name).to_snake_case()).unwrap();
 
   writer_stmt_list.push(
     parse2(quote! {
@@ -636,7 +566,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   writer_stmt_list.push(
     parse2(quote! {
       let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored)
+        .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o755);
     })
     .unwrap(),
@@ -680,19 +610,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     .unwrap(),
   );
 
-  if part.name == "CustomXmlPart" {
+  if part.name == "CustomXmlPart" || part.name == "XmlSignaturePart" {
     writer_stmt_list.push(
       parse2(quote! {
-        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}{}{}.xml", parent_path, #part_path, self.prefix),
-        );
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.start_file(&#part_name_file_path_ident, options)?;
+        zip.start_file(&self.inner_path, options)?;
       })
       .unwrap(),
     );
@@ -700,29 +621,6 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     writer_stmt_list.push(
       parse2(quote! {
         zip.write_all(self.content.as_bytes())?;
-      })
-      .unwrap(),
-    );
-  } else if part.name == "CustomXmlPropertiesPart" || part.name == "ThemePart" {
-    writer_stmt_list.push(
-      parse2(quote! {
-        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}{}{}.xml", parent_path, #part_path, self.prefix),
-        );
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.start_file(&#part_name_file_path_ident, options)?;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.write_all(self.root_element.to_string()?.as_bytes())?;
       })
       .unwrap(),
     );
@@ -778,54 +676,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       })
       .unwrap(),
     );
-  } else if part.name == "CoreFilePropertiesPart" || part.name == "XmlSignaturePart" {
+  } else if part.base != "OpenXmlPackage" {
     writer_stmt_list.push(
       parse2(quote! {
-        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}{}", parent_path, #part_xml),
-        );
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        let options = zip::write::SimpleFileOptions::default()
-          .compression_method(zip::CompressionMethod::Stored)
-          .unix_permissions(0o755);
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.start_file(&#part_name_file_path_ident, options)?;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.write_all(self.content.as_bytes())?;
-      })
-      .unwrap(),
-    );
-  } else if context.part_name_type_map.contains_key(part.name.as_str())
-    || context.target_type_map.contains_key(&part.root_element)
-    || context.target_type_map.contains_key(&part.target)
-  {
-    writer_stmt_list.push(
-      parse2(quote! {
-        let #part_name_file_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}{}", parent_path, #part_xml),
-        );
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.start_file(&#part_name_file_path_ident, options)?;
+        zip.start_file(&self.inner_path, options)?;
       })
       .unwrap(),
     );
@@ -977,7 +831,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         let mut zip = zip::ZipWriter::new(file);
 
         let options = zip::write::SimpleFileOptions::default()
-          .compression_method(zip::CompressionMethod::Stored)
+          .compression_method(zip::CompressionMethod::Deflated)
           .unix_permissions(0o755);
 
         zip.start_file("[Content_Types].xml", options)?;

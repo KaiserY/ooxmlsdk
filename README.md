@@ -26,7 +26,8 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 
 ## Known Issues
 
-- This library raise recursion limit by `#![recursion_limit = "768"]` for `cargo doc`, you may neet to add it too, be cautious when use.
+- This library raise recursion limit by `#![recursion_limit = "768"]` for `cargo doc`, you may need to add it too, be cautious when use.
+- Currently no `serde` support: intial benches show `serde` slower than current custom implemention; `serde` somehow not good at working with xml, you need a lot of special rename for xml attribute or children. 
 
 ## License
 

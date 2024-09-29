@@ -90,6 +90,8 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
 
     let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
 
+    let name_prefix = rename_list.first().ok_or(format!("{:?}", t.name)).unwrap();
+
     let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
 
     let end_tag_writer;
@@ -120,10 +122,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       end_writer = quote! {
         writer.write_str("</")?;
 
-        if with_xmlns {
-          writer.write_str(#rename_ser_str)?;
-        } else {
+        if xmlns_prefix == #name_prefix {
           writer.write_str(#rename_de_str)?;
+        } else {
+          writer.write_str(#rename_ser_str)?;
         }
 
         writer.write_char('>')?;
@@ -179,7 +181,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
+                  writer.write_str(&child.to_string_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -187,7 +189,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
           } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
             child_stmt_list.push(
               parse2(quote! {
-                writer.write_str(&self.#child_name_ident.to_string_inner(with_xmlns)?)?;
+                writer.write_str(&self.#child_name_ident.to_string_inner(xmlns_prefix)?)?;
               })
               .unwrap(),
             );
@@ -195,7 +197,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
+                  writer.write_str(&child.to_string_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -204,7 +206,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             child_stmt_list.push(
               parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
+                  writer.write_str(&#child_name_ident.to_string_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -223,10 +225,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         end_writer = quote! {
           writer.write_str("</")?;
 
-          if with_xmlns {
-            writer.write_str(#rename_ser_str)?;
-          } else {
+          if xmlns_prefix == #name_prefix {
             writer.write_str(#rename_de_str)?;
+          } else {
+            writer.write_str(#rename_ser_str)?;
           }
 
           writer.write_char('>')?;
@@ -253,10 +255,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         end_writer = quote! {
           writer.write_str("</")?;
 
-          if with_xmlns {
-            writer.write_str(#rename_ser_str)?;
-          } else {
+          if xmlns_prefix == #name_prefix {
             writer.write_str(#rename_de_str)?;
+          } else {
+            writer.write_str(#rename_ser_str)?;
           }
 
           writer.write_char('>')?;
@@ -304,10 +306,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
           end_writer = quote! {
             writer.write_str("</")?;
 
-            if with_xmlns {
-              writer.write_str(#rename_ser_str)?;
-            } else {
+            if xmlns_prefix == #name_prefix {
               writer.write_str(#rename_de_str)?;
+            } else {
+              writer.write_str(#rename_ser_str)?;
             }
 
             writer.write_char('>')?;
@@ -351,7 +353,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
+                  writer.write_str(&child.to_string_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -359,7 +361,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
           } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
             child_stmt_list.push(
               parse2(quote! {
-                writer.write_str(&self.#child_name_ident.to_string_inner(with_xmlns)?)?;
+                writer.write_str(&self.#child_name_ident.to_string_inner(xmlns_prefix)?)?;
               })
               .unwrap(),
             );
@@ -367,7 +369,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_string_inner(with_xmlns)?)?;
+                  writer.write_str(&child.to_string_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -376,7 +378,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
             child_stmt_list.push(
               parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_string_inner(with_xmlns)?)?;
+                  writer.write_str(&#child_name_ident.to_string_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -395,10 +397,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         end_writer = quote! {
           writer.write_str("</")?;
 
-          if with_xmlns {
-            writer.write_str(#rename_ser_str)?;
-          } else {
+          if xmlns_prefix == #name_prefix {
             writer.write_str(#rename_de_str)?;
+          } else {
+            writer.write_str(#rename_ser_str)?;
           }
 
           writer.write_char('>')?;
@@ -421,10 +423,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         end_writer = quote! {
           writer.write_str("</")?;
 
-          if with_xmlns {
-            writer.write_str(#rename_ser_str)?;
-          } else {
+          if xmlns_prefix == #name_prefix {
             writer.write_str(#rename_de_str)?;
+          } else {
+            writer.write_str(#rename_ser_str)?;
           }
 
           writer.write_char('>')?;
@@ -498,6 +500,8 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
 
     let xmlns_uri_str = &schema_namespace.uri;
 
+    let xmlns_prefix_str = &schema_namespace.prefix;
+
     let to_string_fn: ItemFn = if !t.part.is_empty()
       || t.base_class == "OpenXmlPartRootElement"
       || ((t.base_class == "OpenXmlCompositeElement"
@@ -512,9 +516,13 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         pub fn to_string(&self) -> Result<String, crate::common::SdkError> {
           self.to_string_inner(
             if let Some(xmlns) = &self.xmlns {
-              xmlns != #xmlns_uri_str
+              if xmlns == #xmlns_uri_str {
+                #xmlns_prefix_str
+              } else {
+                ""
+              }
             } else {
-              true
+              ""
             }
           )
         }
@@ -524,7 +532,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
       parse2(quote! {
         #[allow(clippy::inherent_to_string)]
         pub fn to_string(&self) -> Result<String, crate::common::SdkError> {
-          self.to_string_inner(false)
+          self.to_string_inner("")
         }
       })
       .unwrap()
@@ -535,7 +543,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         impl #struct_type {
           #to_string_fn
 
-          pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, crate::common::SdkError> {
+          pub fn to_string_inner(&self, xmlns_prefix: &str) -> Result<String, crate::common::SdkError> {
             use std::fmt::Write;
 
             let mut writer = String::new();
@@ -544,10 +552,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
 
             writer.write_char('<')?;
 
-            if with_xmlns {
-              writer.write_str(#rename_ser_str)?;
-            } else {
+            if xmlns_prefix == #name_prefix {
               writer.write_str(#rename_de_str)?;
+            } else {
+              writer.write_str(#rename_ser_str)?;
             }
 
             #( #xmlns_attr_writer_list )*
@@ -627,7 +635,7 @@ fn gen_child_arm(child: &OpenXmlSchemaTypeChild, child_choice_enum_type: &Type) 
     parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
 
   parse2(quote! {
-    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_string_inner(with_xmlns)?,
+    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_string_inner(xmlns_prefix)?,
   })
   .unwrap()
 }

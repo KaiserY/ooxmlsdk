@@ -32,6 +32,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     fields.push(quote! {
       pub relationships: Option<std::boxed::Box<crate::packages::opc_relationships::Relationships>>,
     });
+
+    fields.push(quote! {
+      pub rels_path: String,
+    });
   }
 
   fields.push(quote! {
@@ -193,6 +197,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   if !part.children.is_empty() {
     field_declaration_list.push(
       parse2(quote! {
+        let mut rels_path = "".to_string();
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
         let child_parent_path = format!("{}{}", parent_path, #path_str);
       })
       .unwrap(),
@@ -224,6 +235,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     field_declaration_list.push(
       parse2(quote! {
         let relationships = if let Some(file_path) = file_path_set.get(&#part_rels_path_ident) {
+          rels_path = file_path.to_string();
+
           Some(std::boxed::Box::new(
             crate::packages::opc_relationships::Relationships::from_reader(
               std::io::BufReader::new(archive.by_name(file_path)?,
@@ -232,6 +245,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
         } else {
           None
         };
+      })
+      .unwrap(),
+    );
+
+    self_field_value_list.push(
+      parse2(quote! {
+        rels_path
       })
       .unwrap(),
     );
@@ -581,10 +601,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   writer_stmt_list.push(
     parse2(quote! {
-      if !directory_path.is_empty() && !directory_set.contains(&directory_path) {
+      if !directory_path.is_empty() && !entry_set.contains(&directory_path) {
         zip.add_directory(&directory_path, zip::write::SimpleFileOptions::default())?;
 
-        directory_set.insert(directory_path);
+        entry_set.insert(directory_path);
       }
     })
     .unwrap(),
@@ -601,10 +621,10 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   writer_stmt_list.push(
     parse2(quote! {
-      if !#part_name_dir_path_ident.is_empty() && !directory_set.contains(&#part_name_dir_path_ident) {
+      if !#part_name_dir_path_ident.is_empty() && !entry_set.contains(&#part_name_dir_path_ident) {
         zip.add_directory(&#part_name_dir_path_ident, zip::write::SimpleFileOptions::default())?;
 
-        directory_set.insert(#part_name_dir_path_ident);
+        entry_set.insert(#part_name_dir_path_ident);
       }
     })
     .unwrap(),
@@ -613,14 +633,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   if part.name == "CustomXmlPart" || part.name == "XmlSignaturePart" {
     writer_stmt_list.push(
       parse2(quote! {
-        zip.start_file(&self.inner_path, options)?;
-      })
-      .unwrap(),
-    );
+        if !entry_set.contains(&self.inner_path) {
+          zip.start_file(&self.inner_path, options)?;
 
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.write_all(self.content.as_bytes())?;
+          zip.write_all(self.content.as_bytes())?;
+
+          entry_set.insert(self.inner_path.to_string());
+        }
       })
       .unwrap(),
     );
@@ -658,14 +677,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     writer_stmt_list.push(
       parse2(quote! {
-        zip.start_file(&self.inner_path, options)?;
-      })
-      .unwrap(),
-    );
+        if !entry_set.contains(&self.inner_path) {
+          zip.start_file(&self.inner_path, options)?;
 
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.write_all(&buffer)?;
+          zip.write_all(&buffer)?;
+
+          entry_set.insert(self.inner_path.to_string());
+        }
       })
       .unwrap(),
     );
@@ -679,14 +697,13 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   } else if part.base != "OpenXmlPackage" {
     writer_stmt_list.push(
       parse2(quote! {
-        zip.start_file(&self.inner_path, options)?;
-      })
-      .unwrap(),
-    );
+        if !entry_set.contains(&self.inner_path) {
+          zip.start_file(&self.inner_path, options)?;
 
-    writer_stmt_list.push(
-      parse2(quote! {
-        zip.write_all(self.root_element.to_string()?.as_bytes())?;
+          zip.write_all(self.root_element.to_string()?.as_bytes())?;
+
+          entry_set.insert(self.inner_path.to_string());
+        }
       })
       .unwrap(),
     );
@@ -703,32 +720,23 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     writer_stmt_list.push(
       parse2(quote! {
         if let Some(relationships) = &self.relationships {
-          let part_target_str = if self.inner_path.ends_with(".xml") {
-            &self.inner_path[self.inner_path
-              .rfind('/')
-              .ok_or_else(|| crate::common::SdkError::CommonError(self.inner_path.to_string()))?
-              + 1..self.inner_path.len()]
-          } else {
-            ""
-          };
-
           let rels_dir_path = crate::common::resolve_zip_file_path(
             &format!("{}_rels", child_parent_path),
           );
 
-          let rels_file_path = crate::common::resolve_zip_file_path(
-            &format!("{}_rels/{}.rels", child_parent_path, part_target_str),
-          );
-
-          if !rels_dir_path.is_empty() && !directory_set.contains(&rels_dir_path) {
+          if !rels_dir_path.is_empty() && !entry_set.contains(&rels_dir_path) {
             zip.add_directory(&rels_dir_path, zip::write::SimpleFileOptions::default())?;
 
-            directory_set.insert(rels_dir_path);
+            entry_set.insert(rels_dir_path);
           }
 
-          zip.start_file(&rels_file_path, options)?;
+          if !entry_set.contains(&self.rels_path) {
+            zip.start_file(&self.rels_path, options)?;
 
-          zip.write_all(relationships.to_string()?.as_bytes())?;
+            zip.write_all(relationships.to_string()?.as_bytes())?;
+
+            entry_set.insert(self.rels_path.to_string());
+          }
         }
       })
       .unwrap(),
@@ -748,7 +756,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       children_writer_stmt_list.push(
         parse2(quote! {
           for #child_name_ident in &self.#child_api_name_ident {
-            #child_name_ident.save_zip(&child_parent_path, zip, directory_set)?;
+            #child_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
           }
         })
         .unwrap(),
@@ -756,7 +764,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
     } else if child.min_occurs_is_non_zero {
       children_writer_stmt_list.push(
         parse2(quote! {
-          self.#child_api_name_ident.save_zip(&child_parent_path, zip, directory_set)?;
+          self.#child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
         })
         .unwrap(),
       );
@@ -764,7 +772,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       children_writer_stmt_list.push(
         parse2(quote! {
           if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
-            #child_api_name_ident.save_zip(&child_parent_path, zip, directory_set)?;
+            #child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
           }
         })
         .unwrap(),
@@ -778,7 +786,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       &self,
       parent_path: &str,
       zip: &mut zip::ZipWriter<std::fs::File>,
-      directory_set: &mut std::collections::HashSet<String>,
+      entry_set: &mut std::collections::HashSet<String>,
     ) -> Result<(), crate::common::SdkError> {
       #( #writer_stmt_list )*
 
@@ -822,7 +830,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
       pub fn save(&self, path: &str) -> Result<(), crate::common::SdkError> {
         use std::io::Write;
 
-        let mut directory_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut entry_set: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         let path = std::path::Path::new(path);
 
@@ -838,7 +846,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
         zip.write_all(self.content_types.to_string()?.as_bytes())?;
 
-        self.save_zip("", &mut zip, &mut directory_set)?;
+        self.save_zip("", &mut zip, &mut entry_set)?;
 
         zip.finish()?;
 

@@ -14,6 +14,9 @@ fn main() {
     slide_layout_part.image_parts[0].path = "examples/write_pptx/samples/image2.jpeg".to_string();
   }
 
+  pptx.presentation_part.slide_master_parts[0].slide_layout_parts[4].image_parts[0].path =
+    "examples/write_pptx/samples/image2.jpeg".to_string();
+
   pptx.presentation_part.slide_master_parts[0].image_parts[0].path =
     "examples/write_pptx/samples/image1.jpeg".to_string();
 

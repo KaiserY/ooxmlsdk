@@ -48,7 +48,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
           parse2(quote! {
             for child in &self.children {
               if !child::validate() {
-                return false;
+                return Ok(false);
               }
             }
           })
@@ -68,7 +68,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
           parse2(quote! {
             for child in &self.children {
               if !child::validate() {
-                return false;
+                return Ok(false);
               }
             }
           })
@@ -81,7 +81,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
           parse2(quote! {
             if let Some(child) = &self.child {
               if !child::validate() {
-                return false;
+                return Ok(false);
               }
             }
           })

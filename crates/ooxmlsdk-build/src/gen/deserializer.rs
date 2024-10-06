@@ -1,13 +1,12 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type};
 
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
-  OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
-  OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
+  OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 use crate::GenContext;
@@ -86,21 +85,544 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     ))
     .unwrap();
 
-    let deserialize_self_fn = if t.base_class == "OpenXmlLeafTextElement" {
-      gen_open_xml_leaf_text_element_fn(t, schema_namespace, context)
+    let t_name_str = t.class_name.to_upper_camel_case();
+
+    let name_list: Vec<&str> = t.name.split('/').collect();
+
+    let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
+    let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
+
+    let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
+
+    let rename_ser_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_ser_str)).unwrap();
+
+    let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
+
+    let mut field_declaration_list: Vec<Stmt> = vec![];
+    let mut attr_match_list: Vec<Arm> = vec![];
+    let mut field_unwrap_list: Vec<Stmt> = vec![];
+    let mut field_init_list: Vec<Ident> = vec![];
+    let mut child_ser_match_list: Vec<Arm> = vec![];
+    let mut child_de_match_list: Vec<Arm> = vec![];
+    let mut child_match_arm: Option<Arm> = None;
+    let mut attributes: Vec<&OpenXmlSchemaTypeAttribute> = vec![];
+
+    let xmlns_literal: LitByteStr =
+      parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
+
+    if t.base_class == "OpenXmlLeafTextElement" {
+      for attr in &t.attributes {
+        attributes.push(attr);
+      }
+
+      field_declaration_list.push(
+        parse2(quote! {
+          let mut child = None;
+        })
+        .unwrap(),
+      );
+
+      field_init_list.push(
+        parse2(quote! {
+          child
+        })
+        .unwrap(),
+      );
+
+      let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
+
+      child_match_arm = Some(gen_simple_child_match_arm(first_name, context));
     } else if t.base_class == "OpenXmlLeafElement" {
-      gen_open_xml_leaf_element_fn(t, schema_namespace, context)
+      for attr in &t.attributes {
+        attributes.push(attr);
+      }
     } else if t.base_class == "OpenXmlCompositeElement"
       || t.base_class == "CustomXmlElement"
       || t.base_class == "OpenXmlPartRootElement"
       || t.base_class == "SdtElement"
     {
-      gen_open_xml_composite_element_fn(t, schema_namespace, context)
+      for attr in &t.attributes {
+        attributes.push(attr);
+      }
+
+      let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+      for child in &t.children {
+        child_map.insert(&child.name, child);
+      }
+
+      if t.is_one_sequence_flatten() {
+        for p in &t.particle.items {
+          let child = child_map
+            .get(p.name.as_str())
+            .ok_or(format!("{:?}", p.name))
+            .unwrap();
+
+          let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+          let child_rename_ser_str = child_name_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          let child_name_str = if child.property_name.is_empty() {
+            child_rename_ser_str
+          } else {
+            child.property_name.as_str()
+          };
+
+          let child_name_ident: Ident =
+            parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
+
+          if p.occurs.is_empty() {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = vec![];
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = None;
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = vec![];
+              })
+              .unwrap(),
+            );
+          } else {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = None;
+              })
+              .unwrap(),
+            );
+          }
+
+          if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+            field_unwrap_list.push(
+              parse2(quote! {
+                let #child_name_ident = #child_name_ident
+                  .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+              })
+              .unwrap(),
+            );
+          }
+
+          field_init_list.push(child_name_ident);
+        }
+      } else if !t.children.is_empty() {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut children = vec![];
+          })
+          .unwrap(),
+        );
+
+        field_init_list.push(
+          parse2(quote! {
+            children
+          })
+          .unwrap(),
+        );
+      }
+
+      let scheme_mod = context
+        .prefix_schema_mod_map
+        .get(schema_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", schema_namespace.prefix))
+        .unwrap();
+
+      let child_choice_enum_type: Type = parse_str(&format!(
+        "crate::schemas::{}::{}ChildChoice",
+        scheme_mod,
+        t.class_name.to_upper_camel_case()
+      ))
+      .unwrap();
+
+      if t.is_one_sequence_flatten() {
+        for p in &t.particle.items {
+          let child = child_map
+            .get(p.name.as_str())
+            .ok_or(format!("{:?}", p.name))
+            .unwrap();
+
+          let (ser_arm, de_arm) = gen_one_sequence_match_arm(p, child, context);
+
+          child_ser_match_list.push(ser_arm);
+
+          child_de_match_list.push(de_arm);
+        }
+      } else {
+        for child in &t.children {
+          let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
+
+          child_ser_match_list.push(ser_arm);
+
+          child_de_match_list.push(de_arm);
+        }
+      }
     } else if t.is_derived {
-      gen_derived_fn(t, schema_namespace, context)
+      let base_class_type = context
+        .type_name_type_map
+        .get(&t.name[0..t.name.find('/').unwrap() + 1])
+        .ok_or(format!("{:?}", t.base_class))
+        .unwrap();
+
+      for attr in &t.attributes {
+        attributes.push(attr);
+      }
+
+      for attr in &base_class_type.attributes {
+        attributes.push(attr);
+      }
+
+      let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+      for child in &t.children {
+        child_map.insert(&child.name, child);
+      }
+
+      if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+        for p in &t.particle.items {
+          let child = child_map
+            .get(p.name.as_str())
+            .ok_or(format!("{:?}", p.name))
+            .unwrap();
+
+          let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+          let child_rename_ser_str = child_name_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          let child_name_str = if child.property_name.is_empty() {
+            child_rename_ser_str
+          } else {
+            child.property_name.as_str()
+          };
+
+          let child_name_ident: Ident =
+            parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
+
+          if p.occurs.is_empty() {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = vec![];
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = None;
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = vec![];
+              })
+              .unwrap(),
+            );
+          } else {
+            field_declaration_list.push(
+              parse2(quote! {
+                let mut #child_name_ident = None;
+              })
+              .unwrap(),
+            );
+          }
+
+          if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
+            field_unwrap_list.push(
+              parse2(quote! {
+                let #child_name_ident = #child_name_ident
+                  .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+              })
+              .unwrap(),
+            );
+          }
+
+          field_init_list.push(child_name_ident);
+        }
+      } else if !t.children.is_empty() {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut children = vec![];
+          })
+          .unwrap(),
+        );
+
+        field_init_list.push(
+          parse2(quote! {
+            children
+          })
+          .unwrap(),
+        );
+      } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut child = None;
+          })
+          .unwrap(),
+        );
+
+        field_init_list.push(
+          parse2(quote! {
+            child
+          })
+          .unwrap(),
+        );
+      }
+
+      let scheme_mod = context
+        .prefix_schema_mod_map
+        .get(schema_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", schema_namespace.prefix))
+        .unwrap();
+
+      let child_choice_enum_type: Type = parse_str(&format!(
+        "crate::schemas::{}::{}ChildChoice",
+        scheme_mod,
+        t.class_name.to_upper_camel_case()
+      ))
+      .unwrap();
+
+      if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+        for p in &t.particle.items {
+          let child = child_map
+            .get(p.name.as_str())
+            .ok_or(format!("{:?}", p.name))
+            .unwrap();
+
+          let (ser_arm, de_arm) = gen_one_sequence_match_arm(p, child, context);
+
+          child_ser_match_list.push(ser_arm);
+
+          child_de_match_list.push(de_arm);
+        }
+      } else {
+        for child in &t.children {
+          let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
+
+          child_ser_match_list.push(ser_arm);
+
+          child_de_match_list.push(de_arm);
+        }
+      }
+
+      if t.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
+        let base_name_list: Vec<&str> = base_class_type.name.split('/').collect();
+
+        let base_first_name = base_name_list
+          .first()
+          .ok_or(format!("{:?}", base_class_type.name))
+          .unwrap();
+
+        child_match_arm = Some(gen_simple_child_match_arm(base_first_name, context));
+      }
     } else {
       panic!("{:?}", t);
     };
+
+    if !t.children.is_empty() {
+      child_match_arm = Some(
+        parse2(quote! {
+          quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
+            if with_xmlns {
+              match e.name().as_ref() {
+                #( #child_ser_match_list )*
+                _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
+              }
+            } else {
+              match e.name().local_name().as_ref() {
+                #( #child_de_match_list )*
+                _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
+              }
+            }
+          }
+        })
+        .unwrap(),
+      );
+    }
+
+    for attr in &attributes {
+      let attr_name_str = if attr.property_name.is_empty() {
+        escape_snake_case(attr.q_name.to_snake_case())
+      } else {
+        escape_snake_case(attr.property_name.to_snake_case())
+      };
+
+      let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
+
+      field_declaration_list.push(
+        parse2(quote! {
+          let mut #attr_name_ident = None;
+        })
+        .unwrap(),
+      );
+
+      attr_match_list.push(gen_field_match_arm(attr, context));
+
+      let mut required = false;
+
+      for validator in &attr.validators {
+        if validator.name == "RequiredValidator" {
+          required = true;
+        }
+      }
+
+      if required {
+        field_unwrap_list.push(
+          parse2(quote! {
+            let #attr_name_ident = #attr_name_ident
+              .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
+          })
+          .unwrap(),
+        )
+      }
+
+      field_init_list.push(attr_name_ident);
+    }
+
+    let attr_match_stmt: Stmt = if !t.part.is_empty()
+      || t.base_class == "OpenXmlPartRootElement"
+      || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
+      || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+    {
+      parse2(quote! {
+        for attr in e.attributes() {
+          let attr = attr?;
+
+          match attr.key.as_ref() {
+            #( #attr_match_list )*
+            b"xmlns" => xmlns = Some(
+              attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
+            ),
+            b"mc:Ignorable" => mc_ignorable = Some(
+              attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
+            ),
+            key => {
+              if key.starts_with(b"xmlns:") {
+                xmlns_map.insert(
+                  String::from_utf8_lossy(&key[6..]).to_string(),
+                  attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
+                );
+
+                if key == #xmlns_literal {
+                  with_xmlns = true;
+                }
+              }
+            },
+          }
+        }
+      })
+      .unwrap()
+    } else if attr_match_list.is_empty() {
+      parse2(quote! {
+        for attr in e.attributes() {
+          let attr = attr?;
+
+          if attr.key.as_ref() == #xmlns_literal {
+            with_xmlns = true;
+          }
+        }
+      })
+      .unwrap()
+    } else {
+      parse2(quote! {
+        for attr in e.attributes() {
+          let attr = attr?;
+
+          match attr.key.as_ref() {
+            #( #attr_match_list )*
+            #xmlns_literal => with_xmlns = true,
+            _ => (),
+          }
+        }
+      })
+      .unwrap()
+    };
+
+    let deserialize_self_fn: ItemFn = parse2(quote! {
+      pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
+        xml_reader: &mut R,
+        with_xmlns: bool,
+      ) -> Result<Self, crate::common::SdkError> {
+        let mut with_xmlns = with_xmlns;
+
+        let mut empty_tag = false;
+
+        let e = match xml_reader.next()? {
+          quick_xml::events::Event::Start(e) => e,
+          quick_xml::events::Event::Empty(e) => {
+            empty_tag = true;
+
+            e
+          }
+          _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
+        };
+
+        #( #field_declaration_list )*
+
+        #attr_match_stmt
+
+        if with_xmlns {
+          if e.name().as_ref() != #rename_ser_literal {
+            Err(crate::common::SdkError::MismatchError {
+              expected: #rename_ser_str.to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
+          }
+        } else if e.name().local_name().as_ref() != #rename_de_literal {
+          Err(crate::common::SdkError::MismatchError {
+            expected: #rename_de_str.to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
+        }
+
+        if !empty_tag {
+          loop {
+            let peek_event = xml_reader.peek()?;
+
+            match peek_event {
+              #child_match_arm
+              quick_xml::events::Event::End(e) => {
+                if with_xmlns {
+                  if e.name().as_ref() == #rename_ser_literal {
+                    break;
+                  }
+                } else if e.name().local_name().as_ref() == #rename_de_literal {
+                  break;
+                }
+
+                xml_reader.next()?;
+              }
+              quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
+              _ => {
+                xml_reader.next()?;
+              },
+            }
+          }
+        }
+
+        #( #field_unwrap_list )*
+
+        Ok(Self {
+          #( #field_init_list, )*
+        })
+      }
+    })
+    .unwrap();
 
     token_stream_list.push(
       parse2(quote! {
@@ -146,1160 +668,6 @@ fn gen_from_reader_fn() -> ItemFn {
   };
 
   parse_str(&token_stream.to_string()).unwrap()
-}
-
-fn gen_open_xml_leaf_element_fn(
-  t: &OpenXmlSchemaType,
-  schema_namespace: &OpenXmlNamespace,
-  context: &GenContext,
-) -> ItemFn {
-  let t_name_str = t.class_name.to_upper_camel_case();
-
-  let name_list: Vec<&str> = t.name.split('/').collect();
-
-  let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
-
-  let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_ser_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_ser_str)).unwrap();
-
-  let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
-
-  let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<Stmt> = vec![];
-  let mut field_init_list: Vec<Ident> = vec![];
-
-  for attr in &t.attributes {
-    let attr_name_str = if attr.property_name.is_empty() {
-      escape_snake_case(attr.q_name.to_snake_case())
-    } else {
-      escape_snake_case(attr.property_name.to_snake_case())
-    };
-
-    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #attr_name_ident = None;
-      })
-      .unwrap(),
-    );
-
-    attr_match_list.push(gen_field_match_arm(attr, context));
-
-    let mut required = false;
-
-    for validator in &attr.validators {
-      if validator.name == "RequiredValidator" {
-        required = true;
-      }
-    }
-
-    if required {
-      field_unwrap_list.push(
-        parse2(quote! {
-          let #attr_name_ident = #attr_name_ident
-            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-        })
-        .unwrap(),
-      )
-    }
-
-    field_init_list.push(attr_name_ident);
-  }
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        if attr.key.as_ref() == #xmlns_literal {
-          with_xmlns = true
-        }
-      }
-    })
-    .unwrap()
-  } else {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        match attr.key.as_ref() {
-          #( #attr_match_list )*
-          #xmlns_literal => with_xmlns = true,
-          _ => (),
-        }
-      }
-    })
-    .unwrap()
-  };
-
-  parse2(quote! {
-    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
-      xml_reader: &mut R,
-      with_xmlns: bool,
-    ) -> Result<Self, crate::common::SdkError> {
-      let mut with_xmlns = with_xmlns;
-
-      let mut empty_tag = false;
-
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-      };
-
-      #( #field_declaration_list )*
-
-      #attr_match_stmt
-
-      if with_xmlns {
-        if e.name().as_ref() != #rename_ser_literal {
-          Err(crate::common::SdkError::MismatchError {
-            expected: #rename_ser_str.to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(crate::common::SdkError::MismatchError {
-          expected: #rename_de_str.to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-
-      if !empty_tag {
-        loop {
-          let peek_event = xml_reader.peek()?;
-
-          match peek_event {
-            quick_xml::events::Event::End(e) => {
-              if with_xmlns {
-                if e.name().as_ref() == #rename_ser_literal {
-                  break;
-                }
-              } else if e.name().local_name().as_ref() == #rename_de_literal {
-                break;
-              }
-
-              xml_reader.next()?;
-            }
-            quick_xml::events::Event::Eof => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-            _ => {
-              xml_reader.next()?;
-            },
-          }
-        }
-      }
-
-      #( #field_unwrap_list )*
-
-      Ok(Self {
-        #( #field_init_list, )*
-      })
-    }
-  })
-  .unwrap()
-}
-
-fn gen_open_xml_leaf_text_element_fn(
-  t: &OpenXmlSchemaType,
-  schema_namespace: &OpenXmlNamespace,
-  context: &GenContext,
-) -> ItemFn {
-  let t_name_str = t.class_name.to_upper_camel_case();
-
-  let name_list: Vec<&str> = t.name.split('/').collect();
-
-  let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
-
-  let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_ser_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_ser_str)).unwrap();
-
-  let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
-
-  let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<Stmt> = vec![];
-  let mut field_init_list: Vec<Ident> = vec![];
-
-  for attr in &t.attributes {
-    let attr_name_str = if attr.property_name.is_empty() {
-      escape_snake_case(attr.q_name.to_snake_case())
-    } else {
-      escape_snake_case(attr.property_name.to_snake_case())
-    };
-
-    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #attr_name_ident = None;
-      })
-      .unwrap(),
-    );
-
-    attr_match_list.push(gen_field_match_arm(attr, context));
-
-    let mut required = false;
-
-    for validator in &attr.validators {
-      if validator.name == "RequiredValidator" {
-        required = true;
-      }
-    }
-
-    if required {
-      field_unwrap_list.push(
-        parse2(quote! {
-          let #attr_name_ident = #attr_name_ident
-            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-        })
-        .unwrap(),
-      )
-    }
-
-    field_init_list.push(attr_name_ident)
-  }
-
-  field_declaration_list.push(
-    parse2(quote! {
-      let mut child = None;
-    })
-    .unwrap(),
-  );
-
-  field_init_list.push(
-    parse2(quote! {
-      child
-    })
-    .unwrap(),
-  );
-
-  let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let child_match_arm = gen_simple_child_match_arm(first_name, context);
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        if attr.key.as_ref() == #xmlns_literal {
-          with_xmlns = true
-        }
-      }
-    })
-    .unwrap()
-  } else {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        match attr.key.as_ref() {
-          #( #attr_match_list )*
-          #xmlns_literal => with_xmlns = true,
-          _ => (),
-        }
-      }
-    })
-    .unwrap()
-  };
-
-  parse2(quote! {
-    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
-      xml_reader: &mut R,
-      with_xmlns: bool,
-    ) -> Result<Self, crate::common::SdkError> {
-      let mut with_xmlns = with_xmlns;
-
-      let mut empty_tag = false;
-
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-      };
-
-      #( #field_declaration_list )*
-
-      #attr_match_stmt
-
-      if with_xmlns {
-        if e.name().as_ref() != #rename_ser_literal {
-          Err(crate::common::SdkError::MismatchError {
-            expected: #rename_ser_str.to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(crate::common::SdkError::MismatchError {
-          expected: #rename_de_str.to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-
-      if !empty_tag {
-        loop {
-          let peek_event = xml_reader.peek()?;
-
-          match peek_event {
-            #child_match_arm
-            quick_xml::events::Event::End(e) => {
-              if with_xmlns {
-                if e.name().as_ref() == #rename_ser_literal {
-                  break;
-                }
-              } else if e.name().local_name().as_ref() == #rename_de_literal {
-                break;
-              }
-
-              xml_reader.next()?;
-            }
-            quick_xml::events::Event::Eof => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-            _ => {
-              xml_reader.next()?;
-            },
-          }
-        }
-      }
-
-      #( #field_unwrap_list )*
-
-      Ok(Self {
-        #( #field_init_list, )*
-      })
-    }
-  })
-  .unwrap()
-}
-
-fn gen_open_xml_composite_element_fn(
-  t: &OpenXmlSchemaType,
-  schema_namespace: &OpenXmlNamespace,
-  context: &GenContext,
-) -> ItemFn {
-  let t_name_str = t.class_name.to_upper_camel_case();
-
-  let name_list: Vec<&str> = t.name.split('/').collect();
-
-  let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
-
-  let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_ser_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_ser_str)).unwrap();
-
-  let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
-
-  let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<Stmt> = vec![];
-  let mut field_init_list: Vec<Ident> = vec![];
-  let mut child_ser_match_list: Vec<Arm> = vec![];
-
-  if !t.part.is_empty()
-    || t.base_class == "OpenXmlPartRootElement"
-    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
-    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
-  {
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut xmlns = None;
-      })
-      .unwrap(),
-    );
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut xmlns_map = std::collections::HashMap::<String, String>::new();
-      })
-      .unwrap(),
-    );
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut mc_ignorable = None;
-      })
-      .unwrap(),
-    );
-
-    field_init_list.push(parse_str("xmlns").unwrap());
-    field_init_list.push(parse_str("xmlns_map").unwrap());
-    field_init_list.push(parse_str("mc_ignorable").unwrap());
-  }
-
-  for attr in &t.attributes {
-    let attr_name_str = if attr.property_name.is_empty() {
-      escape_snake_case(attr.q_name.to_snake_case())
-    } else {
-      escape_snake_case(attr.property_name.to_snake_case())
-    };
-
-    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #attr_name_ident = None;
-      })
-      .unwrap(),
-    );
-
-    attr_match_list.push(gen_field_match_arm(attr, context));
-
-    let mut required = false;
-
-    for validator in &attr.validators {
-      if validator.name == "RequiredValidator" {
-        required = true;
-      }
-    }
-
-    if required {
-      field_unwrap_list.push(
-        parse2(quote! {
-          let #attr_name_ident = #attr_name_ident
-            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-        })
-        .unwrap(),
-      );
-    }
-
-    field_init_list.push(attr_name_ident);
-  }
-
-  let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
-
-  for child in &t.children {
-    child_map.insert(&child.name, child);
-  }
-
-  if t.is_one_sequence_flatten() {
-    for p in &t.particle.items {
-      let child = child_map
-        .get(p.name.as_str())
-        .ok_or(format!("{:?}", p.name))
-        .unwrap();
-
-      let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-      let child_rename_ser_str = child_name_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      let child_name_str = if child.property_name.is_empty() {
-        child_rename_ser_str
-      } else {
-        child.property_name.as_str()
-      };
-
-      let child_name_ident: Ident =
-        parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
-
-      if p.occurs.is_empty() {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = vec![];
-          })
-          .unwrap(),
-        );
-      } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = None;
-          })
-          .unwrap(),
-        );
-      } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = vec![];
-          })
-          .unwrap(),
-        );
-      } else {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = None;
-          })
-          .unwrap(),
-        );
-      }
-
-      if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-        field_unwrap_list.push(
-          parse2(quote! {
-            let #child_name_ident = #child_name_ident
-              .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
-          })
-          .unwrap(),
-        );
-      }
-
-      field_init_list.push(child_name_ident);
-    }
-  } else if !t.children.is_empty() {
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut children = vec![];
-      })
-      .unwrap(),
-    );
-
-    field_init_list.push(
-      parse2(quote! {
-        children
-      })
-      .unwrap(),
-    );
-  }
-
-  let scheme_mod = context
-    .prefix_schema_mod_map
-    .get(schema_namespace.prefix.as_str())
-    .ok_or(format!("{:?}", schema_namespace.prefix))
-    .unwrap();
-
-  let child_choice_enum_type: Type = parse_str(&format!(
-    "crate::schemas::{}::{}ChildChoice",
-    scheme_mod,
-    t.class_name.to_upper_camel_case()
-  ))
-  .unwrap();
-
-  let mut child_variant_name_set: HashSet<String> = HashSet::new();
-
-  let mut child_de_match_map: HashMap<&str, Arm> = HashMap::new();
-
-  if t.is_one_sequence_flatten() {
-    for p in &t.particle.items {
-      let child = child_map
-        .get(p.name.as_str())
-        .ok_or(format!("{:?}", p.name))
-        .unwrap();
-
-      let (ser_arm, de_arm) = gen_one_sequence_match_arm(p, child, context);
-
-      child_ser_match_list.push(ser_arm);
-
-      let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-      let child_rename_ser_str = child_name_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
-
-      let child_rename_de_str = child_rename_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      child_de_match_map.insert(child_rename_de_str, de_arm);
-    }
-  } else {
-    for child in &t.children {
-      if !child_variant_name_set.contains(child.name.as_str()) {
-        let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
-
-        child_ser_match_list.push(ser_arm);
-
-        let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-        let child_rename_ser_str = child_name_list
-          .last()
-          .ok_or(format!("{:?}", child.name))
-          .unwrap();
-
-        let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
-
-        let child_rename_de_str = child_rename_list
-          .last()
-          .ok_or(format!("{:?}", child.name))
-          .unwrap();
-
-        child_de_match_map.insert(child_rename_de_str, de_arm);
-
-        child_variant_name_set.insert(child.name.clone());
-      }
-    }
-  }
-
-  let child_de_match_list: Vec<Arm> = child_de_match_map.into_values().collect();
-
-  let child_match_arm: TokenStream = if t.children.is_empty() {
-    quote! {}
-  } else {
-    quote! {
-      quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
-        if with_xmlns {
-          match e.name().as_ref() {
-            #( #child_ser_match_list )*
-            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-          }
-        } else {
-          match e.name().local_name().as_ref() {
-            #( #child_de_match_list )*
-            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-          }
-        }
-      }
-    }
-  };
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  let attr_match_stmt: Stmt = if !t.part.is_empty()
-    || t.base_class == "OpenXmlPartRootElement"
-    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
-    || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
-  {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        match attr.key.as_ref() {
-          #( #attr_match_list )*
-          b"xmlns" => xmlns = Some(
-            attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
-          ),
-          b"mc:Ignorable" => mc_ignorable = Some(
-            attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
-          ),
-          key => {
-            if key.starts_with(b"xmlns:") {
-              xmlns_map.insert(
-                String::from_utf8_lossy(&key[6..]).to_string(),
-                attr.decode_and_unescape_value(xml_reader.decoder())?.to_string(),
-              );
-
-              if key == #xmlns_literal {
-                with_xmlns = true;
-              }
-            }
-          },
-        }
-      }
-    })
-    .unwrap()
-  } else if attr_match_list.is_empty() {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        if attr.key.as_ref() == #xmlns_literal {
-          with_xmlns = true;
-        }
-      }
-    })
-    .unwrap()
-  } else {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        match attr.key.as_ref() {
-          #( #attr_match_list )*
-          #xmlns_literal => with_xmlns = true,
-          _ => (),
-        }
-      }
-    })
-    .unwrap()
-  };
-
-  parse2(quote! {
-    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
-      xml_reader: &mut R,
-      with_xmlns: bool,
-    ) -> Result<Self, crate::common::SdkError> {
-      let mut with_xmlns = with_xmlns;
-
-      let mut empty_tag = false;
-
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-      };
-
-      #( #field_declaration_list )*
-
-      #attr_match_stmt
-
-      if with_xmlns {
-        if e.name().as_ref() != #rename_ser_literal {
-          Err(crate::common::SdkError::MismatchError {
-            expected: #rename_ser_str.to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(crate::common::SdkError::MismatchError {
-          expected: #rename_de_str.to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-
-      if !empty_tag {
-        loop {
-          let peek_event = xml_reader.peek()?;
-
-          match peek_event {
-            #child_match_arm
-            quick_xml::events::Event::End(e) => {
-              if with_xmlns {
-                if e.name().as_ref() == #rename_ser_literal {
-                  break;
-                }
-              } else if e.name().local_name().as_ref() == #rename_de_literal {
-                break;
-              }
-
-              xml_reader.next()?;
-            }
-            quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
-            _ => {
-              xml_reader.next()?;
-            },
-          }
-        }
-      }
-
-      #( #field_unwrap_list )*
-
-      Ok(Self {
-        #( #field_init_list, )*
-      })
-    }
-  })
-  .unwrap()
-}
-
-fn gen_derived_fn(
-  t: &OpenXmlSchemaType,
-  schema_namespace: &OpenXmlNamespace,
-  context: &GenContext,
-) -> ItemFn {
-  let t_name_str = t.class_name.to_upper_camel_case();
-
-  let base_class_type = context
-    .type_name_type_map
-    .get(&t.name[0..t.name.find('/').unwrap() + 1])
-    .ok_or(format!("{:?}", t.base_class))
-    .unwrap();
-
-  let name_list: Vec<&str> = t.name.split('/').collect();
-
-  let rename_ser_str = name_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_list: Vec<&str> = rename_ser_str.split(':').collect();
-
-  let rename_de_str = rename_list.last().ok_or(format!("{:?}", t.name)).unwrap();
-
-  let rename_ser_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_ser_str)).unwrap();
-
-  let rename_de_literal: LitByteStr = parse_str(&format!("b\"{}\"", rename_de_str)).unwrap();
-
-  let mut field_declaration_list: Vec<Stmt> = vec![];
-  let mut attr_match_list: Vec<Arm> = vec![];
-  let mut field_unwrap_list: Vec<Stmt> = vec![];
-  let mut field_init_list: Vec<Ident> = vec![];
-  let mut child_ser_match_list: Vec<Arm> = vec![];
-
-  let mut attributes: Vec<&OpenXmlSchemaTypeAttribute> = vec![];
-
-  for attr in &t.attributes {
-    attributes.push(attr);
-  }
-
-  for attr in &base_class_type.attributes {
-    attributes.push(attr);
-  }
-
-  for attr in attributes {
-    let attr_name_str = if attr.property_name.is_empty() {
-      escape_snake_case(attr.q_name.to_snake_case())
-    } else {
-      escape_snake_case(attr.property_name.to_snake_case())
-    };
-
-    let attr_name_ident: Ident = parse_str(&attr_name_str).unwrap();
-
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut #attr_name_ident = None;
-      })
-      .unwrap(),
-    );
-
-    attr_match_list.push(gen_field_match_arm(attr, context));
-
-    let mut required = false;
-
-    for validator in &attr.validators {
-      if validator.name == "RequiredValidator" {
-        required = true;
-      }
-    }
-
-    if required {
-      field_unwrap_list.push(
-        parse2(quote! {
-          let #attr_name_ident = #attr_name_ident
-            .ok_or_else(|| crate::common::SdkError::CommonError(#attr_name_str.to_string()))?;
-        })
-        .unwrap(),
-      );
-    }
-
-    field_init_list.push(attr_name_ident);
-  }
-
-  let mut children: Vec<&OpenXmlSchemaTypeChild> = vec![];
-
-  for child in &t.children {
-    children.push(child);
-  }
-
-  for child in &base_class_type.children {
-    children.push(child);
-  }
-
-  let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
-
-  for child in &t.children {
-    child_map.insert(&child.name, child);
-  }
-
-  if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
-    for p in &t.particle.items {
-      let child = child_map
-        .get(p.name.as_str())
-        .ok_or(format!("{:?}", p.name))
-        .unwrap();
-
-      let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-      let child_rename_ser_str = child_name_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      let child_name_str = if child.property_name.is_empty() {
-        child_rename_ser_str
-      } else {
-        child.property_name.as_str()
-      };
-
-      let child_name_ident: Ident =
-        parse_str(&escape_snake_case(child_name_str.to_snake_case())).unwrap();
-
-      if p.occurs.is_empty() {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = vec![];
-          })
-          .unwrap(),
-        );
-      } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = None;
-          })
-          .unwrap(),
-        );
-      } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = vec![];
-          })
-          .unwrap(),
-        );
-      } else {
-        field_declaration_list.push(
-          parse2(quote! {
-            let mut #child_name_ident = None;
-          })
-          .unwrap(),
-        );
-      }
-
-      if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-        field_unwrap_list.push(
-          parse2(quote! {
-            let #child_name_ident = #child_name_ident
-              .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
-          })
-          .unwrap(),
-        );
-      }
-
-      field_init_list.push(child_name_ident);
-    }
-  } else if !children.is_empty() {
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut children = vec![];
-      })
-      .unwrap(),
-    );
-
-    field_init_list.push(
-      parse2(quote! {
-        children
-      })
-      .unwrap(),
-    );
-  } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
-    field_declaration_list.push(
-      parse2(quote! {
-        let mut child = None;
-      })
-      .unwrap(),
-    );
-
-    field_init_list.push(
-      parse2(quote! {
-        child
-      })
-      .unwrap(),
-    );
-  }
-
-  let scheme_mod = context
-    .prefix_schema_mod_map
-    .get(schema_namespace.prefix.as_str())
-    .ok_or(format!("{:?}", schema_namespace.prefix))
-    .unwrap();
-
-  let child_choice_enum_type: Type = parse_str(&format!(
-    "crate::schemas::{}::{}ChildChoice",
-    scheme_mod,
-    t.class_name.to_upper_camel_case()
-  ))
-  .unwrap();
-
-  let mut child_variant_name_set: HashSet<&str> = HashSet::new();
-
-  let mut child_de_match_map: HashMap<&str, Arm> = HashMap::new();
-
-  if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
-    for p in &t.particle.items {
-      let child = child_map
-        .get(p.name.as_str())
-        .ok_or(format!("{:?}", p.name))
-        .unwrap();
-
-      let (ser_arm, de_arm) = gen_one_sequence_match_arm(p, child, context);
-
-      child_ser_match_list.push(ser_arm);
-
-      let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-      let child_rename_ser_str = child_name_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
-
-      let child_rename_de_str = child_rename_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      child_de_match_map.insert(child_rename_de_str, de_arm);
-    }
-  } else {
-    for child in children.iter() {
-      if !child_variant_name_set.contains(child.name.as_str()) {
-        let (ser_arm, de_arm) = gen_child_match_arm(child, &child_choice_enum_type, context);
-
-        child_ser_match_list.push(ser_arm);
-
-        let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-        let child_rename_ser_str = child_name_list
-          .last()
-          .ok_or(format!("{:?}", child.name))
-          .unwrap();
-
-        let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
-
-        let child_rename_de_str = child_rename_list
-          .last()
-          .ok_or(format!("{:?}", child.name))
-          .unwrap();
-
-        child_de_match_map.insert(child_rename_de_str, de_arm);
-
-        child_variant_name_set.insert(&child.name);
-      }
-    }
-  }
-
-  let child_de_match_list: Vec<Arm> = child_de_match_map.into_values().collect();
-
-  let child_match_arm: TokenStream = if children.is_empty() {
-    if base_class_type.base_class == "OpenXmlLeafTextElement" {
-      let base_name_list: Vec<&str> = base_class_type.name.split('/').collect();
-
-      let base_first_name = base_name_list
-        .first()
-        .ok_or(format!("{:?}", base_class_type.name))
-        .unwrap();
-
-      let child_match_arm = gen_simple_child_match_arm(base_first_name, context);
-
-      quote! {#child_match_arm}
-    } else {
-      quote! {}
-    }
-  } else {
-    quote! {
-      quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
-        if with_xmlns {
-          match e.name().as_ref() {
-            #( #child_ser_match_list )*
-            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-          }
-        } else {
-          match e.name().local_name().as_ref() {
-            #( #child_de_match_list )*
-            _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-          }
-        }
-      }
-    }
-  };
-
-  let xmlns_literal: LitByteStr =
-    parse_str(&format!("b\"xmlns:{}\"", schema_namespace.prefix)).unwrap();
-
-  let attr_match_stmt: Stmt = if attr_match_list.is_empty() {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        if attr.key.as_ref() == #xmlns_literal {
-          with_xmlns = true
-        }
-      }
-    })
-    .unwrap()
-  } else {
-    parse2(quote! {
-      for attr in e.attributes() {
-        let attr = attr?;
-
-        match attr.key.as_ref() {
-          #( #attr_match_list )*
-          #xmlns_literal => with_xmlns = true,
-          _ => (),
-        }
-      }
-    })
-    .unwrap()
-  };
-
-  parse2(quote! {
-    pub fn deserialize_self<'de, R: crate::common::XmlReader<'de>>(
-      xml_reader: &mut R,
-      with_xmlns: bool,
-    ) -> Result<Self, crate::common::SdkError> {
-      let mut with_xmlns = with_xmlns;
-
-      let mut empty_tag = false;
-
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => Err(crate::common::SdkError::CommonError(#t_name_str.to_string()))?,
-      };
-
-      #( #field_declaration_list )*
-
-      #attr_match_stmt
-
-      if with_xmlns {
-        if e.name().as_ref() != #rename_ser_literal {
-          Err(crate::common::SdkError::MismatchError {
-            expected: #rename_ser_str.to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      } else if e.name().local_name().as_ref() != #rename_de_literal {
-        Err(crate::common::SdkError::MismatchError {
-          expected: #rename_de_str.to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-
-      if !empty_tag {
-        loop {
-          let peek_event = xml_reader.peek()?;
-
-          match peek_event {
-            #child_match_arm
-            quick_xml::events::Event::End(e) => {
-              if with_xmlns {
-                if e.name().as_ref() == #rename_ser_literal {
-                  break;
-                }
-              } else if e.name().local_name().as_ref() == #rename_de_literal {
-                break;
-              }
-
-              xml_reader.next()?;
-            }
-            quick_xml::events::Event::Eof => Err(crate::common::SdkError::UnknownError)?,
-            _ => {
-              xml_reader.next()?;
-            },
-          }
-        }
-      }
-
-      #( #field_unwrap_list )*
-
-      Ok(Self {
-        #( #field_init_list, )*
-      })
-    }
-  })
-  .unwrap()
 }
 
 fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, context: &GenContext) -> Arm {

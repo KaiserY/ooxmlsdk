@@ -209,38 +209,29 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
           if p.occurs.is_empty() {
             field_declaration_list.push(
               parse2(quote! {
-                let mut #child_name_ident = vec![];
-              })
-              .unwrap(),
-            );
-          } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-            field_declaration_list.push(
-              parse2(quote! {
                 let mut #child_name_ident = None;
               })
               .unwrap(),
             );
-          } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+
+            field_unwrap_list.push(
+              parse2(quote! {
+                let #child_name_ident = #child_name_ident
+                  .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
             field_declaration_list.push(
               parse2(quote! {
-                let mut #child_name_ident = vec![];
+                let mut #child_name_ident = None;
               })
               .unwrap(),
             );
           } else {
             field_declaration_list.push(
               parse2(quote! {
-                let mut #child_name_ident = None;
-              })
-              .unwrap(),
-            );
-          }
-
-          if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-            field_unwrap_list.push(
-              parse2(quote! {
-                let #child_name_ident = #child_name_ident
-                  .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+                let mut #child_name_ident = vec![];
               })
               .unwrap(),
             );
@@ -374,38 +365,29 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
           if p.occurs.is_empty() {
             field_declaration_list.push(
               parse2(quote! {
-                let mut #child_name_ident = vec![];
-              })
-              .unwrap(),
-            );
-          } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-            field_declaration_list.push(
-              parse2(quote! {
                 let mut #child_name_ident = None;
               })
               .unwrap(),
             );
-          } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+
+            field_unwrap_list.push(
+              parse2(quote! {
+                let #child_name_ident = #child_name_ident
+                  .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+              })
+              .unwrap(),
+            );
+          } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
             field_declaration_list.push(
               parse2(quote! {
-                let mut #child_name_ident = vec![];
+                let mut #child_name_ident = None;
               })
               .unwrap(),
             );
           } else {
             field_declaration_list.push(
               parse2(quote! {
-                let mut #child_name_ident = None;
-              })
-              .unwrap(),
-            );
-          }
-
-          if !p.occurs.is_empty() && p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-            field_unwrap_list.push(
-              parse2(quote! {
-                let #child_name_ident = #child_name_ident
-                  .ok_or_else(|| crate::common::SdkError::CommonError(#child_name_str.to_string()))?;
+                let mut #child_name_ident = vec![];
               })
               .unwrap(),
             );
@@ -1026,36 +1008,27 @@ fn gen_one_sequence_match_arm(
   let ser_arm: Arm = if p.occurs.is_empty() {
     parse2(quote! {
       #child_rename_ser_literal => {
-        #child_name_ident.push(
-          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        );
-      }
-    })
-    .unwrap()
-  } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-    parse2(quote! {
-      #child_rename_ser_literal => {
         #child_name_ident = Some(std::boxed::Box::new(
           #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
         ));
       }
     })
     .unwrap()
-  } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+  } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
     parse2(quote! {
       #child_rename_ser_literal => {
-        #child_name_ident.push(
+        #child_name_ident = Some(std::boxed::Box::new(
           #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        );
+        ));
       }
     })
     .unwrap()
   } else {
     parse2(quote! {
       #child_rename_ser_literal => {
-        #child_name_ident = Some(std::boxed::Box::new(
+        #child_name_ident.push(
           #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        ));
+        );
       }
     })
     .unwrap()
@@ -1064,36 +1037,27 @@ fn gen_one_sequence_match_arm(
   let de_arm: Arm = if p.occurs.is_empty() {
     parse2(quote! {
       #child_rename_de_literal => {
-        #child_name_ident.push(
-          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        );
-      }
-    })
-    .unwrap()
-  } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-    parse2(quote! {
-      #child_rename_de_literal => {
         #child_name_ident = Some(std::boxed::Box::new(
           #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
         ));
       }
     })
     .unwrap()
-  } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+  } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
     parse2(quote! {
       #child_rename_de_literal => {
-        #child_name_ident.push(
+        #child_name_ident = Some(std::boxed::Box::new(
           #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        );
+        ));
       }
     })
     .unwrap()
   } else {
     parse2(quote! {
       #child_rename_de_literal => {
-        #child_name_ident = Some(std::boxed::Box::new(
+        #child_name_ident.push(
           #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        ));
+        );
       }
     })
     .unwrap()

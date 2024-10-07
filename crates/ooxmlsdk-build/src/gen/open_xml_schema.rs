@@ -474,22 +474,17 @@ pub fn gen_one_sequence_fields(
     if p.occurs.is_empty() {
       fields.push(quote! {
         #[doc = #property_comments]
-        pub #child_name_ident: Vec<#child_variant_type>,
-      });
-    } else if p.occurs[0].min == 1 && p.occurs[0].max == 1 {
-      fields.push(quote! {
-        #[doc = #property_comments]
         pub #child_name_ident: std::boxed::Box<#child_variant_type>,
       });
-    } else if p.occurs[0].max > 1 || p.occurs[0].min == 0 && p.occurs[0].max == 0 {
+    } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
       fields.push(quote! {
         #[doc = #property_comments]
-        pub #child_name_ident: Vec<#child_variant_type>,
+        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
       });
     } else {
       fields.push(quote! {
         #[doc = #property_comments]
-        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+        pub #child_name_ident: Vec<#child_variant_type>,
       });
     }
   }

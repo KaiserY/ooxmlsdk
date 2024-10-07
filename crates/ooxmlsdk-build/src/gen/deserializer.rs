@@ -104,7 +104,7 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     let mut field_unwrap_list: Vec<Stmt> = vec![];
     let mut field_init_list: Vec<Ident> = vec![];
     let mut child_ser_match_list: Vec<Arm> = vec![];
-    let mut child_de_match_list: Vec<Arm> = vec![];
+    let mut child_de_match_map: HashMap<&str, Arm> = HashMap::new();
     let mut child_match_arm: Option<Arm> = None;
     let mut attributes: Vec<&OpenXmlSchemaTypeAttribute> = vec![];
 
@@ -142,6 +142,37 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
       || t.base_class == "OpenXmlPartRootElement"
       || t.base_class == "SdtElement"
     {
+      if !t.part.is_empty()
+        || t.base_class == "OpenXmlPartRootElement"
+        || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
+        || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+      {
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut xmlns = None;
+          })
+          .unwrap(),
+        );
+
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+          })
+          .unwrap(),
+        );
+
+        field_declaration_list.push(
+          parse2(quote! {
+            let mut mc_ignorable = None;
+          })
+          .unwrap(),
+        );
+
+        field_init_list.push(parse_str("xmlns").unwrap());
+        field_init_list.push(parse_str("xmlns_map").unwrap());
+        field_init_list.push(parse_str("mc_ignorable").unwrap());
+      }
+
       for attr in &t.attributes {
         attributes.push(attr);
       }
@@ -257,7 +288,21 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
           child_ser_match_list.push(ser_arm);
 
-          child_de_match_list.push(de_arm);
+          let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+          let child_rename_ser_str = child_name_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+          let child_rename_de_str = child_rename_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          child_de_match_map.insert(child_rename_de_str, de_arm);
         }
       } else {
         for child in &t.children {
@@ -265,7 +310,21 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
           child_ser_match_list.push(ser_arm);
 
-          child_de_match_list.push(de_arm);
+          let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+          let child_rename_ser_str = child_name_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+          let child_rename_de_str = child_rename_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          child_de_match_map.insert(child_rename_de_str, de_arm);
         }
       }
     } else if t.is_derived {
@@ -408,7 +467,21 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
           child_ser_match_list.push(ser_arm);
 
-          child_de_match_list.push(de_arm);
+          let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+          let child_rename_ser_str = child_name_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+          let child_rename_de_str = child_rename_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          child_de_match_map.insert(child_rename_de_str, de_arm);
         }
       } else {
         for child in &t.children {
@@ -416,7 +489,21 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
           child_ser_match_list.push(ser_arm);
 
-          child_de_match_list.push(de_arm);
+          let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+          let child_rename_ser_str = child_name_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          let child_rename_list: Vec<&str> = child_rename_ser_str.split(':').collect();
+
+          let child_rename_de_str = child_rename_list
+            .last()
+            .ok_or(format!("{:?}", child.name))
+            .unwrap();
+
+          child_de_match_map.insert(child_rename_de_str, de_arm);
         }
       }
 
@@ -433,6 +520,8 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
     } else {
       panic!("{:?}", t);
     };
+
+    let child_de_match_list: Vec<Arm> = child_de_match_map.into_values().collect();
 
     if !t.children.is_empty() {
       child_match_arm = Some(
@@ -494,10 +583,14 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
       field_init_list.push(attr_name_ident);
     }
 
-    let attr_match_stmt: Stmt = if !t.part.is_empty()
+    let attr_match_stmt: Stmt = if (t.base_class == "OpenXmlCompositeElement"
+      || t.base_class == "CustomXmlElement"
       || t.base_class == "OpenXmlPartRootElement"
-      || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
-      || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+      || t.base_class == "SdtElement")
+      && (!t.part.is_empty()
+        || t.base_class == "OpenXmlPartRootElement"
+        || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/main"
+        || schema_namespace.uri == "http://schemas.openxmlformats.org/drawingml/2006/picture")
     {
       parse2(quote! {
         for attr in e.attributes() {

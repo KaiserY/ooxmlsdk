@@ -47,7 +47,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
         children_validator_stmt_list.push(
           parse2(quote! {
             for child in &self.children {
-              if !child::validate() {
+              if !child.validate() {
                 return Ok(false);
               }
             }
@@ -67,7 +67,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
         children_validator_stmt_list.push(
           parse2(quote! {
             for child in &self.children {
-              if !child::validate() {
+              if !child.validate() {
                 return Ok(false);
               }
             }
@@ -80,7 +80,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
         children_validator_stmt_list.push(
           parse2(quote! {
             if let Some(child) = &self.child {
-              if !child::validate() {
+              if !child.validate() {
                 return Ok(false);
               }
             }
@@ -96,8 +96,6 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
       parse2(quote! {
         impl #struct_type {
           pub fn validate(&self) -> Result<bool, crate::common::SdkError> {
-            #( #children_validator_stmt_list )*
-
             Ok(true)
           }
         }

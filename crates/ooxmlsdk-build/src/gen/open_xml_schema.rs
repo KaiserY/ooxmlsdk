@@ -322,7 +322,7 @@ pub fn gen_children(
 
     let child_rename_ser_str = child_name_list
       .last()
-      .ok_or(format!("{:?}", class_name))
+      .ok_or(format!("{:?}", child.name))
       .unwrap();
 
     let child_variant_name_ident: Ident =

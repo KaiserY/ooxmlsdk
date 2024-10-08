@@ -1,9 +1,10 @@
-use heck::ToUpperCamelCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse2, parse_str, Arm, Ident, ItemImpl, Stmt, Type};
 
-use crate::models::OpenXmlSchema;
+use crate::models::{OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaTypeAttribute};
+use crate::utils::escape_snake_case;
 use crate::GenContext;
 
 pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
@@ -21,8 +22,6 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
     .ok_or(format!("{:?}", schema_namespace.prefix))
     .unwrap();
 
-  let mut children_validator_stmt_list: Vec<Stmt> = vec![];
-
   for t in &schema.types {
     if t.is_abstract {
       continue;
@@ -34,6 +33,18 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
       t.class_name.to_upper_camel_case()
     ))
     .unwrap();
+
+    let mut attr_validator_stmt_list: Vec<Stmt> = vec![];
+
+    let mut children_validator_stmt_list: Vec<Stmt> = vec![];
+
+    for attr in &t.attributes {
+      attr_validator_stmt_list.extend(gen_attr_validator_stmt_list(
+        attr,
+        schema_namespace,
+        context,
+      ));
+    }
 
     if t.base_class == "OpenXmlLeafTextElement" {
     } else if t.base_class == "OpenXmlLeafElement" {
@@ -66,27 +77,26 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
 
           child_match_arm_list.push(
             parse2(quote! {
-              #child_choice_enum_type::#child_variant_name_ident(c) => {
-                if !c.validate()? {
-                  return Ok(false);
+              #child_choice_enum_type::#child_variant_name_ident(c) => if !c.validate()? {
+                return Ok(false);
+              },
+            })
+            .unwrap(),
+          );
+        }
+
+        if !t.children.is_empty() {
+          children_validator_stmt_list.push(
+            parse2(quote! {
+              for child in &self.children {
+                match child {
+                  #( #child_match_arm_list )*
                 }
               }
             })
             .unwrap(),
           );
         }
-
-        children_validator_stmt_list.push(
-          parse2(quote! {
-            for child in &self.children {
-              match child {
-                #( #child_match_arm_list )*
-                _ => (),
-              }
-            }
-          })
-          .unwrap(),
-        );
       }
     } else if t.is_derived {
       let base_class_type = context
@@ -94,6 +104,14 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
         .get(&t.name[0..t.name.find('/').unwrap() + 1])
         .ok_or(format!("{:?}", t.base_class))
         .unwrap();
+
+      for attr in &base_class_type.attributes {
+        attr_validator_stmt_list.extend(gen_attr_validator_stmt_list(
+          attr,
+          schema_namespace,
+          context,
+        ));
+      }
 
       if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
       } else {
@@ -119,40 +137,26 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
 
           child_match_arm_list.push(
             parse2(quote! {
-              #child_choice_enum_type::#child_variant_name_ident(c) => {
-                if !c.validate()? {
-                  return Ok(false);
+              #child_choice_enum_type::#child_variant_name_ident(c) => if !c.validate()? {
+                return Ok(false);
+              },
+            })
+            .unwrap(),
+          );
+        }
+
+        if !t.children.is_empty() {
+          children_validator_stmt_list.push(
+            parse2(quote! {
+              for child in &self.children {
+                match child {
+                  #( #child_match_arm_list )*
                 }
               }
             })
             .unwrap(),
           );
         }
-
-        children_validator_stmt_list.push(
-          parse2(quote! {
-            for child in &self.children {
-              match child {
-                #( #child_match_arm_list )*
-                _ => (),
-              }
-            }
-          })
-          .unwrap(),
-        );
-      }
-
-      if t.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
-        children_validator_stmt_list.push(
-          parse2(quote! {
-            if let Some(child) = &self.child {
-              if !child.validate()? {
-                return Ok(false);
-              }
-            }
-          })
-          .unwrap(),
-        );
       }
     } else {
       panic!("{:?}", t);
@@ -162,15 +166,114 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
       parse2(quote! {
         impl #struct_type {
           pub fn validate(&self) -> Result<bool, crate::common::SdkError> {
+            #( #attr_validator_stmt_list )*
+
+            #( #children_validator_stmt_list )*
+
             Ok(true)
           }
         }
       })
       .unwrap(),
-    )
+    );
   }
 
   quote! {
     #( #token_stream_list )*
+  }
+}
+
+fn gen_attr_validator_stmt_list(
+  attr: &OpenXmlSchemaTypeAttribute,
+  _schema_namespace: &OpenXmlNamespace,
+  _context: &GenContext,
+) -> Vec<Stmt> {
+  let mut attr_validator_stmt_list: Vec<Stmt> = vec![];
+
+  let attr_name_ident: Ident = if attr.property_name.is_empty() {
+    parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+  } else {
+    parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+  };
+
+  let mut required = false;
+
+  for validator in &attr.validators {
+    if validator.name == "RequiredValidator" {
+      required = true;
+    }
+  }
+
+  for validator in &attr.validators {
+    match validator.name.as_str() {
+      "StringValidator" => {
+        for argument in &validator.arguments {
+          match argument.name.as_str() {
+            "MinLength" => {
+              let value: usize = argument.value.parse().unwrap();
+
+              if required {
+                attr_validator_stmt_list.push(
+                  parse2(quote! {
+                    if !(self.#attr_name_ident.len() >= #value) {
+                      return Ok(false);
+                    }
+                  })
+                  .unwrap(),
+                );
+              } else {
+                attr_validator_stmt_list.push(
+                  parse2(quote! {
+                    if !(#attr_name_ident.len() >= #value) {
+                      return Ok(false);
+                    }
+                  })
+                  .unwrap(),
+                );
+              }
+            }
+            "MaxLength" => {
+              let value: usize = argument.value.parse().unwrap();
+
+              if required {
+                attr_validator_stmt_list.push(
+                  parse2(quote! {
+                    if !(self.#attr_name_ident.len() <= #value) {
+                      return Ok(false);
+                    }
+                  })
+                  .unwrap(),
+                );
+              } else {
+                attr_validator_stmt_list.push(
+                  parse2(quote! {
+                    if !(#attr_name_ident.len() <= #value) {
+                      return Ok(false);
+                    }
+                  })
+                  .unwrap(),
+                );
+              }
+            }
+            _ => (),
+          }
+        }
+      }
+      "NumberValidator" => {}
+      _ => (),
+    }
+  }
+
+  if required {
+    attr_validator_stmt_list
+  } else if !attr_validator_stmt_list.is_empty() {
+    vec![parse2(quote! {
+      if let Some(#attr_name_ident) = &self.#attr_name_ident {
+        #( #attr_validator_stmt_list )*
+      }
+    })
+    .unwrap()]
+  } else {
+    vec![]
   }
 }

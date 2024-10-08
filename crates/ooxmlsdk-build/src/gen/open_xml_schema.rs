@@ -193,7 +193,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
   }
 }
 
-pub fn gen_attr(
+fn gen_attr(
   attr: &OpenXmlSchemaTypeAttribute,
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
@@ -286,7 +286,7 @@ pub fn gen_attr(
   }
 }
 
-pub fn gen_children(
+fn gen_children(
   class_name: &str,
   children: &Vec<OpenXmlSchemaTypeChild>,
   schema_namespace: &OpenXmlNamespace,
@@ -363,7 +363,7 @@ pub fn gen_children(
   (field_option, enum_option)
 }
 
-pub fn gen_child_type(
+fn gen_child_type(
   t: &OpenXmlSchemaType,
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,
@@ -404,7 +404,7 @@ pub fn gen_child_type(
   }
 }
 
-pub fn gen_one_sequence_fields(
+fn gen_one_sequence_fields(
   t: &OpenXmlSchemaType,
   schema_namespace: &OpenXmlNamespace,
   context: &GenContext,

@@ -1005,16 +1005,7 @@ fn gen_one_sequence_match_arm(
   ))
   .unwrap();
 
-  let ser_arm: Arm = if p.occurs.is_empty() {
-    parse2(quote! {
-      #child_rename_ser_literal => {
-        #child_name_ident = Some(std::boxed::Box::new(
-          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        ));
-      }
-    })
-    .unwrap()
-  } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
+  let ser_arm: Arm = if p.occurs.is_empty() || (p.occurs[0].min == 0 && p.occurs[0].max == 1) {
     parse2(quote! {
       #child_rename_ser_literal => {
         #child_name_ident = Some(std::boxed::Box::new(
@@ -1034,16 +1025,7 @@ fn gen_one_sequence_match_arm(
     .unwrap()
   };
 
-  let de_arm: Arm = if p.occurs.is_empty() {
-    parse2(quote! {
-      #child_rename_de_literal => {
-        #child_name_ident = Some(std::boxed::Box::new(
-          #child_variant_type::deserialize_self(xml_reader, with_xmlns)?,
-        ));
-      }
-    })
-    .unwrap()
-  } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
+  let de_arm: Arm = if p.occurs.is_empty() || (p.occurs[0].min == 0 && p.occurs[0].max == 1) {
     parse2(quote! {
       #child_rename_de_literal => {
         #child_name_ident = Some(std::boxed::Box::new(

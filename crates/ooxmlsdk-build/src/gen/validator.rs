@@ -205,12 +205,20 @@ fn gen_attr_validator_stmt_list(
   }
 
   for validator in &attr.validators {
+    if attr.r#type.starts_with("ListValue<") || attr.r#type.starts_with("EnumValue<") {
+      continue;
+    }
+
     match validator.name.as_str() {
       "StringValidator" => {
         for argument in &validator.arguments {
           match argument.name.as_str() {
             "MinLength" => {
               let value: usize = argument.value.parse().unwrap();
+
+              if value == 0 {
+                continue;
+              }
 
               if required {
                 attr_validator_stmt_list.push(
@@ -259,7 +267,109 @@ fn gen_attr_validator_stmt_list(
           }
         }
       }
-      "NumberValidator" => {}
+      "NumberValidator" => {
+        for argument in &validator.arguments {
+          match argument.name.as_str() {
+            "MinInclusive" => {
+              let value: i64 = argument.value.parse().unwrap();
+
+              match attr.r#type.as_str() {
+                "StringValue" | "IntegerValue" | "SByteValue" | "DecimalValue" => {
+                  if required {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(self.#attr_name_ident.parse::<i64>()? >= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  } else {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(#attr_name_ident.parse::<i64>()? >= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  }
+                }
+                _ => {
+                  if required {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(self.#attr_name_ident as i64 >= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  } else {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(*#attr_name_ident as i64 >= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  }
+                }
+              }
+            }
+            "MaxInclusive" => {
+              let value: i64 = argument.value.parse().unwrap();
+
+              match attr.r#type.as_str() {
+                "StringValue" | "IntegerValue" | "SByteValue" | "DecimalValue" => {
+                  if required {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(self.#attr_name_ident.parse::<i64>()? <= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  } else {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(#attr_name_ident.parse::<i64>()? <= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  }
+                }
+                _ => {
+                  if required {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(self.#attr_name_ident as i64 <= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  } else {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if !(*#attr_name_ident as i64 <= #value) {
+                          return Ok(false);
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  }
+                }
+              }
+            }
+            _ => (),
+          }
+        }
+      }
       _ => (),
     }
   }

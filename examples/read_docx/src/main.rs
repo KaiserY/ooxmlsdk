@@ -7,4 +7,9 @@ fn main() {
     "{}",
     docx.main_document_part.root_element.to_string().unwrap()
   );
+
+  println!(
+    "{}",
+    docx.main_document_part.root_element.validate().unwrap()
+  );
 }

@@ -46,8 +46,7 @@ pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStrea
       ));
     }
 
-    if t.base_class == "OpenXmlLeafTextElement" {
-    } else if t.base_class == "OpenXmlLeafElement" {
+    if t.base_class == "OpenXmlLeafTextElement" || t.base_class == "OpenXmlLeafElement" {
     } else if t.base_class == "OpenXmlCompositeElement"
       || t.base_class == "CustomXmlElement"
       || t.base_class == "OpenXmlPartRootElement"
@@ -204,6 +203,8 @@ fn gen_attr_validator_stmt_list(
     }
   }
 
+  let mut validator_count: usize = 0;
+
   for validator in &attr.validators {
     if attr.r#type.starts_with("ListValue<") || attr.r#type.starts_with("EnumValue<") {
       continue;
@@ -211,9 +212,13 @@ fn gen_attr_validator_stmt_list(
 
     match validator.name.as_str() {
       "StringValidator" => {
+        let mut add_validator = false;
+
         for argument in &validator.arguments {
           match argument.name.as_str() {
             "MinLength" => {
+              add_validator = true;
+
               let value: usize = argument.value.parse().unwrap();
 
               if value == 0 {
@@ -224,7 +229,7 @@ fn gen_attr_validator_stmt_list(
                 attr_validator_stmt_list.push(
                   parse2(quote! {
                     if !(self.#attr_name_ident.len() >= #value) {
-                      return Ok(false);
+                      validator_results[#validator_count] = false;
                     }
                   })
                   .unwrap(),
@@ -233,7 +238,7 @@ fn gen_attr_validator_stmt_list(
                 attr_validator_stmt_list.push(
                   parse2(quote! {
                     if !(#attr_name_ident.len() >= #value) {
-                      return Ok(false);
+                      validator_results[#validator_count] = false;
                     }
                   })
                   .unwrap(),
@@ -241,13 +246,15 @@ fn gen_attr_validator_stmt_list(
               }
             }
             "MaxLength" => {
+              add_validator = true;
+
               let value: usize = argument.value.parse().unwrap();
 
               if required {
                 attr_validator_stmt_list.push(
                   parse2(quote! {
                     if !(self.#attr_name_ident.len() <= #value) {
-                      return Ok(false);
+                      validator_results[#validator_count] = false;
                     }
                   })
                   .unwrap(),
@@ -256,7 +263,7 @@ fn gen_attr_validator_stmt_list(
                 attr_validator_stmt_list.push(
                   parse2(quote! {
                     if !(#attr_name_ident.len() <= #value) {
-                      return Ok(false);
+                      validator_results[#validator_count] = false;
                     }
                   })
                   .unwrap(),
@@ -266,11 +273,26 @@ fn gen_attr_validator_stmt_list(
             _ => (),
           }
         }
+
+        if add_validator {
+          attr_validator_stmt_list.push(
+            parse2(quote! {
+              validator_results[#validator_count] = true;
+            })
+            .unwrap(),
+          );
+
+          validator_count += 1;
+        }
       }
       "NumberValidator" => {
+        let mut add_validator = false;
+
         for argument in &validator.arguments {
           match argument.name.as_str() {
             "MinInclusive" => {
+              add_validator = true;
+
               let value: i64 = argument.value.parse().unwrap();
 
               match attr.r#type.as_str() {
@@ -278,8 +300,8 @@ fn gen_attr_validator_stmt_list(
                   if required {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(self.#attr_name_ident.parse::<i64>()? >= #value) {
-                          return Ok(false);
+                        if self.#attr_name_ident.parse::<i64>()? < #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -287,8 +309,8 @@ fn gen_attr_validator_stmt_list(
                   } else {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(#attr_name_ident.parse::<i64>()? >= #value) {
-                          return Ok(false);
+                        if #attr_name_ident.parse::<i64>()? < #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -299,8 +321,8 @@ fn gen_attr_validator_stmt_list(
                   if required {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(self.#attr_name_ident as i64 >= #value) {
-                          return Ok(false);
+                        if (self.#attr_name_ident as i64) < #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -308,8 +330,8 @@ fn gen_attr_validator_stmt_list(
                   } else {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(*#attr_name_ident as i64 >= #value) {
-                          return Ok(false);
+                        if (*#attr_name_ident as i64) < #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -319,6 +341,8 @@ fn gen_attr_validator_stmt_list(
               }
             }
             "MaxInclusive" => {
+              add_validator = true;
+
               let value: i64 = argument.value.parse().unwrap();
 
               match attr.r#type.as_str() {
@@ -326,8 +350,8 @@ fn gen_attr_validator_stmt_list(
                   if required {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(self.#attr_name_ident.parse::<i64>()? <= #value) {
-                          return Ok(false);
+                        if self.#attr_name_ident.parse::<i64>()? > #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -335,8 +359,8 @@ fn gen_attr_validator_stmt_list(
                   } else {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(#attr_name_ident.parse::<i64>()? <= #value) {
-                          return Ok(false);
+                        if #attr_name_ident.parse::<i64>()? > #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -347,8 +371,8 @@ fn gen_attr_validator_stmt_list(
                   if required {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(self.#attr_name_ident as i64 <= #value) {
-                          return Ok(false);
+                        if (self.#attr_name_ident as i64) > #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -356,8 +380,8 @@ fn gen_attr_validator_stmt_list(
                   } else {
                     attr_validator_stmt_list.push(
                       parse2(quote! {
-                        if !(*#attr_name_ident as i64 <= #value) {
-                          return Ok(false);
+                        if (*#attr_name_ident as i64) > #value {
+                          validator_results[#validator_count] = false;
                         }
                       })
                       .unwrap(),
@@ -369,20 +393,65 @@ fn gen_attr_validator_stmt_list(
             _ => (),
           }
         }
+
+        if add_validator {
+          attr_validator_stmt_list.push(
+            parse2(quote! {
+              validator_results[#validator_count] = true;
+            })
+            .unwrap(),
+          );
+
+          validator_count += 1;
+        }
       }
       _ => (),
     }
   }
 
-  if required {
-    attr_validator_stmt_list
-  } else if !attr_validator_stmt_list.is_empty() {
-    vec![parse2(quote! {
-      if let Some(#attr_name_ident) = &self.#attr_name_ident {
-        #( #attr_validator_stmt_list )*
-      }
+  if required && validator_count > 0 {
+    let mut stmt_list = vec![parse2(quote! {
+      let mut validator_results: Vec<bool> = Vec::with_capacity(#validator_count);
     })
-    .unwrap()]
+    .unwrap()];
+
+    stmt_list.extend(attr_validator_stmt_list);
+
+    stmt_list.push(
+      parse2(quote! {
+        if !validator_results.into_iter().any(|x| x) {
+          return Ok(false);
+        }
+      })
+      .unwrap(),
+    );
+
+    stmt_list
+  } else if validator_count > 0 {
+    let mut stmt_list = vec![parse2(quote! {
+      let mut validator_results: Vec<bool> = Vec::with_capacity(#validator_count);
+    })
+    .unwrap()];
+
+    stmt_list.push(
+      parse2(quote! {
+        if let Some(#attr_name_ident) = &self.#attr_name_ident {
+          #( #attr_validator_stmt_list )*
+        }
+      })
+      .unwrap(),
+    );
+
+    stmt_list.push(
+      parse2(quote! {
+        if !validator_results.into_iter().any(|x| x) {
+          return Ok(false);
+        }
+      })
+      .unwrap(),
+    );
+
+    stmt_list
   } else {
     vec![]
   }

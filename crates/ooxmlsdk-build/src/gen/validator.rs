@@ -223,12 +223,30 @@ fn gen_attr_validator_stmt_list(
 
               if value == 0 {
                 continue;
-              }
-
-              if required {
+              } else if value == 1 {
+                if required {
+                  attr_validator_stmt_list.push(
+                    parse2(quote! {
+                      if self.#attr_name_ident.is_empty() {
+                        validator_results[#validator_count] = false;
+                      }
+                    })
+                    .unwrap(),
+                  );
+                } else {
+                  attr_validator_stmt_list.push(
+                    parse2(quote! {
+                      if #attr_name_ident.is_empty() {
+                        validator_results[#validator_count] = false;
+                      }
+                    })
+                    .unwrap(),
+                  );
+                }
+              } else if required {
                 attr_validator_stmt_list.push(
                   parse2(quote! {
-                    if !(self.#attr_name_ident.len() >= #value) {
+                    if self.#attr_name_ident.len() < #value {
                       validator_results[#validator_count] = false;
                     }
                   })
@@ -237,7 +255,7 @@ fn gen_attr_validator_stmt_list(
               } else {
                 attr_validator_stmt_list.push(
                   parse2(quote! {
-                    if !(#attr_name_ident.len() >= #value) {
+                    if #attr_name_ident.len() < #value {
                       validator_results[#validator_count] = false;
                     }
                   })
@@ -253,7 +271,7 @@ fn gen_attr_validator_stmt_list(
               if required {
                 attr_validator_stmt_list.push(
                   parse2(quote! {
-                    if !(self.#attr_name_ident.len() <= #value) {
+                    if self.#attr_name_ident.len() > #value {
                       validator_results[#validator_count] = false;
                     }
                   })
@@ -262,7 +280,7 @@ fn gen_attr_validator_stmt_list(
               } else {
                 attr_validator_stmt_list.push(
                   parse2(quote! {
-                    if !(#attr_name_ident.len() <= #value) {
+                    if #attr_name_ident.len() > #value {
                       validator_results[#validator_count] = false;
                     }
                   })
@@ -296,6 +314,27 @@ fn gen_attr_validator_stmt_list(
               let value: i64 = argument.value.parse().unwrap();
 
               match attr.r#type.as_str() {
+                "Int64Value" => {
+                  if required {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if self.#attr_name_ident < #value {
+                          validator_results[#validator_count] = false;
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  } else {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if *#attr_name_ident < #value {
+                          validator_results[#validator_count] = false;
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  }
+                }
                 "StringValue" | "IntegerValue" | "SByteValue" | "DecimalValue" => {
                   if required {
                     attr_validator_stmt_list.push(
@@ -346,6 +385,27 @@ fn gen_attr_validator_stmt_list(
               let value: i64 = argument.value.parse().unwrap();
 
               match attr.r#type.as_str() {
+                "Int64Value" => {
+                  if required {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if self.#attr_name_ident > #value {
+                          validator_results[#validator_count] = false;
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  } else {
+                    attr_validator_stmt_list.push(
+                      parse2(quote! {
+                        if *#attr_name_ident > #value {
+                          validator_results[#validator_count] = false;
+                        }
+                      })
+                      .unwrap(),
+                    );
+                  }
+                }
                 "StringValue" | "IntegerValue" | "SByteValue" | "DecimalValue" => {
                   if required {
                     attr_validator_stmt_list.push(

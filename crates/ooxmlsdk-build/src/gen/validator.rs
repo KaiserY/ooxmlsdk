@@ -471,7 +471,7 @@ fn gen_attr_validator_stmt_list(
 
   if required && validator_count > 0 {
     let mut stmt_list = vec![parse2(quote! {
-      let mut validator_results: Vec<bool> = Vec::with_capacity(#validator_count);
+      let mut validator_results: Vec<bool> = vec![true; #validator_count];
     })
     .unwrap()];
 
@@ -488,30 +488,18 @@ fn gen_attr_validator_stmt_list(
 
     stmt_list
   } else if validator_count > 0 {
-    let mut stmt_list = vec![parse2(quote! {
-      let mut validator_results: Vec<bool> = Vec::with_capacity(#validator_count);
-    })
-    .unwrap()];
+    vec![parse2(quote! {
+      if let Some(#attr_name_ident) = &self.#attr_name_ident {
+        let mut validator_results: Vec<bool> = vec![true; #validator_count];
 
-    stmt_list.push(
-      parse2(quote! {
-        if let Some(#attr_name_ident) = &self.#attr_name_ident {
-          #( #attr_validator_stmt_list )*
-        }
-      })
-      .unwrap(),
-    );
+        #( #attr_validator_stmt_list )*
 
-    stmt_list.push(
-      parse2(quote! {
         if !validator_results.into_iter().any(|x| x) {
           return Ok(false);
         }
-      })
-      .unwrap(),
-    );
-
-    stmt_list
+      }
+    })
+    .unwrap()]
   } else {
     vec![]
   }

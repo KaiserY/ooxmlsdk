@@ -11,6 +11,15 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
+[features]
+default = ["parts", "validators"]
+schemas = []
+serializers = ["schemas"]
+deserializers = ["schemas"]
+parts = ["schemas", "serializers", "deserializers", "packages"]
+validators = ["schemas"]
+packages = []
+
 [dependencies]
 quick-xml = { workspace = true }
 thiserror = { workspace = true }

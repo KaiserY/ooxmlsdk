@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Types {
   pub xmlns: Option<String>,
   pub xmlns_map: std::collections::HashMap<String, String>,
@@ -6,10 +6,12 @@ pub struct Types {
   pub children: Vec<TypesChildChoice>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub enum TypesChildChoice {
   Default(std::boxed::Box<Default>),
   Override(std::boxed::Box<Override>),
+  #[default]
+  None,
 }
 
 impl Types {
@@ -223,6 +225,7 @@ impl Types {
       let child_str = match child {
         TypesChildChoice::Default(child) => child.to_string_inner(with_xmlns)?,
         TypesChildChoice::Override(child) => child.to_string_inner(with_xmlns)?,
+        TypesChildChoice::None => "".to_string(),
       };
       writer.write_str(&child_str)?;
     }
@@ -241,7 +244,7 @@ impl Types {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Default {
   pub extension: String,
   pub content_type: String,
@@ -368,7 +371,7 @@ impl Default {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Override {
   pub content_type: String,
   pub part_name: String,

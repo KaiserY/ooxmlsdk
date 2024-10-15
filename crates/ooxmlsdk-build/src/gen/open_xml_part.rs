@@ -145,7 +145,7 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
   }
 
   let part_struct: ItemStruct = parse2(quote! {
-    #[derive(Clone)]
+    #[derive(Clone, Debug, Default)]
     pub struct #struct_name_ident {
       #( #fields )*
     }

@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.1.17
+
+### New Features
+
+- Add `Debug` and `Default` traits for schemas and parts
+- refactor validators
+
+### Bug Fixes
+
+### Misc Changes
+
 ## 0.1.16
 
 ### New Features

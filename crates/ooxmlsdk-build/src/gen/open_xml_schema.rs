@@ -26,23 +26,33 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
 
     let mut variants: Vec<Variant> = vec![];
 
-    for facet in &e.facets {
+    for (i, facet) in e.facets.iter().enumerate() {
       let variant_ident: Ident = if facet.name.is_empty() {
         parse_str(&escape_upper_camel_case(facet.value.to_upper_camel_case())).unwrap()
       } else {
         parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
       };
 
-      variants.push(
-        parse2(quote! {
-          #variant_ident
-        })
-        .unwrap(),
-      )
+      if i == 0 {
+        variants.push(
+          parse2(quote! {
+            #[default]
+            #variant_ident
+          })
+          .unwrap(),
+        );
+      } else {
+        variants.push(
+          parse2(quote! {
+            #variant_ident
+          })
+          .unwrap(),
+        );
+      }
     }
 
     token_stream_list.push(quote! {
-      #[derive(Clone)]
+      #[derive(Clone, Debug, Default)]
       pub enum #e_enum_name_ident {
         #( #variants, )*
       }
@@ -169,7 +179,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       token_stream_list.push(quote! {
         #[doc = #summary_doc]
         #[doc = #qualified_doc]
-        #[derive(Clone)]
+        #[derive(Clone, Debug, Default)]
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -180,7 +190,7 @@ pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> Toke
       token_stream_list.push(quote! {
         #[doc = #summary_doc]
         #[doc = #qualified_doc]
-        #[derive(Clone)]
+        #[derive(Clone, Debug, Default)]
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -352,7 +362,7 @@ fn gen_children(
 
   let enum_option = Some(
     parse2(quote! {
-      #[derive(Clone)]
+      #[derive(Clone, Debug)]
       pub enum #child_choice_enum_ident {
         #( #variants )*
       }

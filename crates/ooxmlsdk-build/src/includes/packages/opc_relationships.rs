@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Relationships {
   pub xmlns: Option<String>,
   pub xmlns_map: std::collections::HashMap<String, String>,
@@ -219,7 +219,7 @@ impl Relationships {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Relationship {
   pub target_mode: Option<TargetMode>,
   pub target: String,
@@ -382,8 +382,9 @@ impl Relationship {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub enum TargetMode {
+  #[default]
   External,
   Internal,
 }

@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct CoreProperties {
   pub xmlns: Option<String>,
   pub xmlns_map: std::collections::HashMap<String, String>,

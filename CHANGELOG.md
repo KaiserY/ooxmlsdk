@@ -1,11 +1,23 @@
 # Change Log
 
+## 0.1.18
+
+### New Features
+
+- Add `new_from_reader` function for docx, xlsx and pptx parts
+
+### Bug Fixes
+
+### Misc Changes
+
+- Bump dependencies version
+
 ## 0.1.17
 
 ### New Features
 
 - Add `Debug` and `Default` traits for schemas and parts
-- refactor validators
+- Refactor validators
 
 ### Bug Fixes
 

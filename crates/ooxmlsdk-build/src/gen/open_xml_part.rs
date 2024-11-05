@@ -547,12 +547,12 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
   let part_new_from_archive_fn: ItemFn = parse2(quote! {
     #[allow(unused_variables)]
-    pub(crate) fn new_from_archive(
+    pub(crate) fn new_from_archive<R: std::io::Read + std::io::Seek>(
       parent_path: &str,
       path: &str,
       r_id: &str,
       file_path_set: &std::collections::HashSet<String>,
-      archive: &mut zip::ZipArchive<std::io::BufReader<std::fs::File>>,
+      archive: &mut zip::ZipArchive<R>,
     ) -> Result<Self, crate::common::SdkError> {
       #( #field_declaration_list )*
 
@@ -804,6 +804,15 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
         let reader = std::io::BufReader::new(zip_file);
 
+        Self::new_from_reader(reader)
+      }
+    })
+    .unwrap();
+
+    let part_new_from_reader_fn: ItemFn = parse2(quote! {
+      pub fn new_from_reader<R: std::io::Read + std::io::Seek>(
+        reader: R,
+      ) -> Result<Self, crate::common::SdkError> {
         let mut archive = zip::ZipArchive::new(reader)?;
 
         let mut file_path_set: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -857,6 +866,8 @@ pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStrea
 
     let part_impl: ItemImpl = parse2(quote! {
       impl #struct_name_ident {
+        #part_new_from_reader_fn
+
         #part_new_fn
 
         #part_new_from_archive_fn

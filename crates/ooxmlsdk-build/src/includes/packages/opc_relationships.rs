@@ -354,26 +354,26 @@ impl Relationship {
       writer.write_char(' ')?;
       writer.write_str("TargetMode")?;
       writer.write_str("=\"")?;
-      writer.write_str(&quick_xml::escape::escape(&target_mode.to_string()))?;
+      writer.write_str(&quick_xml::escape::escape(target_mode.to_string()))?;
       writer.write_char('"')?;
     }
 
     writer.write_char(' ')?;
     writer.write_str("Target")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.target.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.target.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_char(' ')?;
     writer.write_str("Type")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.r#type.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.r#type.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_char(' ')?;
     writer.write_str("Id")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.id.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.id.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_str("/>")?;

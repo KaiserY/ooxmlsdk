@@ -356,13 +356,13 @@ impl Default {
     writer.write_char(' ')?;
     writer.write_str("Extension")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.extension.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.extension.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_char(' ')?;
     writer.write_str("ContentType")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.content_type.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.content_type.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_str("/>")?;
@@ -483,13 +483,13 @@ impl Override {
     writer.write_char(' ')?;
     writer.write_str("ContentType")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.content_type.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.content_type.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_char(' ')?;
     writer.write_str("PartName")?;
     writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(&self.part_name.to_string()))?;
+    writer.write_str(&quick_xml::escape::escape(self.part_name.to_string()))?;
     writer.write_char('"')?;
 
     writer.write_str("/>")?;

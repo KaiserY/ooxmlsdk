@@ -111,7 +111,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
     if t.base_class == "OpenXmlLeafTextElement" {
       children_writer = quote! {
         if let Some(child) = &self.child {
-          writer.write_str(&quick_xml::escape::escape(&child.to_string()))?;
+          writer.write_str(&quick_xml::escape::escape(child.to_string()))?;
         }
       };
 
@@ -286,7 +286,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStre
         if base_class_type.base_class == "OpenXmlLeafTextElement" {
           children_writer = quote! {
             if let Some(child) = &self.child {
-              writer.write_str(&quick_xml::escape::escape(&child.to_string()))?;
+              writer.write_str(&quick_xml::escape::escape(child.to_string()))?;
             }
           };
 
@@ -589,7 +589,7 @@ fn gen_attr(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
       writer.write_char(' ')?;
       writer.write_str(#attr_rename_ser_str)?;
       writer.write_str("=\"")?;
-      writer.write_str(&quick_xml::escape::escape(&self.#attr_name_ident.to_string()))?;
+      writer.write_str(&quick_xml::escape::escape(self.#attr_name_ident.to_string()))?;
       writer.write_char('"')?;
     }
   } else {
@@ -598,7 +598,7 @@ fn gen_attr(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
         writer.write_char(' ')?;
         writer.write_str(#attr_rename_ser_str)?;
         writer.write_str("=\"")?;
-        writer.write_str(&quick_xml::escape::escape(&#attr_name_ident.to_string()))?;
+        writer.write_str(&quick_xml::escape::escape(#attr_name_ident.to_string()))?;
         writer.write_char('"')?;
       }
     }

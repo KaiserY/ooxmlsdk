@@ -12,6 +12,15 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
+[features]
+default = ["parts", "validators"]
+schemas = []
+serializers = ["schemas"]
+deserializers = ["schemas"]
+parts = ["schemas", "serializers", "deserializers", "packages", "dep:zip"]
+validators = ["schemas"]
+packages = []
+
 [dependencies]
 quick-xml = { workspace = true, features = ["serialize"] }
 serde = { workspace = true }
@@ -23,7 +32,7 @@ prettyplease = { workspace = true }
 proc-macro2 = { workspace = true }
 heck = { workspace = true }
 thiserror = { workspace = true }
-zip = { workspace = true }
+zip = { workspace = true, optional = true }
 path-clean = { workspace = true }
 
 [dev-dependencies]

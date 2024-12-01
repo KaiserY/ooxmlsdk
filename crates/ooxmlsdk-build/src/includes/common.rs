@@ -22,6 +22,7 @@ pub enum SdkError {
   StdFmtError(#[from] std::fmt::Error),
   #[error("StdIoError")]
   StdIoError(#[from] std::io::Error),
+  #[cfg(feature = "parts")]
   #[error("ZipError")]
   ZipError(#[from] zip::result::ZipError),
   #[error("mismatch error (expected {expected:?}, found {found:?})")]

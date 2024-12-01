@@ -14,17 +14,24 @@ readme.workspace = true
 
 [features]
 default = ["parts", "validators"]
-schemas = []
-serializers = ["schemas"]
-deserializers = ["schemas"]
-parts = ["schemas", "serializers", "deserializers", "packages"]
-validators = ["schemas"]
-packages = []
+schemas = ["ooxmlsdk-build/schemas"]
+serializers = ["schemas", "ooxmlsdk-build/serializers"]
+deserializers = ["schemas", "ooxmlsdk-build/deserializers"]
+parts = [
+  "schemas",
+  "serializers",
+  "deserializers",
+  "packages",
+  "ooxmlsdk-build/parts",
+  "dep:zip",
+]
+validators = ["schemas", "ooxmlsdk-build/validators"]
+packages = ["ooxmlsdk-build/packages"]
 
 [dependencies]
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
-zip = { workspace = true }
+zip = { workspace = true, optional = true }
 
 [build-dependencies]
 ooxmlsdk-build = { workspace = true }

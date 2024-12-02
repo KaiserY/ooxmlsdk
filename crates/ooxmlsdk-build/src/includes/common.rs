@@ -47,7 +47,7 @@ pub struct IoReader<'de, R: BufRead> {
   buf: Vec<u8>,
 }
 
-impl<'de, R: BufRead> IoReader<'de, R> {
+impl<R: BufRead> IoReader<'_, R> {
   pub fn new(reader: Reader<R>) -> Self {
     Self {
       reader,

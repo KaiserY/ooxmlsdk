@@ -20,14 +20,17 @@ pub struct CoreProperties {
   pub version: Option<String>,
 }
 
-impl CoreProperties {
-  #[allow(clippy::should_implement_trait)]
-  pub fn from_str(s: &str) -> Result<Self, super::super::common::SdkError> {
+impl std::str::FromStr for CoreProperties {
+  type Err = super::super::common::SdkError;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
     Self::deserialize_self(&mut xml_reader, false)
   }
+}
 
+impl CoreProperties {
   pub fn from_reader<R: std::io::BufRead>(
     reader: R,
   ) -> Result<Self, super::super::common::SdkError> {

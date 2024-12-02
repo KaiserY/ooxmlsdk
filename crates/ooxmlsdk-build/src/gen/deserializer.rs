@@ -701,9 +701,18 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
     token_stream_list.push(
       parse2(quote! {
-        impl #struct_type {
-          #from_str_fn
+        impl std::str::FromStr for #struct_type {
+          type Err = super::super::common::SdkError;
 
+          #from_str_fn
+        }
+      })
+      .unwrap(),
+    );
+
+    token_stream_list.push(
+      parse2(quote! {
+        impl #struct_type {
           #from_reader_fn
 
           #deserialize_self_fn
@@ -720,8 +729,7 @@ pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenSt
 
 fn gen_from_str_fn() -> ItemFn {
   let token_stream = quote! {
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
       let mut xml_reader = crate::common::from_str_inner(s)?;
 
       Self::deserialize_self(&mut xml_reader, false)

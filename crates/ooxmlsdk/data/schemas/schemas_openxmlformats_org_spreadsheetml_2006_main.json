@@ -24272,8 +24272,20 @@
           "PropertyName": "Xsdboolean"
         },
         {
+          "Name": "xprd:CT_PivotCacheRichInfo/xprd:richInfo",
+          "PropertyName": "PivotCacheRichInfo"
+        },
+        {
           "Name": "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo",
           "PropertyName": "CacheVersionInfo"
+        },
+        {
+          "Name": "xsd:boolean/xlpar:autoRefresh",
+          "PropertyName": "Xsdboolean"
+        },
+        {
+          "Name": "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray",
+          "PropertyName": "PivotCacheDynamicArray"
         }
       ],
       "Particle": {
@@ -24300,7 +24312,19 @@
             "InitialVersion": "Office2021"
           },
           {
+            "Name": "xprd:CT_PivotCacheRichInfo/xprd:richInfo",
+            "InitialVersion": "Microsoft365"
+          },
+          {
             "Name": "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo",
+            "InitialVersion": "Microsoft365"
+          },
+          {
+            "Name": "xsd:boolean/xlpar:autoRefresh",
+            "InitialVersion": "Microsoft365"
+          },
+          {
+            "Name": "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray",
             "InitialVersion": "Microsoft365"
           },
           {
@@ -25421,6 +25445,10 @@
         {
           "Name": "xlecs:CT_ExternalCodeService/xlecs:externalCodeService",
           "PropertyName": "ExternalCodeService"
+        },
+        {
+          "Name": "xlwcv:CT_Version/xlwcv:version",
+          "PropertyName": "Version"
         }
       ],
       "Particle": {
@@ -25472,6 +25500,10 @@
           },
           {
             "Name": "xlecs:CT_ExternalCodeService/xlecs:externalCodeService",
+            "InitialVersion": "Microsoft365"
+          },
+          {
+            "Name": "xlwcv:CT_Version/xlwcv:version",
             "InitialVersion": "Microsoft365"
           },
           {

@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use pprof::criterion::{Output, PProfProfiler};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -55,5 +56,10 @@ fn bench_serde_from_str(c: &mut Criterion) {
   c.bench_function("serde_from_str", |b| b.iter(|| serde_from_str()));
 }
 
-criterion_group!(benches, bench_from_str, bench_serde_from_str);
+criterion_group!(
+  name = benches;
+  config = Criterion::default().with_profiler(PProfProfiler::new(100, Output::Flamegraph(None)));
+  targets = bench_from_str, bench_serde_from_str
+);
+
 criterion_main!(benches);

@@ -37,6 +37,10 @@ path-clean = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+pprof = { workspace = true }
+
+[profile.bench]
+debug = true
 
 [[bench]]
 name = "serde_bench"

@@ -10,7 +10,59 @@ use crate::models::{
   OpenXmlSchemaTypeChild,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
-use crate::GenContext;
+use crate::{GenContext, GenContextNeo};
+
+pub fn gen_open_xml_schema_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -> TokenStream {
+  let mut token_stream_list: Vec<TokenStream> = vec![];
+
+  let _schema_namespace = gen_context
+    .uri_namespace_map
+    .get(schema.target_namespace.as_str())
+    .ok_or(format!("{:?}", schema.target_namespace))
+    .unwrap();
+
+  for e in &schema.enums {
+    let e_enum_name_ident: Ident = parse_str(&e.name.to_upper_camel_case()).unwrap();
+
+    let mut variants: Vec<Variant> = vec![];
+
+    for (i, facet) in e.facets.iter().enumerate() {
+      let variant_ident: Ident = if facet.name.is_empty() {
+        parse_str(&escape_upper_camel_case(facet.value.to_upper_camel_case())).unwrap()
+      } else {
+        parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
+      };
+
+      if i == 0 {
+        variants.push(
+          parse2(quote! {
+            #[default]
+            #variant_ident
+          })
+          .unwrap(),
+        );
+      } else {
+        variants.push(
+          parse2(quote! {
+            #variant_ident
+          })
+          .unwrap(),
+        );
+      }
+    }
+
+    token_stream_list.push(quote! {
+      #[derive(Clone, Debug, Default)]
+      pub enum #e_enum_name_ident {
+        #( #variants, )*
+      }
+    })
+  }
+
+  quote! {
+    #( #token_stream_list )*
+  }
+}
 
 pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
   let mut token_stream_list: Vec<TokenStream> = vec![];

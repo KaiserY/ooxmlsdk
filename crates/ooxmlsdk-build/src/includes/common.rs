@@ -147,14 +147,16 @@ pub fn resolve_zip_file_path(path: &str) -> String {
 }
 
 #[inline]
-pub fn from_reader_inner<'de, R: BufRead>(reader: R) -> Result<IoReader<'de, R>, SdkError> {
+pub(crate) fn from_reader_inner<'de, R: BufRead>(reader: R) -> Result<IoReader<'de, R>, SdkError> {
   let mut xml_reader = IoReader::new(quick_xml::Reader::from_reader(reader));
 
   loop {
     let peek_event = xml_reader.peek()?;
 
     match peek_event {
-      quick_xml::events::Event::Decl(_) | quick_xml::events::Event::Text(_) => {
+      quick_xml::events::Event::Decl(_)
+      | quick_xml::events::Event::Text(_)
+      | quick_xml::events::Event::CData(_) => {
         xml_reader.next()?;
       }
       _ => {
@@ -167,14 +169,16 @@ pub fn from_reader_inner<'de, R: BufRead>(reader: R) -> Result<IoReader<'de, R>,
 }
 
 #[inline]
-pub fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
+pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
   let mut xml_reader = SliceReader::new(quick_xml::Reader::from_str(s));
 
   loop {
     let peek_event = xml_reader.peek()?;
 
     match peek_event {
-      quick_xml::events::Event::Decl(_) | quick_xml::events::Event::Text(_) => {
+      quick_xml::events::Event::Decl(_)
+      | quick_xml::events::Event::Text(_)
+      | quick_xml::events::Event::CData(_) => {
         xml_reader.next()?;
       }
       _ => {

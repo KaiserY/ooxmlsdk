@@ -9,10 +9,10 @@ use std::fs::File;
 use std::{fs, path::Path};
 use syn::{parse_str, Ident, ItemMod};
 
-use crate::gen::context::GenContext;
+use crate::gen::context::{GenContext, GenContextNeo};
 use crate::gen::deserializer::gen_deserializer;
 use crate::gen::open_xml_part::gen_open_xml_part;
-use crate::gen::open_xml_schema::gen_open_xml_schema;
+use crate::gen::open_xml_schema::{gen_open_xml_schema, gen_open_xml_schema_neo};
 use crate::models::{
   OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, TypedNamespace,
 };
@@ -21,6 +21,91 @@ pub mod gen;
 pub mod includes;
 pub mod models;
 pub mod utils;
+
+pub fn gen_neo(data_dir: &str, out_dir: &str) {
+  let out_dir_path = Path::new(out_dir);
+
+  let mut gen_context = GenContextNeo::new(data_dir);
+
+  for namespace in gen_context.namespaces.iter() {
+    gen_context
+      .prefix_namespace_map
+      .insert(&namespace.prefix, namespace);
+
+    gen_context
+      .uri_namespace_map
+      .insert(&namespace.uri, namespace);
+  }
+
+  write_schemas(&gen_context, out_dir_path);
+}
+
+pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
+  let out_schemas_dir_path = out_dir_path.join("schemas");
+  let out_common_dir_path = out_dir_path.join("common");
+
+  fs::create_dir_all(&out_schemas_dir_path).unwrap();
+  fs::create_dir_all(&out_common_dir_path).unwrap();
+
+  let mut schemas_mod_use_list: Vec<ItemMod> = vec![];
+
+  for (i, schema) in gen_context.schemas.iter().enumerate() {
+    let schema_mod = &gen_context.schema_mods[i];
+
+    let token_stream = gen_open_xml_schema_neo(schema, gen_context);
+
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+
+    let schema_path = out_schemas_dir_path.join(format!("{}.rs", schema_mod));
+
+    fs::write(schema_path, formatted).unwrap();
+  }
+
+  let token_stream: TokenStream = parse_str(include_str!("includes/simple_type.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_schemas_dir_path.join("simple_type.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream = parse_str(include_str!("includes/common.rs")).unwrap();
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_common_dir_path.join("mod.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
+
+  for schema_mod in gen_context.schema_mods.iter() {
+    let schema_mod_ident: Ident = parse_str(schema_mod).unwrap();
+
+    let shcemas_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #schema_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+
+    schemas_mod_use_list.push(shcemas_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    pub mod simple_type;
+    #( #schemas_mod_use_list )*
+  };
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let schemas_mod_path = out_schemas_dir_path.join("mod.rs");
+
+  fs::write(schemas_mod_path, formatted).unwrap();
+}
 
 pub fn gen(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
@@ -459,5 +544,10 @@ mod tests {
   #[test]
   fn test_gen() {
     gen("../ooxmlsdk/data", "src");
+  }
+
+  #[test]
+  fn test_gen_new() {
+    gen_neo("../ooxmlsdk/data", "src");
   }
 }

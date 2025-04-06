@@ -13,13 +13,20 @@ categories.workspace = true
 readme.workspace = true
 
 [features]
-default = ["parts", "validators"]
+default = ["docx", "office2007"]
 schemas = []
-serializers = ["schemas"]
-deserializers = ["schemas"]
-parts = ["schemas", "serializers", "deserializers", "packages", "dep:zip"]
+parts = ["schemas", "dep:zip"]
 validators = ["schemas"]
-packages = []
+docx = []
+xlsx = []
+pptx = []
+office2007 = []
+office2010 = ["office2007"]
+office2013 = ["office2010"]
+office2016 = ["office2013"]
+office2019 = ["office2016"]
+office2021 = ["office2019"]
+microsoft365 = []
 
 [dependencies]
 quick-xml = { workspace = true, features = ["serialize"] }

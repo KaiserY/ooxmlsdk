@@ -999,34 +999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "read_docx"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
-]
-
-[[package]]
-name = "read_pptx"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
-]
-
-[[package]]
-name = "read_write_xml"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
-]
-
-[[package]]
-name = "read_xlsx"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1551,27 +1523,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags 2.9.0",
-]
-
-[[package]]
-name = "write_docx"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
-]
-
-[[package]]
-name = "write_pptx"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
-]
-
-[[package]]
-name = "write_xlsx"
-version = "0.2.0"
-dependencies = [
- "ooxmlsdk",
 ]
 
 [[package]]

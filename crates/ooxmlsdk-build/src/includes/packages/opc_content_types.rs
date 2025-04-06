@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Clone, Debug, Default)]
 pub struct Types {
   pub xmlns: Option<String>,
@@ -60,7 +62,7 @@ impl Types {
 
     let mut children = vec![];
 
-    for attr in e.attributes() {
+    for attr in e.attributes().with_checks(false) {
       let attr = attr?;
       match attr.key.as_ref() {
         b"xmlns" => {
@@ -121,7 +123,7 @@ impl Types {
                 }
                 b"w:Override" => {
                   children.push(TypesChildChoice::Override(std::boxed::Box::new(
-                    Override::deserialize_self(xml_reader, with_xmlns)?,
+                    Override::deserialize_with_xmlns(xml_reader, with_xmlns)?,
                   )));
                 }
                 _ => Err(super::super::common::SdkError::CommonError(
@@ -137,7 +139,7 @@ impl Types {
                 }
                 b"Override" => {
                   children.push(TypesChildChoice::Override(std::boxed::Box::new(
-                    Override::deserialize_self(xml_reader, with_xmlns)?,
+                    Override::deserialize_with_xmlns(xml_reader, with_xmlns)?,
                   )));
                 }
                 _ => Err(super::super::common::SdkError::CommonError(
@@ -227,7 +229,7 @@ impl Types {
     for child in &self.children {
       let child_str = match child {
         TypesChildChoice::Default(child) => child.to_string_inner(with_xmlns)?,
-        TypesChildChoice::Override(child) => child.to_string_inner(with_xmlns)?,
+        TypesChildChoice::Override(child) => child.to_string_with_xmlns(with_xmlns)?,
         TypesChildChoice::None => "".to_string(),
       };
       writer.write_str(&child_str)?;
@@ -280,7 +282,7 @@ impl Default {
 
       let mut content_type = None;
 
-      for attr in e.attributes() {
+      for attr in e.attributes().with_checks(false) {
         let attr = attr?;
         match attr.key.as_ref() {
           b"Extension" => {
@@ -385,7 +387,7 @@ impl Override {
   pub fn from_str(s: &str) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_with_xmlns(&mut xml_reader, false)
   }
 
   pub fn from_reader<R: std::io::BufRead>(
@@ -393,10 +395,10 @@ impl Override {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_with_xmlns(&mut xml_reader, false)
   }
 
-  pub fn deserialize_self<'de, R: super::super::common::XmlReader<'de>>(
+  pub fn deserialize_with_xmlns<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,
   ) -> Result<Self, super::super::common::SdkError> {
@@ -404,10 +406,9 @@ impl Override {
 
     if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
       let mut content_type = None;
-
       let mut part_name = None;
 
-      for attr in e.attributes() {
+      for attr in e.attributes().with_checks(false) {
         let attr = attr?;
         match attr.key.as_ref() {
           b"ContentType" => {
@@ -461,13 +462,28 @@ impl Override {
   }
 }
 
-impl Override {
-  #[allow(clippy::inherent_to_string)]
-  pub fn to_string(&self) -> Result<String, super::super::common::SdkError> {
-    self.to_string_inner(false)
-  }
+impl Display for Override {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "<Override")?;
 
-  pub fn to_string_inner(
+    write!(
+      f,
+      " ContentType=\"{}\"",
+      quick_xml::escape::escape(&self.content_type)
+    )?;
+
+    write!(
+      f,
+      " PartName=\"{}\"",
+      quick_xml::escape::escape(&self.part_name)
+    )?;
+
+    write!(f, "/>")
+  }
+}
+
+impl Override {
+  pub fn to_string_with_xmlns(
     &self,
     with_xmlns: bool,
   ) -> Result<String, super::super::common::SdkError> {
@@ -475,24 +491,18 @@ impl Override {
 
     let mut writer = String::new();
 
-    writer.write_char('<')?;
-
     if with_xmlns {
-      writer.write_str("w:Override")?;
+      writer.write_str("<w:Override")?;
     } else {
-      writer.write_str("Override")?;
+      writer.write_str("<Override")?;
     }
 
-    writer.write_char(' ')?;
-    writer.write_str("ContentType")?;
-    writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(self.content_type.to_string()))?;
+    writer.write_str(" ContentType=\"")?;
+    writer.write_str(&quick_xml::escape::escape(&self.content_type))?;
     writer.write_char('"')?;
 
-    writer.write_char(' ')?;
-    writer.write_str("PartName")?;
-    writer.write_str("=\"")?;
-    writer.write_str(&quick_xml::escape::escape(self.part_name.to_string()))?;
+    writer.write_str(" PartName=\"")?;
+    writer.write_str(&quick_xml::escape::escape(&self.part_name))?;
     writer.write_char('"')?;
 
     writer.write_str("/>")?;

@@ -37,6 +37,22 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
       .insert(&namespace.uri, namespace);
   }
 
+  for (schema, schema_mod) in gen_context.schemas.iter().zip(&gen_context.schema_mods) {
+    let namespace = gen_context
+      .uri_namespace_map
+      .get(schema.target_namespace.as_str())
+      .ok_or(format!("{:?}", schema.target_namespace))
+      .unwrap();
+
+    gen_context
+      .prefix_schema_mod_map
+      .insert(&namespace.prefix, schema_mod);
+
+    gen_context
+      .prefix_schema_map
+      .insert(&namespace.prefix, schema);
+  }
+
   write_schemas(&gen_context, out_dir_path);
 }
 
@@ -53,31 +69,43 @@ pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
     let schema_mod = &gen_context.schema_mods[i];
 
     let token_stream = gen_open_xml_schema_neo(schema, gen_context);
-
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
-
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", schema_mod));
-
     fs::write(schema_path, formatted).unwrap();
   }
 
   let token_stream: TokenStream = parse_str(include_str!("includes/simple_type.rs")).unwrap();
-
   let syntax_tree = syn::parse2(token_stream).unwrap();
   let formatted = prettyplease::unparse(&syntax_tree);
-
   let schemas_mod_path = out_schemas_dir_path.join("simple_type.rs");
-
   fs::write(schemas_mod_path, formatted).unwrap();
 
   let token_stream: TokenStream = parse_str(include_str!("includes/common.rs")).unwrap();
-
   let syntax_tree = syn::parse2(token_stream).unwrap();
   let formatted = prettyplease::unparse(&syntax_tree);
-
   let schemas_mod_path = out_common_dir_path.join("mod.rs");
+  fs::write(schemas_mod_path, formatted).unwrap();
 
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/packages/opc_content_types.rs")).unwrap();
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+  let schemas_mod_path = out_schemas_dir_path.join("opc_content_types.rs");
+  fs::write(schemas_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/packages/opc_relationships.rs")).unwrap();
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+  let schemas_mod_path = out_schemas_dir_path.join("opc_relationships.rs");
+  fs::write(schemas_mod_path, formatted).unwrap();
+
+  let token_stream: TokenStream =
+    parse_str(include_str!("includes/packages/opc_core_properties.rs")).unwrap();
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+  let schemas_mod_path = out_schemas_dir_path.join("opc_core_properties.rs");
   fs::write(schemas_mod_path, formatted).unwrap();
 
   for schema_mod in gen_context.schema_mods.iter() {
@@ -96,14 +124,14 @@ pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
 
   let token_stream: TokenStream = quote! {
     pub mod simple_type;
+    pub mod opc_content_types;
+    pub mod opc_core_properties;
+    pub mod opc_relationships;
     #( #schemas_mod_use_list )*
   };
-
   let syntax_tree = syn::parse2(token_stream).unwrap();
   let formatted = prettyplease::unparse(&syntax_tree);
-
   let schemas_mod_path = out_schemas_dir_path.join("mod.rs");
-
   fs::write(schemas_mod_path, formatted).unwrap();
 }
 

@@ -51,6 +51,7 @@ pub struct OpenXmlSchemaType {
   pub name: String,
   pub class_name: String,
   pub summary: String,
+  pub version: String,
   pub part: String,
   pub composite_type: String,
   pub base_class: String,

@@ -4,6 +4,7 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{parse2, parse_str, Ident, ItemEnum, Type, Variant};
 
+use crate::gen::context::check_office_version;
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
@@ -15,7 +16,7 @@ use crate::{GenContext, GenContextNeo};
 pub fn gen_open_xml_schema_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -> TokenStream {
   let mut token_stream_list: Vec<TokenStream> = vec![];
 
-  let _schema_namespace = gen_context
+  let schema_namespace = gen_context
     .uri_namespace_map
     .get(schema.target_namespace.as_str())
     .ok_or(format!("{:?}", schema.target_namespace))
@@ -52,15 +53,165 @@ pub fn gen_open_xml_schema_neo(schema: &OpenXmlSchema, gen_context: &GenContextN
     }
 
     token_stream_list.push(quote! {
-      #[derive(Clone, Debug, Default)]
+      #[derive(Clone, Default)]
       pub enum #e_enum_name_ident {
         #( #variants, )*
       }
     })
   }
 
+  for t in &schema.types {
+    if !check_office_version(&t.version) {
+      continue;
+    }
+
+    let mut fields: Vec<TokenStream> = vec![];
+
+    for attr in &t.attributes {
+      if check_office_version(&attr.version) {
+        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+      }
+    }
+
+    let child_choice_enum_option: Option<ItemEnum> = None;
+
+    let struct_name_ident: Ident = parse_str(&t.class_name.to_upper_camel_case()).unwrap();
+
+    let summary_doc = format!(" {}", t.summary);
+
+    let version_doc = if t.version.is_empty() {
+      " Available in Office2007 and above.".to_string()
+    } else {
+      format!(" Available in {} and above.", t.version)
+    };
+
+    let qualified_doc = if t.name.ends_with('/') {
+      " When the object is serialized out as xml, it's qualified name is .".to_string()
+    } else {
+      let qualified_str = &t.name[t.name.find('/').unwrap() + 1..t.name.len()];
+
+      format!(
+        " When the object is serialized out as xml, it's qualified name is {}.",
+        qualified_str
+      )
+    };
+
+    token_stream_list.push(quote! {
+      #[doc = #summary_doc]
+      #[doc = #version_doc]
+      #[doc = #qualified_doc]
+      #[derive(Clone, Default)]
+      pub struct #struct_name_ident {
+        #( #fields )*
+      }
+
+      #child_choice_enum_option
+    });
+  }
+
   quote! {
     #( #token_stream_list )*
+  }
+}
+
+fn gen_attr_neo(
+  attr: &OpenXmlSchemaTypeAttribute,
+  schema_namespace: &OpenXmlNamespace,
+  gen_context: &GenContextNeo,
+) -> TokenStream {
+  let attr_name_ident: Ident = if attr.property_name.is_empty() {
+    parse_str(&escape_snake_case(attr.q_name.to_snake_case())).unwrap()
+  } else {
+    parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
+  };
+
+  let type_ident: Type = if attr.r#type.starts_with("ListValue<") {
+    parse_str("String").unwrap()
+  } else if attr.r#type.starts_with("EnumValue<") {
+    let e_typed_namespace_str =
+      &attr.r#type[attr.r#type.find("<").unwrap() + 1..attr.r#type.rfind(".").unwrap()];
+
+    let enum_name = &attr.r#type[attr.r#type.rfind(".").unwrap() + 1..attr.r#type.len() - 1];
+
+    let mut e_prefix = "";
+
+    for typed_namespace in &gen_context.typed_namespaces {
+      if e_typed_namespace_str == typed_namespace.namespace {
+        let e_schema = gen_context
+          .prefix_schema_map
+          .get(typed_namespace.prefix.as_str())
+          .ok_or(format!("{:?}", typed_namespace))
+          .unwrap();
+
+        for e in &e_schema.enums {
+          if e.name == enum_name {
+            e_prefix = &typed_namespace.prefix;
+          }
+        }
+      }
+    }
+
+    let e_namespace = gen_context
+      .prefix_namespace_map
+      .get(e_prefix)
+      .ok_or(format!("{:?}", e_prefix))
+      .unwrap();
+
+    if e_namespace.prefix != schema_namespace.prefix {
+      let scheme_mod = gen_context
+        .prefix_schema_mod_map
+        .get(e_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", e_namespace.prefix))
+        .unwrap();
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        enum_name.to_upper_camel_case()
+      ))
+      .unwrap()
+    } else {
+      parse_str(&enum_name.to_upper_camel_case()).unwrap()
+    }
+  } else {
+    parse_str(&format!("crate::schemas::simple_type::{}", &attr.r#type)).unwrap()
+  };
+
+  let mut required = false;
+
+  for validator in &attr.validators {
+    if validator.name == "RequiredValidator" {
+      required = true;
+    }
+  }
+
+  let property_comments_doc = format!(" {}", attr.property_comments);
+
+  let version_doc = if attr.version.is_empty() {
+    " Available in Office2007 and above.".to_string()
+  } else {
+    format!(" Available in {} and above.", attr.version)
+  };
+
+  let qualified_doc = format!(
+    " Represents the following attribute in the schema: {}",
+    attr.q_name
+  );
+
+  if required {
+    quote! {
+      #[doc = #property_comments_doc]
+      #[doc = #version_doc]
+      #[doc = #qualified_doc]
+      pub #attr_name_ident: #type_ident,
+    }
+  } else {
+    quote! {
+      #[doc = #property_comments_doc]
+      #[doc = #version_doc]
+      #[doc = #qualified_doc]
+      pub #attr_name_ident: Option<#type_ident>,
+    }
   }
 }
 

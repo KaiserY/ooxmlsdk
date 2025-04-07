@@ -18,17 +18,17 @@ readme = "README.md"
 [workspace.dependencies]
 ooxmlsdk = { version = "0.2.0", path = "crates/ooxmlsdk", default-features = false }
 ooxmlsdk-build = { version = "0.2.0", path = "crates/ooxmlsdk-build" }
-quick-xml = "0.37.3"
+quick-xml = "0.37.4"
 anyhow = "1.0.97"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_derive = "1.0.219"
 serde_json = "1.0.140"
 quote = "1.0.40"
 syn = "2.0.100"
-prettyplease = "0.2.31"
+prettyplease = "0.2.32"
 proc-macro2 = "1.0.94"
 heck = "0.5.0"
-zip = "2.5.0"
+zip = "2.6.1"
 thiserror = "2.0.12"
 path-clean = "1.0.1"
 criterion = "0.5.1"

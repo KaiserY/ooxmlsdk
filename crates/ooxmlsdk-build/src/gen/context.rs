@@ -33,7 +33,7 @@ pub struct GenContext<'a> {
   pub target_type_map: HashMap<String, &'a OpenXmlSchemaType>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GenContextNeo<'a> {
   pub parts: Vec<OpenXmlPart>,
   pub schemas: Vec<OpenXmlSchema>,
@@ -43,6 +43,8 @@ pub struct GenContextNeo<'a> {
   pub part_mods: Vec<String>,
   pub prefix_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
   pub uri_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
+  pub prefix_schema_map: HashMap<&'a str, &'a OpenXmlSchema>,
+  pub prefix_schema_mod_map: HashMap<&'a str, &'a str>,
 }
 
 impl<'a> GenContextNeo<'a> {
@@ -168,8 +170,7 @@ impl<'a> GenContextNeo<'a> {
       typed_namespaces,
       schema_mods,
       part_mods,
-      prefix_namespace_map: HashMap::new(),
-      uri_namespace_map: HashMap::new(),
+      ..Default::default()
     }
   }
 }
@@ -210,7 +211,7 @@ pub(crate) fn gen_part_name_set(
   }
 }
 
-pub(crate) fn _check_version(version: &str) -> bool {
+pub(crate) fn check_office_version(version: &str) -> bool {
   match version {
     #[cfg(feature = "microsoft365")]
     "Microsoft365" => true,

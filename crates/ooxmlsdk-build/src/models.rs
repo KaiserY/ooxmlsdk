@@ -145,6 +145,7 @@ pub struct OpenXmlSchemaEnum {
   pub name: String,
   pub r#type: String,
   pub facets: Vec<OpenXmlSchemaEnumFacet>,
+  pub version: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -152,6 +153,7 @@ pub struct OpenXmlSchemaEnum {
 pub struct OpenXmlSchemaEnumFacet {
   pub name: String,
   pub value: String,
+  pub version: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

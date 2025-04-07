@@ -66,26 +66,16 @@ impl Types {
       let attr = attr?;
       match attr.key.as_ref() {
         b"xmlns" => {
-          xmlns = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
+          xmlns = Some(attr.unescape_value()?.to_string());
         }
         b"mc:Ignorable" => {
-          mc_ignorable = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
+          mc_ignorable = Some(attr.unescape_value()?.to_string());
         }
         key => {
           if key.starts_with(b"xmlns:") {
             xmlns_map.insert(
               String::from_utf8_lossy(&key[6..]).to_string(),
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
+              attr.unescape_value()?.to_string(),
             );
             if key == b"xmlns:w" {
               with_xmlns = true;
@@ -286,18 +276,10 @@ impl Default {
         let attr = attr?;
         match attr.key.as_ref() {
           b"Extension" => {
-            extension = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            extension = Some(attr.unescape_value()?.to_string());
           }
           b"ContentType" => {
-            content_type = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            content_type = Some(attr.unescape_value()?.to_string());
           }
           b"xmlns:w" => with_xmlns = true,
           _ => {}
@@ -412,18 +394,10 @@ impl Override {
         let attr = attr?;
         match attr.key.as_ref() {
           b"ContentType" => {
-            content_type = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            content_type = Some(attr.unescape_value()?.to_string());
           }
           b"PartName" => {
-            part_name = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            part_name = Some(attr.unescape_value()?.to_string());
           }
           b"xmlns:w" => with_xmlns = true,
           _ => {}

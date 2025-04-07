@@ -23,11 +23,19 @@ pub fn gen_open_xml_schema_neo(schema: &OpenXmlSchema, gen_context: &GenContextN
     .unwrap();
 
   for e in &schema.enums {
+    if !check_office_version(&e.version) {
+      continue;
+    }
+
     let e_enum_name_ident: Ident = parse_str(&e.name.to_upper_camel_case()).unwrap();
 
     let mut variants: Vec<Variant> = vec![];
 
     for (i, facet) in e.facets.iter().enumerate() {
+      if !check_office_version(&facet.version) {
+        continue;
+      }
+
       let variant_ident: Ident = if facet.name.is_empty() {
         parse_str(&escape_upper_camel_case(facet.value.to_upper_camel_case())).unwrap()
       } else {
@@ -67,13 +75,113 @@ pub fn gen_open_xml_schema_neo(schema: &OpenXmlSchema, gen_context: &GenContextN
 
     let mut fields: Vec<TokenStream> = vec![];
 
-    for attr in &t.attributes {
-      if check_office_version(&attr.version) {
-        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
-      }
-    }
+    let mut child_choice_enum_option: Option<ItemEnum> = None;
 
-    let child_choice_enum_option: Option<ItemEnum> = None;
+    if t.base_class == "OpenXmlLeafTextElement" {
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      let simple_type_name = gen_child_type_neo(t, schema_namespace, gen_context);
+
+      fields.push(quote! {
+        pub child: Option<#simple_type_name>,
+      });
+    } else if t.base_class == "OpenXmlLeafElement" {
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+    } else if t.base_class == "OpenXmlCompositeElement"
+      || t.base_class == "CustomXmlElement"
+      || t.base_class == "OpenXmlPartRootElement"
+      || t.base_class == "SdtElement"
+    {
+      if !t.part.is_empty()
+        || t.base_class == "OpenXmlPartRootElement"
+        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
+        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+      {
+        fields.push(quote! {
+          pub xmlns: Option<String>,
+        });
+
+        fields.push(quote! {
+          pub xmlns_map: std::collections::HashMap<String, String>,
+        });
+
+        fields.push(quote! {
+          pub mc_ignorable: Option<String>,
+        });
+      }
+
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      if t.is_one_sequence_flatten() {
+        let one_sequence_fields = gen_one_sequence_fields_neo(t, schema_namespace, gen_context);
+
+        fields.extend(one_sequence_fields);
+      } else {
+        let (field_option, enum_option) =
+          gen_children_neo(&t.class_name, &t.children, schema_namespace, gen_context);
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        child_choice_enum_option = enum_option;
+      }
+    } else if t.is_derived {
+      let base_class_type = gen_context
+        .type_name_type_map
+        .get(&t.name[0..t.name.find('/').unwrap()])
+        .ok_or(format!("{:?}", t.name))
+        .unwrap();
+
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      for attr in &base_class_type.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+        let one_sequence_fields = gen_one_sequence_fields_neo(t, schema_namespace, gen_context);
+
+        fields.extend(one_sequence_fields);
+      } else {
+        let (field_option, enum_option) =
+          gen_children_neo(&t.class_name, &t.children, schema_namespace, gen_context);
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        child_choice_enum_option = enum_option;
+      }
+
+      if t.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
+        let simple_type_name = gen_child_type_neo(base_class_type, schema_namespace, gen_context);
+
+        fields.push(quote! {
+          pub child: Option<#simple_type_name>,
+        });
+      }
+    } else {
+      panic!("{:?}", t);
+    }
 
     let struct_name_ident: Ident = parse_str(&t.class_name.to_upper_camel_case()).unwrap();
 
@@ -213,6 +321,212 @@ fn gen_attr_neo(
       pub #attr_name_ident: Option<#type_ident>,
     }
   }
+}
+
+fn gen_children_neo(
+  class_name: &str,
+  children: &Vec<OpenXmlSchemaTypeChild>,
+  schema_namespace: &OpenXmlNamespace,
+  gen_context: &GenContextNeo,
+) -> (Option<TokenStream>, Option<ItemEnum>) {
+  if children.is_empty() {
+    return (None, None);
+  }
+
+  let child_choice_enum_ident: Ident =
+    parse_str(&format!("{}ChildChoice", class_name.to_upper_camel_case())).unwrap();
+
+  let field_option = Some(quote! {
+    pub children: Vec<#child_choice_enum_ident>,
+  });
+
+  let mut variants: Vec<TokenStream> = vec![];
+
+  for child in children {
+    let child_type = gen_context
+      .type_name_type_map
+      .get(&child.name[0..child.name.find('/').unwrap()])
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_namespace = gen_context
+      .type_name_namespace_map
+      .get(&child.name[0..child.name.find('/').unwrap()])
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+    let child_rename_ser_str = child_name_list
+      .last()
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_variant_name_ident: Ident =
+      parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
+
+    let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
+      let scheme_mod = gen_context
+        .prefix_schema_mod_map
+        .get(child_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", child_namespace.prefix))
+        .unwrap();
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        child_type.class_name.to_upper_camel_case()
+      ))
+      .unwrap()
+    } else {
+      parse_str(&child_type.class_name.to_upper_camel_case()).unwrap()
+    };
+
+    variants.push(quote! {
+      #child_variant_name_ident(std::boxed::Box<#child_variant_type>),
+    });
+  }
+
+  let enum_option = Some(
+    parse2(quote! {
+      #[derive(Clone, Debug)]
+      pub enum #child_choice_enum_ident {
+        #( #variants )*
+      }
+    })
+    .unwrap(),
+  );
+
+  (field_option, enum_option)
+}
+
+fn gen_child_type_neo(
+  t: &OpenXmlSchemaType,
+  schema_namespace: &OpenXmlNamespace,
+  gen_context: &GenContextNeo,
+) -> Type {
+  let name_list: Vec<&str> = t.name.split('/').collect();
+
+  let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
+
+  if let Some(e) = gen_context.enum_type_enum_map.get(first_name) {
+    let e_namespace = gen_context
+      .enum_type_namespace_map
+      .get(e.r#type.as_str())
+      .ok_or(format!("{:?}", e.r#type))
+      .unwrap();
+
+    if e_namespace.prefix != schema_namespace.prefix {
+      let scheme_mod = gen_context
+        .prefix_schema_mod_map
+        .get(e_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", e_namespace.prefix))
+        .unwrap();
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        e.name.to_upper_camel_case()
+      ))
+      .unwrap()
+    } else {
+      parse_str(&e.name.to_upper_camel_case()).unwrap()
+    }
+  } else {
+    parse_str(&format!(
+      "crate::schemas::simple_type::{}",
+      simple_type_mapping(first_name)
+    ))
+    .unwrap()
+  }
+}
+
+fn gen_one_sequence_fields_neo(
+  t: &OpenXmlSchemaType,
+  schema_namespace: &OpenXmlNamespace,
+  gen_context: &GenContextNeo,
+) -> Vec<TokenStream> {
+  let mut fields: Vec<TokenStream> = vec![];
+
+  let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
+
+  for child in &t.children {
+    child_map.insert(&child.name, child);
+  }
+
+  for p in &t.particle.items {
+    let child = child_map
+      .get(p.name.as_str())
+      .ok_or(format!("{:?}", p.name))
+      .unwrap();
+
+    let child_type = gen_context
+      .type_name_type_map
+      .get(child.name.as_str())
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_namespace = gen_context
+      .type_name_namespace_map
+      .get(child.name.as_str())
+      .ok_or(format!("{:?}", child.name))
+      .unwrap();
+
+    let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
+      let scheme_mod = gen_context
+        .prefix_schema_mod_map
+        .get(child_namespace.prefix.as_str())
+        .ok_or(format!("{:?}", child_namespace.prefix))
+        .unwrap();
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        scheme_mod,
+        child_type.class_name.to_upper_camel_case()
+      ))
+      .unwrap()
+    } else {
+      parse_str(&child_type.class_name.to_upper_camel_case()).unwrap()
+    };
+
+    let child_name_ident: Ident = if child.property_name.is_empty() {
+      let child_name_list: Vec<&str> = child.name.split('/').collect();
+
+      let child_rename_ser_str = child_name_list
+        .last()
+        .ok_or(format!("{:?}", child.name))
+        .unwrap();
+
+      parse_str(&child_rename_ser_str.to_snake_case()).unwrap()
+    } else {
+      parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
+    };
+
+    let property_comments = if child.property_comments.is_empty() {
+      " _"
+    } else {
+      &child.property_comments
+    };
+
+    if p.occurs.is_empty() {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: std::boxed::Box<#child_variant_type>,
+      });
+    } else if p.occurs[0].min == 0 && p.occurs[0].max == 1 {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+      });
+    } else {
+      fields.push(quote! {
+        #[doc = #property_comments]
+        pub #child_name_ident: Vec<#child_variant_type>,
+      });
+    }
+  }
+
+  fields
 }
 
 pub fn gen_open_xml_schema(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {

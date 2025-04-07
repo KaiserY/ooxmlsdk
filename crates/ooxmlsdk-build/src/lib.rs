@@ -51,6 +51,26 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
     gen_context
       .prefix_schema_map
       .insert(&namespace.prefix, schema);
+
+    for e in schema.enums.iter() {
+      gen_context.enum_type_enum_map.insert(&e.r#type, e);
+
+      gen_context
+        .enum_type_namespace_map
+        .insert(&e.r#type, namespace);
+    }
+
+    for ty in schema.types.iter() {
+      if !ty.is_derived {
+        gen_context
+          .type_name_type_map
+          .insert(&ty.name[0..ty.name.find('/').unwrap()], ty);
+
+        gen_context
+          .type_name_namespace_map
+          .insert(&ty.name[0..ty.name.find('/').unwrap()], namespace);
+      }
+    }
   }
 
   write_schemas(&gen_context, out_dir_path);

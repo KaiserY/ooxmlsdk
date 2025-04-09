@@ -63,13 +63,19 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
     for ty in schema.types.iter() {
       if !ty.is_derived {
         gen_context
-          .type_name_type_map
+          .type_name_prefix_type_map
           .insert(&ty.name[0..ty.name.find('/').unwrap()], ty);
 
         gen_context
-          .type_name_namespace_map
+          .type_name_prefix_namespace_map
           .insert(&ty.name[0..ty.name.find('/').unwrap()], namespace);
       }
+
+      gen_context.type_name_type_map.insert(&ty.name, ty);
+
+      gen_context
+        .type_name_namespace_map
+        .insert(&ty.name, namespace);
     }
   }
 

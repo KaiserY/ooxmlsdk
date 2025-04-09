@@ -49,6 +49,8 @@ pub struct GenContextNeo<'a> {
   pub enum_type_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
   pub type_name_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
   pub type_name_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
+  pub type_name_prefix_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
+  pub type_name_prefix_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
 }
 
 impl<'a> GenContextNeo<'a> {

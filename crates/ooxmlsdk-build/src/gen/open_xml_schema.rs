@@ -141,7 +141,7 @@ pub fn gen_open_xml_schema_neo(schema: &OpenXmlSchema, gen_context: &GenContextN
     } else if t.is_derived {
       let base_class_type = gen_context
         .type_name_type_map
-        .get(&t.name[0..t.name.find('/').unwrap()])
+        .get(t.name.as_str())
         .ok_or(format!("{:?}", t.name))
         .unwrap();
 
@@ -345,13 +345,13 @@ fn gen_children_neo(
   for child in children {
     let child_type = gen_context
       .type_name_type_map
-      .get(&child.name[0..child.name.find('/').unwrap()])
+      .get(child.name.as_str())
       .ok_or(format!("{:?}", child.name))
       .unwrap();
 
     let child_namespace = gen_context
       .type_name_namespace_map
-      .get(&child.name[0..child.name.find('/').unwrap()])
+      .get(child.name.as_str())
       .ok_or(format!("{:?}", child.name))
       .unwrap();
 

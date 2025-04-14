@@ -394,7 +394,7 @@ impl Override {
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
 
-      let value = attr.unescape_value()?.to_string();
+      let value = attr.unescape_value()?.into_owned();
 
       match attr.key.as_ref() {
         b"ContentType" => {
@@ -408,11 +408,13 @@ impl Override {
       }
     }
 
-    if with_xmlns && e.name().as_ref() != b"w:Override" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "w:Override".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
+    if with_xmlns {
+      if e.name().as_ref() != b"w:Override" {
+        Err(super::super::common::SdkError::MismatchError {
+          expected: "w:Override".to_string(),
+          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+        })?;
+      }
     } else if e.name().as_ref() != b"Override" {
       Err(super::super::common::SdkError::MismatchError {
         expected: "Override".to_string(),

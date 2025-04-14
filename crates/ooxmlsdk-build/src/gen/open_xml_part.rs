@@ -4,7 +4,11 @@ use quote::quote;
 use syn::{parse2, parse_str, Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
 
 use crate::models::OpenXmlPart;
-use crate::GenContext;
+use crate::{GenContext, GenContextNeo};
+
+pub fn gen_open_xml_parts_neo(_part: &OpenXmlPart, _gen_context: &GenContextNeo) -> TokenStream {
+  quote! {}
+}
 
 pub fn gen_open_xml_part(part: &OpenXmlPart, context: &GenContext) -> TokenStream {
   let relationship_type_str = &part.relationship_type;

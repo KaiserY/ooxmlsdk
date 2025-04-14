@@ -14,6 +14,8 @@ pub struct OpenXmlPart {
   pub paths: OpenXmlPartPaths,
   pub version: String,
   pub children: Vec<OpenXmlPartChild>,
+  #[serde(skip)]
+  pub module_name: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -43,6 +45,8 @@ pub struct OpenXmlSchema {
   pub target_namespace: String,
   pub types: Vec<OpenXmlSchemaType>,
   pub enums: Vec<OpenXmlSchemaEnum>,
+  #[serde(skip)]
+  pub module_name: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -169,4 +173,12 @@ pub struct OpenXmlNamespace {
 pub struct TypedNamespace {
   pub prefix: String,
   pub namespace: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct TypedSchema {
+  pub name: String,
+  pub class_name: String,
+  pub part_class_name: String,
 }

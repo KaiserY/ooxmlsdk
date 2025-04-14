@@ -9,7 +9,15 @@ use crate::models::{
   OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
-use crate::GenContext;
+use crate::{GenContext, GenContextNeo};
+
+pub fn gen_deserializers_neo(_schema: &OpenXmlSchema, _gen_context: &GenContextNeo) -> TokenStream {
+  let token_stream_list: Vec<ItemImpl> = vec![];
+
+  quote! {
+    #( #token_stream_list )*
+  }
+}
 
 pub fn gen_deserializer(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
   let mut token_stream_list: Vec<ItemImpl> = vec![];

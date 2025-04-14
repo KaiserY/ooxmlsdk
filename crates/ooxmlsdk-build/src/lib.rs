@@ -1,5 +1,3 @@
-use gen::serializer::gen_serializer;
-use gen::validator::gen_validator;
 use heck::ToSnakeCase;
 use models::OpenXmlSchemaEnum;
 use proc_macro2::TokenStream;
@@ -10,9 +8,11 @@ use std::{fs, path::Path};
 use syn::{parse_str, Ident, ItemMod};
 
 use crate::gen::context::{GenContext, GenContextNeo};
-use crate::gen::deserializer::gen_deserializer;
-use crate::gen::open_xml_part::gen_open_xml_part;
-use crate::gen::open_xml_schema::{gen_open_xml_schema, gen_open_xml_schema_neo};
+use crate::gen::deserializer::{gen_deserializer, gen_deserializers_neo};
+use crate::gen::open_xml_part::{gen_open_xml_part, gen_open_xml_parts_neo};
+use crate::gen::open_xml_schema::{gen_open_xml_schema, gen_open_xml_schemas_neo};
+use crate::gen::serializer::{gen_serializer, gen_serializer_neo};
+use crate::gen::validator::{gen_validator, gen_validators_neo};
 use crate::models::{
   OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, TypedNamespace,
 };
@@ -37,16 +37,12 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
       .insert(&namespace.uri, namespace);
   }
 
-  for (schema, schema_mod) in gen_context.schemas.iter().zip(&gen_context.schema_mods) {
+  for schema in gen_context.schemas.iter() {
     let namespace = gen_context
       .uri_namespace_map
       .get(schema.target_namespace.as_str())
       .ok_or(format!("{:?}", schema.target_namespace))
       .unwrap();
-
-    gen_context
-      .prefix_schema_mod_map
-      .insert(&namespace.prefix, schema_mod);
 
     gen_context
       .prefix_schema_map
@@ -80,6 +76,18 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
   }
 
   write_schemas(&gen_context, out_dir_path);
+
+  #[cfg(feature = "parts")]
+  write_deserializers(&gen_context, out_dir_path);
+
+  #[cfg(feature = "parts")]
+  write_serializers(&gen_context, out_dir_path);
+
+  #[cfg(feature = "parts")]
+  write_parts(&gen_context, out_dir_path);
+
+  #[cfg(feature = "validators")]
+  write_validators(&gen_context, out_dir_path);
 }
 
 pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
@@ -91,14 +99,22 @@ pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
 
   let mut schemas_mod_use_list: Vec<ItemMod> = vec![];
 
-  for (i, schema) in gen_context.schemas.iter().enumerate() {
-    let schema_mod = &gen_context.schema_mods[i];
-
-    let token_stream = gen_open_xml_schema_neo(schema, gen_context);
+  for schema in gen_context.schemas.iter() {
+    let token_stream = gen_open_xml_schemas_neo(schema, gen_context);
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
-    let schema_path = out_schemas_dir_path.join(format!("{}.rs", schema_mod));
+    let schema_path = out_schemas_dir_path.join(format!("{}.rs", &schema.module_name));
     fs::write(schema_path, formatted).unwrap();
+
+    let schema_mod_ident: Ident = parse_str(&schema.module_name).unwrap();
+    let shcemas_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #schema_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+    schemas_mod_use_list.push(shcemas_mod_use);
   }
 
   let token_stream: TokenStream = parse_str(include_str!("includes/simple_type.rs")).unwrap();
@@ -134,20 +150,6 @@ pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
   let schemas_mod_path = out_schemas_dir_path.join("opc_core_properties.rs");
   fs::write(schemas_mod_path, formatted).unwrap();
 
-  for schema_mod in gen_context.schema_mods.iter() {
-    let schema_mod_ident: Ident = parse_str(schema_mod).unwrap();
-
-    let shcemas_mod_use: ItemMod = parse_str(
-      &quote! {
-        pub mod #schema_mod_ident;
-      }
-      .to_string(),
-    )
-    .unwrap();
-
-    schemas_mod_use_list.push(shcemas_mod_use);
-  }
-
   let token_stream: TokenStream = quote! {
     pub mod simple_type;
     pub mod opc_content_types;
@@ -159,6 +161,145 @@ pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
   let formatted = prettyplease::unparse(&syntax_tree);
   let schemas_mod_path = out_schemas_dir_path.join("mod.rs");
   fs::write(schemas_mod_path, formatted).unwrap();
+}
+
+pub(crate) fn write_deserializers(gen_context: &GenContextNeo, out_dir_path: &Path) {
+  let out_deserializers_dir_path = &out_dir_path.join("deserializers");
+
+  fs::create_dir_all(out_deserializers_dir_path).unwrap();
+
+  let mut deserializers_mod_use_list: Vec<ItemMod> = vec![];
+
+  for part in gen_context.schemas.iter() {
+    let token_stream = gen_deserializers_neo(part, gen_context);
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    let part_path = out_deserializers_dir_path.join(format!("{}.rs", &part.module_name));
+    fs::write(part_path, formatted).unwrap();
+
+    let deserializer_mod_ident: Ident = parse_str(&part.module_name).unwrap();
+    let deserializer_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #deserializer_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+    deserializers_mod_use_list.push(deserializer_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    #( #deserializers_mod_use_list )*
+  };
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+  let deserializers_mod_path = out_deserializers_dir_path.join("mod.rs");
+  fs::write(deserializers_mod_path, formatted).unwrap();
+}
+
+pub(crate) fn write_serializers(gen_context: &GenContextNeo, out_dir_path: &Path) {
+  let out_serializers_dir_path = &out_dir_path.join("serializers");
+
+  fs::create_dir_all(out_serializers_dir_path).unwrap();
+
+  let mut serializers_mod_use_list: Vec<ItemMod> = vec![];
+
+  for part in gen_context.schemas.iter() {
+    let token_stream = gen_serializer_neo(part, gen_context);
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    let part_path = out_serializers_dir_path.join(format!("{}.rs", &part.module_name));
+    fs::write(part_path, formatted).unwrap();
+
+    let serializer_mod_ident: Ident = parse_str(&part.module_name).unwrap();
+    let serializer_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #serializer_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+    serializers_mod_use_list.push(serializer_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    #( #serializers_mod_use_list )*
+  };
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+  let serializers_mod_path = out_serializers_dir_path.join("mod.rs");
+  fs::write(serializers_mod_path, formatted).unwrap();
+}
+
+pub(crate) fn write_parts(gen_context: &GenContextNeo, out_dir_path: &Path) {
+  let out_parts_dir_path = &out_dir_path.join("parts");
+
+  fs::create_dir_all(out_parts_dir_path).unwrap();
+
+  let mut parts_mod_use_list: Vec<ItemMod> = vec![];
+
+  for part in gen_context.parts.iter() {
+    let token_stream = gen_open_xml_parts_neo(part, gen_context);
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    let part_path = out_parts_dir_path.join(format!("{}.rs", &part.module_name));
+    fs::write(part_path, formatted).unwrap();
+
+    let part_mod_ident: Ident = parse_str(&part.module_name).unwrap();
+    let part_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #part_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+    parts_mod_use_list.push(part_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    #( #parts_mod_use_list )*
+  };
+
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+
+  let parts_mod_path = out_parts_dir_path.join("mod.rs");
+
+  fs::write(parts_mod_path, formatted).unwrap();
+}
+
+pub(crate) fn write_validators(gen_context: &GenContextNeo, out_dir_path: &Path) {
+  let out_validators_dir_path = &out_dir_path.join("validators");
+
+  fs::create_dir_all(out_validators_dir_path).unwrap();
+
+  let mut validators_mod_use_list: Vec<ItemMod> = vec![];
+
+  for part in gen_context.schemas.iter() {
+    let token_stream = gen_validators_neo(part, gen_context);
+    let syntax_tree = syn::parse2(token_stream).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    let part_path = out_validators_dir_path.join(format!("{}.rs", &part.module_name));
+    fs::write(part_path, formatted).unwrap();
+
+    let validator_mod_ident: Ident = parse_str(&part.module_name).unwrap();
+    let validator_mod_use: ItemMod = parse_str(
+      &quote! {
+        pub mod #validator_mod_ident;
+      }
+      .to_string(),
+    )
+    .unwrap();
+    validators_mod_use_list.push(validator_mod_use);
+  }
+
+  let token_stream: TokenStream = quote! {
+    #( #validators_mod_use_list )*
+  };
+  let syntax_tree = syn::parse2(token_stream).unwrap();
+  let formatted = prettyplease::unparse(&syntax_tree);
+  let validators_mod_path = out_validators_dir_path.join("mod.rs");
+  fs::write(validators_mod_path, formatted).unwrap();
 }
 
 pub fn gen(data_dir: &str, out_dir: &str) {

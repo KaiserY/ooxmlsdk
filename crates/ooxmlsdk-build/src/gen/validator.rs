@@ -8,7 +8,15 @@ use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild,
 };
 use crate::utils::escape_snake_case;
-use crate::GenContext;
+use crate::{GenContext, GenContextNeo};
+
+pub fn gen_validators_neo(_schema: &OpenXmlSchema, _gen_context: &GenContextNeo) -> TokenStream {
+  let token_stream_list: Vec<ItemImpl> = vec![];
+
+  quote! {
+    #( #token_stream_list )*
+  }
+}
 
 pub fn gen_validator(schema: &OpenXmlSchema, context: &GenContext) -> TokenStream {
   let mut token_stream_list: Vec<ItemImpl> = vec![];

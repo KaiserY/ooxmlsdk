@@ -74,10 +74,8 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
 
   write_schemas(&gen_context, out_dir_path);
 
-  #[cfg(feature = "parts")]
   write_deserializers(&gen_context, out_dir_path);
 
-  #[cfg(feature = "parts")]
   write_serializers(&gen_context, out_dir_path);
 
   #[cfg(feature = "parts")]

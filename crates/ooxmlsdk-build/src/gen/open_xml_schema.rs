@@ -10,7 +10,7 @@ use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
   OpenXmlSchemaTypeChild,
 };
-use crate::utils::{escape_snake_case, escape_upper_camel_case};
+use crate::utils::{escape_snake_case, escape_upper_camel_case, get_or_panic};
 use crate::{GenContext, GenContextNeo};
 
 pub fn gen_open_xml_schemas_neo(
@@ -19,11 +19,10 @@ pub fn gen_open_xml_schemas_neo(
 ) -> TokenStream {
   let mut token_stream_list: Vec<TokenStream> = vec![];
 
-  let schema_namespace = gen_context
-    .uri_namespace_map
-    .get(schema.target_namespace.as_str())
-    .ok_or(format!("{:?}", schema.target_namespace))
-    .unwrap();
+  let schema_namespace = get_or_panic!(
+    gen_context.uri_namespace_map,
+    schema.target_namespace.as_str()
+  );
 
   for e in &schema.enums {
     if !check_office_version(&e.version) {
@@ -78,13 +77,113 @@ pub fn gen_open_xml_schemas_neo(
 
     let mut fields: Vec<TokenStream> = vec![];
 
-    for attr in &t.attributes {
-      if check_office_version(&attr.version) {
-        fields.push(gen_attr_neo(attr, schema, schema_namespace, gen_context));
-      }
-    }
+    let mut child_choice_enum_option: Option<ItemEnum> = None;
 
-    let child_choice_enum_option: Option<ItemEnum> = None;
+    if t.base_class == "OpenXmlLeafTextElement" {
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      let simple_type_name = gen_xml_content_type_neo(t, schema_namespace, gen_context);
+
+      fields.push(quote! {
+        pub xml_content: Option<#simple_type_name>,
+      });
+    } else if t.base_class == "OpenXmlLeafElement" {
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+    } else if t.base_class == "OpenXmlCompositeElement"
+      || t.base_class == "CustomXmlElement"
+      || t.base_class == "OpenXmlPartRootElement"
+      || t.base_class == "SdtElement"
+    {
+      if !t.part.is_empty()
+        || t.base_class == "OpenXmlPartRootElement"
+        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
+        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"
+      {
+        fields.push(quote! {
+          pub xmlns: Option<String>,
+        });
+
+        fields.push(quote! {
+          pub xmlns_map: std::collections::HashMap<String, String>,
+        });
+
+        fields.push(quote! {
+          pub mc_ignorable: Option<String>,
+        });
+      }
+
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      if t.is_one_sequence_flatten() {
+        let one_sequence_fields = gen_one_sequence_fields_neo(t, schema_namespace, gen_context);
+
+        fields.extend(one_sequence_fields);
+      } else {
+        let (field_option, enum_option) =
+          gen_children_neo(&t.class_name, &t.children, schema_namespace, gen_context);
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        child_choice_enum_option = enum_option;
+      }
+    } else if t.is_derived {
+      let base_class_type = get_or_panic!(
+        gen_context.type_name_type_map,
+        &t.name[0..t.name.find('/').unwrap() + 1]
+      );
+
+      for attr in &t.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      for attr in &base_class_type.attributes {
+        if check_office_version(&attr.version) {
+          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
+        }
+      }
+
+      if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
+        let one_sequence_fields = gen_one_sequence_fields_neo(t, schema_namespace, gen_context);
+
+        fields.extend(one_sequence_fields);
+      } else {
+        let (field_option, enum_option) =
+          gen_children_neo(&t.class_name, &t.children, schema_namespace, gen_context);
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        child_choice_enum_option = enum_option;
+      }
+
+      if t.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
+        let simple_type_name =
+          gen_xml_content_type_neo(base_class_type, schema_namespace, gen_context);
+
+        fields.push(quote! {
+          pub xml_content: Option<#simple_type_name>,
+        });
+      }
+    } else {
+      panic!("{:?}", t);
+    }
 
     let struct_name_ident: Ident = parse_str(&t.class_name.to_upper_camel_case()).unwrap();
 
@@ -127,7 +226,6 @@ pub fn gen_open_xml_schemas_neo(
 
 fn gen_attr_neo(
   attr: &OpenXmlSchemaTypeAttribute,
-  schema: &OpenXmlSchema,
   schema_namespace: &OpenXmlNamespace,
   gen_context: &GenContextNeo,
 ) -> TokenStream {
@@ -140,39 +238,25 @@ fn gen_attr_neo(
   let type_ident: Type = if attr.r#type.starts_with("ListValue<") {
     parse_str("String").unwrap()
   } else if attr.r#type.starts_with("EnumValue<") {
-    let e_typed_namespace_str =
+    let typed_namespace_str =
       &attr.r#type[attr.r#type.find("<").unwrap() + 1..attr.r#type.rfind(".").unwrap()];
 
     let enum_name = &attr.r#type[attr.r#type.rfind(".").unwrap() + 1..attr.r#type.len() - 1];
 
-    let mut e_prefix = "";
+    let typed_namespace = get_or_panic!(
+      gen_context.namespace_typed_namespace_map,
+      typed_namespace_str
+    );
 
-    for typed_namespace in &gen_context.typed_namespaces {
-      if e_typed_namespace_str == typed_namespace.namespace {
-        let e_schema = gen_context
-          .prefix_schema_map
-          .get(typed_namespace.prefix.as_str())
-          .ok_or(format!("{:?}", typed_namespace))
-          .unwrap();
+    if typed_namespace.prefix != schema_namespace.prefix {
+      let enum_schema = get_or_panic!(
+        gen_context.prefix_schema_map,
+        typed_namespace.prefix.as_str()
+      );
 
-        for e in &e_schema.enums {
-          if e.name == enum_name {
-            e_prefix = &typed_namespace.prefix;
-          }
-        }
-      }
-    }
-
-    let e_namespace = gen_context
-      .prefix_namespace_map
-      .get(e_prefix)
-      .ok_or(format!("{:?}", e_prefix))
-      .unwrap();
-
-    if e_namespace.prefix != schema_namespace.prefix {
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &schema.module_name,
+        &enum_schema.module_name,
         enum_name.to_upper_camel_case()
       ))
       .unwrap()
@@ -224,7 +308,6 @@ fn gen_attr_neo(
 fn gen_children_neo(
   class_name: &str,
   children: &Vec<OpenXmlSchemaTypeChild>,
-  schema: &OpenXmlSchema,
   schema_namespace: &OpenXmlNamespace,
   gen_context: &GenContextNeo,
 ) -> (Option<TokenStream>, Option<ItemEnum>) {
@@ -242,32 +325,28 @@ fn gen_children_neo(
   let mut variants: Vec<TokenStream> = vec![];
 
   for child in children {
-    let child_type = gen_context
-      .type_name_type_map
-      .get(child.name.as_str())
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
+    let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
-    let child_namespace = gen_context
-      .type_name_namespace_map
-      .get(child.name.as_str())
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
+    if !check_office_version(&child_type.version) {
+      continue;
+    }
 
-    let child_name_list: Vec<&str> = child.name.split('/').collect();
+    let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
 
-    let child_rename_ser_str = child_name_list
-      .last()
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
+    let child_last_name = &child.name[child.name.find('/').unwrap() + 1..child.name.len()];
 
     let child_variant_name_ident: Ident =
-      parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
+      parse_str(&child_last_name.to_upper_camel_case()).unwrap();
 
     let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
+      let child_schema = get_or_panic!(
+        gen_context.prefix_schema_map,
+        child_namespace.prefix.as_str()
+      );
+
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &schema.module_name,
+        &child_schema.module_name,
         child_type.class_name.to_upper_camel_case()
       ))
       .unwrap()
@@ -293,27 +372,25 @@ fn gen_children_neo(
   (field_option, enum_option)
 }
 
-fn gen_child_type_neo(
+fn gen_xml_content_type_neo(
   t: &OpenXmlSchemaType,
-  schema: &OpenXmlSchema,
   schema_namespace: &OpenXmlNamespace,
   gen_context: &GenContextNeo,
 ) -> Type {
-  let name_list: Vec<&str> = t.name.split('/').collect();
-
-  let first_name = name_list.first().ok_or(format!("{:?}", t.name)).unwrap();
+  let first_name = &t.name[0..t.name.find('/').unwrap()];
 
   if let Some(e) = gen_context.enum_type_enum_map.get(first_name) {
-    let e_namespace = gen_context
-      .enum_type_namespace_map
-      .get(e.r#type.as_str())
-      .ok_or(format!("{:?}", e.r#type))
-      .unwrap();
+    let enum_namespace = get_or_panic!(gen_context.enum_type_namespace_map, e.r#type.as_str());
 
-    if e_namespace.prefix != schema_namespace.prefix {
+    if enum_namespace.prefix != schema_namespace.prefix {
+      let enum_schema = get_or_panic!(
+        gen_context.prefix_schema_map,
+        enum_namespace.prefix.as_str()
+      );
+
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &schema.module_name,
+        &enum_schema.module_name,
         e.name.to_upper_camel_case()
       ))
       .unwrap()
@@ -331,7 +408,6 @@ fn gen_child_type_neo(
 
 fn gen_one_sequence_fields_neo(
   t: &OpenXmlSchemaType,
-  schema: &OpenXmlSchema,
   schema_namespace: &OpenXmlNamespace,
   gen_context: &GenContextNeo,
 ) -> Vec<TokenStream> {
@@ -344,27 +420,25 @@ fn gen_one_sequence_fields_neo(
   }
 
   for p in &t.particle.items {
-    let child = child_map
-      .get(p.name.as_str())
-      .ok_or(format!("{:?}", p.name))
-      .unwrap();
+    let child = get_or_panic!(child_map, p.name.as_str());
 
-    let child_type = gen_context
-      .type_name_type_map
-      .get(child.name.as_str())
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
+    let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
-    let child_namespace = gen_context
-      .type_name_namespace_map
-      .get(child.name.as_str())
-      .ok_or(format!("{:?}", child.name))
-      .unwrap();
+    if !check_office_version(&child_type.version) {
+      continue;
+    }
+
+    let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
 
     let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
+      let child_schema = get_or_panic!(
+        gen_context.prefix_schema_map,
+        child_namespace.prefix.as_str()
+      );
+
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &schema.module_name,
+        &child_schema.module_name,
         child_type.class_name.to_upper_camel_case()
       ))
       .unwrap()
@@ -373,14 +447,9 @@ fn gen_one_sequence_fields_neo(
     };
 
     let child_name_ident: Ident = if child.property_name.is_empty() {
-      let child_name_list: Vec<&str> = child.name.split('/').collect();
+      let child_last_name = &child.name[child.name.find('/').unwrap() + 1..child.name.len()];
 
-      let child_rename_ser_str = child_name_list
-        .last()
-        .ok_or(format!("{:?}", child.name))
-        .unwrap();
-
-      parse_str(&child_rename_ser_str.to_snake_case()).unwrap()
+      parse_str(&child_last_name.to_snake_case()).unwrap()
     } else {
       parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
     };

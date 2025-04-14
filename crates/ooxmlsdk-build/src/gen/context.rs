@@ -48,8 +48,7 @@ pub struct GenContextNeo<'a> {
   pub enum_type_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
   pub type_name_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
   pub type_name_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
-  pub type_name_prefix_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
-  pub type_name_prefix_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
+  pub namespace_typed_namespace_map: HashMap<&'a str, &'a TypedNamespace>,
 }
 
 impl<'a> GenContextNeo<'a> {
@@ -183,18 +182,6 @@ impl<'a> GenContextNeo<'a> {
       }
     }
 
-    let mut uri_namespace_map: HashMap<&str, &OpenXmlNamespace> = HashMap::new();
-
-    for namespace in namespaces.iter() {
-      uri_namespace_map.insert(&namespace.uri, namespace);
-    }
-
-    schemas.retain(|x| {
-      let schema_namespace = get_or_panic!(uri_namespace_map, x.target_namespace.as_str());
-
-      check_office_version(&schema_namespace.version)
-    });
-
     for schema in schemas.iter_mut() {
       schema.types.retain(|x| type_name_set.contains(&x.name));
     }
@@ -218,10 +205,12 @@ pub(crate) fn gen_type_name_set(
   if type_name_set.insert(type_name.to_string()) {
     let ty = type_name_type_map.get(type_name).unwrap();
 
-    if check_office_version(&ty.version) {
-      for type_child in ty.children.iter() {
-        gen_type_name_set(type_name_set, &type_child.name, type_name_type_map)
-      }
+    if ty.is_derived {
+      type_name_set.insert(type_name[00..type_name.find('/').unwrap() + 1].to_string());
+    }
+
+    for type_child in ty.children.iter() {
+      gen_type_name_set(type_name_set, &type_child.name, type_name_type_map)
     }
   }
 }

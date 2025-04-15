@@ -4,14 +4,13 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{parse2, parse_str, Ident, ItemEnum, Type, Variant};
 
-use crate::gen::context::check_office_version;
+use crate::gen::context::{check_office_version, GenContext, GenContextNeo};
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
   OpenXmlSchemaTypeChild,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case, get_or_panic};
-use crate::{GenContext, GenContextNeo};
 
 pub fn gen_open_xml_schemas_neo(
   schema: &OpenXmlSchema,

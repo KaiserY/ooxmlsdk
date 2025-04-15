@@ -79,10 +79,22 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
   write_serializers(&gen_context, out_dir_path);
 
   #[cfg(feature = "parts")]
-  write_parts(&gen_context, out_dir_path);
+  let with_parts = true;
+  #[cfg(not(feature = "parts"))]
+  let with_parts = false;
+
+  if with_parts {
+    write_parts(&gen_context, out_dir_path);
+  }
 
   #[cfg(feature = "validators")]
-  write_validators(&gen_context, out_dir_path);
+  let with_validators = true;
+  #[cfg(not(feature = "validators"))]
+  let with_validators = false;
+
+  if with_validators {
+    write_validators(&gen_context, out_dir_path);
+  }
 }
 
 pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
@@ -174,14 +186,23 @@ pub(crate) fn write_deserializers(gen_context: &GenContextNeo, out_dir_path: &Pa
 
   let mut deserializers_mod_use_list: Vec<ItemMod> = vec![];
 
-  for part in gen_context.schemas.iter() {
-    let token_stream = gen_deserializers_neo(part, gen_context);
+  for schema in gen_context.schemas.iter() {
+    let schema_namespace = get_or_panic!(
+      gen_context.uri_namespace_map,
+      schema.target_namespace.as_str()
+    );
+
+    if !check_office_version(&schema_namespace.version) {
+      continue;
+    }
+
+    let token_stream = gen_deserializers_neo(schema, gen_context);
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
-    let part_path = out_deserializers_dir_path.join(format!("{}.rs", &part.module_name));
+    let part_path = out_deserializers_dir_path.join(format!("{}.rs", &schema.module_name));
     fs::write(part_path, formatted).unwrap();
 
-    let deserializer_mod_ident: Ident = parse_str(&part.module_name).unwrap();
+    let deserializer_mod_ident: Ident = parse_str(&schema.module_name).unwrap();
     let deserializer_mod_use: ItemMod = parse_str(
       &quote! {
         pub mod #deserializer_mod_ident;
@@ -208,14 +229,23 @@ pub(crate) fn write_serializers(gen_context: &GenContextNeo, out_dir_path: &Path
 
   let mut serializers_mod_use_list: Vec<ItemMod> = vec![];
 
-  for part in gen_context.schemas.iter() {
-    let token_stream = gen_serializer_neo(part, gen_context);
+  for schema in gen_context.schemas.iter() {
+    let schema_namespace = get_or_panic!(
+      gen_context.uri_namespace_map,
+      schema.target_namespace.as_str()
+    );
+
+    if !check_office_version(&schema_namespace.version) {
+      continue;
+    }
+
+    let token_stream = gen_serializer_neo(schema, gen_context);
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
-    let part_path = out_serializers_dir_path.join(format!("{}.rs", &part.module_name));
+    let part_path = out_serializers_dir_path.join(format!("{}.rs", &schema.module_name));
     fs::write(part_path, formatted).unwrap();
 
-    let serializer_mod_ident: Ident = parse_str(&part.module_name).unwrap();
+    let serializer_mod_ident: Ident = parse_str(&schema.module_name).unwrap();
     let serializer_mod_use: ItemMod = parse_str(
       &quote! {
         pub mod #serializer_mod_ident;

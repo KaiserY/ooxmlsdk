@@ -39,12 +39,10 @@ impl Types {
   pub(crate) fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,
-    empty_tag: bool,
+    mut empty_tag: bool,
     xml_event: Option<quick_xml::events::BytesStart<'de>>,
   ) -> Result<Self, super::super::common::SdkError> {
     let mut with_xmlns = with_xmlns;
-    let mut empty_tag = empty_tag;
-
     let mut xmlns = None;
     let mut xmlns_map = std::collections::HashMap::<String, String>::new();
     let mut mc_ignorable = None;
@@ -83,18 +81,19 @@ impl Types {
 
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
+
       match attr.key.as_ref() {
         b"xmlns" => {
-          xmlns = Some(attr.unescape_value()?.to_string());
+          xmlns = Some(attr.unescape_value()?.into_owned());
         }
         b"mc:Ignorable" => {
-          mc_ignorable = Some(attr.unescape_value()?.to_string());
+          mc_ignorable = Some(attr.unescape_value()?.into_owned());
         }
         key => {
           if key.starts_with(b"xmlns:") {
             xmlns_map.insert(
               String::from_utf8_lossy(&key[6..]).to_string(),
-              attr.unescape_value()?.to_string(),
+              attr.unescape_value()?.into_owned(),
             );
 
             if key == b"xmlns:w" {
@@ -322,12 +321,13 @@ impl Default {
 
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
+
       match attr.key.as_ref() {
         b"Extension" => {
-          extension = Some(attr.unescape_value()?.to_string());
+          extension = Some(attr.unescape_value()?.into_owned());
         }
         b"ContentType" => {
-          content_type = Some(attr.unescape_value()?.to_string());
+          content_type = Some(attr.unescape_value()?.into_owned());
         }
         _ => {}
       }
@@ -476,14 +476,12 @@ impl Override {
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
 
-      let value = attr.unescape_value()?.into_owned();
-
       match attr.key.as_ref() {
         b"ContentType" => {
-          content_type = Some(value);
+          content_type = Some(attr.unescape_value()?.into_owned());
         }
         b"PartName" => {
-          part_name = Some(value);
+          part_name = Some(attr.unescape_value()?.into_owned());
         }
         _ => {}
       }

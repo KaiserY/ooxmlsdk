@@ -54,9 +54,7 @@ impl Types {
     };
 
     let mut xmlns = None;
-
     let mut xmlns_map = std::collections::HashMap::<String, String>::new();
-
     let mut mc_ignorable = None;
 
     let mut children = vec![];
@@ -99,19 +97,18 @@ impl Types {
 
     if !empty_tag {
       loop {
-        let peek_event = xml_reader.peek()?;
-        match peek_event {
+        match xml_reader.next()? {
           quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
             if with_xmlns {
               match e.name().as_ref() {
                 b"w:Default" => {
                   children.push(TypesChildChoice::Default(std::boxed::Box::new(
-                    Default::deserialize_with_xmlns(xml_reader, with_xmlns)?,
+                    Default::deserialize_with_xmlns(xml_reader, with_xmlns, Some(e))?,
                   )));
                 }
                 b"w:Override" => {
                   children.push(TypesChildChoice::Override(std::boxed::Box::new(
-                    Override::deserialize_with_xmlns(xml_reader, with_xmlns)?,
+                    Override::deserialize_with_xmlns(xml_reader, with_xmlns, Some(e))?,
                   )));
                 }
                 _ => Err(super::super::common::SdkError::CommonError(
@@ -122,12 +119,12 @@ impl Types {
               match e.name().as_ref() {
                 b"Default" => {
                   children.push(TypesChildChoice::Default(std::boxed::Box::new(
-                    Default::deserialize_with_xmlns(xml_reader, with_xmlns)?,
+                    Default::deserialize_with_xmlns(xml_reader, with_xmlns, Some(e))?,
                   )));
                 }
                 b"Override" => {
                   children.push(TypesChildChoice::Override(std::boxed::Box::new(
-                    Override::deserialize_with_xmlns(xml_reader, with_xmlns)?,
+                    Override::deserialize_with_xmlns(xml_reader, with_xmlns, Some(e))?,
                   )));
                 }
                 _ => Err(super::super::common::SdkError::CommonError(
@@ -137,16 +134,16 @@ impl Types {
             }
           }
           quick_xml::events::Event::End(e) => {
-            if (with_xmlns && e.name().as_ref() == b"w:Types") || e.name().as_ref() == b"Types" {
+            if with_xmlns {
+              if e.name().as_ref() == b"w:Types" {
+                break;
+              }
+            } else if e.name().as_ref() == b"Types" {
               break;
-            } else {
-              xml_reader.next()?;
             }
           }
           quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => {
-            xml_reader.next()?;
-          }
+          _ => (),
         }
       }
     }
@@ -239,73 +236,86 @@ pub struct Default {
   pub content_type: String,
 }
 
-impl Default {
-  #[allow(clippy::should_implement_trait)]
-  pub fn from_str(s: &str) -> Result<Self, super::super::common::SdkError> {
+impl std::str::FromStr for Default {
+  type Err = super::super::common::SdkError;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_with_xmlns(&mut xml_reader, false)
+    Self::deserialize_with_xmlns(&mut xml_reader, false, None)
   }
+}
 
+impl Default {
   pub fn from_reader<R: std::io::BufRead>(
     reader: R,
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_with_xmlns(&mut xml_reader, false)
+    Self::deserialize_with_xmlns(&mut xml_reader, false, None)
   }
 
   #[inline(always)]
   pub fn deserialize_with_xmlns<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    mut with_xmlns: bool,
+    with_xmlns: bool,
+    xml_event: Option<quick_xml::events::BytesStart<'de>>,
   ) -> Result<Self, super::super::common::SdkError> {
-    if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
-      let mut extension = None;
+    let mut extension = None;
+    let mut content_type = None;
 
-      let mut content_type = None;
+    let e = if let Some(e) = xml_event {
+      e
+    } else {
+      match xml_reader.next()? {
+        quick_xml::events::Event::Empty(e) | quick_xml::events::Event::Start(e) => {
+          if with_xmlns {
+            if e.name().as_ref() != b"w:Default" {
+              Err(super::super::common::SdkError::MismatchError {
+                expected: "w:Default".to_string(),
+                found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+              })?;
+            }
+          } else if e.name().as_ref() != b"Default" {
+            Err(super::super::common::SdkError::MismatchError {
+              expected: "Default".to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
+          }
 
-      for attr in e.attributes().with_checks(false) {
-        let attr = attr?;
-        match attr.key.as_ref() {
-          b"Extension" => {
-            extension = Some(attr.unescape_value()?.to_string());
-          }
-          b"ContentType" => {
-            content_type = Some(attr.unescape_value()?.to_string());
-          }
-          b"xmlns:w" => with_xmlns = true,
-          _ => {}
+          e
+        }
+        _ => {
+          return Err(super::super::common::SdkError::CommonError(
+            "Default".into(),
+          ))
         }
       }
+    };
 
-      if with_xmlns && e.name().as_ref() != b"w:Default" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Default".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      } else if e.name().as_ref() != b"Default" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "Default".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
+    for attr in e.attributes().with_checks(false) {
+      let attr = attr?;
+      match attr.key.as_ref() {
+        b"Extension" => {
+          extension = Some(attr.unescape_value()?.to_string());
+        }
+        b"ContentType" => {
+          content_type = Some(attr.unescape_value()?.to_string());
+        }
+        _ => {}
       }
-
-      let extension = extension
-        .ok_or_else(|| super::super::common::SdkError::CommonError("extension".to_string()))?;
-
-      let content_type = content_type
-        .ok_or_else(|| super::super::common::SdkError::CommonError("content_type".to_string()))?;
-
-      Ok(Self {
-        extension,
-        content_type,
-      })
-    } else {
-      Err(super::super::common::SdkError::CommonError(
-        "Default".to_string(),
-      ))?
     }
+
+    let extension = extension
+      .ok_or_else(|| super::super::common::SdkError::CommonError("extension".to_string()))?;
+
+    let content_type = content_type
+      .ok_or_else(|| super::super::common::SdkError::CommonError("content_type".to_string()))?;
+
+    Ok(Self {
+      extension,
+      content_type,
+    })
   }
 }
 
@@ -361,7 +371,7 @@ impl std::str::FromStr for Override {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_with_xmlns(&mut xml_reader, false)
+    Self::deserialize_with_xmlns(&mut xml_reader, false, None)
   }
 }
 
@@ -371,25 +381,46 @@ impl Override {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_with_xmlns(&mut xml_reader, false)
+    Self::deserialize_with_xmlns(&mut xml_reader, false, None)
   }
 
   #[inline(always)]
   pub fn deserialize_with_xmlns<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    mut with_xmlns: bool,
+    with_xmlns: bool,
+    xml_event: Option<quick_xml::events::BytesStart<'de>>,
   ) -> Result<Self, super::super::common::SdkError> {
-    let e = match xml_reader.next()? {
-      quick_xml::events::Event::Empty(e) => e,
-      _ => {
-        return Err(super::super::common::SdkError::CommonError(
-          "Override".into(),
-        ))
-      }
-    };
-
     let mut content_type = None;
     let mut part_name = None;
+
+    let e = if let Some(e) = xml_event {
+      e
+    } else {
+      match xml_reader.next()? {
+        quick_xml::events::Event::Empty(e) => {
+          if with_xmlns {
+            if e.name().as_ref() != b"w:Override" {
+              Err(super::super::common::SdkError::MismatchError {
+                expected: "w:Override".to_string(),
+                found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+              })?;
+            }
+          } else if e.name().as_ref() != b"Override" {
+            Err(super::super::common::SdkError::MismatchError {
+              expected: "Override".to_string(),
+              found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+            })?;
+          }
+
+          e
+        }
+        _ => {
+          return Err(super::super::common::SdkError::CommonError(
+            "Override".into(),
+          ))
+        }
+      }
+    };
 
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
@@ -403,23 +434,8 @@ impl Override {
         b"PartName" => {
           part_name = Some(value);
         }
-        b"xmlns:w" => with_xmlns = true,
         _ => {}
       }
-    }
-
-    if with_xmlns {
-      if e.name().as_ref() != b"w:Override" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Override".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-    } else if e.name().as_ref() != b"Override" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "Override".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
     }
 
     let content_type = content_type

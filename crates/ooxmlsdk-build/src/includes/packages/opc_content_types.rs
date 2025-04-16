@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 #[derive(Clone, Default)]
 pub struct Types {
   pub xmlns: Option<String>,
@@ -518,7 +516,7 @@ impl Override {
   }
 }
 
-impl Display for Override {
+impl std::fmt::Display for Override {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "<Override")?;
 

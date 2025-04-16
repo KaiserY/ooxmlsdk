@@ -215,25 +215,36 @@ fn gen_attr_neo(
   let type_ident: Type = if attr.r#type.starts_with("ListValue<") {
     parse_str("String").unwrap()
   } else if attr.r#type.starts_with("EnumValue<") {
-    let typed_namespace_str =
+    let e_typed_namespace_str =
       &attr.r#type[attr.r#type.find("<").unwrap() + 1..attr.r#type.rfind(".").unwrap()];
 
     let enum_name = &attr.r#type[attr.r#type.rfind(".").unwrap() + 1..attr.r#type.len() - 1];
 
-    let typed_namespace = get_or_panic!(
-      gen_context.namespace_typed_namespace_map,
-      typed_namespace_str
-    );
+    let mut e_prefix = "";
 
-    if typed_namespace.prefix != schema_namespace.prefix {
-      let enum_schema = get_or_panic!(
-        gen_context.prefix_schema_map,
-        typed_namespace.prefix.as_str()
-      );
+    for typed_namespace in &gen_context.typed_namespaces {
+      if e_typed_namespace_str == typed_namespace.namespace {
+        let e_schema = get_or_panic!(
+          gen_context.prefix_schema_map,
+          typed_namespace.prefix.as_str()
+        );
+
+        for e in &e_schema.enums {
+          if e.name == enum_name {
+            e_prefix = &typed_namespace.prefix;
+          }
+        }
+      }
+    }
+
+    let e_namespace = get_or_panic!(gen_context.prefix_namespace_map, e_prefix);
+
+    if e_namespace.prefix != schema_namespace.prefix {
+      let e_schema = get_or_panic!(gen_context.prefix_schema_map, e_namespace.prefix.as_str());
 
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &enum_schema.module_name,
+        e_schema.module_name,
         enum_name.to_upper_camel_case()
       ))
       .unwrap()

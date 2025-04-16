@@ -566,7 +566,7 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
 
     let deserialize_inner_fn: ItemFn = parse2(quote! {
       #[inline(always)]
-      pub fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
+      pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
         with_xmlns: bool,
         mut empty_tag: bool,
@@ -913,24 +913,35 @@ fn gen_field_match_arm_neo(attr: &OpenXmlSchemaTypeAttribute, gen_context: &GenC
       }
     }
   } else if attr.r#type.starts_with("EnumValue<") {
-    let typed_namespace_str =
+    let e_typed_namespace_str =
       &attr.r#type[attr.r#type.find("<").unwrap() + 1..attr.r#type.rfind(".").unwrap()];
 
     let enum_name = &attr.r#type[attr.r#type.rfind(".").unwrap() + 1..attr.r#type.len() - 1];
 
-    let typed_namespace = get_or_panic!(
-      gen_context.namespace_typed_namespace_map,
-      typed_namespace_str
-    );
+    let mut e_prefix = "";
 
-    let enum_schema = get_or_panic!(
-      gen_context.prefix_schema_map,
-      typed_namespace.prefix.as_str()
-    );
+    for typed_namespace in &gen_context.typed_namespaces {
+      if e_typed_namespace_str == typed_namespace.namespace {
+        let e_schema = get_or_panic!(
+          gen_context.prefix_schema_map,
+          typed_namespace.prefix.as_str()
+        );
+
+        for e in &e_schema.enums {
+          if e.name == enum_name {
+            e_prefix = &typed_namespace.prefix;
+          }
+        }
+      }
+    }
+
+    let e_namespace = get_or_panic!(gen_context.prefix_namespace_map, e_prefix);
+
+    let e_schema = get_or_panic!(gen_context.prefix_schema_map, e_namespace.prefix.as_str());
 
     let e_type: Type = parse_str(&format!(
       "crate::schemas::{}::{}",
-      &enum_schema.module_name,
+      e_schema.module_name,
       enum_name.to_upper_camel_case()
     ))
     .unwrap();

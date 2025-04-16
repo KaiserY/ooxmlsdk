@@ -4,7 +4,7 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type};
 
-use crate::gen::context::{check_office_version, GenContext, GenContextNeo};
+use crate::gen::context::{GenContext, GenContextNeo};
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
@@ -20,10 +20,6 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
   );
 
   for e in &schema.enums {
-    if !check_office_version(&e.version) {
-      continue;
-    }
-
     let enum_type: Type = parse_str(&format!(
       "crate::schemas::{}::{}",
       &schema.module_name,
@@ -34,10 +30,6 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
     let mut variants: Vec<Arm> = vec![];
 
     for facet in &e.facets {
-      if !check_office_version(&facet.version) {
-        continue;
-      }
-
       let variant_rename = &facet.value;
 
       let variant_ident: Ident = if facet.name.is_empty() {
@@ -74,10 +66,6 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
   let from_reader_fn = gen_from_reader_fn_neo();
 
   for t in &schema.types {
-    if !check_office_version(&t.version) {
-      continue;
-    }
-
     if t.is_abstract {
       continue;
     }
@@ -117,15 +105,13 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
     let mut loop_match_arm_list: Vec<Arm> = vec![];
 
     let mut loop_children_match_list: Vec<Arm> = vec![];
-    let mut loop_children_suffix_match_list: Vec<Arm> = vec![];
+    let mut loop_children_suffix_match_map: HashMap<String, Arm> = HashMap::new();
 
     let mut attributes: Vec<&OpenXmlSchemaTypeAttribute> = vec![];
 
     if t.base_class == "OpenXmlLeafTextElement" {
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          attributes.push(attr);
-        }
+        attributes.push(attr);
       }
 
       field_declaration_list.push(
@@ -145,9 +131,7 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
       loop_match_arm_list.push(gen_simple_child_match_arm_neo(first_name, gen_context));
     } else if t.base_class == "OpenXmlLeafElement" {
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          attributes.push(attr);
-        }
+        attributes.push(attr);
       }
     } else if t.base_class == "OpenXmlCompositeElement"
       || t.base_class == "CustomXmlElement"
@@ -193,9 +177,7 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
       }
 
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          attributes.push(attr);
-        }
+        attributes.push(attr);
       }
 
       let child_choice_enum_type: Type = parse_str(&format!(
@@ -214,12 +196,6 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
       if t.is_one_sequence_flatten() {
         for p in &t.particle.items {
           let child = get_or_panic!(child_map, p.name.as_str());
-
-          let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
-
-          if !check_office_version(&child_type.version) {
-            continue;
-          }
 
           let child_name_str = if child.property_name.is_empty() {
             &child.name[child.name.find('/').unwrap() + 1..child.name.len()]
@@ -263,9 +239,10 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
 
           field_ident_list.push(child_name_ident);
 
-          let (suffix_match_arm, match_arm) = gen_one_sequence_match_arm_neo(p, child, gen_context);
+          let (suffix_match_name, suffix_match_arm, _, match_arm) =
+            gen_one_sequence_match_arm_neo(p, child, gen_context);
 
-          loop_children_suffix_match_list.push(suffix_match_arm);
+          loop_children_suffix_match_map.insert(suffix_match_name, suffix_match_arm);
           loop_children_match_list.push(match_arm);
         }
       } else {
@@ -286,16 +263,10 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
         }
 
         for child in &t.children {
-          let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
-
-          if !check_office_version(&child_type.version) {
-            continue;
-          }
-
-          let (suffix_match_arm, match_arm) =
+          let (suffix_match_name, suffix_match_arm, _, match_arm) =
             gen_child_match_arm_neo(child, &child_choice_enum_type, gen_context);
 
-          loop_children_suffix_match_list.push(suffix_match_arm);
+          loop_children_suffix_match_map.insert(suffix_match_name, suffix_match_arm);
           loop_children_match_list.push(match_arm);
         }
       }
@@ -306,15 +277,11 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
       );
 
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          attributes.push(attr);
-        }
+        attributes.push(attr);
       }
 
       for attr in &base_class_type.attributes {
-        if check_office_version(&attr.version) {
-          attributes.push(attr);
-        }
+        attributes.push(attr);
       }
 
       let mut child_map: HashMap<&str, &OpenXmlSchemaTypeChild> = HashMap::new();
@@ -325,20 +292,10 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
 
       if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
         for p in &t.particle.items {
-          let child = child_map
-            .get(p.name.as_str())
-            .ok_or(format!("{:?}", p.name))
-            .unwrap();
-
-          let child_name_list: Vec<&str> = child.name.split('/').collect();
-
-          let child_rename_ser_str = child_name_list
-            .last()
-            .ok_or(format!("{:?}", child.name))
-            .unwrap();
+          let child = get_or_panic!(child_map, p.name.as_str());
 
           let child_name_str = if child.property_name.is_empty() {
-            child_rename_ser_str
+            &child.name[child.name.find('/').unwrap() + 1..child.name.len()]
           } else {
             child.property_name.as_str()
           };
@@ -420,29 +377,18 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
         for p in &t.particle.items {
           let child = get_or_panic!(child_map, p.name.as_str());
 
-          let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
+          let (suffix_match_name, suffix_match_arm, _, match_arm) =
+            gen_one_sequence_match_arm_neo(p, child, gen_context);
 
-          if !check_office_version(&child_type.version) {
-            continue;
-          }
-
-          let (suffix_match_arm, match_arm) = gen_one_sequence_match_arm_neo(p, child, gen_context);
-
-          loop_children_suffix_match_list.push(suffix_match_arm);
+          loop_children_suffix_match_map.insert(suffix_match_name, suffix_match_arm);
           loop_children_match_list.push(match_arm);
         }
       } else {
         for child in &t.children {
-          let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
-
-          if !check_office_version(&child_type.version) {
-            continue;
-          }
-
-          let (suffix_match_arm, match_arm) =
+          let (suffix_match_name, suffix_match_arm, _, match_arm) =
             gen_child_match_arm_neo(child, &child_choice_enum_type, gen_context);
 
-          loop_children_suffix_match_list.push(suffix_match_arm);
+          loop_children_suffix_match_map.insert(suffix_match_name, suffix_match_arm);
           loop_children_match_list.push(match_arm);
         }
       }
@@ -542,6 +488,7 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
 
+            #[allow(clippy::single_match)]
             match attr.key.as_ref() {
               #( #attr_match_list )*
               _ => {}
@@ -556,7 +503,7 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
       None
     };
 
-    if !loop_children_match_list.is_empty() || !loop_children_suffix_match_list.is_empty() {
+    if !loop_children_match_list.is_empty() || !loop_children_suffix_match_map.is_empty() {
       loop_declaration_list.push(
         parse2(quote! {
           let mut e_opt = None;
@@ -589,6 +536,9 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
         })
         .unwrap(),
       );
+
+      let loop_children_suffix_match_list: Vec<Arm> =
+        loop_children_suffix_match_map.into_values().collect();
 
       loop_children_stmt_opt = Some(
         parse2(quote! {
@@ -739,7 +689,7 @@ fn gen_one_sequence_match_arm_neo(
   p: &OpenXmlSchemaTypeParticle,
   child: &OpenXmlSchemaTypeChild,
   gen_context: &GenContextNeo,
-) -> (Arm, Arm) {
+) -> (String, Arm, String, Arm) {
   let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
   let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
@@ -813,14 +763,19 @@ fn gen_one_sequence_match_arm_neo(
     .unwrap()
   };
 
-  (suffix_match_arm, match_arm)
+  (
+    child_suffix_last_name.to_string(),
+    suffix_match_arm,
+    child_last_name.to_string(),
+    match_arm,
+  )
 }
 
 fn gen_child_match_arm_neo(
   child: &OpenXmlSchemaTypeChild,
   child_choice_enum_ident: &Type,
   gen_context: &GenContextNeo,
-) -> (Arm, Arm) {
+) -> (String, Arm, String, Arm) {
   let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
   let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
@@ -867,7 +822,12 @@ fn gen_child_match_arm_neo(
   })
   .unwrap();
 
-  (suffix_match_arm, match_arm)
+  (
+    child_suffix_last_name.to_string(),
+    suffix_match_arm,
+    child_last_name.to_string(),
+    match_arm,
+  )
 }
 
 fn gen_simple_child_match_arm_neo(first_name: &str, gen_context: &GenContextNeo) -> Arm {

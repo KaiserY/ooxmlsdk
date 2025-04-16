@@ -4,7 +4,7 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{parse2, parse_str, Ident, ItemEnum, Type, Variant};
 
-use crate::gen::context::{check_office_version, GenContext, GenContextNeo};
+use crate::gen::context::{GenContext, GenContextNeo};
 use crate::gen::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
@@ -24,19 +24,11 @@ pub fn gen_open_xml_schemas_neo(
   );
 
   for e in &schema.enums {
-    if !check_office_version(&e.version) {
-      continue;
-    }
-
     let e_enum_name_ident: Ident = parse_str(&e.name.to_upper_camel_case()).unwrap();
 
     let mut variants: Vec<Variant> = vec![];
 
     for (i, facet) in e.facets.iter().enumerate() {
-      if !check_office_version(&facet.version) {
-        continue;
-      }
-
       let variant_ident: Ident = if facet.name.is_empty() {
         parse_str(&escape_upper_camel_case(facet.value.to_upper_camel_case())).unwrap()
       } else {
@@ -70,19 +62,13 @@ pub fn gen_open_xml_schemas_neo(
   }
 
   for t in &schema.types {
-    if !check_office_version(&t.version) {
-      continue;
-    }
-
     let mut fields: Vec<TokenStream> = vec![];
 
     let mut child_choice_enum_option: Option<ItemEnum> = None;
 
     if t.base_class == "OpenXmlLeafTextElement" {
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
-        }
+        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
       }
 
       let simple_type_name = gen_xml_content_type_neo(t, schema_namespace, gen_context);
@@ -92,9 +78,7 @@ pub fn gen_open_xml_schemas_neo(
       });
     } else if t.base_class == "OpenXmlLeafElement" {
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
-        }
+        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
       }
     } else if t.base_class == "OpenXmlCompositeElement"
       || t.base_class == "CustomXmlElement"
@@ -120,9 +104,7 @@ pub fn gen_open_xml_schemas_neo(
       }
 
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
-        }
+        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
       }
 
       if t.is_one_sequence_flatten() {
@@ -146,15 +128,11 @@ pub fn gen_open_xml_schemas_neo(
       );
 
       for attr in &t.attributes {
-        if check_office_version(&attr.version) {
-          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
-        }
+        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
       }
 
       for attr in &base_class_type.attributes {
-        if check_office_version(&attr.version) {
-          fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
-        }
+        fields.push(gen_attr_neo(attr, schema_namespace, gen_context));
       }
 
       if t.is_one_sequence_flatten() && base_class_type.composite_type == "OneSequence" {
@@ -326,10 +304,6 @@ fn gen_children_neo(
   for child in children {
     let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
-    if !check_office_version(&child_type.version) {
-      continue;
-    }
-
     let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
 
     let child_last_name = &child.name[child.name.find('/').unwrap() + 1..child.name.len()];
@@ -421,11 +395,7 @@ fn gen_one_sequence_fields_neo(
   for p in &t.particle.items {
     let child = get_or_panic!(child_map, p.name.as_str());
 
-    let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
-
-    if !check_office_version(&child_type.version) {
-      continue;
-    }
+    let child_type = get_or_panic!(gen_context.type_name_type_map, p.name.as_str());
 
     let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
 

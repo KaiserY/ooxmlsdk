@@ -46,9 +46,6 @@ path-clean = { workspace = true }
 criterion = { workspace = true }
 pprof = { workspace = true }
 
-[profile.bench]
-debug = true
-
 [[bench]]
 name = "serde_bench"
 harness = false

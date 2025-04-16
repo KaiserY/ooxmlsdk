@@ -7,7 +7,7 @@ use std::fs::File;
 use std::{fs, path::Path};
 use syn::{parse_str, Ident, ItemMod};
 
-use crate::gen::context::{check_office_version, GenContext, GenContextNeo};
+use crate::gen::context::{GenContext, GenContextNeo};
 use crate::gen::deserializer::{gen_deserializer, gen_deserializers_neo};
 use crate::gen::open_xml_part::{gen_open_xml_part, gen_open_xml_parts_neo};
 use crate::gen::open_xml_schema::{gen_open_xml_schema, gen_open_xml_schemas_neo};
@@ -16,7 +16,6 @@ use crate::gen::validator::{gen_validator, gen_validators_neo};
 use crate::models::{
   OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, TypedNamespace,
 };
-use crate::utils::get_or_panic;
 
 pub mod gen;
 pub mod includes;
@@ -107,15 +106,6 @@ pub(crate) fn write_schemas(gen_context: &GenContextNeo, out_dir_path: &Path) {
   let mut schemas_mod_use_list: Vec<ItemMod> = vec![];
 
   for schema in gen_context.schemas.iter() {
-    let schema_namespace = get_or_panic!(
-      gen_context.uri_namespace_map,
-      schema.target_namespace.as_str()
-    );
-
-    if !check_office_version(&schema_namespace.version) {
-      continue;
-    }
-
     let token_stream = gen_open_xml_schemas_neo(schema, gen_context);
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
@@ -187,15 +177,6 @@ pub(crate) fn write_deserializers(gen_context: &GenContextNeo, out_dir_path: &Pa
   let mut deserializers_mod_use_list: Vec<ItemMod> = vec![];
 
   for schema in gen_context.schemas.iter() {
-    let schema_namespace = get_or_panic!(
-      gen_context.uri_namespace_map,
-      schema.target_namespace.as_str()
-    );
-
-    if !check_office_version(&schema_namespace.version) {
-      continue;
-    }
-
     let token_stream = gen_deserializers_neo(schema, gen_context);
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
@@ -230,15 +211,6 @@ pub(crate) fn write_serializers(gen_context: &GenContextNeo, out_dir_path: &Path
   let mut serializers_mod_use_list: Vec<ItemMod> = vec![];
 
   for schema in gen_context.schemas.iter() {
-    let schema_namespace = get_or_panic!(
-      gen_context.uri_namespace_map,
-      schema.target_namespace.as_str()
-    );
-
-    if !check_office_version(&schema_namespace.version) {
-      continue;
-    }
-
     let token_stream = gen_serializer_neo(schema, gen_context);
     let syntax_tree = syn::parse2(token_stream).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);

@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::models::{
   OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaEnum, OpenXmlSchemaType,
-  TypedNamespace, TypedSchema,
+  OpenXmlSchemaTypeParticle, TypedNamespace, TypedSchema,
 };
 use crate::utils::get_or_panic;
 
@@ -182,9 +182,49 @@ impl<'a> GenContextNeo<'a> {
       }
     }
 
-    for schema in schemas.iter_mut() {
-      schema.types.retain(|x| type_name_set.contains(&x.name));
+    let mut uri_namespace_version_map: HashMap<&str, &str> = HashMap::new();
+    let mut type_name_version_map: HashMap<String, String> = HashMap::new();
+
+    for namespace in namespaces.iter() {
+      uri_namespace_version_map.insert(&namespace.uri, &namespace.version);
     }
+
+    for schema in schemas.iter() {
+      for ty in schema.types.iter() {
+        type_name_version_map.insert(ty.name.clone(), ty.version.clone());
+      }
+    }
+
+    for schema in schemas.iter_mut() {
+      for e in schema.enums.iter_mut() {
+        e.facets.retain(|x| check_office_version(&x.version));
+      }
+
+      schema.enums.retain(|x| check_office_version(&x.version));
+
+      for ty in schema.types.iter_mut() {
+        ty.attributes.retain(|x| check_office_version(&x.version));
+
+        ty.children.retain(|x| {
+          let child_type_version = get_or_panic!(type_name_version_map, x.name.as_str());
+
+          check_office_version(child_type_version)
+        });
+
+        check_particle_version(&mut ty.particle);
+      }
+
+      schema
+        .types
+        .retain(|x: &OpenXmlSchemaType| check_office_version(&x.version));
+    }
+
+    schemas.retain(|x| {
+      let schema_namespace_version =
+        get_or_panic!(uri_namespace_version_map, x.target_namespace.as_str());
+
+      check_office_version(schema_namespace_version)
+    });
 
     Self {
       parts,
@@ -193,6 +233,18 @@ impl<'a> GenContextNeo<'a> {
       typed_schemas,
       typed_namespaces,
       ..Default::default()
+    }
+  }
+}
+
+pub(crate) fn check_particle_version(particle: &mut OpenXmlSchemaTypeParticle) {
+  particle
+    .items
+    .retain(|x| check_office_version(&x.initial_version));
+
+  for item in particle.items.iter_mut() {
+    if !item.kind.is_empty() {
+      check_particle_version(item);
     }
   }
 }

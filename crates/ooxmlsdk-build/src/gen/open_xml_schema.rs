@@ -54,7 +54,7 @@ pub fn gen_open_xml_schemas_neo(
     }
 
     token_stream_list.push(quote! {
-      #[derive(Clone, Default)]
+      #[derive(Clone, Debug, Default)]
       pub enum #e_enum_name_ident {
         #( #variants, )*
       }
@@ -187,7 +187,7 @@ pub fn gen_open_xml_schemas_neo(
       #[doc = #summary_doc]
       #[doc = #version_doc]
       #[doc = #qualified_doc]
-      #[derive(Clone, Default)]
+      #[derive(Clone, Debug, Default)]
       pub struct #struct_name_ident {
         #( #fields )*
       }
@@ -345,7 +345,7 @@ fn gen_children_neo(
 
   let enum_option = Some(
     parse2(quote! {
-      #[derive(Clone)]
+      #[derive(Clone, Debug)]
       pub enum #child_choice_enum_ident {
         #( #variants )*
       }

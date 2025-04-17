@@ -1,4 +1,4 @@
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Types {
   pub xmlns: Option<String>,
   pub xmlns_map: std::collections::HashMap<String, String>,
@@ -6,7 +6,7 @@ pub struct Types {
   pub children: Vec<TypesChildChoice>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub enum TypesChildChoice {
   Default(std::boxed::Box<Default>),
   Override(std::boxed::Box<Override>),
@@ -176,8 +176,7 @@ impl Types {
 }
 
 impl Types {
-  #[allow(clippy::inherent_to_string)]
-  pub fn to_string(&self) -> Result<String, super::super::common::SdkError> {
+  pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
     self.to_string_inner(if let Some(xmlns) = &self.xmlns {
       xmlns != "http://schemas.openxmlformats.org/package/2006/content-types"
     } else {
@@ -185,10 +184,7 @@ impl Types {
     })
   }
 
-  pub fn to_string_inner(
-    &self,
-    with_xmlns: bool,
-  ) -> Result<String, super::super::common::SdkError> {
+  pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
     let mut writer = String::new();
@@ -248,7 +244,7 @@ impl Types {
   }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Default {
   pub extension: String,
   pub content_type: String,
@@ -363,15 +359,11 @@ impl Default {
 }
 
 impl Default {
-  #[allow(clippy::inherent_to_string)]
-  pub fn to_string(&self) -> Result<String, super::super::common::SdkError> {
+  pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
     self.to_string_with_xmlns(false)
   }
 
-  pub fn to_string_with_xmlns(
-    &self,
-    with_xmlns: bool,
-  ) -> Result<String, super::super::common::SdkError> {
+  pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
     let mut writer = String::new();
@@ -402,7 +394,7 @@ impl Default {
   }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Override {
   pub content_type: String,
   pub part_name: String,
@@ -523,6 +515,10 @@ impl std::fmt::Display for Override {
 }
 
 impl Override {
+  pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
+    self.to_string_with_xmlns(false)
+  }
+
   pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 

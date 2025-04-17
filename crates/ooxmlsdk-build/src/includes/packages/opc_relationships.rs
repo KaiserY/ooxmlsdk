@@ -154,7 +154,7 @@ impl Relationships {
 
 impl Relationships {
   #[allow(clippy::inherent_to_string)]
-  pub fn to_string(&self) -> Result<String, super::super::common::SdkError> {
+  pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
     self.to_string_inner(if let Some(xmlns) = &self.xmlns {
       xmlns != "http://schemas.openxmlformats.org/package/2006/relationships"
     } else {
@@ -162,10 +162,7 @@ impl Relationships {
     })
   }
 
-  pub fn to_string_inner(
-    &self,
-    with_xmlns: bool,
-  ) -> Result<String, super::super::common::SdkError> {
+  pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
     let mut writer = String::new();
@@ -333,14 +330,11 @@ impl Relationship {
 
 impl Relationship {
   #[allow(clippy::inherent_to_string)]
-  pub fn to_string(&self) -> Result<String, super::super::common::SdkError> {
+  pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
     self.to_string_inner(false)
   }
 
-  pub fn to_string_inner(
-    &self,
-    with_xmlns: bool,
-  ) -> Result<String, super::super::common::SdkError> {
+  pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
     let mut writer = String::new();

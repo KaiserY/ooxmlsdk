@@ -130,6 +130,30 @@ impl<'a> GenContextNeo<'a> {
       part_name_version_map.insert(part.name.to_string(), part.version.to_string());
     }
 
+    let mut uri_namespace_version_map: HashMap<&str, &str> = HashMap::new();
+
+    for namespace in namespaces.iter() {
+      uri_namespace_version_map.insert(&namespace.uri, &namespace.version);
+    }
+
+    let mut type_name_version_map: HashMap<String, String> = HashMap::new();
+
+    for schema in schemas.iter() {
+      for ty in schema.types.iter() {
+        type_name_version_map.insert(ty.name.clone(), ty.version.clone());
+      }
+    }
+
+    let mut part_type_name_map: HashMap<&str, &str> = HashMap::new();
+
+    for typed_schema_list in typed_schemas.iter() {
+      for typed_schema in typed_schema_list.iter() {
+        if !typed_schema.part_class_name.is_empty() {
+          part_type_name_map.insert(&typed_schema.part_class_name, &typed_schema.name);
+        }
+      }
+    }
+
     let mut part_name_set: HashSet<String> = HashSet::new();
 
     gen_part_name_set(
@@ -154,7 +178,15 @@ impl<'a> GenContextNeo<'a> {
 
     parts.retain(|x| part_name_set.contains(&x.name));
 
-    parts.retain(|x| check_office_version(&x.version));
+    parts.retain(|x| {
+      if let Some(part_type_name) = part_type_name_map.get(x.name.as_str()) {
+        let type_version = get_or_panic!(type_name_version_map, *part_type_name);
+
+        check_office_version(&x.version) && check_office_version(type_version)
+      } else {
+        check_office_version(&x.version)
+      }
+    });
 
     for part in parts.iter_mut() {
       part.children.retain(|x| {
@@ -163,7 +195,13 @@ impl<'a> GenContextNeo<'a> {
         } else {
           let child_version = get_or_panic!(part_name_version_map, &x.name);
 
-          check_office_version(child_version)
+          if let Some(part_type_name) = part_type_name_map.get(x.name.as_str()) {
+            let type_version = get_or_panic!(type_name_version_map, *part_type_name);
+
+            check_office_version(child_version) && check_office_version(type_version)
+          } else {
+            check_office_version(child_version)
+          }
         }
       });
     }
@@ -175,16 +213,6 @@ impl<'a> GenContextNeo<'a> {
 
       for e in schema.enums.iter_mut() {
         e.module_name = schema.module_name.clone();
-      }
-    }
-
-    let mut part_type_name_map: HashMap<&str, &str> = HashMap::new();
-
-    for typed_schema_list in typed_schemas.iter() {
-      for typed_schema in typed_schema_list.iter() {
-        if !typed_schema.part_class_name.is_empty() {
-          part_type_name_map.insert(&typed_schema.part_class_name, &typed_schema.name);
-        }
       }
     }
 
@@ -203,19 +231,6 @@ impl<'a> GenContextNeo<'a> {
         let type_name = get_or_panic!(part_type_name_map, part.name.as_str());
 
         gen_type_name_set(&mut type_name_set, type_name, &type_name_type_map)
-      }
-    }
-
-    let mut uri_namespace_version_map: HashMap<&str, &str> = HashMap::new();
-    let mut type_name_version_map: HashMap<String, String> = HashMap::new();
-
-    for namespace in namespaces.iter() {
-      uri_namespace_version_map.insert(&namespace.uri, &namespace.version);
-    }
-
-    for schema in schemas.iter() {
-      for ty in schema.types.iter() {
-        type_name_version_map.insert(ty.name.clone(), ty.version.clone());
       }
     }
 

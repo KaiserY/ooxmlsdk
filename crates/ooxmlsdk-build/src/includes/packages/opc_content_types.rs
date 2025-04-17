@@ -518,29 +518,12 @@ impl Override {
 
 impl std::fmt::Display for Override {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "<Override")?;
-
-    write!(
-      f,
-      " ContentType=\"{}\"",
-      quick_xml::escape::escape(&self.content_type)
-    )?;
-
-    write!(
-      f,
-      " PartName=\"{}\"",
-      quick_xml::escape::escape(&self.part_name)
-    )?;
-
-    write!(f, "/>")
+    write!(f, "{}", self.to_string_with_xmlns(false)?)
   }
 }
 
 impl Override {
-  pub fn to_string_with_xmlns(
-    &self,
-    with_xmlns: bool,
-  ) -> Result<String, super::super::common::SdkError> {
+  pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
     let mut writer = String::new();

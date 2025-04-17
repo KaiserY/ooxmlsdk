@@ -180,7 +180,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
           if p.occurs.is_empty() {
             child_stmt_list.push(
               parse2(quote! {
-                writer.write_str(&self.#child_name_ident.to_string_inner(xmlns_prefix)?)?;
+                writer.write_str(&self.#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
               })
               .unwrap(),
             );
@@ -188,7 +188,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
             child_stmt_list.push(
               parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_string_inner(xmlns_prefix)?)?;
+                  writer.write_str(&#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -197,7 +197,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_string_inner(xmlns_prefix)?)?;
+                  writer.write_str(&child.to_xml_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -276,8 +276,8 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
       if children.is_empty() {
         if base_class_type.base_class == "OpenXmlLeafTextElement" {
           children_writer = quote! {
-            if let Some(child) = &self.child {
-              writer.write_str(&quick_xml::escape::escape(child.to_string()))?;
+            if let Some(xml_content) = &self.xml_content {
+              writer.write_str(&quick_xml::escape::escape(xml_content.to_string()))?;
             }
           };
 
@@ -330,7 +330,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
           if p.occurs.is_empty() {
             child_stmt_list.push(
               parse2(quote! {
-                writer.write_str(&self.#child_name_ident.to_string_inner(xmlns_prefix)?)?;
+                writer.write_str(&self.#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
               })
               .unwrap(),
             );
@@ -338,7 +338,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
             child_stmt_list.push(
               parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_string_inner(xmlns_prefix)?)?;
+                  writer.write_str(&#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -347,7 +347,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_string_inner(xmlns_prefix)?)?;
+                  writer.write_str(&child.to_xml_inner(xmlns_prefix)?)?;
                 }
               })
               .unwrap(),
@@ -463,7 +463,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
 
     let xmlns_prefix_str = &schema_namespace.prefix;
 
-    let to_string_fn: ItemFn = if !t.part.is_empty()
+    let to_xml_fn: ItemFn = if !t.part.is_empty()
       || t.base_class == "OpenXmlPartRootElement"
       || ((t.base_class == "OpenXmlCompositeElement"
         || t.base_class == "CustomXmlElement"
@@ -473,8 +473,8 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
           || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"))
     {
       parse2(quote! {
-        pub fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-          self.to_string_inner(
+        pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
+          self.to_xml_inner(
             if let Some(xmlns) = &self.xmlns {
               if xmlns == #xmlns_uri_str {
                 #xmlns_prefix_str
@@ -490,8 +490,8 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
       .unwrap()
     } else {
       parse2(quote! {
-        pub fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-          self.to_string_inner("")
+        pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
+          self.to_xml_inner("")
         }
       })
       .unwrap()
@@ -500,9 +500,9 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
     token_stream_list.push(
       parse2(quote! {
         impl #struct_type {
-          #to_string_fn
+          #to_xml_fn
 
-          pub fn to_string_inner(&self, xmlns_prefix: &str) -> Result<String, crate::common::SdkError> {
+          pub(crate) fn to_xml_inner(&self, xmlns_prefix: &str) -> Result<String, std::fmt::Error> {
             use std::fmt::Write;
 
             let mut writer = String::new();
@@ -530,7 +530,18 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
         }
       })
       .unwrap(),
-    )
+    );
+
+    token_stream_list.push(
+      parse2(quote! {
+        impl std::fmt::Display for #struct_type {
+          fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.to_xml()?)
+          }
+        }
+      })
+      .unwrap(),
+    );
   }
 
   quote! {
@@ -539,7 +550,7 @@ pub fn gen_serializer_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo) -
 }
 
 fn gen_attr_neo(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
-  let attr_rename_ser_str = if attr.q_name.starts_with(':') {
+  let attr_name_str = if attr.q_name.starts_with(':') {
     &attr.q_name[1..attr.q_name.len()]
   } else {
     &attr.q_name
@@ -559,20 +570,18 @@ fn gen_attr_neo(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
     }
   }
 
+  let attr_name_fmt_str = format!(" {}=\"", attr_name_str);
+
   if required {
     quote! {
-      writer.write_char(' ')?;
-      writer.write_str(#attr_rename_ser_str)?;
-      writer.write_str("=\"")?;
+      writer.write_str(#attr_name_fmt_str)?;
       writer.write_str(&quick_xml::escape::escape(self.#attr_name_ident.to_string()))?;
       writer.write_char('"')?;
     }
   } else {
     quote! {
       if let Some(#attr_name_ident) = &self.#attr_name_ident {
-        writer.write_char(' ')?;
-        writer.write_str(#attr_rename_ser_str)?;
-        writer.write_str("=\"")?;
+        writer.write_str(#attr_name_fmt_str)?;
         writer.write_str(&quick_xml::escape::escape(#attr_name_ident.to_string()))?;
         writer.write_char('"')?;
       }
@@ -592,7 +601,7 @@ fn gen_child_arm_neo(child: &OpenXmlSchemaTypeChild, child_choice_enum_type: &Ty
     parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
 
   parse2(quote! {
-    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_string_inner(xmlns_prefix)?,
+    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_xml_inner(xmlns_prefix)?,
   })
   .unwrap()
 }

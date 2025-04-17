@@ -66,6 +66,8 @@ pub struct OpenXmlSchemaType {
   pub attributes: Vec<OpenXmlSchemaTypeAttribute>,
   pub children: Vec<OpenXmlSchemaTypeChild>,
   pub particle: OpenXmlSchemaTypeParticle,
+  #[serde(skip)]
+  pub module_name: String,
 }
 
 impl OpenXmlSchemaType {
@@ -150,6 +152,8 @@ pub struct OpenXmlSchemaEnum {
   pub r#type: String,
   pub facets: Vec<OpenXmlSchemaEnumFacet>,
   pub version: String,
+  #[serde(skip)]
+  pub module_name: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

@@ -43,6 +43,16 @@ pub fn gen_neo(data_dir: &str, out_dir: &str) {
       .insert(&typed_namespace.namespace, typed_namespace);
   }
 
+  for typed_schema in gen_context.typed_schemas.iter() {
+    for ty in typed_schema.iter() {
+      if !ty.part_class_name.is_empty() {
+        gen_context
+          .part_name_type_name_map
+          .insert(&ty.part_class_name, &ty.name);
+      }
+    }
+  }
+
   for schema in gen_context.schemas.iter() {
     let namespace = gen_context
       .uri_namespace_map

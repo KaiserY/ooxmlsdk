@@ -49,6 +49,7 @@ pub struct GenContextNeo<'a> {
   pub type_name_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
   pub type_name_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
   pub namespace_typed_namespace_map: HashMap<&'a str, &'a TypedNamespace>,
+  pub part_name_type_name_map: HashMap<&'a str, &'a str>,
 }
 
 impl<'a> GenContextNeo<'a> {
@@ -120,15 +121,16 @@ impl<'a> GenContextNeo<'a> {
 
     let typed_namespaces: Vec<TypedNamespace> = serde_json::from_reader(file).unwrap();
 
-    let mut part_name_set: HashSet<String> = HashSet::new();
     let mut part_name_part_map: HashMap<String, &OpenXmlPart> = HashMap::new();
+    let mut part_name_version_map: HashMap<String, String> = HashMap::new();
 
     for part in parts.iter() {
-      part_name_part_map.insert(
-        part.name.split('/').collect::<Vec<&str>>()[0].to_string(),
-        part,
-      );
+      part_name_part_map.insert(part.name.to_string(), part);
+
+      part_name_version_map.insert(part.name.to_string(), part.version.to_string());
     }
+
+    let mut part_name_set: HashSet<String> = HashSet::new();
 
     gen_part_name_set(
       &mut part_name_set,
@@ -150,6 +152,32 @@ impl<'a> GenContextNeo<'a> {
       &part_name_part_map,
     );
 
+    parts.retain(|x| part_name_set.contains(&x.name));
+
+    parts.retain(|x| check_office_version(&x.version));
+
+    for part in parts.iter_mut() {
+      part.children.retain(|x| {
+        if x.is_data_part_reference {
+          true
+        } else {
+          let child_version = get_or_panic!(part_name_version_map, &x.name);
+
+          check_office_version(child_version)
+        }
+      });
+    }
+
+    for schema in schemas.iter_mut() {
+      for ty in schema.types.iter_mut() {
+        ty.module_name = schema.module_name.clone();
+      }
+
+      for e in schema.enums.iter_mut() {
+        e.module_name = schema.module_name.clone();
+      }
+    }
+
     let mut part_type_name_map: HashMap<&str, &str> = HashMap::new();
 
     for typed_schema_list in typed_schemas.iter() {
@@ -160,25 +188,21 @@ impl<'a> GenContextNeo<'a> {
       }
     }
 
-    parts.retain(|x| part_name_set.contains(&x.name));
-
     let mut type_name_set: HashSet<String> = HashSet::new();
 
-    {
-      let mut type_name_type_map: HashMap<String, &OpenXmlSchemaType> = HashMap::new();
+    let mut type_name_type_map: HashMap<String, &OpenXmlSchemaType> = HashMap::new();
 
-      for schema in schemas.iter() {
-        for ty in schema.types.iter() {
-          type_name_type_map.insert(ty.name.clone(), ty);
-        }
+    for schema in schemas.iter() {
+      for ty in schema.types.iter() {
+        type_name_type_map.insert(ty.name.clone(), ty);
       }
+    }
 
-      for part in parts.iter() {
-        if part.base == "OpenXmlPart" && !part.root.is_empty() {
-          let type_name = get_or_panic!(part_type_name_map, part.name.as_str());
+    for part in parts.iter() {
+      if part.base == "OpenXmlPart" && !part.root.is_empty() {
+        let type_name = get_or_panic!(part_type_name_map, part.name.as_str());
 
-          gen_type_name_set(&mut type_name_set, type_name, &type_name_type_map)
-        }
+        gen_type_name_set(&mut type_name_set, type_name, &type_name_type_map)
       }
     }
 

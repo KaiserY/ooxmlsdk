@@ -13,7 +13,7 @@ categories.workspace = true
 readme.workspace = true
 
 [features]
-default = ["docx", "office2007"]
+default = ["docx", "office2007", "parts"]
 schemas = []
 parts = ["schemas", "dep:zip"]
 validators = ["schemas"]

@@ -8,5 +8,5 @@ fn main() {
   ))
   .unwrap();
 
-  println!("{}", value.to_string().unwrap());
+  println!("{}", value.to_string());
 }

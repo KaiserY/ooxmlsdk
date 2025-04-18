@@ -2,10 +2,10 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type};
+use syn::{Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
 
-use crate::gen::context::{GenContext, GenContextNeo};
-use crate::gen::simple_type::simple_type_mapping;
+use crate::generator::context::{GenContext, GenContextNeo};
+use crate::generator::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
 };
@@ -565,7 +565,6 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
     }
 
     let deserialize_inner_fn: ItemFn = parse2(quote! {
-      #[inline(always)]
       pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
         with_xmlns: bool,
@@ -614,10 +613,10 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
               #( #loop_match_arm_list )*
               quick_xml::events::Event::End(e) => {
                 if with_xmlns {
-                  if e.name().as_ref() == b"w:Override" {
+                  if e.name().as_ref() == #prefix_type_name_literal {
                     break;
                   }
-                } else if e.name().as_ref() == b"Override" {
+                } else if e.name().as_ref() == #type_name_literal {
                   break;
                 }
               }

@@ -7,11 +7,22 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 
 ## Features
 
-- Deserialize/serialize OOXML for Rust structs
-- Namespace support
-- Read & Write `docx`, `xlsx` and `pptx` file
-- All Rust structs and ser/de code are generated from metadata (`crates/ooxmlsdk/data`)
-- Documentation for Rust structs
+
+
+* `default`: `docx`，`xlsx`，`pptx`，`office2007"` and `parts`.
+* `schemas`: generate xml schemas, deserializers and serializers. this feature is always enabled.
+* `parts`: genrate parts for reading and writing office file.
+* `validators`: WIP, for validate xml.
+* `docx`: generate docx related schemas, parts etc. this feature is always enabled.
+* `xlsx`: generate xlsx related schemas, parts etc.
+* `pptx`: generate pptx related schemas, parts etc.
+* `office2007`: generate office2007 related schemas, parts etc. this feature is always enabled.
+* `office2010`: generate office2010 and below related schemas, parts etc.
+* `office2013`: generate office2013 and below related schemas, parts etc.
+* `office2016`: generate office2016 and below related schemas, parts etc.
+* `office2019`: generate office2019 and below related schemas, parts etc.
+* `office2021`: generate office2021 and below related schemas, parts etc.
+* `microsoft365`: generate microsoft365 related schemas, parts etc.
 
 ## What's missing
 
@@ -27,7 +38,7 @@ Open XML SDK for Rust (ooxmlsdk) is a Rust library for working with Office Word,
 ## Known Issues
 
 - This library raise recursion limit by `#![recursion_limit = "768"]` for `cargo doc`, you may need to add it too, be cautious when use.
-- Currently no `serde` support: intial benches show `serde` slower than current custom implemention; `serde` somehow not good at working with xml, you need a lot of special rename for xml attribute or children. 
+- Currently no `serde` support.
 
 ## License
 

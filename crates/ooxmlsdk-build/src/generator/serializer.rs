@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{parse2, parse_str, Arm, Ident, ItemFn, ItemImpl, Stmt, Type};
+use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::models::{OpenXmlSchema, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild};
 use crate::utils::{escape_snake_case, escape_upper_camel_case, get_or_panic};

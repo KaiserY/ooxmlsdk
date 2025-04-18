@@ -13,20 +13,20 @@ categories.workspace = true
 readme.workspace = true
 
 [features]
-# default = ["parts", "validators"]
-# schemas = ["ooxmlsdk-build/schemas"]
-# serializers = ["schemas", "ooxmlsdk-build/serializers"]
-# deserializers = ["schemas", "ooxmlsdk-build/deserializers"]
-# parts = [
-#   "schemas",
-#   "serializers",
-#   "deserializers",
-#   "packages",
-#   "ooxmlsdk-build/parts",
-#   "dep:zip",
-# ]
-# validators = ["schemas", "ooxmlsdk-build/validators"]
-# packages = ["ooxmlsdk-build/packages"]
+default = ["docx", "xlsx", "pptx", "office2007", "parts"]
+schemas = ["ooxmlsdk-build/schemas"]
+parts = ["schemas", "dep:zip", "ooxmlsdk-build/parts"]
+validators = ["schemas", "ooxmlsdk-build/validators"]
+docx = ["ooxmlsdk-build/docx"]
+xlsx = ["ooxmlsdk-build/xlsx"]
+pptx = ["ooxmlsdk-build/pptx"]
+office2007 = ["ooxmlsdk-build/office2007"]
+office2010 = ["ooxmlsdk-build/office2010"]
+office2013 = ["ooxmlsdk-build/office2013"]
+office2016 = ["ooxmlsdk-build/office2016"]
+office2019 = ["ooxmlsdk-build/office2019"]
+office2021 = ["ooxmlsdk-build/office2021"]
+microsoft365 = ["ooxmlsdk-build/microsoft365"]
 
 [dependencies]
 quick-xml = { workspace = true }

@@ -2,10 +2,10 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{parse2, parse_str, Ident, ItemEnum, Type, Variant};
+use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
-use crate::gen::context::{GenContext, GenContextNeo};
-use crate::gen::simple_type::simple_type_mapping;
+use crate::generator::context::{GenContext, GenContextNeo};
+use crate::generator::simple_type::simple_type_mapping;
 use crate::models::{
   OpenXmlNamespace, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute,
   OpenXmlSchemaTypeChild,

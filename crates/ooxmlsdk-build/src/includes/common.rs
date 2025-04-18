@@ -1,6 +1,6 @@
 use quick_xml::{
-  events::{attributes::AttrError, Event},
   Decoder, Reader,
+  events::{Event, attributes::AttrError},
 };
 use std::{
   io::BufRead,

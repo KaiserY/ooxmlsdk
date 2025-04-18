@@ -5,24 +5,24 @@ use quote::quote;
 use std::collections::HashMap;
 use std::fs::File;
 use std::{fs, path::Path};
-use syn::{parse_str, Ident, ItemMod};
+use syn::{Ident, ItemMod, parse_str};
 
-use crate::gen::context::{GenContext, GenContextNeo};
-use crate::gen::deserializer::{gen_deserializer, gen_deserializers_neo};
-use crate::gen::open_xml_part::{gen_open_xml_part, gen_open_xml_parts_neo};
-use crate::gen::open_xml_schema::{gen_open_xml_schema, gen_open_xml_schemas_neo};
-use crate::gen::serializer::{gen_serializer, gen_serializer_neo};
-use crate::gen::validator::{gen_validator, gen_validators_neo};
+use crate::generator::context::{GenContext, GenContextNeo};
+use crate::generator::deserializer::{gen_deserializer, gen_deserializers_neo};
+use crate::generator::open_xml_part::{gen_open_xml_part, gen_open_xml_parts_neo};
+use crate::generator::open_xml_schema::{gen_open_xml_schema, gen_open_xml_schemas_neo};
+use crate::generator::serializer::{gen_serializer, gen_serializer_neo};
+use crate::generator::validator::{gen_validator, gen_validators_neo};
 use crate::models::{
   OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, TypedNamespace,
 };
 
-pub mod gen;
+pub mod generator;
 pub mod includes;
 pub mod models;
 pub mod utils;
 
-pub fn gen_neo(data_dir: &str, out_dir: &str) {
+pub fn generate_neo(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
 
   let mut gen_context = GenContextNeo::new(data_dir);
@@ -318,7 +318,7 @@ pub(crate) fn write_validators(gen_context: &GenContextNeo, out_dir_path: &Path)
   fs::write(validators_mod_path, formatted).unwrap();
 }
 
-pub fn gen(data_dir: &str, out_dir: &str) {
+pub fn generate(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
   let out_parts_dir_path = &out_dir_path.join("parts");
   let out_schemas_dir_path = &out_dir_path.join("schemas");
@@ -754,11 +754,11 @@ mod tests {
 
   #[test]
   fn test_gen() {
-    gen("../ooxmlsdk/data", "src");
+    generate("../ooxmlsdk/data", "src");
   }
 
   #[test]
   fn test_gen_new() {
-    gen_neo("../ooxmlsdk/data", "src");
+    generate_neo("../ooxmlsdk/data", "src");
   }
 }

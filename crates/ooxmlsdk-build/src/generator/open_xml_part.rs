@@ -1,7 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, parse_str, Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
+use syn::{Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type, parse_str, parse2};
 
 use crate::models::OpenXmlPart;
 use crate::utils::get_or_panic;
@@ -482,13 +482,6 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
 
   writer_stmt_list.push(
     parse2(quote! {
-      use std::io::Write;
-    })
-    .unwrap(),
-  );
-
-  writer_stmt_list.push(
-    parse2(quote! {
       let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o755);
@@ -537,6 +530,13 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
   if part.name == "CustomXmlPart" || part.name == "XmlSignaturePart" {
     writer_stmt_list.push(
       parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
         if !entry_set.contains(&self.inner_path) {
           zip.start_file(&self.inner_path, options)?;
 
@@ -551,6 +551,13 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
     || part.name == "CustomDataPart"
     || part.name == "InternationalMacroSheetPart"
   {
+    writer_stmt_list.push(
+      parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
     writer_stmt_list.push(
       parse2(quote! {
         use std::io::Read;
@@ -605,6 +612,13 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
   {
     writer_stmt_list.push(
       parse2(quote! {
+        use std::io::Write;
+      })
+      .unwrap(),
+    );
+
+    writer_stmt_list.push(
+      parse2(quote! {
         if !entry_set.contains(&self.inner_path) {
           zip.start_file(&self.inner_path, options)?;
 
@@ -612,6 +626,13 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
 
           entry_set.insert(self.inner_path.to_string());
         }
+      })
+      .unwrap(),
+    );
+  } else if !part.children.is_empty() {
+    writer_stmt_list.push(
+      parse2(quote! {
+        use std::io::Write;
       })
       .unwrap(),
     );

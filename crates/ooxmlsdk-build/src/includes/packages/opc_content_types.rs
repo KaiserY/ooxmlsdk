@@ -292,7 +292,7 @@ impl Default {
         _ => {
           return Err(super::super::common::SdkError::CommonError(
             "Default".into(),
-          ))
+          ));
         }
       };
 
@@ -442,7 +442,7 @@ impl Override {
         _ => {
           return Err(super::super::common::SdkError::CommonError(
             "Override".into(),
-          ))
+          ));
         }
       };
 

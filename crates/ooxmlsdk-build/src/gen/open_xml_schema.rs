@@ -323,14 +323,9 @@ fn gen_children_neo(
       parse_str(&child_last_name.to_upper_camel_case()).unwrap();
 
     let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
-      let child_schema = get_or_panic!(
-        gen_context.prefix_schema_map,
-        child_namespace.prefix.as_str()
-      );
-
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &child_schema.module_name,
+        &child_type.module_name,
         child_type.class_name.to_upper_camel_case()
       ))
       .unwrap()
@@ -367,14 +362,9 @@ fn gen_xml_content_type_neo(
     let enum_namespace = get_or_panic!(gen_context.enum_type_namespace_map, e.r#type.as_str());
 
     if enum_namespace.prefix != schema_namespace.prefix {
-      let enum_schema = get_or_panic!(
-        gen_context.prefix_schema_map,
-        enum_namespace.prefix.as_str()
-      );
-
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &enum_schema.module_name,
+        &e.module_name,
         e.name.to_upper_camel_case()
       ))
       .unwrap()
@@ -411,14 +401,9 @@ fn gen_one_sequence_fields_neo(
     let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
 
     let child_variant_type: Type = if child_namespace.prefix != schema_namespace.prefix {
-      let child_schema = get_or_panic!(
-        gen_context.prefix_schema_map,
-        child_namespace.prefix.as_str()
-      );
-
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &child_schema.module_name,
+        &child_type.module_name,
         child_type.class_name.to_upper_camel_case()
       ))
       .unwrap()

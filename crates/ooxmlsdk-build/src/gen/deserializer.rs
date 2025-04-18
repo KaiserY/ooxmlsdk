@@ -692,8 +692,6 @@ fn gen_one_sequence_match_arm_neo(
 ) -> (String, Arm, String, Arm) {
   let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
-  let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
-
   let child_last_name = &child.name[child.name.find('/').unwrap() + 1..child.name.len()];
   let child_suffix_last_name =
     &child_last_name[child_last_name.find(':').unwrap() + 1..child_last_name.len()];
@@ -710,14 +708,9 @@ fn gen_one_sequence_match_arm_neo(
   let child_suffix_last_name_literal: LitByteStr =
     parse_str(&format!("b\"{}\"", child_suffix_last_name)).unwrap();
 
-  let child_schema = get_or_panic!(
-    gen_context.prefix_schema_map,
-    child_namespace.prefix.as_str()
-  );
-
   let child_variant_type: Type = parse_str(&format!(
     "crate::schemas::{}::{}",
-    &child_schema.module_name,
+    &child_type.module_name,
     child_type.class_name.to_upper_camel_case()
   ))
   .unwrap();
@@ -778,8 +771,6 @@ fn gen_child_match_arm_neo(
 ) -> (String, Arm, String, Arm) {
   let child_type = get_or_panic!(gen_context.type_name_type_map, child.name.as_str());
 
-  let child_namespace = get_or_panic!(gen_context.type_name_namespace_map, child.name.as_str());
-
   let child_last_name = &child.name[child.name.find('/').unwrap() + 1..child.name.len()];
   let child_suffix_last_name =
     &child_last_name[child_last_name.find(':').unwrap() + 1..child_last_name.len()];
@@ -792,14 +783,9 @@ fn gen_child_match_arm_neo(
 
   let child_variant_name_ident: Ident = parse_str(&child_last_name.to_upper_camel_case()).unwrap();
 
-  let child_schema = get_or_panic!(
-    gen_context.prefix_schema_map,
-    child_namespace.prefix.as_str()
-  );
-
   let child_variant_type: Type = parse_str(&format!(
     "crate::schemas::{}::{}",
-    &child_schema.module_name,
+    &child_type.module_name,
     child_type.class_name.to_upper_camel_case()
   ))
   .unwrap();
@@ -832,16 +818,9 @@ fn gen_child_match_arm_neo(
 
 fn gen_simple_child_match_arm_neo(first_name: &str, gen_context: &GenContextNeo) -> Arm {
   if let Some(e) = gen_context.enum_type_enum_map.get(first_name) {
-    let enum_namespace = get_or_panic!(gen_context.enum_type_namespace_map, e.r#type.as_str());
-
-    let enum_schema = get_or_panic!(
-      gen_context.prefix_schema_map,
-      enum_namespace.prefix.as_str()
-    );
-
     let simple_type_name: Type = parse_str(&format!(
       "crate::schemas::{}::{}",
-      &enum_schema.module_name,
+      &e.module_name,
       e.name.to_upper_camel_case()
     ))
     .unwrap();

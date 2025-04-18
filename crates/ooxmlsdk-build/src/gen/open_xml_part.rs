@@ -598,7 +598,11 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
       })
       .unwrap(),
     );
-  } else if part.base != "OpenXmlPackage" {
+  } else if part.name == "CoreFilePropertiesPart"
+    || gen_context
+      .part_name_type_name_map
+      .contains_key(part.name.as_str())
+  {
     writer_stmt_list.push(
       parse2(quote! {
         if !entry_set.contains(&self.inner_path) {
@@ -757,7 +761,7 @@ pub fn gen_open_xml_parts_neo(part: &OpenXmlPart, gen_context: &GenContextNeo) -
 
         zip.start_file("[Content_Types].xml", options)?;
 
-        zip.write_all(self.content_types.to_string()?.as_bytes())?;
+        zip.write_all(self.content_types.to_xml()?.as_bytes())?;
 
         self.save_zip("", &mut zip, &mut entry_set)?;
 

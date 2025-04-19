@@ -33,7 +33,6 @@ impl Types {
     Self::deserialize_inner(&mut xml_reader, false, false, None)
   }
 
-  #[inline(always)]
   pub(crate) fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,
@@ -269,7 +268,6 @@ impl Default {
     Self::deserialize_inner(&mut xml_reader, false, false, None)
   }
 
-  #[inline(always)]
   pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,
@@ -419,7 +417,6 @@ impl Override {
     Self::deserialize_inner(&mut xml_reader, false, false, None)
   }
 
-  #[inline(always)]
   pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
     with_xmlns: bool,

@@ -195,3 +195,14 @@ pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
 
   Ok(reader)
 }
+
+#[inline]
+pub fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
+  match b {
+    b"true" | b"1" | b"True" | b"TRUE" | b"t" | b"Yes" | b"YES" | b"yes" | b"y" => Ok(true),
+    b"false" | b"0" | b"False" | b"FALSE" | b"f" | b"No" | b"NO" | b"no" | b"n" | b"" => Ok(false),
+    other => Err(SdkError::CommonError(
+      String::from_utf8_lossy(other).into_owned(),
+    )),
+  }
+}

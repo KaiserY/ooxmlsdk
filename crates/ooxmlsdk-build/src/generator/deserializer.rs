@@ -28,6 +28,7 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
     .unwrap();
 
     let mut variants: Vec<Arm> = vec![];
+    let mut byte_variants: Vec<Arm> = vec![];
 
     for facet in &e.facets {
       let variant_rename = &facet.value;
@@ -38,12 +39,22 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
         parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
       };
 
+      let variant_ident_literal: LitByteStr =
+        parse_str(&format!("b\"{}\"", variant_ident)).unwrap();
+
       variants.push(
         parse2(quote! {
           #variant_rename => Ok(Self::#variant_ident),
         })
         .unwrap(),
-      )
+      );
+
+      byte_variants.push(
+        parse2(quote! {
+          #variant_ident_literal => Ok(Self::#variant_ident),
+        })
+        .unwrap(),
+      );
     }
 
     token_stream_list.push(
@@ -60,7 +71,23 @@ pub fn gen_deserializers_neo(schema: &OpenXmlSchema, gen_context: &GenContextNeo
         }
       })
       .unwrap(),
-    )
+    );
+
+    token_stream_list.push(
+      parse2(quote! {
+        impl #enum_type {
+          pub fn from_bytes(b: &[u8]) -> Result<Self, crate::common::SdkError> {
+            match b {
+              #( #byte_variants )*
+              other => Err(crate::common::SdkError::CommonError(
+                String::from_utf8_lossy(other).into_owned(),
+              )),
+            }
+          }
+        }
+      })
+      .unwrap(),
+    );
   }
 
   let from_reader_fn = gen_from_reader_fn_neo();
@@ -826,9 +853,7 @@ fn gen_simple_child_match_arm_neo(first_name: &str, gen_context: &GenContextNeo)
 
     parse2(quote! {
       quick_xml::events::Event::Text(t) => {
-        use std::str::FromStr;
-
-        xml_content = Some(#simple_type_name::from_str(&t.unescape()?)?);
+        xml_content = Some(#simple_type_name::from_bytes(&t.into_inner())?);
       }
     })
     .unwrap()
@@ -847,14 +872,7 @@ fn gen_simple_child_match_arm_neo(first_name: &str, gen_context: &GenContextNeo)
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          xml_content = Some(
-            match t.unescape()?.as_ref()
-            {
-              "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
-              "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(crate::common::SdkError::CommonError(t.unescape()?.to_string()))?,
-            }
-          );
+          xml_content = Some(crate::common::parse_bool_bytes(&t.into_inner())?);
         }
       },
       "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
@@ -926,9 +944,7 @@ fn gen_field_match_arm_neo(attr: &OpenXmlSchemaTypeAttribute, gen_context: &GenC
 
     quote! {
       #attr_name_literal => {
-        use std::str::FromStr;
-
-        #attr_name_ident = Some(#e_type::from_str(&attr.unescape_value()?)?);
+        #attr_name_ident = Some(#e_type::from_bytes(&attr.value)?);
       }
     }
   } else {
@@ -941,16 +957,7 @@ fn gen_field_match_arm_neo(attr: &OpenXmlSchemaTypeAttribute, gen_context: &GenC
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
         #attr_name_literal => {
-          #attr_name_ident = Some(
-            match attr
-              .unescape_value()?
-              .as_ref()
-            {
-              "true" | "1" | "True" | "TRUE" | "t" | "Yes" | "YES" | "yes" | "y" => true,
-              "false" | "0" | "False" | "FALSE" | "f" | "No" | "NO" | "no" | "n" | "" => false,
-              _ => Err(crate::common::SdkError::CommonError(attr.unescape_value()?.into_owned()))?,
-            }
-          );
+          #attr_name_ident = Some(crate::common::parse_bool_bytes(&attr.value)?);
         }
       },
       "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"

@@ -7,7 +7,7 @@ fn main() {
 
   println!(
     "{}",
-    docx.main_document_part.root_element.to_string().unwrap()
+    docx.main_document_part.root_element.to_xml().unwrap()
   );
 
   println!(
@@ -23,7 +23,7 @@ fn main() {
 
   println!(
     "{}",
-    docx.main_document_part.root_element.to_string().unwrap()
+    docx.main_document_part.root_element.to_xml().unwrap()
   );
 
   println!(

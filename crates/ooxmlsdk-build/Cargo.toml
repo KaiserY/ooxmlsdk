@@ -40,7 +40,6 @@ proc-macro2 = { workspace = true }
 heck = { workspace = true }
 thiserror = { workspace = true }
 zip = { workspace = true, optional = true }
-path-clean = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

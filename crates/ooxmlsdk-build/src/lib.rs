@@ -22,6 +22,10 @@ pub mod includes;
 pub mod models;
 pub mod utils;
 
+// pub mod common;
+// pub mod deserializers;
+// pub mod schemas;
+
 pub fn generate_neo(data_dir: &str, out_dir: &str) {
   let out_dir_path = Path::new(out_dir);
 

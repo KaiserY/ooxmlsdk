@@ -5,6 +5,6 @@ fn main() {
 
   println!(
     "{}",
-    pptx.presentation_part.root_element.to_string().unwrap()
+    pptx.presentation_part.root_element.to_xml().unwrap()
   );
 }

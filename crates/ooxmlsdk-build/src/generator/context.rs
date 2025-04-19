@@ -10,32 +10,8 @@ use crate::models::{
 };
 use crate::utils::get_or_panic;
 
-#[derive(Debug)]
-pub struct GenContext<'a> {
-  pub parts: Vec<OpenXmlPart>,
-  pub schemas: Vec<OpenXmlSchema>,
-  pub namespaces: Vec<OpenXmlNamespace>,
-  pub typed_namespaces: Vec<TypedNamespace>,
-  pub schema_mods: Vec<String>,
-  pub part_mods: Vec<String>,
-  pub prefix_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
-  pub uri_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
-  pub prefix_schema_mod_map: HashMap<&'a str, &'a str>,
-  pub uri_schema_mod_map: HashMap<&'a str, &'a str>,
-  pub type_name_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
-  pub type_name_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
-  pub enum_type_enum_map: HashMap<&'a str, &'a OpenXmlSchemaEnum>,
-  pub enum_type_namespace_map: HashMap<&'a str, &'a OpenXmlNamespace>,
-  pub enum_name_enum_map: HashMap<&'a str, &'a OpenXmlSchemaEnum>,
-  pub part_name_type_map: HashMap<&'a str, &'a OpenXmlSchemaType>,
-  pub prefix_schema_map: HashMap<&'a str, &'a OpenXmlSchema>,
-  pub part_name_part_map: HashMap<&'a str, &'a OpenXmlPart>,
-  pub part_name_part_mod_map: HashMap<&'a str, &'a str>,
-  pub target_type_map: HashMap<String, &'a OpenXmlSchemaType>,
-}
-
 #[derive(Debug, Default)]
-pub struct GenContextNeo<'a> {
+pub struct GenContext<'a> {
   pub parts: Vec<OpenXmlPart>,
   pub schemas: Vec<OpenXmlSchema>,
   pub namespaces: Vec<OpenXmlNamespace>,
@@ -52,7 +28,7 @@ pub struct GenContextNeo<'a> {
   pub part_name_type_name_map: HashMap<&'a str, &'a str>,
 }
 
-impl<'a> GenContextNeo<'a> {
+impl<'a> GenContext<'a> {
   pub(crate) fn new(data_dir: &'a str) -> Self {
     let data_dir_path = Path::new(data_dir);
     let data_parts_dir_path = &data_dir_path.join("parts");

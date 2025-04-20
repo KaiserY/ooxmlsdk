@@ -56,26 +56,16 @@ impl Relationships {
       let attr = attr?;
       match attr.key.as_ref() {
         b"xmlns" => {
-          xmlns = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
+          xmlns = Some(attr.unescape_value()?.to_string());
         }
         b"mc:Ignorable" => {
-          mc_ignorable = Some(
-            attr
-              .decode_and_unescape_value(xml_reader.decoder())?
-              .to_string(),
-          );
+          mc_ignorable = Some(attr.unescape_value()?.to_string());
         }
         key => {
           if key.starts_with(b"xmlns:") {
             xmlns_map.insert(
               String::from_utf8_lossy(&key[6..]).to_string(),
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
+              attr.unescape_value()?.to_string(),
             );
             if key == b"xmlns:w" {
               with_xmlns = true;
@@ -262,30 +252,16 @@ impl Relationship {
         let attr = attr?;
         match attr.key.as_ref() {
           b"TargetMode" => {
-            target_mode = Some(TargetMode::from_str(
-              &attr.decode_and_unescape_value(xml_reader.decoder())?,
-            )?);
+            target_mode = Some(TargetMode::from_str(&attr.unescape_value()?)?);
           }
           b"Target" => {
-            target = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            target = Some(attr.unescape_value()?.to_string());
           }
           b"Type" => {
-            r#type = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            r#type = Some(attr.unescape_value()?.to_string());
           }
           b"Id" => {
-            id = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .to_string(),
-            );
+            id = Some(attr.unescape_value()?.to_string());
           }
           b"xmlns:w" => with_xmlns = true,
           _ => {}

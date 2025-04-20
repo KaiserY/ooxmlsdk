@@ -4,9 +4,15 @@
 
 ### New Features
 
+- Add `FromStr` and `Display`.
+- Performance improvement.
+- Split features for smaller codegen and faster build.
+
 ### Bug Fixes
 
 ### Misc Changes
+
+- Bump dependencies version
 
 ## 0.1.18
 

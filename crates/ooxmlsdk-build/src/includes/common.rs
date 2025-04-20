@@ -1,6 +1,7 @@
 use quick_xml::{
-  Decoder, Reader,
+  Reader,
   events::{Event, attributes::AttrError},
+  name::QName,
 };
 use std::{
   io::BufRead,
@@ -38,7 +39,7 @@ pub trait XmlReader<'de> {
 
   fn peek(&mut self) -> Result<&Event<'de>, SdkError>;
 
-  fn decoder(&self) -> Decoder;
+  fn read_to_end(&mut self, name: QName) -> Result<(), SdkError>;
 }
 
 pub struct IoReader<'de, R: BufRead> {
@@ -81,8 +82,11 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<'de, R> {
     }
   }
 
-  fn decoder(&self) -> Decoder {
-    self.reader.decoder()
+  fn read_to_end(&mut self, name: QName) -> Result<(), SdkError> {
+    match self.reader.read_to_end_into(name, &mut self.buf) {
+      Err(e) => Err(e.into()),
+      Ok(_) => Ok(()),
+    }
   }
 }
 
@@ -119,8 +123,11 @@ impl<'de> XmlReader<'de> for SliceReader<'de> {
     }
   }
 
-  fn decoder(&self) -> Decoder {
-    self.reader.decoder()
+  fn read_to_end(&mut self, name: QName) -> Result<(), SdkError> {
+    match self.reader.read_to_end(name) {
+      Err(e) => Err(e.into()),
+      Ok(_) => Ok(()),
+    }
   }
 }
 

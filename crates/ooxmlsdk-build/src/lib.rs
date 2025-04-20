@@ -71,8 +71,21 @@ pub fn generate(data_dir: &str, out_dir: &str) {
       gen_context
         .type_name_namespace_map
         .insert(&ty.name, namespace);
+
+      if !ty.part.is_empty() {
+        gen_context
+          .part_name_type_name_map
+          .insert(&ty.part, &ty.name);
+      }
     }
   }
+
+  gen_context
+    .part_name_type_name_map
+    .insert("StyleDefinitionsPart", "w:CT_Styles/w:styles");
+  gen_context
+    .part_name_type_name_map
+    .insert("StylesWithEffectsPart", "w:CT_Styles/w:styles");
 
   write_schemas(&gen_context, out_dir_path);
 

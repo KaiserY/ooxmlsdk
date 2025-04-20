@@ -130,8 +130,10 @@ impl<'a> GenContext<'a> {
       }
     }
 
+    #[allow(unused_mut)]
     let mut part_name_set: HashSet<String> = HashSet::new();
 
+    #[cfg(feature = "docx")]
     gen_part_name_set(
       &mut part_name_set,
       "WordprocessingDocument",
@@ -282,6 +284,7 @@ pub(crate) fn gen_type_name_set(
   }
 }
 
+#[allow(dead_code)]
 pub(crate) fn gen_part_name_set(
   part_name_set: &mut HashSet<String>,
   part_name: &str,

@@ -1,4 +1,4 @@
-#![recursion_limit = "768"]
+#![recursion_limit = "512"]
 
 pub mod common {
   include!(concat!(env!("OUT_DIR"), "/common/mod.rs"));

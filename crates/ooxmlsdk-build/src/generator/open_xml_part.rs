@@ -21,7 +21,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
 
   if part.base == "OpenXmlPackage" {
     fields.push(quote! {
-      pub content_types: std::boxed::Box<crate::schemas::opc_content_types::Types>,
+      pub content_types: crate::schemas::opc_content_types::Types,
     });
   } else {
     fields.push(quote! {
@@ -31,7 +31,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
 
   if !part.children.is_empty() {
     fields.push(quote! {
-      pub relationships: Option<std::boxed::Box<crate::schemas::opc_relationships::Relationships>>,
+      pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
     });
 
     fields.push(quote! {
@@ -45,18 +45,18 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
 
   if part.name == "CustomXmlPart" || part.name == "XmlSignaturePart" {
     fields.push(quote! {
-      pub content: String,
+      pub part_content: String,
     });
   } else if !part.extension.is_empty()
     || part.name == "CustomDataPart"
     || part.name == "InternationalMacroSheetPart"
   {
     fields.push(quote! {
-      pub path: String,
+      pub part_content: Vec<u8>,
     });
   } else if part.name == "CoreFilePropertiesPart" {
     fields.push(quote! {
-      pub root_element: std::boxed::Box<crate::schemas::opc_core_properties::CoreProperties>,
+      pub root_element: crate::schemas::opc_core_properties::CoreProperties,
     });
   } else if let Some(root_element_type_name) =
     gen_context.part_name_type_name_map.get(part.name.as_str())
@@ -71,7 +71,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
     .unwrap();
 
     fields.push(quote! {
-      pub root_element: std::boxed::Box<#field_type>,
+      pub root_element: #field_type,
     });
   }
 
@@ -130,11 +130,9 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
   if part.base == "OpenXmlPackage" {
     field_declaration_list.push(
       parse2(quote! {
-        let content_types = std::boxed::Box::new(
-          crate::schemas::opc_content_types::Types::from_reader(
-            std::io::BufReader::new(archive.by_name("[Content_Types].xml")?,
-          ))?,
-        );
+        let content_types = crate::schemas::opc_content_types::Types::from_reader(
+          std::io::BufReader::new(archive.by_name("[Content_Types].xml")?,
+        ))?;
       })
       .unwrap(),
     );
@@ -197,11 +195,10 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
         let relationships = if let Some(file_path) = file_path_set.get(&#part_rels_path_ident) {
           rels_path = file_path.to_string();
 
-          Some(std::boxed::Box::new(
-            crate::schemas::opc_relationships::Relationships::from_reader(
+          Some(crate::schemas::opc_relationships::Relationships::from_reader(
               std::io::BufReader::new(archive.by_name(file_path)?,
             ))?,
-          ))
+          )
         } else {
           None
         };
@@ -241,7 +238,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
 
     field_declaration_list.push(
       parse2(quote! {
-        let mut content = String::new();
+        let mut part_content = String::new();
       })
       .unwrap(),
     );
@@ -251,15 +248,15 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
         {
           let mut file = std::io::BufReader::new(archive.by_name(path)?);
 
-          file.read_to_string(&mut content)?;
-        };
+          file.read_to_string(&mut part_content)?;
+        }
       })
       .unwrap(),
     );
 
     self_field_value_list.push(
       parse2(quote! {
-        content
+        part_content
       })
       .unwrap(),
     );
@@ -267,17 +264,44 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
     || part.name == "CustomDataPart"
     || part.name == "InternationalMacroSheetPart"
   {
+    field_declaration_list.push(
+      parse2(quote! {
+        use std::io::Read;
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        let mut part_content;
+      })
+      .unwrap(),
+    );
+
+    field_declaration_list.push(
+      parse2(quote! {
+        {
+          let mut zip_entry = archive.by_name(path)?;
+
+          part_content = Vec::with_capacity(zip_entry.size() as usize);
+
+          zip_entry.read_to_end(&mut part_content)?;
+        }
+      })
+      .unwrap(),
+    );
+
     self_field_value_list.push(
       parse2(quote! {
-        path: path.to_string()
+        part_content
       })
       .unwrap(),
     );
   } else if part.name == "CoreFilePropertiesPart" {
     field_declaration_list.push(parse2(quote! {
-      let root_element = Some(std::boxed::Box::new(
+      let root_element = Some(
         crate::schemas::opc_core_properties::CoreProperties::from_reader(std::io::BufReader::new(archive.by_name(path)?))?,
-      ));
+      );
     }).unwrap());
 
     field_unwrap_list.push(
@@ -307,7 +331,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
     .unwrap();
 
     field_declaration_list.push(parse2(quote! {
-      let root_element = Some(std::boxed::Box::new(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?));
+      let root_element = Some(#field_type::from_reader(std::io::BufReader::new(archive.by_name(path)?))?);
     }).unwrap());
 
     field_unwrap_list.push(
@@ -540,7 +564,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
         if !entry_set.contains(&self.inner_path) {
           zip.start_file(&self.inner_path, options)?;
 
-          zip.write_all(self.content.as_bytes())?;
+          zip.write_all(self.part_content.as_bytes())?;
 
           entry_set.insert(self.inner_path.to_string());
         }
@@ -560,48 +584,13 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
 
     writer_stmt_list.push(
       parse2(quote! {
-        use std::io::Read;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        let mut buffer = Vec::new();
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        let mut file = std::fs::File::open(&self.path)?;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        file.read_to_end(&mut buffer)?;
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
         if !entry_set.contains(&self.inner_path) {
           zip.start_file(&self.inner_path, options)?;
 
-          zip.write_all(&buffer)?;
+          zip.write_all(&self.part_content)?;
 
           entry_set.insert(self.inner_path.to_string());
         }
-      })
-      .unwrap(),
-    );
-
-    writer_stmt_list.push(
-      parse2(quote! {
-        buffer.clear();
       })
       .unwrap(),
     );

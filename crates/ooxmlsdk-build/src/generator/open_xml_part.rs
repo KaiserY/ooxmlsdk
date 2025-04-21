@@ -1,11 +1,11 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type, parse_str, parse2};
+use syn::{parse2, parse_str, Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
 
-use crate::GenContext;
 use crate::models::OpenXmlPart;
 use crate::utils::get_or_panic;
+use crate::GenContext;
 
 pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> TokenStream {
   let relationship_type_str = &part.relationship_type;
@@ -523,7 +523,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
   writer_stmt_list.push(
     parse2(quote! {
       if !directory_path.is_empty() && !entry_set.contains(&directory_path) {
-        zip.add_directory(&directory_path, zip::write::SimpleFileOptions::default())?;
+        zip.add_directory(&directory_path, options)?;
 
         entry_set.insert(directory_path);
       }
@@ -543,7 +543,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
   writer_stmt_list.push(
     parse2(quote! {
       if !#part_name_dir_path_ident.is_empty() && !entry_set.contains(&#part_name_dir_path_ident) {
-        zip.add_directory(&#part_name_dir_path_ident, zip::write::SimpleFileOptions::default())?;
+        zip.add_directory(&#part_name_dir_path_ident, options)?;
 
         entry_set.insert(#part_name_dir_path_ident);
       }
@@ -643,7 +643,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
           );
 
           if !rels_dir_path.is_empty() && !entry_set.contains(&rels_dir_path) {
-            zip.add_directory(&rels_dir_path, zip::write::SimpleFileOptions::default())?;
+            zip.add_directory(&rels_dir_path, options)?;
 
             entry_set.insert(rels_dir_path);
           }
@@ -699,11 +699,10 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
   }
 
   let part_save_zip_fn: ItemFn = parse2(quote! {
-    #[allow(unused_variables)]
-    pub(crate) fn save_zip(
+    pub(crate) fn save_zip<W: std::io::Write + std::io::Seek>(
       &self,
       parent_path: &str,
-      zip: &mut zip::ZipWriter<std::fs::File>,
+      zip: &mut zip::ZipWriter<W>,
       entry_set: &mut std::collections::HashSet<String>,
     ) -> Result<(), crate::common::SdkError> {
       #( #writer_stmt_list )*
@@ -717,18 +716,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
 
   if part.base == "OpenXmlPackage" {
     let part_new_fn: ItemFn = parse2(quote! {
-      pub fn new(path: &str) -> Result<Self, crate::common::SdkError> {
-        let zip_file = std::fs::File::open(path)?;
-
-        let reader = std::io::BufReader::new(zip_file);
-
-        Self::new_from_reader(reader)
-      }
-    })
-    .unwrap();
-
-    let part_new_from_reader_fn: ItemFn = parse2(quote! {
-      pub fn new_from_reader<R: std::io::Read + std::io::Seek>(
+      pub fn new<R: std::io::Read + std::io::Seek>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         let mut archive = zip::ZipArchive::new(reader)?;
@@ -753,17 +741,20 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
     })
     .unwrap();
 
+    let part_new_from_file_fn: ItemFn = parse2(quote! {
+      pub fn new_from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, crate::common::SdkError> {
+        Self::new(std::io::BufReader::new(std::fs::File::open(path)?))
+      }
+    })
+    .unwrap();
+
     let part_save_fn: ItemFn = parse2(quote! {
-      pub fn save(&self, path: &str) -> Result<(), crate::common::SdkError> {
+      pub fn save<W: std::io::Write + std::io::Seek>(&self, writer: W) -> Result<(), crate::common::SdkError> {
         use std::io::Write;
 
         let mut entry_set: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-        let path = std::path::Path::new(path);
-
-        let file = std::fs::File::create(path)?;
-
-        let mut zip = zip::ZipWriter::new(file);
+        let mut zip = zip::ZipWriter::new(writer);
 
         let options = zip::write::SimpleFileOptions::default()
           .compression_method(zip::CompressionMethod::Deflated)
@@ -782,15 +773,24 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
     })
     .unwrap();
 
+    let part_save_to_file_fn: ItemFn = parse2(quote! {
+      pub fn save_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), crate::common::SdkError> {
+        self.save(std::fs::File::create(path)?)
+      }
+    })
+    .unwrap();
+
     let part_impl: ItemImpl = parse2(quote! {
       impl #struct_name_ident {
-        #part_new_from_reader_fn
-
         #part_new_fn
+
+        #part_new_from_file_fn
 
         #part_new_from_archive_fn
 
         #part_save_fn
+
+        #part_save_to_file_fn
 
         #part_save_zip_fn
       }

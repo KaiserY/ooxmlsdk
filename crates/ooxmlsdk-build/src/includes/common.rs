@@ -1,7 +1,7 @@
 use quick_xml::{
-  Reader,
-  events::{Event, attributes::AttrError},
+  events::{attributes::AttrError, Event},
   name::QName,
+  Reader,
 };
 use std::{
   io::BufRead,
@@ -160,19 +160,11 @@ pub(crate) fn from_reader_inner<'de, R: BufRead>(reader: R) -> Result<IoReader<'
 
   let mut reader = IoReader::new(xml_reader);
 
-  loop {
-    let peek_event = reader.peek()?;
-
-    match peek_event {
-      quick_xml::events::Event::Decl(_)
-      | quick_xml::events::Event::Text(_)
-      | quick_xml::events::Event::CData(_) => {
-        reader.next()?;
-      }
-      _ => {
-        break;
-      }
-    }
+  while matches!(
+    reader.peek()?,
+    Event::Decl(_) | Event::Text(_) | Event::CData(_)
+  ) {
+    reader.next()?;
   }
 
   Ok(reader)
@@ -185,19 +177,11 @@ pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
 
   let mut reader = SliceReader::new(xml_reader);
 
-  loop {
-    let peek_event = reader.peek()?;
-
-    match peek_event {
-      quick_xml::events::Event::Decl(_)
-      | quick_xml::events::Event::Text(_)
-      | quick_xml::events::Event::CData(_) => {
-        reader.next()?;
-      }
-      _ => {
-        break;
-      }
-    }
+  while matches!(
+    reader.peek()?,
+    Event::Decl(_) | Event::Text(_) | Event::CData(_)
+  ) {
+    reader.next()?;
   }
 
   Ok(reader)

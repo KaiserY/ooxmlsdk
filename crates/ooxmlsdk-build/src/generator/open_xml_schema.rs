@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
+use syn::{parse2, parse_str, Ident, ItemEnum, Type, Variant};
 
 use crate::generator::context::GenContext;
 use crate::generator::simple_type::simple_type_mapping;
@@ -181,7 +181,9 @@ pub fn gen_open_xml_schemas(schema: &OpenXmlSchema, gen_context: &GenContext) ->
 
     token_stream_list.push(quote! {
       #[doc = #summary_doc]
+      #[doc = ""]
       #[doc = #version_doc]
+      #[doc = ""]
       #[doc = #qualified_doc]
       #[derive(Clone, Debug, Default)]
       pub struct #struct_name_ident {
@@ -275,14 +277,18 @@ fn gen_attr(
   if required {
     quote! {
       #[doc = #property_comments_doc]
+      #[doc = ""]
       #[doc = #version_doc]
+      #[doc = ""]
       #[doc = #qualified_doc]
       pub #attr_name_ident: #type_ident,
     }
   } else {
     quote! {
       #[doc = #property_comments_doc]
+      #[doc = ""]
       #[doc = #version_doc]
+      #[doc = ""]
       #[doc = #qualified_doc]
       pub #attr_name_ident: Option<#type_ident>,
     }

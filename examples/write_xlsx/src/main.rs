@@ -1,7 +1,7 @@
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
 fn main() {
-  let xlsx = SpreadsheetDocument::new("examples/read_xlsx/samples/demo.xlsx").unwrap();
+  let xlsx = SpreadsheetDocument::new_from_file("examples/read_xlsx/samples/demo.xlsx").unwrap();
 
-  xlsx.save("/tmp/demo.xlsx").unwrap();
+  xlsx.save_to_file("/tmp/demo.xlsx").unwrap();
 }

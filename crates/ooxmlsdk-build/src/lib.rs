@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::{fs, path::Path};
-use syn::{Ident, ItemMod, parse_str};
+use syn::{parse_str, Ident, ItemMod};
 
 use crate::generator::context::GenContext;
 use crate::generator::deserializer::gen_deserializers;

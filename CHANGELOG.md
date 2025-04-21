@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.3.0
+
+### New Features
+
+- Breaking change in part methods, add `new` and `save` align with `zip` crate.
+
+### Bug Fixes
+
+### Misc Changes
+
+- Reduce `zip` dependency features.
+- Format doc comment.
+
 ## 0.2.0
 
 ### New Features

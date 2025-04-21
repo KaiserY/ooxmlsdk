@@ -13,4 +13,4 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
-ooxmlsdk = { workspace = true, features = ["xlsx", "office2007", "parts"] }
+ooxmlsdk = { workspace = true, features = ["xlsx", "office2010", "parts"] }

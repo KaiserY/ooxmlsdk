@@ -1,7 +1,17 @@
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+use std::error::Error;
+use std::fs::OpenOptions;
 
-fn main() {
-  let xlsx = SpreadsheetDocument::new_from_file("examples/read_xlsx/samples/demo.xlsx").unwrap();
+fn main() -> Result<(), Box<dyn Error>> {
+  let xlsx = SpreadsheetDocument::new_from_file("examples/read_xlsx/samples/demo.xlsx")?;
 
-  xlsx.save_to_file("/tmp/demo.xlsx").unwrap();
+  let file = OpenOptions::new()
+    .create(true)
+    .write(true)
+    .truncate(true)
+    .open("/tmp/demo.xlsx")?;
+
+  xlsx.save(file)?;
+
+  Ok(())
 }

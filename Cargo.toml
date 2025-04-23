@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["crates/ooxmlsdk-build", "crates/ooxmlsdk-build", "examples/*"]
+members = ["crates/ooxmlsdk-build"]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.73"
 authors = ["KaiserY"]
@@ -16,8 +16,8 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { version = "0.2.1", path = "crates/ooxmlsdk", default-features = false }
-ooxmlsdk-build = { version = "0.2.1", path = "crates/ooxmlsdk-build" }
+ooxmlsdk = { version = "0.2.2", path = "crates/ooxmlsdk", default-features = false }
+ooxmlsdk-build = { version = "0.2.2", path = "crates/ooxmlsdk-build" }
 quick-xml = "0.37.4"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_derive = "1.0.219"

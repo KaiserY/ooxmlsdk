@@ -456,7 +456,10 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
       field_ident_list.push(attr_name_ident);
     }
 
-    let mut e_ident: Ident = parse_str("e").unwrap();
+    let mut expect_event_start_stmt: Stmt = parse2(quote! {
+      let (e, empty_tag) =
+        crate::common::expect_event_start!(xml_reader, xml_event, #prefix_type_name_literal, #type_name_literal);
+    }).unwrap();
 
     let attr_match_stmt_opt: Option<Stmt> = if (t.base_class == "OpenXmlCompositeElement"
       || t.base_class == "CustomXmlElement"
@@ -509,7 +512,10 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
         .unwrap(),
       )
     } else {
-      e_ident = parse_str("_e").unwrap();
+      expect_event_start_stmt = parse2(quote! {
+        let (_, empty_tag) =
+          crate::common::expect_event_start!(xml_reader, xml_event, #prefix_type_name_literal, #type_name_literal);
+      }).unwrap();
 
       None
     };
@@ -566,38 +572,11 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
     let deserialize_inner_fn: ItemFn = parse2(quote! {
       pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
-        mut empty_tag: bool,
-        xml_event: Option<quick_xml::events::BytesStart<'de>>,
+        xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
+        #expect_event_start_stmt
+
         #( #field_declaration_list )*
-
-        let #e_ident = if let Some(e) = xml_event {
-          e
-        } else {
-          let e = match xml_reader.next()? {
-            quick_xml::events::Event::Start(e) => e,
-            quick_xml::events::Event::Empty(e) => {
-              empty_tag = true;
-
-              e
-            }
-            _ => Err(crate::common::SdkError::CommonError(
-              #class_name_str.to_string(),
-            ))?,
-          };
-
-          match e.name().as_ref() {
-            #prefix_type_name_literal | #type_name_literal => (),
-            _ => {
-              Err(super::super::common::SdkError::MismatchError {
-                expected: #prefix_type_name_str.to_string(),
-                found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-              })?;
-            }
-          }
-
-          e
-        };
 
         #attr_match_stmt_opt
 
@@ -655,7 +634,7 @@ fn gen_from_str_impl(struct_type: &Type) -> ItemImpl {
       fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
 
-        Self::deserialize_inner(&mut xml_reader, false, None)
+        Self::deserialize_inner(&mut xml_reader, None)
       }
     }
   };
@@ -670,7 +649,7 @@ fn gen_from_reader_fn() -> ItemFn {
     ) -> Result<Self, crate::common::SdkError> {
       let mut xml_reader = crate::common::from_reader_inner(reader)?;
 
-      Self::deserialize_inner(&mut xml_reader, false, None)
+      Self::deserialize_inner(&mut xml_reader, None)
     }
   };
 
@@ -713,7 +692,7 @@ fn gen_one_sequence_match_arm(
       parse2(quote! {
         #child_last_name_literal | #child_suffix_last_name_literal => {
           #child_name_ident = Some(std::boxed::Box::new(
-            #child_variant_type::deserialize_inner(xml_reader, e_empty, Some(e))?,
+            #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
           ));
         }
       })
@@ -722,7 +701,7 @@ fn gen_one_sequence_match_arm(
       parse2(quote! {
         #child_last_name_literal | #child_suffix_last_name_literal => {
           #child_name_ident.push(
-            #child_variant_type::deserialize_inner(xml_reader, e_empty, Some(e))?,
+            #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
           );
         }
       })
@@ -732,7 +711,7 @@ fn gen_one_sequence_match_arm(
     parse2(quote! {
       #child_last_name_literal => {
         #child_name_ident = Some(std::boxed::Box::new(
-          #child_variant_type::deserialize_inner(xml_reader, e_empty, Some(e))?,
+          #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
         ));
       }
     })
@@ -741,7 +720,7 @@ fn gen_one_sequence_match_arm(
     parse2(quote! {
       #child_last_name_literal => {
         #child_name_ident.push(
-          #child_variant_type::deserialize_inner(xml_reader, e_empty, Some(e))?,
+          #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
         );
       }
     })
@@ -780,7 +759,7 @@ fn gen_child_match_arm(
     parse2(quote! {
       #child_last_name_literal | #child_suffix_last_name_literal => {
         children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
-          #child_variant_type::deserialize_inner(xml_reader, e_empty, Some(e))?,
+          #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
         )));
       }
     })
@@ -789,7 +768,7 @@ fn gen_child_match_arm(
     parse2(quote! {
       #child_last_name_literal => {
         children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
-          #child_variant_type::deserialize_inner(xml_reader, e_empty, Some(e))?,
+          #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
         )));
       }
     })

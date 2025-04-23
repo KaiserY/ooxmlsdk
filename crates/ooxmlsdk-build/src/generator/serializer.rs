@@ -505,7 +505,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
           pub(crate) fn to_xml_inner(&self, xmlns_prefix: &str) -> Result<String, std::fmt::Error> {
             use std::fmt::Write;
 
-            let mut writer = String::new();
+            let mut writer = String::with_capacity(32);
 
             #xml_header_writer
 

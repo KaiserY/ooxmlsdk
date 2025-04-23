@@ -20,7 +20,7 @@ impl std::str::FromStr for Types {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_inner(&mut xml_reader, false, None)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 }
 
@@ -30,47 +30,21 @@ impl Types {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_inner(&mut xml_reader, false, None)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
   pub(crate) fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    mut empty_tag: bool,
-    xml_event: Option<quick_xml::events::BytesStart<'de>>,
+    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, super::super::common::SdkError> {
+    let (e, empty_tag) =
+      super::super::common::expect_event_start!(xml_reader, xml_event, b"w:Types", b"Types");
+
     let mut xmlns = None;
     let mut xmlns_map = std::collections::HashMap::<String, String>::new();
     let mut mc_ignorable = None;
 
     let mut children = vec![];
-
-    let e = if let Some(e) = xml_event {
-      e
-    } else {
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => Err(super::super::common::SdkError::CommonError(
-          "Types".to_string(),
-        ))?,
-      };
-
-      match e.name().as_ref() {
-        b"w:Types" | b"Types" => (),
-        _ => {
-          Err(super::super::common::SdkError::MismatchError {
-            expected: "w:Types".to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      }
-
-      e
-    };
 
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
@@ -120,12 +94,12 @@ impl Types {
           match e.name().as_ref() {
             b"w:Default" | b"Default" => {
               children.push(TypesChildChoice::Default(std::boxed::Box::new(
-                Default::deserialize_inner(xml_reader, e_empty, Some(e))?,
+                Default::deserialize_inner(xml_reader, Some((e, e_empty)))?,
               )));
             }
             b"w:Override" | b"Override" => {
               children.push(TypesChildChoice::Override(std::boxed::Box::new(
-                Override::deserialize_inner(xml_reader, e_empty, Some(e))?,
+                Override::deserialize_inner(xml_reader, Some((e, e_empty)))?,
               )));
             }
             _ => Err(super::super::common::SdkError::CommonError(
@@ -157,7 +131,7 @@ impl Types {
   pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let mut writer = String::new();
+    let mut writer = String::with_capacity(32);
 
     writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
 
@@ -226,7 +200,7 @@ impl std::str::FromStr for Default {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_inner(&mut xml_reader, false, None)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 }
 
@@ -236,46 +210,18 @@ impl Default {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_inner(&mut xml_reader, false, None)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
   pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    mut empty_tag: bool,
-    xml_event: Option<quick_xml::events::BytesStart<'de>>,
+    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, super::super::common::SdkError> {
+    let (e, _) =
+      super::super::common::expect_event_start!(xml_reader, xml_event, b"w:Default", b"Default");
+
     let mut extension = None;
     let mut content_type = None;
-
-    let e = if let Some(e) = xml_event {
-      e
-    } else {
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => {
-          return Err(super::super::common::SdkError::CommonError(
-            "Default".into(),
-          ));
-        }
-      };
-
-      match e.name().as_ref() {
-        b"w:Default" | b"Default" => (),
-        _ => {
-          Err(super::super::common::SdkError::MismatchError {
-            expected: "w:Default".to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      }
-
-      e
-    };
 
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
@@ -288,21 +234,6 @@ impl Default {
           content_type = Some(attr.unescape_value()?.into_owned());
         }
         _ => {}
-      }
-    }
-
-    if !empty_tag {
-      loop {
-        match xml_reader.next()? {
-          quick_xml::events::Event::End(e) => match e.name().as_ref() {
-            b"w:Default" | b"Default" => {
-              break;
-            }
-            _ => (),
-          },
-          quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => (),
-        }
       }
     }
 
@@ -327,7 +258,7 @@ impl Default {
   pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let mut writer = String::new();
+    let mut writer = String::with_capacity(32);
 
     writer.write_char('<')?;
 
@@ -367,7 +298,7 @@ impl std::str::FromStr for Override {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_inner(&mut xml_reader, false, None)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 }
 
@@ -377,46 +308,18 @@ impl Override {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_inner(&mut xml_reader, false, None)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
-  pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
+  pub(crate) fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    mut empty_tag: bool,
-    xml_event: Option<quick_xml::events::BytesStart<'de>>,
+    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, super::super::common::SdkError> {
+    let (e, _) =
+      super::super::common::expect_event_start!(xml_reader, xml_event, b"w:Override", b"Override");
+
     let mut content_type = None;
     let mut part_name = None;
-
-    let e = if let Some(e) = xml_event {
-      e
-    } else {
-      let e = match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => e,
-        quick_xml::events::Event::Empty(e) => {
-          empty_tag = true;
-
-          e
-        }
-        _ => {
-          return Err(super::super::common::SdkError::CommonError(
-            "Override".into(),
-          ));
-        }
-      };
-
-      match e.name().as_ref() {
-        b"w:Override" | b"Override" => (),
-        _ => {
-          Err(super::super::common::SdkError::MismatchError {
-            expected: "Override".to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
-        }
-      }
-
-      e
-    };
 
     for attr in e.attributes().with_checks(false) {
       let attr = attr?;
@@ -429,21 +332,6 @@ impl Override {
           part_name = Some(attr.unescape_value()?.into_owned());
         }
         _ => {}
-      }
-    }
-
-    if !empty_tag {
-      loop {
-        match xml_reader.next()? {
-          quick_xml::events::Event::End(e) => match e.name().as_ref() {
-            b"w:Override" | b"Override" => {
-              break;
-            }
-            _ => (),
-          },
-          quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => (),
-        }
       }
     }
 
@@ -474,7 +362,7 @@ impl Override {
   pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let mut writer = String::new();
+    let mut writer = String::with_capacity(32);
 
     if with_xmlns {
       writer.write_str("<w:Override")?;

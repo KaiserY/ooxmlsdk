@@ -26,7 +26,7 @@ impl std::str::FromStr for CoreProperties {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 }
 
@@ -36,27 +36,19 @@ impl CoreProperties {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
-  pub fn deserialize_self<'de, R: super::super::common::XmlReader<'de>>(
+  pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    with_xmlns: bool,
+    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, super::super::common::SdkError> {
-    let mut with_xmlns = with_xmlns;
-
-    let mut empty_tag = false;
-
-    let e = match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => e,
-      quick_xml::events::Event::Empty(e) => {
-        empty_tag = true;
-        e
-      }
-      _ => Err(super::super::common::SdkError::CommonError(
-        "coreProperties".to_string(),
-      ))?,
-    };
+    let (e, empty_tag) = super::super::common::expect_event_start!(
+      xml_reader,
+      xml_event,
+      b"cp:coreProperties",
+      b"coreProperties"
+    );
 
     let mut xmlns = None;
 
@@ -109,37 +101,17 @@ impl CoreProperties {
               String::from_utf8_lossy(&key[6..]).to_string(),
               attr.unescape_value()?.to_string(),
             );
-            if key == b"xmlns:w" {
-              with_xmlns = true;
-            }
           }
         }
       }
     }
 
-    if with_xmlns {
-      if e.name().as_ref() != b"cp:coreProperties" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "cp:coreProperties".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-    } else if e.name().local_name().as_ref() != b"coreProperties" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "coreProperties".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
-    }
-
     if !empty_tag {
       loop {
-        let peek_event = xml_reader.peek()?;
-        match peek_event {
+        match xml_reader.next()? {
           quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
             match e.name().as_ref() {
               b"cp:category" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   category = Some(t.unescape()?.to_string())
                 }
@@ -147,8 +119,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"cp:contentStatus" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   content_status = Some(t.unescape()?.to_string())
                 }
@@ -156,8 +126,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dcterms:created" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   created = Some(t.unescape()?.to_string())
                 }
@@ -165,8 +133,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dc:creator" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   creator = Some(t.unescape()?.to_string())
                 }
@@ -174,8 +140,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dc:description" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   description = Some(t.unescape()?.to_string())
                 }
@@ -183,8 +147,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dc:identifier" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   identifier = Some(t.unescape()?.to_string())
                 }
@@ -192,8 +154,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"cp:keywords" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   keywords = Some(t.unescape()?.to_string())
                 }
@@ -201,8 +161,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dc:language" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   language = Some(t.unescape()?.to_string())
                 }
@@ -210,8 +168,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"cp:lastModifiedBy" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   last_modified_by = Some(t.unescape()?.to_string())
                 }
@@ -219,8 +175,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"cp:lastPrinted" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   last_printed = Some(t.unescape()?.to_string())
                 }
@@ -228,8 +182,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dcterms:modified" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   modified = Some(t.unescape()?.to_string())
                 }
@@ -237,8 +189,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"cp:revision" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   revision = Some(t.unescape()?.to_string())
                 }
@@ -246,8 +196,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dc:subject" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   subject = Some(t.unescape()?.to_string())
                 }
@@ -255,8 +203,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"dc:title" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   title = Some(t.unescape()?.to_string())
                 }
@@ -264,8 +210,6 @@ impl CoreProperties {
                 xml_reader.next()?;
               }
               b"cp:version" => {
-                xml_reader.next()?;
-
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
                   version = Some(t.unescape()?.to_string())
                 }
@@ -277,21 +221,14 @@ impl CoreProperties {
               ))?,
             }
           }
-          quick_xml::events::Event::End(e) => {
-            if with_xmlns {
-              if e.name().as_ref() == b"cp:coreProperties" {
-                break;
-              }
-            } else if e.name().local_name().as_ref() == b"coreProperties" {
+          quick_xml::events::Event::End(e) => match e.name().as_ref() {
+            b"cp:coreProperties" | b"coreProperties" => {
               break;
             }
-
-            xml_reader.next()?;
-          }
+            _ => (),
+          },
           quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => {
-            xml_reader.next()?;
-          }
+          _ => (),
         }
       }
     }

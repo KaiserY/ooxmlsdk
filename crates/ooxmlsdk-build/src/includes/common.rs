@@ -1,6 +1,5 @@
 use quick_xml::{
   events::{attributes::AttrError, Event},
-  name::QName,
   Reader,
 };
 use std::{
@@ -36,98 +35,45 @@ pub enum SdkError {
 
 pub trait XmlReader<'de> {
   fn next(&mut self) -> Result<Event<'de>, SdkError>;
-
-  fn peek(&mut self) -> Result<&Event<'de>, SdkError>;
-
-  fn read_to_end(&mut self, name: QName) -> Result<(), SdkError>;
 }
 
-pub struct IoReader<'de, R: BufRead> {
+pub struct IoReader<R: BufRead> {
   reader: Reader<R>,
-  peek: Option<Event<'de>>,
   buf: Vec<u8>,
 }
 
-impl<R: BufRead> IoReader<'_, R> {
+impl<R: BufRead> IoReader<R> {
   pub fn new(reader: Reader<R>) -> Self {
     Self {
       reader,
-      peek: None,
       buf: Vec::new(),
     }
   }
 }
 
-impl<'de, R: BufRead> XmlReader<'de> for IoReader<'de, R> {
+impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
+  #[inline]
   fn next(&mut self) -> Result<Event<'de>, SdkError> {
-    if let Some(e) = self.peek.take() {
-      return Ok(e);
-    }
-
     self.buf.clear();
 
-    let event = self.reader.read_event_into(&mut self.buf)?;
-
-    Ok(event.into_owned())
-  }
-
-  fn peek(&mut self) -> Result<&Event<'de>, SdkError> {
-    if self.peek.is_none() {
-      self.peek = Some(self.next()?);
-    }
-
-    match self.peek.as_ref() {
-      Some(v) => Ok(v),
-      None => Err(SdkError::UnknownError),
-    }
-  }
-
-  fn read_to_end(&mut self, name: QName) -> Result<(), SdkError> {
-    match self.reader.read_to_end_into(name, &mut self.buf) {
-      Err(e) => Err(e.into()),
-      Ok(_) => Ok(()),
-    }
+    Ok(self.reader.read_event_into(&mut self.buf)?.into_owned())
   }
 }
 
 pub struct SliceReader<'de> {
   reader: Reader<&'de [u8]>,
-  peek: Option<Event<'de>>,
 }
 
 impl<'de> SliceReader<'de> {
   pub fn new(reader: Reader<&'de [u8]>) -> Self {
-    Self { reader, peek: None }
+    Self { reader }
   }
 }
 
 impl<'de> XmlReader<'de> for SliceReader<'de> {
+  #[inline]
   fn next(&mut self) -> Result<Event<'de>, SdkError> {
-    if let Some(e) = self.peek.take() {
-      return Ok(e);
-    }
-
-    let event = self.reader.read_event()?;
-
-    Ok(event.into_owned())
-  }
-
-  fn peek(&mut self) -> Result<&Event<'de>, SdkError> {
-    if self.peek.is_none() {
-      self.peek = Some(self.next()?);
-    }
-
-    match self.peek.as_ref() {
-      Some(v) => Ok(v),
-      None => Err(SdkError::UnknownError),
-    }
-  }
-
-  fn read_to_end(&mut self, name: QName) -> Result<(), SdkError> {
-    match self.reader.read_to_end(name) {
-      Err(e) => Err(e.into()),
-      Ok(_) => Ok(()),
-    }
+    Ok(self.reader.read_event()?)
   }
 }
 
@@ -154,20 +100,11 @@ pub fn resolve_zip_file_path(path: &str) -> String {
 }
 
 #[inline]
-pub(crate) fn from_reader_inner<'de, R: BufRead>(reader: R) -> Result<IoReader<'de, R>, SdkError> {
+pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> Result<IoReader<R>, SdkError> {
   let mut xml_reader = quick_xml::Reader::from_reader(reader);
   xml_reader.config_mut().check_end_names = false;
 
-  let mut reader = IoReader::new(xml_reader);
-
-  while matches!(
-    reader.peek()?,
-    Event::Decl(_) | Event::Text(_) | Event::CData(_)
-  ) {
-    reader.next()?;
-  }
-
-  Ok(reader)
+  Ok(IoReader::new(xml_reader))
 }
 
 #[inline]
@@ -175,16 +112,7 @@ pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
   let mut xml_reader = quick_xml::Reader::from_str(s);
   xml_reader.config_mut().check_end_names = false;
 
-  let mut reader = SliceReader::new(xml_reader);
-
-  while matches!(
-    reader.peek()?,
-    Event::Decl(_) | Event::Text(_) | Event::CData(_)
-  ) {
-    reader.next()?;
-  }
-
-  Ok(reader)
+  Ok(SliceReader::new(xml_reader))
 }
 
 #[inline]
@@ -197,3 +125,36 @@ pub fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
     )),
   }
 }
+
+macro_rules! expect_event_start {
+  ($xml_reader:expr, $xml_event:expr, $tag_prefix:expr, $tag:expr) => {{
+    if let Some((e, empty_tag)) = $xml_event {
+      (e, empty_tag)
+    } else {
+      let (e, empty_tag) = loop {
+        match $xml_reader.next()? {
+          quick_xml::events::Event::Start(b) => break (b, false),
+          quick_xml::events::Event::Empty(b) => break (b, true),
+          quick_xml::events::Event::Eof => {
+            return Err(super::super::common::SdkError::UnknownError)
+          }
+          _ => continue,
+        }
+      };
+
+      match e.name().as_ref() {
+        $tag_prefix | $tag => (),
+        _ => {
+          Err(super::super::common::SdkError::MismatchError {
+            expected: String::from_utf8_lossy($tag).to_string(),
+            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
+          })?;
+        }
+      }
+
+      (e, empty_tag)
+    }
+  }};
+}
+
+pub(crate) use expect_event_start;

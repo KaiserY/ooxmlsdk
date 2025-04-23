@@ -12,7 +12,7 @@ impl std::str::FromStr for Relationships {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 }
 
@@ -22,27 +22,19 @@ impl Relationships {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
-  pub fn deserialize_self<'de, R: super::super::common::XmlReader<'de>>(
+  pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    with_xmlns: bool,
+    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, super::super::common::SdkError> {
-    let mut with_xmlns = with_xmlns;
-
-    let mut empty_tag = false;
-
-    let e = match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => e,
-      quick_xml::events::Event::Empty(e) => {
-        empty_tag = true;
-        e
-      }
-      _ => Err(super::super::common::SdkError::CommonError(
-        "Relationships".to_string(),
-      ))?,
-    };
+    let (e, empty_tag) = super::super::common::expect_event_start!(
+      xml_reader,
+      xml_event,
+      b"w:Relationships",
+      b"Relationships"
+    );
 
     let mut xmlns = None;
 
@@ -67,67 +59,46 @@ impl Relationships {
               String::from_utf8_lossy(&key[6..]).to_string(),
               attr.unescape_value()?.to_string(),
             );
-            if key == b"xmlns:w" {
-              with_xmlns = true;
-            }
           }
         }
       }
     }
 
-    if with_xmlns {
-      if e.name().as_ref() != b"w:Relationships" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "w:Relationships".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
-      }
-    } else if e.name().local_name().as_ref() != b"Relationships" {
-      Err(super::super::common::SdkError::MismatchError {
-        expected: "Relationships".to_string(),
-        found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-      })?;
-    }
-
     if !empty_tag {
       loop {
-        let peek_event = xml_reader.peek()?;
-        match peek_event {
-          quick_xml::events::Event::Start(e) | quick_xml::events::Event::Empty(e) => {
-            if with_xmlns {
-              match e.name().as_ref() {
-                b"w:Relationship" => {
-                  relationship.push(Relationship::deserialize_self(xml_reader, with_xmlns)?);
-                }
-                _ => Err(super::super::common::SdkError::CommonError(
-                  "Relationships".to_string(),
-                ))?,
-              }
-            } else {
-              match e.name().local_name().as_ref() {
-                b"Relationship" => {
-                  relationship.push(Relationship::deserialize_self(xml_reader, with_xmlns)?);
-                }
-                _ => Err(super::super::common::SdkError::CommonError(
-                  "Relationships".to_string(),
-                ))?,
-              }
-            }
+        let mut e_opt: Option<quick_xml::events::BytesStart<'_>> = None;
+        let mut e_empty = false;
+
+        match xml_reader.next()? {
+          quick_xml::events::Event::Start(e) => {
+            e_opt = Some(e);
           }
-          quick_xml::events::Event::End(e) => {
-            if with_xmlns {
-              if e.name().as_ref() == b"w:Relationships" {
-                break;
-              }
-            } else if e.name().local_name().as_ref() == b"Relationships" {
+          quick_xml::events::Event::Empty(e) => {
+            e_empty = true;
+            e_opt = Some(e);
+          }
+          quick_xml::events::Event::End(e) => match e.name().as_ref() {
+            b"w:Relationships" | b"Relationships" => {
               break;
             }
-
-            xml_reader.next()?;
-          }
+            _ => (),
+          },
           quick_xml::events::Event::Eof => Err(super::super::common::SdkError::UnknownError)?,
-          _ => {
-            xml_reader.next()?;
+          _ => (),
+        }
+
+        if let Some(e) = e_opt {
+          match e.name().as_ref() {
+            b"w:Relationship" | b"Relationship" => {
+              relationship.push(Relationship::deserialize_inner(
+                xml_reader,
+                Some((e, e_empty)),
+              )?);
+            }
+
+            _ => Err(super::super::common::SdkError::CommonError(
+              "Types".to_string(),
+            ))?,
           }
         }
       }
@@ -222,7 +193,7 @@ impl Relationship {
   pub fn from_str(s: &str) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_str_inner(s)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
   pub fn from_reader<R: std::io::BufRead>(
@@ -230,77 +201,62 @@ impl Relationship {
   ) -> Result<Self, super::super::common::SdkError> {
     let mut xml_reader = super::super::common::from_reader_inner(reader)?;
 
-    Self::deserialize_self(&mut xml_reader, false)
+    Self::deserialize_inner(&mut xml_reader, None)
   }
 
-  pub fn deserialize_self<'de, R: super::super::common::XmlReader<'de>>(
+  pub fn deserialize_inner<'de, R: super::super::common::XmlReader<'de>>(
     xml_reader: &mut R,
-    with_xmlns: bool,
+    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, super::super::common::SdkError> {
-    let mut with_xmlns = with_xmlns;
+    let (e, _) = super::super::common::expect_event_start!(
+      xml_reader,
+      xml_event,
+      b"w:Relationship",
+      b"Relationship"
+    );
 
-    if let quick_xml::events::Event::Empty(e) = xml_reader.next()? {
-      let mut target_mode = None;
+    let mut target_mode = None;
 
-      let mut target = None;
+    let mut target = None;
 
-      let mut r#type = None;
+    let mut r#type = None;
 
-      let mut id = None;
+    let mut id = None;
 
-      for attr in e.attributes() {
-        let attr = attr?;
-        match attr.key.as_ref() {
-          b"TargetMode" => {
-            target_mode = Some(TargetMode::from_str(&attr.unescape_value()?)?);
-          }
-          b"Target" => {
-            target = Some(attr.unescape_value()?.to_string());
-          }
-          b"Type" => {
-            r#type = Some(attr.unescape_value()?.to_string());
-          }
-          b"Id" => {
-            id = Some(attr.unescape_value()?.to_string());
-          }
-          b"xmlns:w" => with_xmlns = true,
-          _ => {}
+    for attr in e.attributes().with_checks(false) {
+      let attr = attr?;
+
+      match attr.key.as_ref() {
+        b"TargetMode" => {
+          target_mode = Some(TargetMode::from_str(&attr.unescape_value()?)?);
         }
-      }
-
-      if with_xmlns {
-        if e.name().as_ref() != b"w:Relationship" {
-          Err(super::super::common::SdkError::MismatchError {
-            expected: "w:Relationship".to_string(),
-            found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-          })?;
+        b"Target" => {
+          target = Some(attr.unescape_value()?.to_string());
         }
-      } else if e.name().local_name().as_ref() != b"Relationship" {
-        Err(super::super::common::SdkError::MismatchError {
-          expected: "Relationship".to_string(),
-          found: String::from_utf8_lossy(e.name().as_ref()).to_string(),
-        })?;
+        b"Type" => {
+          r#type = Some(attr.unescape_value()?.to_string());
+        }
+        b"Id" => {
+          id = Some(attr.unescape_value()?.to_string());
+        }
+        _ => {}
       }
-
-      let target =
-        target.ok_or_else(|| super::super::common::SdkError::CommonError("target".to_string()))?;
-
-      let r#type =
-        r#type.ok_or_else(|| super::super::common::SdkError::CommonError("type".to_string()))?;
-
-      let id = id.ok_or_else(|| super::super::common::SdkError::CommonError("id".to_string()))?;
-
-      Ok(Self {
-        target_mode,
-        target,
-        r#type,
-        id,
-      })
-    } else {
-      Err(super::super::common::SdkError::CommonError(
-        "FrameProperties".to_string(),
-      ))?
     }
+
+    let target =
+      target.ok_or_else(|| super::super::common::SdkError::CommonError("target".to_string()))?;
+
+    let r#type =
+      r#type.ok_or_else(|| super::super::common::SdkError::CommonError("type".to_string()))?;
+
+    let id = id.ok_or_else(|| super::super::common::SdkError::CommonError("id".to_string()))?;
+
+    Ok(Self {
+      target_mode,
+      target,
+      r#type,
+      id,
+    })
   }
 }
 

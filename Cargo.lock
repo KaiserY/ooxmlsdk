@@ -605,6 +605,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
+name = "ooxmlsdk"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk-build",
+ "quick-xml 0.37.4",
+ "thiserror 2.0.12",
+ "zip",
+]
+
+[[package]]
 name = "ooxmlsdk-build"
 version = "0.2.2"
 dependencies = [
@@ -768,6 +778,34 @@ checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "read_docx"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "read_pptx"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "read_write_xml"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "read_xlsx"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
 ]
 
 [[package]]
@@ -1244,6 +1282,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags 2.9.0",
+]
+
+[[package]]
+name = "write_docx"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "write_pptx"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
+]
+
+[[package]]
+name = "write_xlsx"
+version = "0.2.2"
+dependencies = [
+ "ooxmlsdk",
 ]
 
 [[package]]

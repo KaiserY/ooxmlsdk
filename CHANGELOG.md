@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.2.2
+
+### New Features
+
+### Bug Fixes
+
+### Misc Changes
+
+- Improve read & write performance.
+
 ## 0.2.1
 
 ### New Features

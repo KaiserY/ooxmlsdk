@@ -49,21 +49,9 @@ fn serde_from_str() {
 }
 
 fn to_str() {
-  let t = ooxmlsdk_build::includes::packages::opc_content_types::Override {
-    content_type: "aa".to_string(),
-    part_name: "aa".to_string(),
-  };
+  let t = ooxmlsdk_build::includes::packages::opc_content_types::Types::from_str(XML).unwrap();
 
-  let _ = t.to_string_with_xmlns(false);
-}
-
-fn fmt_str() {
-  let t = ooxmlsdk_build::includes::packages::opc_content_types::Override {
-    content_type: "aa".to_string(),
-    part_name: "aa".to_string(),
-  };
-
-  let _ = t.to_string();
+  let _ = t.to_xml();
 }
 
 fn bench_from_str(c: &mut Criterion) {
@@ -78,14 +66,10 @@ fn bench_to_str(c: &mut Criterion) {
   c.bench_function("to_str", |b| b.iter(|| to_str()));
 }
 
-fn bench_fmt_str(c: &mut Criterion) {
-  c.bench_function("fmt_str", |b| b.iter(|| fmt_str()));
-}
-
 criterion_group!(
   name = benches;
   config = Criterion::default().with_profiler(PProfProfiler::new(100, Output::Flamegraph(None)));
-  targets = bench_from_str, bench_serde_from_str, bench_to_str, bench_fmt_str
+  targets = bench_from_str, bench_serde_from_str, bench_to_str
 );
 
 criterion_main!(benches);

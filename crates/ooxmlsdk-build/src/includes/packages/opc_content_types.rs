@@ -121,18 +121,25 @@ impl Types {
 
 impl Types {
   pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-    self.to_string_inner(if let Some(xmlns) = &self.xmlns {
-      xmlns != "http://schemas.openxmlformats.org/package/2006/content-types"
-    } else {
-      true
-    })
-  }
-
-  pub fn to_string_inner(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
-    use std::fmt::Write;
-
     let mut writer = String::with_capacity(32);
 
+    self.write_xml(
+      &mut writer,
+      if let Some(xmlns) = &self.xmlns {
+        xmlns != "http://schemas.openxmlformats.org/package/2006/content-types"
+      } else {
+        true
+      },
+    )?;
+
+    Ok(writer)
+  }
+
+  pub(crate) fn write_xml<W: std::fmt::Write>(
+    &self,
+    writer: &mut W,
+    with_xmlns: bool,
+  ) -> Result<(), std::fmt::Error> {
     writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
 
     writer.write_char('<')?;
@@ -166,12 +173,11 @@ impl Types {
     writer.write_char('>')?;
 
     for child in &self.children {
-      let child_str = match child {
-        TypesChildChoice::Default(child) => child.to_string_with_xmlns(with_xmlns)?,
-        TypesChildChoice::Override(child) => child.to_string_with_xmlns(with_xmlns)?,
-        TypesChildChoice::None => "".to_string(),
-      };
-      writer.write_str(&child_str)?;
+      match child {
+        TypesChildChoice::Default(child) => child.write_xml(writer, with_xmlns)?,
+        TypesChildChoice::Override(child) => child.write_xml(writer, with_xmlns)?,
+        TypesChildChoice::None => (),
+      }
     }
 
     writer.write_str("</")?;
@@ -184,7 +190,7 @@ impl Types {
 
     writer.write_char('>')?;
 
-    Ok(writer)
+    Ok(())
   }
 }
 
@@ -252,14 +258,18 @@ impl Default {
 
 impl Default {
   pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-    self.to_string_with_xmlns(false)
-  }
-
-  pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
-    use std::fmt::Write;
-
     let mut writer = String::with_capacity(32);
 
+    self.write_xml(&mut writer, false)?;
+
+    Ok(writer)
+  }
+
+  pub(crate) fn write_xml<W: std::fmt::Write>(
+    &self,
+    writer: &mut W,
+    with_xmlns: bool,
+  ) -> Result<(), std::fmt::Error> {
     writer.write_char('<')?;
 
     if with_xmlns {
@@ -282,7 +292,7 @@ impl Default {
 
     writer.write_str("/>")?;
 
-    Ok(writer)
+    Ok(())
   }
 }
 
@@ -350,20 +360,24 @@ impl Override {
 
 impl std::fmt::Display for Override {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.to_string_with_xmlns(false)?)
+    write!(f, "{}", self.to_xml()?)
   }
 }
 
 impl Override {
   pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-    self.to_string_with_xmlns(false)
-  }
-
-  pub fn to_string_with_xmlns(&self, with_xmlns: bool) -> Result<String, std::fmt::Error> {
-    use std::fmt::Write;
-
     let mut writer = String::with_capacity(32);
 
+    self.write_xml(&mut writer, false)?;
+
+    Ok(writer)
+  }
+
+  pub(crate) fn write_xml<W: std::fmt::Write>(
+    &self,
+    writer: &mut W,
+    with_xmlns: bool,
+  ) -> Result<(), std::fmt::Error> {
     if with_xmlns {
       writer.write_str("<w:Override")?;
     } else {
@@ -380,6 +394,6 @@ impl Override {
 
     writer.write_str("/>")?;
 
-    Ok(writer)
+    Ok(())
   }
 }

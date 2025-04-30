@@ -180,7 +180,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
           if p.occurs.is_empty() {
             child_stmt_list.push(
               parse2(quote! {
-                writer.write_str(&self.#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
+                self.#child_name_ident.write_xml(writer, xmlns_prefix)?;
               })
               .unwrap(),
             );
@@ -188,7 +188,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
             child_stmt_list.push(
               parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
+                  #child_name_ident.write_xml(writer, xmlns_prefix)?;
                 }
               })
               .unwrap(),
@@ -197,7 +197,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_xml_inner(xmlns_prefix)?)?;
+                  child.write_xml(writer, xmlns_prefix)?;
                 }
               })
               .unwrap(),
@@ -227,11 +227,9 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
 
         children_writer = quote! {
           for child in &self.children {
-            let child_str = match child {
+            match child {
               #( #child_arms )*
             };
-
-            writer.write_str(&child_str)?;
           }
         };
 
@@ -330,7 +328,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
           if p.occurs.is_empty() {
             child_stmt_list.push(
               parse2(quote! {
-                writer.write_str(&self.#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
+                self.#child_name_ident.write_xml(writer, xmlns_prefix)?;
               })
               .unwrap(),
             );
@@ -338,7 +336,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
             child_stmt_list.push(
               parse2(quote! {
                 if let Some(#child_name_ident) = &self.#child_name_ident {
-                  writer.write_str(&#child_name_ident.to_xml_inner(xmlns_prefix)?)?;
+                  #child_name_ident.write_xml(writer, xmlns_prefix)?;
                 }
               })
               .unwrap(),
@@ -347,7 +345,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
             child_stmt_list.push(
               parse2(quote! {
                 for child in &self.#child_name_ident {
-                  writer.write_str(&child.to_xml_inner(xmlns_prefix)?)?;
+                  child.write_xml(writer, xmlns_prefix)?;
                 }
               })
               .unwrap(),
@@ -373,11 +371,9 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
       } else {
         children_writer = quote! {
           for child in &self.children {
-            let child_str = match child {
+            match child {
               #( #child_arms )*
             };
-
-            writer.write_str(&child_str)?;
           }
         };
 
@@ -474,7 +470,10 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
     {
       parse2(quote! {
         pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-          self.to_xml_inner(
+          let mut writer = String::with_capacity(32);
+
+          self.write_xml(
+            &mut writer,
             if let Some(xmlns) = &self.xmlns {
               if xmlns == #xmlns_uri_str {
                 #xmlns_prefix_str
@@ -483,15 +482,21 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
               }
             } else {
               ""
-            }
-          )
+            },
+          )?;
+
+          Ok(writer)
         }
       })
       .unwrap()
     } else {
       parse2(quote! {
         pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-          self.to_xml_inner("")
+          let mut writer = String::with_capacity(32);
+
+          self.write_xml(&mut writer, "")?;
+
+          Ok(writer)
         }
       })
       .unwrap()
@@ -502,11 +507,11 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
         impl #struct_type {
           #to_xml_fn
 
-          pub(crate) fn to_xml_inner(&self, xmlns_prefix: &str) -> Result<String, std::fmt::Error> {
-            use std::fmt::Write;
-
-            let mut writer = String::with_capacity(32);
-
+          pub(crate) fn write_xml<W: std::fmt::Write>(
+            &self,
+            writer: &mut W,
+            xmlns_prefix: &str,
+          ) -> Result<(), std::fmt::Error> {
             #xml_header_writer
 
             if xmlns_prefix == #last_name_prefix {
@@ -525,7 +530,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
 
             #end_writer
 
-            Ok(writer)
+            Ok(())
           }
         }
       })
@@ -601,7 +606,7 @@ fn gen_child_arm(child: &OpenXmlSchemaTypeChild, child_choice_enum_type: &Type) 
     parse_str(&child_rename_ser_str.to_upper_camel_case()).unwrap();
 
   parse2(quote! {
-    #child_choice_enum_type::#child_variant_name_ident(child) => child.to_xml_inner(xmlns_prefix)?,
+    #child_choice_enum_type::#child_variant_name_ident(child) => child.write_xml(writer, xmlns_prefix)?,
   })
   .unwrap()
 }

@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.2.3
+
+### New Features
+
+### Bug Fixes
+
+### Misc Changes
+
+- Bump the deps version (`zip` to `4.2.0` etc.)
+
 ## 0.2.2
 
 ### New Features

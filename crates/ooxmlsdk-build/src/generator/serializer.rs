@@ -92,11 +92,11 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
     let last_name_prefix = &last_name[0..last_name.find(':').unwrap()];
     let last_name_suffix = &last_name[last_name.find(':').unwrap() + 1..last_name.len()];
 
-    let last_name_start_tag = format!("<{}", last_name);
-    let last_name_suffix_start_tag = format!("<{}", last_name_suffix);
+    let last_name_start_tag = format!("<{last_name}");
+    let last_name_suffix_start_tag = format!("<{last_name_suffix}");
 
-    let last_name_end_tag = format!("</{}>", last_name);
-    let last_name_suffix_end_tag = format!("</{}>", last_name_suffix);
+    let last_name_end_tag = format!("</{last_name}>");
+    let last_name_suffix_end_tag = format!("</{last_name_suffix}>");
 
     let end_tag_writer;
 
@@ -390,7 +390,7 @@ pub fn gen_serializer(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
         };
       }
     } else {
-      panic!("{:?}", t);
+      panic!("{t:?}");
     };
 
     let attr_writer = quote! {
@@ -575,7 +575,7 @@ fn gen_attr(attr: &OpenXmlSchemaTypeAttribute) -> TokenStream {
     }
   }
 
-  let attr_name_fmt_str = format!(" {}=\"", attr_name_str);
+  let attr_name_fmt_str = format!(" {attr_name_str}=\"");
 
   if required {
     quote! {

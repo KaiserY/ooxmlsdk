@@ -39,8 +39,7 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
         parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case())).unwrap()
       };
 
-      let variant_value_literal: LitByteStr =
-        parse_str(&format!("b\"{}\"", variant_value)).unwrap();
+      let variant_value_literal: LitByteStr = parse_str(&format!("b\"{variant_value}\"")).unwrap();
 
       variants.push(
         parse2(quote! {
@@ -117,8 +116,8 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
       [prefix_type_name_str.find(':').unwrap() + 1..prefix_type_name_str.len()];
 
     let prefix_type_name_literal: LitByteStr =
-      parse_str(&format!("b\"{}\"", prefix_type_name_str)).unwrap();
-    let type_name_literal: LitByteStr = parse_str(&format!("b\"{}\"", type_name_str)).unwrap();
+      parse_str(&format!("b\"{prefix_type_name_str}\"")).unwrap();
+    let type_name_literal: LitByteStr = parse_str(&format!("b\"{type_name_str}\"")).unwrap();
 
     let mut field_declaration_list: Vec<Stmt> = vec![];
     let mut attr_match_list: Vec<Arm> = vec![];
@@ -414,7 +413,7 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
         loop_match_arm_list.push(gen_simple_child_match_arm(base_first_name, gen_context));
       }
     } else {
-      panic!("{:?}", t);
+      panic!("{t:?}");
     };
 
     for attr in &attributes {
@@ -674,11 +673,10 @@ fn gen_one_sequence_match_arm(
     parse_str(&escape_snake_case(child.property_name.to_snake_case())).unwrap()
   };
 
-  let child_last_name_literal: LitByteStr =
-    parse_str(&format!("b\"{}\"", child_last_name)).unwrap();
+  let child_last_name_literal: LitByteStr = parse_str(&format!("b\"{child_last_name}\"")).unwrap();
 
   let child_suffix_last_name_literal: LitByteStr =
-    parse_str(&format!("b\"{}\"", child_suffix_last_name)).unwrap();
+    parse_str(&format!("b\"{child_suffix_last_name}\"")).unwrap();
 
   let child_variant_type: Type = parse_str(&format!(
     "crate::schemas::{}::{}",
@@ -740,11 +738,10 @@ fn gen_child_match_arm(
   let child_suffix_last_name =
     &child_last_name[child_last_name.find(':').unwrap() + 1..child_last_name.len()];
 
-  let child_last_name_literal: LitByteStr =
-    parse_str(&format!("b\"{}\"", child_last_name)).unwrap();
+  let child_last_name_literal: LitByteStr = parse_str(&format!("b\"{child_last_name}\"")).unwrap();
 
   let child_suffix_last_name_literal: LitByteStr =
-    parse_str(&format!("b\"{}\"", child_suffix_last_name)).unwrap();
+    parse_str(&format!("b\"{child_suffix_last_name}\"")).unwrap();
 
   let child_variant_name_ident: Ident = parse_str(&child_last_name.to_upper_camel_case()).unwrap();
 
@@ -795,13 +792,13 @@ fn gen_simple_child_match_arm(first_name: &str, gen_context: &GenContext) -> Arm
     let simple_type_str = simple_type_mapping(first_name);
 
     let enum_type: Type =
-      parse_str(&format!("crate::schemas::simple_type::{}", simple_type_str)).unwrap();
+      parse_str(&format!("crate::schemas::simple_type::{simple_type_str}")).unwrap();
 
     parse2(match simple_type_str {
       "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
       | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          xml_content = Some(t.unescape()?.to_string());
+          xml_content = Some(t.decode()?.to_string());
         }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
@@ -812,7 +809,7 @@ fn gen_simple_child_match_arm(first_name: &str, gen_context: &GenContext) -> Arm
       "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
       | "UInt64Value" | "DoubleValue" | "SingleValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          xml_content = Some(t.unescape()?.parse::<#enum_type>()?);
+          xml_content = Some(t.decode()?.parse::<#enum_type>()?);
         }
       },
       _ => panic!("{}", simple_type_str),
@@ -834,7 +831,7 @@ fn gen_field_match_arm(attr: &OpenXmlSchemaTypeAttribute, gen_context: &GenConte
     parse_str(&escape_snake_case(attr.property_name.to_snake_case())).unwrap()
   };
 
-  let attr_name_literal: LitByteStr = parse_str(&format!("b\"{}\"", attr_name_str)).unwrap();
+  let attr_name_literal: LitByteStr = parse_str(&format!("b\"{attr_name_str}\"")).unwrap();
 
   parse2(if attr.r#type.starts_with("ListValue<") {
     quote! {

@@ -113,105 +113,105 @@ impl CoreProperties {
             match e.name().as_ref() {
               b"cp:category" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  category = Some(t.unescape()?.to_string())
+                  category = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"cp:contentStatus" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  content_status = Some(t.unescape()?.to_string())
+                  content_status = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dcterms:created" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  created = Some(t.unescape()?.to_string())
+                  created = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dc:creator" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  creator = Some(t.unescape()?.to_string())
+                  creator = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dc:description" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  description = Some(t.unescape()?.to_string())
+                  description = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dc:identifier" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  identifier = Some(t.unescape()?.to_string())
+                  identifier = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"cp:keywords" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  keywords = Some(t.unescape()?.to_string())
+                  keywords = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dc:language" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  language = Some(t.unescape()?.to_string())
+                  language = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"cp:lastModifiedBy" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  last_modified_by = Some(t.unescape()?.to_string())
+                  last_modified_by = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"cp:lastPrinted" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  last_printed = Some(t.unescape()?.to_string())
+                  last_printed = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dcterms:modified" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  modified = Some(t.unescape()?.to_string())
+                  modified = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"cp:revision" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  revision = Some(t.unescape()?.to_string())
+                  revision = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dc:subject" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  subject = Some(t.unescape()?.to_string())
+                  subject = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"dc:title" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  title = Some(t.unescape()?.to_string())
+                  title = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;
               }
               b"cp:version" => {
                 if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-                  version = Some(t.unescape()?.to_string())
+                  version = Some(t.decode()?.to_string())
                 }
 
                 xml_reader.next()?;

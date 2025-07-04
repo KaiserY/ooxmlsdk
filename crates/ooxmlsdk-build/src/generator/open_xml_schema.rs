@@ -155,7 +155,7 @@ pub fn gen_open_xml_schemas(schema: &OpenXmlSchema, gen_context: &GenContext) ->
         });
       }
     } else {
-      panic!("{:?}", t);
+      panic!("{t:?}");
     }
 
     let struct_name_ident: Ident = parse_str(&t.class_name.to_upper_camel_case()).unwrap();
@@ -173,10 +173,7 @@ pub fn gen_open_xml_schemas(schema: &OpenXmlSchema, gen_context: &GenContext) ->
     } else {
       let qualified_str = &t.name[t.name.find('/').unwrap() + 1..t.name.len()];
 
-      format!(
-        " When the object is serialized out as xml, it's qualified name is {}.",
-        qualified_str
-      )
+      format!(" When the object is serialized out as xml, it's qualified name is {qualified_str}.")
     };
 
     token_stream_list.push(quote! {

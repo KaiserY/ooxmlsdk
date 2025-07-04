@@ -269,7 +269,7 @@ pub fn gen_validators(schema: &OpenXmlSchema, gen_context: &GenContext) -> Token
         }
       }
     } else {
-      panic!("{:?}", t);
+      panic!("{t:?}");
     }
 
     token_stream_list.push(

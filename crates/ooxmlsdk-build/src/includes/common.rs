@@ -1,4 +1,5 @@
 use quick_xml::{
+  encoding::EncodingError,
   events::{attributes::AttrError, Event},
   Reader,
 };
@@ -12,6 +13,8 @@ use thiserror::Error;
 pub enum SdkError {
   #[error("quick_xml error")]
   QuickXmlError(#[from] quick_xml::Error),
+  #[error("quick_xml encoding error")]
+  QuickEncodingError(#[from] EncodingError),
   #[error("quick_xml attr error")]
   AttrError(#[from] AttrError),
   #[error("ParseIntError")]

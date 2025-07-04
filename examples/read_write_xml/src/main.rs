@@ -8,5 +8,5 @@ fn main() {
   ))
   .unwrap();
 
-  println!("{}", value);
+  println!("{value}");
 }

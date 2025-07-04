@@ -184,7 +184,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
     field_declaration_list.push(
       parse2(quote! {
         let #part_rels_path_ident = crate::common::resolve_zip_file_path(
-          &format!("{}_rels/{}.rels", child_parent_path, part_target_str),
+          &format!("{child_parent_path}_rels/{part_target_str}.rels"),
         );
       })
       .unwrap(),
@@ -639,7 +639,7 @@ pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> Token
       parse2(quote! {
         if let Some(relationships) = &self.relationships {
           let rels_dir_path = crate::common::resolve_zip_file_path(
-            &format!("{}_rels", child_parent_path),
+            &format!("{child_parent_path}_rels"),
           );
 
           if !rels_dir_path.is_empty() && !entry_set.contains(&rels_dir_path) {

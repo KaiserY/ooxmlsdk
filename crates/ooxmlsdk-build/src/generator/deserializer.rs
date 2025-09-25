@@ -832,10 +832,10 @@ fn gen_simple_child_entity_arm(first_name: &str, gen_context: &GenContext, arms:
     if simple_type_str == "StringValue" {
       arms.push(parse2::<Arm>(quote!{
         quick_xml::events::Event::GeneralRef(t) => {
-          let entity_content = match t.decode()? {
-            std::borrow::Cow::Borrowed("amp") => "&",
-            std::borrow::Cow::Borrowed("lt") => "<",
-            std::borrow::Cow::Borrowed("gt") => ">",
+          let entity_content = match &t.decode()?.into_owned()[..] {
+            "amp" => "&",
+            "lt" => "<",
+            "gt" => ">",
             _ => "",
           };
           xml_content = Some(xml_content.unwrap_or("".to_string()) + &entity_content);

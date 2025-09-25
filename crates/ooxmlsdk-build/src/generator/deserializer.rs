@@ -798,7 +798,7 @@ fn gen_simple_child_match_arm(first_name: &str, gen_context: &GenContext) -> Arm
       "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
       | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          xml_content = Some(t.decode()?.to_string());
+          xml_content = Some(format!("{}{}", xml_content.unwrap_or("".to_string()), t.decode()?.to_string()));
         }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {

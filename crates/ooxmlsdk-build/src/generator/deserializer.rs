@@ -800,6 +800,9 @@ fn gen_simple_child_match_arm(first_name: &str, gen_context: &GenContext) -> Arm
         quick_xml::events::Event::Text(t) => {
           xml_content = Some(format!("{}{}", xml_content.unwrap_or("".to_string()), t.decode()?.to_string()));
         }
+        quick_xml::events::Event::GeneralRef(r) => {
+          xml_content = Some(format!("{}{}", xml_content.unwrap_or("".to_string()), r.xml_content()?.to_string()));
+        }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
         quick_xml::events::Event::Text(t) => {

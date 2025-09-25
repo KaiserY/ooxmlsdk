@@ -158,6 +158,7 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
       );
 
       loop_match_arm_list.push(gen_simple_child_match_arm(first_name, gen_context));
+      gen_simple_child_entity_arm(first_name, gen_context, &mut loop_match_arm_list);
     } else if t.base_class == "OpenXmlLeafElement" {
       for attr in &t.attributes {
         attributes.push(attr);
@@ -411,6 +412,7 @@ pub fn gen_deserializers(schema: &OpenXmlSchema, gen_context: &GenContext) -> To
         let base_first_name = &base_class_type.name[0..base_class_type.name.find('/').unwrap()];
 
         loop_match_arm_list.push(gen_simple_child_match_arm(base_first_name, gen_context));
+        gen_simple_child_entity_arm(base_first_name, gen_context, &mut loop_match_arm_list);
       }
     } else {
       panic!("{t:?}");
@@ -796,12 +798,14 @@ fn gen_simple_child_match_arm(first_name: &str, gen_context: &GenContext) -> Arm
 
     parse2(match simple_type_str {
       "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
-      | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
+      | "IntegerValue" | "SByteValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          xml_content = Some(format!("{}{}", xml_content.unwrap_or("".to_string()), t.decode()?.to_string()));
-        };
-        quick_xml::events::Event::GeneralRef(r) => {
-          xml_content = Some(format!("{}{}", xml_content.unwrap_or("".to_string()), r.xml_content()?.to_string()));
+          xml_content = Some(t.decode()?.to_string());
+        }
+      },
+      "StringValue" => quote! {
+        quick_xml::events::Event::Text(t) => {
+          xml_content = Some(xml_content.unwrap_or("".to_string()) + &t.decode()?);
         }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
@@ -818,6 +822,20 @@ fn gen_simple_child_match_arm(first_name: &str, gen_context: &GenContext) -> Arm
       _ => panic!("{}", simple_type_str),
     })
     .unwrap()
+  }
+}
+
+fn gen_simple_child_entity_arm(first_name: &str, gen_context: &GenContext, arms: &mut Vec<Arm>) {
+  if gen_context.enum_type_enum_map.get(first_name).is_none() {
+    let simple_type_str = simple_type_mapping(first_name);
+
+    if simple_type_str == "StringValue" {
+      arms.push(parse2::<Arm>(quote!{
+        quick_xml::events::Event::GeneralRef(t) => {
+          xml_content = Some(xml_content.unwrap_or("".to_string()) + &t.decode()?);
+        }
+      }).unwrap())
+    }
   }
 }
 

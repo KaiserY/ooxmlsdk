@@ -27,3 +27,6 @@ crates/ooxmlsdk-build/src/serializers
 crates/ooxmlsdk-build/src/common
 crates/ooxmlsdk-build/src/validators
 crates/ooxmlsdk-build/src/packages
+
+samples/
+sdk_data/

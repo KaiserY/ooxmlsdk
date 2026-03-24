@@ -1,11 +1,11 @@
 [workspace]
-resolver = "2"
-members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build", "examples/*"]
+resolver = "3"
+members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build"]
 
 [workspace.package]
-version = "0.3.0"
-edition = "2021"
-rust-version = "1.73"
+version = "0.4.0"
+edition = "2024"
+rust-version = "1.88"
 authors = ["KaiserY"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/KaiserY/ooxmlsdk"
@@ -16,18 +16,18 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { version = "0.3.0", path = "crates/ooxmlsdk", default-features = false }
-ooxmlsdk-build = { version = "0.3.0", path = "crates/ooxmlsdk-build" }
-quick-xml = "0.38.0"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_derive = "1.0.219"
-serde_json = "1.0.140"
-quote = "1.0.40"
-syn = "2.0.104"
-prettyplease = "0.2.35"
-proc-macro2 = "1.0.95"
+ooxmlsdk = { version = "0.4.0", path = "crates/ooxmlsdk", default-features = false }
+ooxmlsdk-build = { version = "0.4.0", path = "crates/ooxmlsdk-build" }
+quick-xml = "0.39.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_derive = "1.0.228"
+serde_json = "1.0.149"
+quote = "1.0.45"
+syn = "2.0.117"
+prettyplease = "0.2.37"
+proc-macro2 = "1.0.106"
 heck = "0.5.0"
-zip = { version = "4.2.0", default-features = false, features = ["deflate"] }
-thiserror = "2.0.12"
-criterion = "0.5.1"
-pprof = { version = "0.14", features = ["criterion", "flamegraph"] }
+zip = { version = "8.4.0", default-features = false, features = ["deflate"] }
+thiserror = "2.0.18"
+criterion = "0.8.2"
+pprof = { version = "0.15", features = ["criterion", "flamegraph"] }

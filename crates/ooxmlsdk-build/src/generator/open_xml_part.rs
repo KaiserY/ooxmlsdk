@@ -1,11 +1,11 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, parse_str, Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type};
+use syn::{Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemStruct, Stmt, Type, parse_str, parse2};
 
+use crate::GenContext;
 use crate::models::OpenXmlPart;
 use crate::utils::get_or_panic;
-use crate::GenContext;
 
 pub fn gen_open_xml_parts(part: &OpenXmlPart, gen_context: &GenContext) -> TokenStream {
   let relationship_type_str = &part.relationship_type;

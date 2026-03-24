@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::{fs, path::Path};
-use syn::{parse_str, Ident, ItemMod};
+use syn::{Ident, ItemMod, parse_str};
 
 use crate::generator::context::GenContext;
 use crate::generator::deserializer::gen_deserializers;
@@ -13,6 +13,7 @@ use crate::generator::validator::gen_validators;
 pub mod generator;
 pub mod includes;
 pub mod models;
+pub mod sdk_data;
 pub mod utils;
 
 pub fn generate(data_dir: &str, out_dir: &str) {
@@ -331,5 +332,11 @@ mod tests {
   #[test]
   fn test_gen() {
     generate("../ooxmlsdk/data", "src");
+  }
+
+  #[test]
+  #[ignore]
+  fn test_gen_sdk_data() {
+    sdk_data::gen_sdk_data("/root/git/Open-XML-SDK/data", "../../sdk_data").unwrap();
   }
 }

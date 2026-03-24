@@ -1,7 +1,7 @@
 use quick_xml::{
-  encoding::EncodingError,
-  events::{attributes::AttrError, Event},
   Decoder, Reader,
+  encoding::EncodingError,
+  events::{Event, attributes::AttrError},
 };
 use std::{
   io::BufRead,
@@ -151,7 +151,7 @@ macro_rules! expect_event_start {
           quick_xml::events::Event::Start(b) => break (b, false),
           quick_xml::events::Event::Empty(b) => break (b, true),
           quick_xml::events::Event::Eof => {
-            return Err(super::super::common::SdkError::UnknownError)
+            return Err(super::super::common::SdkError::UnknownError);
           }
           _ => continue,
         }

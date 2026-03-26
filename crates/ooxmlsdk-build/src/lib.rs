@@ -13,6 +13,7 @@ use crate::generator::validator::gen_validators;
 pub mod generator;
 pub mod includes;
 pub mod models;
+pub mod sdk_code;
 pub mod sdk_data;
 pub mod utils;
 
@@ -336,7 +337,8 @@ mod tests {
 
   #[test]
   #[ignore]
-  fn test_gen_sdk_data() {
+  fn test_gen_new() {
     sdk_data::gen_sdk_data("/root/git/Open-XML-SDK/data", "../../sdk_data").unwrap();
+    sdk_code::gen_sdk_code("../../sdk_data", "../ooxmlsdk/src").unwrap();
   }
 }

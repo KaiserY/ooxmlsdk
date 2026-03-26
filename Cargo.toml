@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build"]
+members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build", "crates/ooxmlsdk-test"]
 
 [workspace.package]
 version = "0.4.0"

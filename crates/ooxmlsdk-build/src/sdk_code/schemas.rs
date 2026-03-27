@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
 use crate::generator::simple_type::simple_type_mapping;
+use crate::sdk_code::helpers::{is_composite_type, is_one_sequence_flatten, supports_xmlns_fields};
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
 };
@@ -134,16 +135,8 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
       for attr in &schema_type.attributes {
         fields.push(gen_attr(attr, schema, context)?);
       }
-    } else if schema_type.base_class == "OpenXmlCompositeElement"
-      || schema_type.base_class == "CustomXmlElement"
-      || schema_type.base_class == "OpenXmlPartRootElement"
-      || schema_type.base_class == "SdtElement"
-    {
-      if !schema_type.part.is_empty()
-        || schema_type.base_class == "OpenXmlPartRootElement"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"
-      {
+    } else if is_composite_type(schema_type) {
+      if supports_xmlns_fields(schema_type, schema) {
         fields.push(quote! {
           pub xmlns: Option<String>,
         });
@@ -470,18 +463,4 @@ fn gen_one_sequence_fields(
   }
 
   Ok(fields)
-}
-
-fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
-  if schema_type.composite_type == "OneSequence" || schema_type.particle.kind == "Sequence" {
-    for particle in &schema_type.particle.items {
-      if !particle.kind.is_empty() || !particle.items.is_empty() {
-        return false;
-      }
-    }
-
-    true
-  } else {
-    false
-  }
 }

@@ -4,6 +4,9 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
+use crate::sdk_code::helpers::{
+  is_composite_type, is_one_sequence_flatten, needs_xml_header, supports_xmlns_fields,
+};
 use crate::sdk_code::schemas::CodegenContext;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeParticle,
@@ -517,36 +520,4 @@ fn split_type_name(name: &str) -> Result<(&str, &str, &str, &str)> {
     &last_name[..colon_index],
     &last_name[colon_index + 1..],
   ))
-}
-
-fn is_composite_type(schema_type: &SchemaType) -> bool {
-  schema_type.base_class == "OpenXmlCompositeElement"
-    || schema_type.base_class == "CustomXmlElement"
-    || schema_type.base_class == "OpenXmlPartRootElement"
-    || schema_type.base_class == "SdtElement"
-}
-
-fn needs_xml_header(schema_type: &SchemaType) -> bool {
-  !schema_type.part.is_empty() || schema_type.base_class == "OpenXmlPartRootElement"
-}
-
-fn supports_xmlns_fields(schema_type: &SchemaType, schema: &Schema) -> bool {
-  (!schema_type.part.is_empty() || schema_type.base_class == "OpenXmlPartRootElement")
-    || (is_composite_type(schema_type)
-      && (schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"))
-}
-
-fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
-  if schema_type.composite_type == "OneSequence" || schema_type.particle.kind == "Sequence" {
-    for particle in &schema_type.particle.items {
-      if !particle.kind.is_empty() || !particle.items.is_empty() {
-        return false;
-      }
-    }
-
-    true
-  } else {
-    false
-  }
 }

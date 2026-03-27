@@ -13,6 +13,7 @@ use crate::sdk_code::serializer::gen_schema_serializer;
 use crate::sdk_data::sdk_data_model::{Namespace as SdkDataNamespace, Schema as SdkDataSchema};
 
 pub mod deserializer;
+pub mod helpers;
 pub mod schemas;
 pub mod serializer;
 
@@ -136,16 +137,11 @@ fn write_deserializers(
 }
 
 fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Path) -> Result<()> {
-  let mut prefix_to_uri_arms: Vec<Arm> = vec![];
   let mut uri_to_prefix_arms: Vec<Arm> = vec![];
 
   for namespace in sdk_data_namespaces {
-    let prefix = namespace.prefix.as_str();
     let uri = namespace.uri.as_str();
-
-    prefix_to_uri_arms.push(parse2(quote! {
-      #prefix => Some(#uri),
-    })?);
+    let prefix = namespace.prefix.as_str();
 
     uri_to_prefix_arms.push(parse2(quote! {
       #uri => Some(#prefix),
@@ -153,14 +149,7 @@ fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Pat
   }
 
   let token_stream: TokenStream = quote! {
-    pub fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
-      match prefix {
-        #( #prefix_to_uri_arms )*
-        _ => None,
-      }
-    }
-
-    pub fn prefix_by_uri(uri: &str) -> Option<&'static str> {
+    pub(crate) fn prefix_by_uri(uri: &str) -> Option<&'static str> {
       match uri {
         #( #uri_to_prefix_arms )*
         _ => None,

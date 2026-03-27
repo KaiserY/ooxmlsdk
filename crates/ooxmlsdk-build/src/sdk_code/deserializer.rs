@@ -5,9 +5,10 @@ use std::collections::{HashMap, HashSet};
 use syn::{Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
 
 use crate::generator::simple_type::simple_type_mapping;
+use crate::sdk_code::helpers::{is_composite_type, is_one_sequence_flatten, supports_xmlns_fields};
 use crate::sdk_code::schemas::CodegenContext;
 use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeParticle,
+  Schema, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeParticle,
 };
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
@@ -147,16 +148,8 @@ pub fn gen_schema_deserializer(
       for attr in &schema_type.attributes {
         attributes.push(attr);
       }
-    } else if schema_type.base_class == "OpenXmlCompositeElement"
-      || schema_type.base_class == "CustomXmlElement"
-      || schema_type.base_class == "OpenXmlPartRootElement"
-      || schema_type.base_class == "SdtElement"
-    {
-      if !schema_type.part.is_empty()
-        || schema_type.base_class == "OpenXmlPartRootElement"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture"
-      {
+    } else if is_composite_type(schema_type) {
+      if supports_xmlns_fields(schema_type, schema) {
         field_declaration_list.push(parse2(quote! {
           let mut xmlns = None;
         })?);
@@ -403,15 +396,8 @@ pub fn gen_schema_deserializer(
       );
     })?;
 
-    let attr_match_stmt_opt: Option<Stmt> = if (schema_type.base_class == "OpenXmlCompositeElement"
-      || schema_type.base_class == "CustomXmlElement"
-      || schema_type.base_class == "OpenXmlPartRootElement"
-      || schema_type.base_class == "SdtElement")
-      && (!schema_type.part.is_empty()
-        || schema_type.base_class == "OpenXmlPartRootElement"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/main"
-        || schema.target_namespace == "http://schemas.openxmlformats.org/drawingml/2006/picture")
-    {
+    let attr_match_stmt_opt: Option<Stmt> =
+      if is_composite_type(schema_type) && supports_xmlns_fields(schema_type, schema) {
       Some(parse2(quote! {
         for attr in e.attributes().with_checks(false) {
           let attr = attr?;
@@ -723,8 +709,7 @@ fn gen_simple_child_match_arm(
 
     Ok(parse2(quote! {
       quick_xml::events::Event::Text(t) => {
-        let value = t.decode()?;
-        xml_content = Some(value.parse::<#simple_type_name>()?);
+        xml_content = Some(#simple_type_name::from_bytes(&t.into_inner())?);
       }
     })?)
   } else {
@@ -735,17 +720,12 @@ fn gen_simple_child_match_arm(
       "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
       | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          xml_content = Some(t.decode()?.into_owned());
+          xml_content = Some(t.decode()?.to_string());
         }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
         quick_xml::events::Event::Text(t) => {
-          let value = t.decode()?;
-          xml_content = Some(crate::common::parse_bool_str(
-            value.as_ref(),
-            #owner_type,
-            "xml_content",
-          )?);
+          xml_content = Some(crate::common::parse_bool_bytes(&t.into_inner())?);
         }
       },
       "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
@@ -766,7 +746,7 @@ fn gen_simple_child_match_arm(
 
 fn gen_field_match_arm(
   attr: &SchemaTypeAttribute,
-  owner_type: &str,
+  _owner_type: &str,
   context: &CodegenContext<'_>,
 ) -> Result<Arm> {
   let attr_name_str = if attr.q_name.starts_with(':') {
@@ -786,7 +766,7 @@ fn gen_field_match_arm(
   Ok(parse2(if attr.r#type.starts_with("ListValue<") {
     quote! {
       #attr_name_literal => {
-        #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+        #attr_name_ident = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
       }
     }
   } else if attr.r#type.starts_with("EnumValue<") {
@@ -806,8 +786,7 @@ fn gen_field_match_arm(
 
     quote! {
       #attr_name_literal => {
-        let value = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
-        #attr_name_ident = Some(value.parse::<#enum_type>()?);
+        #attr_name_ident = Some(#enum_type::from_bytes(&attr.value)?);
       }
     }
   } else {
@@ -815,17 +794,12 @@ fn gen_field_match_arm(
       "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
       | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
         #attr_name_literal => {
-          #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+          #attr_name_ident = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
         }
       },
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
         #attr_name_literal => {
-          #attr_name_ident = Some(crate::common::parse_bool_attr(
-            &attr,
-            xml_reader.decoder(),
-            #owner_type,
-            #attr_name_str,
-          )?);
+          #attr_name_ident = Some(crate::common::parse_bool_bytes(&attr.value)?);
         }
       },
       "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
@@ -835,30 +809,15 @@ fn gen_field_match_arm(
 
         quote! {
           #attr_name_literal => {
-            #attr_name_ident = Some(crate::common::parse_attr_value::<#simple_type>(
-              &attr,
-              xml_reader.decoder(),
-              #owner_type,
-              #attr_name_str,
-            )?);
+            #attr_name_ident = Some(
+              attr
+                .decode_and_unescape_value(xml_reader.decoder())?
+                .parse::<#simple_type>()?,
+            );
           }
         }
       }
       _ => return Err(attr.r#type.to_string().into()),
     }
   })?)
-}
-
-fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
-  if schema_type.composite_type == "OneSequence" || schema_type.particle.kind == "Sequence" {
-    for particle in &schema_type.particle.items {
-      if !particle.kind.is_empty() || !particle.items.is_empty() {
-        return false;
-      }
-    }
-
-    true
-  } else {
-    false
-  }
 }

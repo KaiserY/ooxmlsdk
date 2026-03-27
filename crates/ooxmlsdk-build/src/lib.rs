@@ -332,7 +332,7 @@ mod tests {
 
   #[test]
   fn test_gen() {
-    generate("../ooxmlsdk/data", "src");
+    generate("../../../Open-XML-SDK/data", "src");
   }
 
   #[test]

@@ -333,12 +333,16 @@ fn gen_struct_serializer(
     })?);
 
     xmlns_attr_writer_list.push(parse2(quote! {
-      for (k, v) in &self.xmlns_map {
-        writer.write_str(" xmlns:")?;
-        writer.write_str(k)?;
-        writer.write_str("=\"")?;
-        writer.write_str(v)?;
-        writer.write_char('"')?;
+      {
+        let mut xmlns_entries: Vec<_> = self.xmlns_map.iter().collect();
+        xmlns_entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+        for (k, v) in xmlns_entries {
+          writer.write_str(" xmlns:")?;
+          writer.write_str(k)?;
+          writer.write_str("=\"")?;
+          writer.write_str(v)?;
+          writer.write_char('"')?;
+        }
       }
     })?);
 

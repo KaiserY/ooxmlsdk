@@ -5,12 +5,12 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use syn::{Ident, ItemMod, parse_str, parse2};
+use syn::{Arm, Ident, ItemMod, parse_str, parse2};
 
 use crate::sdk_code::deserializer::gen_schema_deserializer;
 use crate::sdk_code::schemas::{CodegenContext, gen_schema};
 use crate::sdk_code::serializer::gen_schema_serializer;
-use crate::sdk_data::sdk_data_model::Schema as SdkDataSchema;
+use crate::sdk_data::sdk_data_model::{Namespace as SdkDataNamespace, Schema as SdkDataSchema};
 
 pub mod deserializer;
 pub mod schemas;
@@ -29,12 +29,14 @@ type Result<T> = std::result::Result<T, BoxError>;
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
   let sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
+  let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
   let context = CodegenContext::new(&sdk_data_schemas);
 
   write_schemas(&sdk_data_schemas, &context, out_dir_path)?;
   write_deserializers(&sdk_data_schemas, &context, out_dir_path)?;
   write_serializers(&sdk_data_schemas, &context, out_dir_path)?;
+  write_namespaces(&sdk_data_namespaces, out_dir_path)?;
 
   Ok(())
 }
@@ -59,6 +61,14 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<SdkDataSchema>> 
   sdk_data_schemas.sort_by(|a, b| a.module_name.cmp(&b.module_name));
 
   Ok(sdk_data_schemas)
+}
+
+fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
+  let file = File::open(path)?;
+  let reader = BufReader::new(file);
+  let mut namespaces: Vec<SdkDataNamespace> = serde_json::from_reader(reader)?;
+  namespaces.sort_by(|left, right| left.prefix.cmp(&right.prefix).then(left.uri.cmp(&right.uri)));
+  Ok(namespaces)
 }
 
 fn write_schemas(
@@ -121,6 +131,45 @@ fn write_deserializers(
   };
   let deserializers_mod_path = out_dir_path.join("deserializers.rs");
   write_generated_module(&deserializers_mod_path, token_stream)?;
+
+  Ok(())
+}
+
+fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Path) -> Result<()> {
+  let mut prefix_to_uri_arms: Vec<Arm> = vec![];
+  let mut uri_to_prefix_arms: Vec<Arm> = vec![];
+
+  for namespace in sdk_data_namespaces {
+    let prefix = namespace.prefix.as_str();
+    let uri = namespace.uri.as_str();
+
+    prefix_to_uri_arms.push(parse2(quote! {
+      #prefix => Some(#uri),
+    })?);
+
+    uri_to_prefix_arms.push(parse2(quote! {
+      #uri => Some(#prefix),
+    })?);
+  }
+
+  let token_stream: TokenStream = quote! {
+    pub fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
+      match prefix {
+        #( #prefix_to_uri_arms )*
+        _ => None,
+      }
+    }
+
+    pub fn prefix_by_uri(uri: &str) -> Option<&'static str> {
+      match uri {
+        #( #uri_to_prefix_arms )*
+        _ => None,
+      }
+    }
+  };
+
+  let namespaces_path = out_dir_path.join("namespaces.rs");
+  write_generated_module(&namespaces_path, token_stream)?;
 
   Ok(())
 }

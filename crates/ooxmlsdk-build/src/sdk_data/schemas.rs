@@ -1,11 +1,28 @@
 use crate::sdk_data::{
   context::Context,
   sdk_data_model::{
-    Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeAttribute,
+    Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeAttribute,
     SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument, SchemaTypeChild,
     SchemaTypeParticle, SchemaTypeParticleOccur,
   },
 };
+
+pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
+  let mut namespaces: Vec<Namespace> = gen_context
+    .namespaces
+    .iter()
+    .filter(|namespace| !namespace.uri.is_empty())
+    .map(|namespace| Namespace {
+      prefix: namespace.prefix.clone(),
+      uri: namespace.uri.clone(),
+      version: namespace.version.clone(),
+    })
+    .collect();
+
+  namespaces.sort_by(|left, right| left.prefix.cmp(&right.prefix).then(left.uri.cmp(&right.uri)));
+
+  namespaces
+}
 
 pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
   let schemas: Vec<Schema> = gen_context

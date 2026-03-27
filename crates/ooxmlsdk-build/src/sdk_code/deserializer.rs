@@ -426,10 +426,14 @@ pub fn gen_schema_deserializer(
             }
             key => {
               if key.starts_with(b"xmlns:") {
-                xmlns_map.insert(
-                  String::from_utf8_lossy(&key[6..]).to_string(),
-                  crate::common::decode_attr_value(&attr, xml_reader.decoder())?,
-                );
+                let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
+                let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
+
+                if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
+                  xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
+                } else {
+                  xmlns_map.insert(prefix, uri);
+                }
               }
             }
           }

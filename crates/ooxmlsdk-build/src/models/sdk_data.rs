@@ -10,6 +10,14 @@ pub struct TypedSchema {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
+pub struct Namespace {
+  pub prefix: String,
+  pub uri: String,
+  pub version: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct Schema {
   pub target_namespace: String,
   pub prefix: String,

@@ -23,6 +23,8 @@ pub fn gen_sdk_data<P: AsRef<Path>>(data_dir: P, out_dir: P) -> Result<()> {
   fs::create_dir_all(&out_schemas_dir_path)?;
   clear_generated_json_files(&out_schemas_dir_path)?;
 
+  write_json(out_dir.join("namespaces.json"), &schemas::gen_namespaces(&gen_context))?;
+
   for schema in gen_schemas(&gen_context) {
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),

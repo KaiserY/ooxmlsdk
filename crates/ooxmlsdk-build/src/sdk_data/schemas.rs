@@ -1,11 +1,14 @@
 use crate::sdk_data::{
   context::Context,
   sdk_data_model::{
-    Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeAttribute,
-    SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument, SchemaTypeChild,
-    SchemaTypeParticle, SchemaTypeParticleOccur,
+    Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind,
+    SchemaTypeAttribute, SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument,
+    SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeKind, SchemaTypeParticle,
+    SchemaTypeParticleOccur,
   },
 };
+
+use std::collections::HashMap;
 
 pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
   let mut namespaces: Vec<Namespace> = gen_context
@@ -30,6 +33,13 @@ pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
 }
 
 pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
+  let type_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType> = gen_context
+    .schemas
+    .iter()
+    .flat_map(|schema| schema.types.iter())
+    .map(|ty| (ty.name.as_str(), ty))
+    .collect();
+
   let schemas: Vec<Schema> = gen_context
     .schemas
     .iter()
@@ -58,10 +68,10 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           part: ty.part.clone(),
           composite_type: ty.composite_type.clone(),
           base_class: ty.base_class.clone(),
-          is_leaf_text: ty.is_leaf_text,
-          is_leaf_element: ty.is_leaf_element,
-          is_derived: ty.is_derived,
+          kind: resolve_kind(ty, &type_map),
+          composite_kind: resolve_composite_kind(ty),
           is_abstract: ty.is_abstract,
+          api_kind: resolve_api_kind(ty, &type_map),
           attributes: ty
             .attributes
             .iter()
@@ -100,10 +110,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               name: child.name.clone(),
               property_name: child.property_name.clone(),
               property_comments: child.property_comments.clone(),
-              schema_module: gen_context
-                .type_name_module_name_map
-                .get(&child.name)
-                .cloned(),
             })
             .collect(),
           particle: gen_particle(&ty.particle),
@@ -131,6 +137,79 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .collect();
 
   schemas
+}
+
+fn resolve_api_kind(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> SchemaTypeApiKind {
+  if !schema_type.attributes.is_empty() || !schema_type.children.is_empty() {
+    return SchemaTypeApiKind::Struct;
+  }
+
+  if schema_type.base_class == "OpenXmlLeafTextElement" {
+    return SchemaTypeApiKind::LeafTextWrapper;
+  }
+
+  let Some(base_class_type) = resolve_derived_base_type(schema_type, type_map) else {
+    return SchemaTypeApiKind::Struct;
+  };
+
+  if base_class_type.base_class == "OpenXmlLeafTextElement"
+    && base_class_type.attributes.is_empty()
+    && base_class_type.children.is_empty()
+  {
+    SchemaTypeApiKind::LeafTextWrapper
+  } else {
+    SchemaTypeApiKind::Struct
+  }
+}
+
+fn resolve_kind(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> SchemaTypeKind {
+  match schema_type.base_class.as_str() {
+    "OpenXmlLeafTextElement" => SchemaTypeKind::LeafText,
+    "OpenXmlLeafElement" => SchemaTypeKind::Leaf,
+    "OpenXmlCompositeElement" | "CustomXmlElement" | "OpenXmlPartRootElement" | "SdtElement" => {
+      SchemaTypeKind::Composite
+    }
+    _ if resolve_derived_base_type(schema_type, type_map).is_some() => SchemaTypeKind::Derived,
+    _ => SchemaTypeKind::Struct,
+  }
+}
+
+fn resolve_composite_kind(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+) -> SchemaTypeCompositeKind {
+  if schema_type.composite_type == "OneSequence" || schema_type.particle.kind == "Sequence" {
+    for particle in &schema_type.particle.items {
+      if !particle.kind.is_empty() || !particle.items.is_empty() {
+        return SchemaTypeCompositeKind::None;
+      }
+    }
+
+    SchemaTypeCompositeKind::OneSequence
+  } else {
+    SchemaTypeCompositeKind::None
+  }
+}
+
+fn resolve_derived_base_type<'a>(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  type_map: &HashMap<&'a str, &'a crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> Option<&'a crate::sdk_data::open_xml::OpenXmlSchemaType> {
+  let base_class_type_name = schema_type
+    .name
+    .find('/')
+    .map(|index| &schema_type.name[..index + 1])?;
+
+  if base_class_type_name == schema_type.name {
+    return None;
+  }
+
+  type_map.get(base_class_type_name).copied()
 }
 
 fn gen_particle(

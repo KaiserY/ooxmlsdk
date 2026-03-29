@@ -18,7 +18,6 @@ use crate::sdk_data::{
 pub struct Context {
   pub schemas: Vec<OpenXmlSchema>,
   pub namespaces: Vec<OpenXmlNamespace>,
-  pub typed_namespaces: Vec<TypedNamespace>,
   pub type_name_module_name_map: HashMap<String, String>,
   pub namespace_uri_prefix_map: HashMap<String, String>,
   pub prefix_typed_namespace_map: HashMap<String, String>,
@@ -277,7 +276,6 @@ impl Context {
     Ok(Self {
       schemas,
       namespaces,
-      typed_namespaces,
       type_name_module_name_map,
       namespace_uri_prefix_map,
       prefix_typed_namespace_map,

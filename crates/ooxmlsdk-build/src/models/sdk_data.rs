@@ -37,13 +37,40 @@ pub struct SchemaType {
   pub part: String,
   pub composite_type: String,
   pub base_class: String,
-  pub is_leaf_text: bool,
-  pub is_leaf_element: bool,
-  pub is_derived: bool,
+  pub kind: SchemaTypeKind,
+  pub composite_kind: SchemaTypeCompositeKind,
   pub is_abstract: bool,
+  pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
   pub particle: SchemaTypeParticle,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SchemaTypeKind {
+  #[default]
+  Struct,
+  LeafText,
+  Leaf,
+  Composite,
+  Derived,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SchemaTypeCompositeKind {
+  #[default]
+  None,
+  OneSequence,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SchemaTypeApiKind {
+  #[default]
+  Struct,
+  LeafTextWrapper,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -82,7 +109,6 @@ pub struct SchemaTypeChild {
   pub name: String,
   pub property_name: String,
   pub property_comments: String,
-  pub schema_module: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

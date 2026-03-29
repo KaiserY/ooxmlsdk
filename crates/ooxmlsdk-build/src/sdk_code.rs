@@ -90,7 +90,15 @@ fn write_schemas(
 
   for sdk_data_schema in sdk_data_schemas {
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
-    write_generated_module(&schema_path, gen_schema(sdk_data_schema, context)?)?;
+    write_generated_module(
+      &schema_path,
+      gen_schema(sdk_data_schema, context).map_err(|err| {
+        format!(
+          "failed to generate schema {}: {err}",
+          sdk_data_schema.module_name
+        )
+      })?,
+    )?;
 
     push_module_decl(&mut schemas_mod_list, &sdk_data_schema.module_name)?;
   }
@@ -126,7 +134,12 @@ fn write_deserializers(
       out_deserializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &deserializer_path,
-      gen_schema_deserializer(sdk_data_schema, context)?,
+      gen_schema_deserializer(sdk_data_schema, context).map_err(|err| {
+        format!(
+          "failed to generate deserializer {}: {err}",
+          sdk_data_schema.module_name
+        )
+      })?,
     )?;
 
     push_module_decl(&mut deserializers_mod_list, &sdk_data_schema.module_name)?;
@@ -184,7 +197,12 @@ fn write_serializers(
       out_serializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &serializer_path,
-      gen_schema_serializer(sdk_data_schema, context)?,
+      gen_schema_serializer(sdk_data_schema, context).map_err(|err| {
+        format!(
+          "failed to generate serializer {}: {err}",
+          sdk_data_schema.module_name
+        )
+      })?,
     )?;
 
     push_module_decl(&mut serializers_mod_list, &sdk_data_schema.module_name)?;
@@ -206,7 +224,8 @@ fn write_include_module(path: &Path, source: &str) -> Result<()> {
 }
 
 fn write_generated_module(path: &Path, token_stream: TokenStream) -> Result<()> {
-  let syntax_tree: syn::File = parse2(token_stream)?;
+  let syntax_tree: syn::File = parse2(token_stream)
+    .map_err(|err| format!("failed to parse generated module {}: {err}", path.display()))?;
   let formatted = prettyplease::unparse(&syntax_tree);
   fs::write(path, format!("{FILE_HEADER}\n{formatted}"))?;
   Ok(())

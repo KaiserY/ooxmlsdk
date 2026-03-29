@@ -6,8 +6,8 @@ use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
 use crate::generator::simple_type::simple_type_mapping;
 use crate::sdk_code::helpers::{
-  AttrTypeKind, classify_attr_type, is_composite_type, is_one_sequence_flatten,
-  supports_xmlns_fields,
+  AttrTypeKind, classify_attr_type, is_composite_type, is_derived_type, is_leaf_element_type,
+  is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten, supports_xmlns_fields,
 };
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
@@ -22,6 +22,7 @@ pub struct CodegenContext<'a> {
   enum_type_map: HashMap<&'a str, &'a SchemaEnum>,
   enum_type_module_map: HashMap<&'a str, &'a str>,
   type_map: HashMap<&'a str, &'a SchemaType>,
+  type_module_map: HashMap<&'a str, &'a str>,
   type_prefix_map: HashMap<&'a str, &'a str>,
   enum_module_by_typed_namespace_and_name: HashMap<(&'a str, &'a str), &'a str>,
 }
@@ -31,12 +32,14 @@ impl<'a> CodegenContext<'a> {
     let mut enum_type_map = HashMap::new();
     let mut enum_type_module_map = HashMap::new();
     let mut type_map = HashMap::new();
+    let mut type_module_map = HashMap::new();
     let mut type_prefix_map = HashMap::new();
     let mut enum_module_by_typed_namespace_and_name = HashMap::new();
 
     for schema in schemas {
       for schema_type in &schema.types {
         type_map.insert(schema_type.name.as_str(), schema_type);
+        type_module_map.insert(schema_type.name.as_str(), schema.module_name.as_str());
         type_prefix_map.insert(schema_type.name.as_str(), schema.prefix.as_str());
       }
 
@@ -54,6 +57,7 @@ impl<'a> CodegenContext<'a> {
       enum_type_map,
       enum_type_module_map,
       type_map,
+      type_module_map,
       type_prefix_map,
       enum_module_by_typed_namespace_and_name,
     }
@@ -71,8 +75,25 @@ impl<'a> CodegenContext<'a> {
     self.type_map.get(name).copied()
   }
 
+  pub fn derived_base_type(&self, schema_type: &SchemaType) -> Option<&'a SchemaType> {
+    let base_type_name = schema_type
+      .name
+      .find('/')
+      .map(|index| &schema_type.name[..index + 1])?;
+
+    if base_type_name == schema_type.name {
+      return None;
+    }
+
+    self.type_by_name(base_type_name)
+  }
+
   pub fn type_prefix(&self, name: &str) -> Option<&'a str> {
     self.type_prefix_map.get(name).copied()
+  }
+
+  pub fn type_module(&self, name: &str) -> Option<&'a str> {
+    self.type_module_map.get(name).copied()
   }
 
   pub fn enum_module_by_typed_namespace_and_name(
@@ -84,6 +105,22 @@ impl<'a> CodegenContext<'a> {
       .enum_module_by_typed_namespace_and_name
       .get(&(typed_namespace, enum_name))
       .copied()
+  }
+
+  pub fn resolve_attr_enum_module<'b>(&self, attr_type: &'b str) -> Result<(&'a str, &'b str)> {
+    let AttrTypeKind::Enum {
+      typed_namespace,
+      enum_name,
+    } = classify_attr_type(attr_type).ok_or_else(|| attr_type.to_string())?
+    else {
+      return Err(attr_type.to_string().into());
+    };
+
+    let enum_module_name = self
+      .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
+      .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
+
+    Ok((enum_module_name, enum_name))
   }
 }
 
@@ -122,10 +159,66 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
   }
 
   for schema_type in &schema.types {
+    let struct_name_ident: Ident = parse_str(&schema_type.class_name.to_upper_camel_case())?;
+    let summary_doc = format!(" {}", schema_type.summary);
+    let version_doc = if schema_type.version.is_empty() {
+      " Available in Office2007 and above.".to_string()
+    } else {
+      format!(" Available in {} and above.", schema_type.version)
+    };
+    let qualified_doc = if schema_type.name.ends_with('/') {
+      " When the object is serialized out as xml, it's qualified name is .".to_string()
+    } else {
+      let qualified_str = &schema_type.name[schema_type.name.find('/').unwrap() + 1..];
+      format!(" When the object is serialized out as xml, it's qualified name is {qualified_str}.")
+    };
+
+    if is_leaf_text_wrapper(schema_type) {
+      let xml_content_type = gen_xml_content_type(schema_type, schema, context)?;
+
+      token_stream_list.push(quote! {
+        #[doc = #summary_doc]
+        #[doc = ""]
+        #[doc = #version_doc]
+        #[doc = ""]
+        #[doc = #qualified_doc]
+        #[derive(Clone, Debug, Default)]
+        pub struct #struct_name_ident(pub Option<#xml_content_type>);
+
+        impl From<#xml_content_type> for #struct_name_ident {
+          fn from(value: #xml_content_type) -> Self {
+            Self(Some(value))
+          }
+        }
+
+        impl From<Option<#xml_content_type>> for #struct_name_ident {
+          fn from(value: Option<#xml_content_type>) -> Self {
+            Self(value)
+          }
+        }
+
+        impl std::ops::Deref for #struct_name_ident {
+          type Target = Option<#xml_content_type>;
+
+          fn deref(&self) -> &Self::Target {
+            &self.0
+          }
+        }
+
+        impl std::ops::DerefMut for #struct_name_ident {
+          fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+          }
+        }
+      });
+
+      continue;
+    }
+
     let mut fields: Vec<TokenStream> = vec![];
     let mut child_choice_enum_option: Option<ItemEnum> = None;
 
-    if schema_type.base_class == "OpenXmlLeafTextElement" {
+    if is_leaf_text_type(schema_type) {
       for attr in &schema_type.attributes {
         fields.push(gen_attr(attr, schema, context)?);
       }
@@ -134,7 +227,7 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
       fields.push(quote! {
         pub xml_content: Option<#simple_type_name>,
       });
-    } else if schema_type.base_class == "OpenXmlLeafElement" {
+    } else if is_leaf_element_type(schema_type) {
       for attr in &schema_type.attributes {
         fields.push(gen_attr(attr, schema, context)?);
       }
@@ -166,12 +259,10 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
 
         child_choice_enum_option = enum_option;
       }
-    } else if schema_type.is_derived {
-      let base_class_type_name = &schema_type.name[0..schema_type.name.find('/').unwrap() + 1];
+    } else if is_derived_type(schema_type) {
       let base_class_type = context
-        .type_map
-        .get(base_class_type_name)
-        .ok_or_else(|| format!("{base_class_type_name:?}"))?;
+        .derived_base_type(schema_type)
+        .ok_or_else(|| format!("{:?}", schema_type.name))?;
 
       for attr in &schema_type.attributes {
         fields.push(gen_attr(attr, schema, context)?);
@@ -181,7 +272,7 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
         fields.push(gen_attr(attr, schema, context)?);
       }
 
-      if is_one_sequence_flatten(schema_type) && base_class_type.composite_type == "OneSequence" {
+      if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         fields.extend(gen_one_sequence_fields(schema_type, schema, context)?);
       } else {
         let (field_option, enum_option) = gen_children(schema_type, schema, context)?;
@@ -193,7 +284,7 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
         child_choice_enum_option = enum_option;
       }
 
-      if schema_type.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
+      if schema_type.children.is_empty() && is_leaf_text_type(base_class_type) {
         let simple_type_name = gen_xml_content_type(base_class_type, schema, context)?;
         fields.push(quote! {
           pub xml_content: Option<#simple_type_name>,
@@ -202,20 +293,6 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
     } else {
       return Err(format!("{schema_type:?}").into());
     }
-
-    let struct_name_ident: Ident = parse_str(&schema_type.class_name.to_upper_camel_case())?;
-    let summary_doc = format!(" {}", schema_type.summary);
-    let version_doc = if schema_type.version.is_empty() {
-      " Available in Office2007 and above.".to_string()
-    } else {
-      format!(" Available in {} and above.", schema_type.version)
-    };
-    let qualified_doc = if schema_type.name.ends_with('/') {
-      " When the object is serialized out as xml, it's qualified name is .".to_string()
-    } else {
-      let qualified_str = &schema_type.name[schema_type.name.find('/').unwrap() + 1..];
-      format!(" When the object is serialized out as xml, it's qualified name is {qualified_str}.")
-    };
 
     token_stream_list.push(quote! {
       #[doc = #summary_doc]
@@ -251,13 +328,8 @@ fn gen_attr(
   let type_ident: Type =
     match classify_attr_type(&attr.r#type).ok_or_else(|| attr.r#type.clone())? {
       AttrTypeKind::List => parse_str("String")?,
-      AttrTypeKind::Enum {
-        typed_namespace,
-        enum_name,
-      } => {
-        let enum_module_name = context
-          .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
-          .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
+      AttrTypeKind::Enum { .. } => {
+        let (enum_module_name, enum_name) = context.resolve_attr_enum_module(&attr.r#type)?;
 
         if enum_module_name != schema.module_name {
           parse_str(&format!(
@@ -343,12 +415,13 @@ fn gen_children(
     let child_variant_name_ident: Ident = parse_str(&child_last_name.to_upper_camel_case())?;
 
     let child_variant_type: Type = if *child_prefix != schema.prefix {
+      let child_module_name = context
+        .type_module(child.name.as_str())
+        .ok_or_else(|| format!("{:?}", child.name))?;
+
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        &child
-          .schema_module
-          .as_deref()
-          .ok_or_else(|| format!("{:?}", child.name))?,
+        child_module_name,
         child_type.class_name.to_upper_camel_case()
       ))?
     } else {
@@ -425,12 +498,13 @@ fn gen_one_sequence_fields(
       .ok_or_else(|| format!("{:?}", child.name))?;
 
     let child_variant_type: Type = if *child_prefix != schema.prefix {
+      let child_module_name = context
+        .type_module(child.name.as_str())
+        .ok_or_else(|| format!("{:?}", child.name))?;
+
       parse_str(&format!(
         "crate::schemas::{}::{}",
-        child
-          .schema_module
-          .as_deref()
-          .ok_or_else(|| format!("{:?}", child.name))?,
+        child_module_name,
         child_type.class_name.to_upper_camel_case()
       ))?
     } else {

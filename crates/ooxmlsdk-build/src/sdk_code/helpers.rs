@@ -1,4 +1,6 @@
-use crate::sdk_data::sdk_data_model::{Schema, SchemaType};
+use crate::sdk_data::sdk_data_model::{
+  Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind, SchemaTypeKind,
+};
 
 const DRAWINGML_MAIN_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const DRAWINGML_PICTURE_NAMESPACE: &str =
@@ -25,10 +27,23 @@ pub enum AttrTypeKind<'a> {
 }
 
 pub fn is_composite_type(schema_type: &SchemaType) -> bool {
-  schema_type.base_class == "OpenXmlCompositeElement"
-    || schema_type.base_class == "CustomXmlElement"
-    || schema_type.base_class == "OpenXmlPartRootElement"
-    || schema_type.base_class == "SdtElement"
+  schema_type.kind == SchemaTypeKind::Composite
+}
+
+pub fn is_leaf_text_wrapper(schema_type: &SchemaType) -> bool {
+  schema_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
+}
+
+pub fn is_leaf_text_type(schema_type: &SchemaType) -> bool {
+  schema_type.kind == SchemaTypeKind::LeafText
+}
+
+pub fn is_leaf_element_type(schema_type: &SchemaType) -> bool {
+  schema_type.kind == SchemaTypeKind::Leaf
+}
+
+pub fn is_derived_type(schema_type: &SchemaType) -> bool {
+  schema_type.kind == SchemaTypeKind::Derived
 }
 
 pub fn is_drawingml_namespace(schema: &Schema) -> bool {
@@ -46,17 +61,7 @@ pub fn supports_xmlns_fields(schema_type: &SchemaType, schema: &Schema) -> bool 
 }
 
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
-  if schema_type.composite_type == "OneSequence" || schema_type.particle.kind == "Sequence" {
-    for particle in &schema_type.particle.items {
-      if !particle.kind.is_empty() || !particle.items.is_empty() {
-        return false;
-      }
-    }
-
-    true
-  } else {
-    false
-  }
+  schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
 }
 
 pub fn classify_simple_type(simple_type: &str) -> Option<SimpleValueKind> {

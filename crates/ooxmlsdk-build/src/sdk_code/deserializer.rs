@@ -7,6 +7,7 @@ use syn::{Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse
 use crate::generator::simple_type::simple_type_mapping;
 use crate::sdk_code::helpers::{
   AttrTypeKind, SimpleValueKind, classify_attr_type, classify_simple_type, is_composite_type,
+  is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
   is_one_sequence_flatten, supports_xmlns_fields,
 };
 use crate::sdk_code::schemas::CodegenContext;
@@ -129,7 +130,17 @@ pub fn gen_schema_deserializer(
       child_map.insert(&child.name, child);
     }
 
-    if schema_type.base_class == "OpenXmlLeafTextElement" {
+    if is_leaf_text_wrapper(schema_type) {
+      field_declaration_list.push(parse2(quote! {
+        let mut xml_content = None;
+      })?);
+
+      loop_match_arm_list.extend(gen_simple_child_match_arms(
+        first_name,
+        class_name_literal,
+        context,
+      )?);
+    } else if is_leaf_text_type(schema_type) {
       for attr in &schema_type.attributes {
         attributes.push(attr);
       }
@@ -147,7 +158,7 @@ pub fn gen_schema_deserializer(
         class_name_literal,
         context,
       )?);
-    } else if schema_type.base_class == "OpenXmlLeafElement" {
+    } else if is_leaf_element_type(schema_type) {
       for attr in &schema_type.attributes {
         attributes.push(attr);
       }
@@ -245,11 +256,10 @@ pub fn gen_schema_deserializer(
           )?);
         }
       }
-    } else if schema_type.is_derived {
-      let base_class_type_name = &schema_type.name[0..schema_type.name.find('/').unwrap() + 1];
+    } else if is_derived_type(schema_type) {
       let base_class_type = context
-        .type_by_name(base_class_type_name)
-        .ok_or_else(|| format!("{base_class_type_name:?}"))?;
+        .derived_base_type(schema_type)
+        .ok_or_else(|| format!("{:?}", schema_type.name))?;
 
       for attr in &schema_type.attributes {
         attributes.push(attr);
@@ -259,7 +269,7 @@ pub fn gen_schema_deserializer(
         attributes.push(attr);
       }
 
-      if is_one_sequence_flatten(schema_type) && base_class_type.composite_type == "OneSequence" {
+      if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         for particle in &schema_type.particle.items {
           let child = child_map
             .get(particle.name.as_str())
@@ -303,7 +313,7 @@ pub fn gen_schema_deserializer(
         field_ident_list.push(parse2(quote! {
           children
         })?);
-      } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
+      } else if is_leaf_text_type(base_class_type) {
         field_declaration_list.push(parse2(quote! {
           let mut xml_content = None;
         })?);
@@ -319,7 +329,7 @@ pub fn gen_schema_deserializer(
         schema_type.class_name.to_upper_camel_case()
       ))?;
 
-      if is_one_sequence_flatten(schema_type) && base_class_type.composite_type == "OneSequence" {
+      if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         for particle in &schema_type.particle.items {
           let child = child_map
             .get(particle.name.as_str())
@@ -345,7 +355,7 @@ pub fn gen_schema_deserializer(
         }
       }
 
-      if schema_type.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
+      if schema_type.children.is_empty() && is_leaf_text_type(base_class_type) {
         let base_first_name = &base_class_type.name[0..base_class_type.name.find('/').unwrap()];
 
         loop_match_arm_list.extend(gen_simple_child_match_arms(
@@ -491,6 +501,18 @@ pub fn gen_schema_deserializer(
       })?);
     }
 
+    let result_expr: TokenStream = if is_leaf_text_wrapper(schema_type) {
+      quote! {
+        Ok(Self(xml_content))
+      }
+    } else {
+      quote! {
+        Ok(Self {
+          #( #field_ident_list, )*
+        })
+      }
+    };
+
     let deserialize_inner_fn: ItemFn = parse2(quote! {
       pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
@@ -526,9 +548,7 @@ pub fn gen_schema_deserializer(
 
         #( #field_unwrap_list )*
 
-        Ok(Self {
-          #( #field_ident_list, )*
-        })
+        #result_expr
       }
     })?;
 
@@ -596,9 +616,8 @@ fn gen_one_sequence_match_arm(
   let child_suffix_last_name_literal: LitByteStr =
     parse_str(&format!("b\"{child_suffix_last_name}\""))?;
 
-  let child_module_name = child
-    .schema_module
-    .as_deref()
+  let child_module_name = context
+    .type_module(child.name.as_str())
     .unwrap_or(&schema.module_name);
   let child_variant_type: Type = parse_str(&format!(
     "crate::schemas::{}::{}",
@@ -665,9 +684,8 @@ fn gen_child_match_arm(
 
   let child_variant_name_ident: Ident = parse_str(&child_last_name.to_upper_camel_case())?;
 
-  let child_module_name = child
-    .schema_module
-    .as_deref()
+  let child_module_name = context
+    .type_module(child.name.as_str())
     .unwrap_or(&schema.module_name);
   let child_variant_type: Type = parse_str(&format!(
     "crate::schemas::{}::{}",
@@ -781,13 +799,8 @@ fn gen_field_match_arm(
           #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
         }
       },
-      AttrTypeKind::Enum {
-        typed_namespace,
-        enum_name,
-      } => {
-        let enum_module_name = context
-          .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
-          .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
+      AttrTypeKind::Enum { .. } => {
+        let (enum_module_name, enum_name) = context.resolve_attr_enum_module(&attr.r#type)?;
 
         let enum_type: Type = parse_str(&format!(
           "crate::schemas::{}::{}",

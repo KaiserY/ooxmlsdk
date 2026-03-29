@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::sdk_code::helpers::{
-  is_composite_type, is_one_sequence_flatten, needs_xml_header, supports_xmlns_fields,
+  is_composite_type, is_derived_type, is_leaf_element_type, is_leaf_text_type,
+  is_leaf_text_wrapper, is_one_sequence_flatten, needs_xml_header, supports_xmlns_fields,
 };
 use crate::sdk_code::schemas::CodegenContext;
 use crate::sdk_data::sdk_data_model::{
@@ -111,7 +112,21 @@ fn gen_struct_serializer(
 
   let mut attributes: Vec<&SchemaTypeAttribute> = vec![];
 
-  if schema_type.base_class == "OpenXmlLeafTextElement" {
+  if is_leaf_text_wrapper(schema_type) {
+    children_writer = quote! {
+      if let Some(xml_content) = &self.0 {
+        crate::common::write_escaped_text(writer, xml_content)?;
+      }
+    };
+
+    end_tag_writer = quote! {
+      writer.write_char('>')?;
+    };
+
+    end_writer = quote! {
+      crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
+    };
+  } else if is_leaf_text_type(schema_type) {
     for attr in &schema_type.attributes {
       attributes.push(attr);
     }
@@ -129,7 +144,7 @@ fn gen_struct_serializer(
     end_writer = quote! {
       crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
     };
-  } else if schema_type.base_class == "OpenXmlLeafElement" {
+  } else if is_leaf_element_type(schema_type) {
     for attr in &schema_type.attributes {
       attributes.push(attr);
     }
@@ -198,11 +213,10 @@ fn gen_struct_serializer(
         crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
     }
-  } else if schema_type.is_derived {
-    let base_class_type_name = &schema_type.name[0..schema_type.name.find('/').unwrap() + 1];
+  } else if is_derived_type(schema_type) {
     let base_class_type = context
-      .type_by_name(base_class_type_name)
-      .ok_or_else(|| format!("{base_class_type_name:?}"))?;
+      .derived_base_type(schema_type)
+      .ok_or_else(|| format!("{:?}", schema_type.name))?;
 
     for attr in &schema_type.attributes {
       attributes.push(attr);
@@ -212,7 +226,7 @@ fn gen_struct_serializer(
       attributes.push(attr);
     }
 
-    if is_one_sequence_flatten(schema_type) && base_class_type.composite_type == "OneSequence" {
+    if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
       let mut child_map: HashMap<&str, &SchemaTypeChild> = HashMap::new();
 
       for child in &schema_type.children {
@@ -261,7 +275,7 @@ fn gen_struct_serializer(
       end_writer = quote! {
         crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
-    } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
+    } else if is_leaf_text_type(base_class_type) {
       children_writer = quote! {
         if let Some(xml_content) = &self.xml_content {
           crate::common::write_escaped_text(writer, xml_content)?;

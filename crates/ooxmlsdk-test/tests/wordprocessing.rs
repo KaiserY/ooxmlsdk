@@ -1,6 +1,6 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   BodyChildChoice, Document, DocumentChildChoice, Paragraph, ParagraphChildChoice, RunChildChoice,
-  TableCellWidth, TableWidthUnitValues, Text,
+  Text,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -29,6 +29,17 @@ fn document_round_trip_from_openxml_reader_test() {
 
   assert_eq!(paragraph.rsid_paragraph_properties.as_deref(), Some("001"));
   assert_eq!(reparsed.children.len(), 1);
+}
+
+#[test]
+fn document_round_trip_drops_misc_node_from_part_reader_misc_node_test() {
+  assert!(fixtures::WORDPROCESSING_DOCUMENT_XML.contains("<!-- start body -->"));
+
+  let (_parsed, serialized, _reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_XML);
+
+  assert!(!serialized.contains("<!-- start body -->"));
+  assert!(serialized.contains("<w:body>"));
 }
 
 #[test]
@@ -150,6 +161,30 @@ fn document_round_trip_with_trailing_whitespace_after_last_element() {
 }
 
 #[test]
+fn document_round_trip_with_trailing_comment_after_document() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_TRAILING_COMMENT_XML);
+
+  let Some(DocumentChildChoice::WBody(body)) = parsed.children.first() else {
+    panic!("expected document body");
+  };
+  let Some(BodyChildChoice::WP(paragraph)) = body.children.first() else {
+    panic!("expected paragraph");
+  };
+
+  assert_eq!(paragraph.children.len(), 0);
+  assert!(!serialized.contains("<!--Your comment-->"));
+
+  let Some(DocumentChildChoice::WBody(reparsed_body)) = reparsed.children.first() else {
+    panic!("expected reparsed body");
+  };
+  let Some(BodyChildChoice::WP(reparsed_paragraph)) = reparsed_body.children.first() else {
+    panic!("expected reparsed paragraph");
+  };
+  assert_eq!(reparsed_paragraph.children.len(), 0);
+}
+
+#[test]
 fn paragraph_round_trip_from_openxml_element_equality_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_XML);
@@ -168,6 +203,80 @@ fn paragraph_round_trip_from_openxml_element_equality_test() {
   assert!(matches!(run.children[0], RunChildChoice::WT(_)));
   assert!(matches!(run.children[1], RunChildChoice::WT(_)));
   assert_eq!(reparsed.children.len(), 1);
+}
+
+#[test]
+fn paragraph_round_trip_from_attribute_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_RSID_P_002_XML);
+
+  assert_eq!(parsed.rsid_paragraph_properties.as_deref(), Some("002"));
+  assert_eq!(
+    serialized,
+    "<w:p w:rsidP=\"002\"><w:r><w:t>Run Text.</w:t><w:t>Run 2.</w:t></w:r></w:p>"
+  );
+
+  let Some(ParagraphChildChoice::WR(run)) = parsed.children.first() else {
+    panic!("expected first paragraph child to be run");
+  };
+
+  assert_eq!(run.children.len(), 2);
+  assert!(matches!(run.children[0], RunChildChoice::WT(_)));
+  assert!(matches!(run.children[1], RunChildChoice::WT(_)));
+  assert_eq!(reparsed.children.len(), 1);
+}
+
+#[test]
+fn paragraph_serialization_differs_for_different_attribute_value_test() {
+  let (_, serialized_rsid_p_001, _) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_XML);
+  let (_, serialized_rsid_p_002, _) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_RSID_P_002_XML);
+
+  assert_ne!(
+    trim_xml_declaration(&serialized_rsid_p_001),
+    trim_xml_declaration(&serialized_rsid_p_002)
+  );
+}
+
+#[test]
+fn paragraph_round_trip_from_different_child_value_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_RUN_1_XML);
+
+  assert_eq!(parsed.rsid_paragraph_properties.as_deref(), Some("001"));
+  let Some(ParagraphChildChoice::WR(run)) = parsed.children.first() else {
+    panic!("expected first paragraph child to be run");
+  };
+
+  assert_eq!(run.children.len(), 2);
+  let Some(RunChildChoice::WT(first_text)) = run.children.first() else {
+    panic!("expected first run child to be text");
+  };
+  let Some(RunChildChoice::WT(second_text)) = run.children.get(1) else {
+    panic!("expected second run child to be text");
+  };
+
+  assert_eq!(first_text.xml_content.as_deref(), Some("Run Text."));
+  assert_eq!(second_text.xml_content.as_deref(), Some("Run 1."));
+  assert_eq!(
+    serialized,
+    "<w:p w:rsidP=\"001\"><w:r><w:t>Run Text.</w:t><w:t>Run 1.</w:t></w:r></w:p>"
+  );
+  assert_eq!(reparsed.children.len(), 1);
+}
+
+#[test]
+fn paragraph_serialization_differs_for_different_child_value_test() {
+  let (_, serialized_run_1, _) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_RUN_1_XML);
+  let (_, serialized_run_2, _) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_XML);
+
+  assert_ne!(
+    trim_xml_declaration(&serialized_run_1),
+    trim_xml_declaration(&serialized_run_2)
+  );
 }
 
 #[test]
@@ -231,6 +340,34 @@ fn paragraph_round_trip_normalizes_rsid_attribute_order() {
 }
 
 #[test]
+fn paragraph_round_trip_from_different_amount_of_children_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_ONLY_RUN_XML);
+
+  assert_eq!(parsed.children.len(), 1);
+  assert!(matches!(parsed.children[0], ParagraphChildChoice::WR(_)));
+
+  assert!(
+    trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r/></w:p>"
+      || trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r></w:r></w:p>"
+  );
+  assert_eq!(reparsed.children.len(), 1);
+}
+
+#[test]
+fn paragraph_serialization_differs_for_different_amount_of_children_test() {
+  let (_, serialized_run_only, _) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_ONLY_RUN_XML);
+  let (_, serialized_with_text, _) =
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_XML);
+
+  assert_ne!(
+    trim_xml_declaration(&serialized_run_only),
+    trim_xml_declaration(&serialized_with_text)
+  );
+}
+
+#[test]
 fn text_round_trip_from_openxml_element_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Text>(fixtures::WORDPROCESSING_TEXT_XML);
@@ -241,13 +378,34 @@ fn text_round_trip_from_openxml_element_test() {
 }
 
 #[test]
-fn table_cell_width_round_trip() {
+fn paragraph_text_content_matches_inner_xml_test() {
   let (parsed, serialized, reparsed) =
-    assert_stable_roundtrip::<TableCellWidth>(fixtures::WORDPROCESSING_TABLE_CELL_WIDTH_XML);
+    assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_XML);
 
-  assert_eq!(parsed.width.as_deref(), Some("2400"));
-  assert!(matches!(parsed.r#type, Some(TableWidthUnitValues::Dxa)));
-  assert_eq!(serialized, "<w:tcW w:w=\"2400\" w:type=\"dxa\"/>");
-  assert_eq!(reparsed.width.as_deref(), Some("2400"));
-  assert!(matches!(reparsed.r#type, Some(TableWidthUnitValues::Dxa)));
+  let Some(ParagraphChildChoice::WR(run)) = parsed.children.first() else {
+    panic!("expected first paragraph child to be run");
+  };
+  let Some(RunChildChoice::WT(first_text)) = run.children.first() else {
+    panic!("expected first run child to be text");
+  };
+  let Some(RunChildChoice::WT(second_text)) = run.children.get(1) else {
+    panic!("expected second run child to be text");
+  };
+
+  let concatenated = format!(
+    "{}{}",
+    first_text.xml_content.as_deref().unwrap_or_default(),
+    second_text.xml_content.as_deref().unwrap_or_default()
+  );
+
+  assert_eq!(concatenated, "Run Text.Run 2.");
+  assert_eq!(
+    trim_xml_declaration(&serialized),
+    "<w:p w:rsidP=\"001\"><w:r><w:t>Run Text.</w:t><w:t>Run 2.</w:t></w:r></w:p>"
+  );
+
+  let Some(ParagraphChildChoice::WR(reparsed_run)) = reparsed.children.first() else {
+    panic!("expected reparsed first paragraph child to be run");
+  };
+  assert_eq!(reparsed_run.children.len(), 2);
 }

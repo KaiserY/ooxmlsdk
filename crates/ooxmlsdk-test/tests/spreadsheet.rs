@@ -37,6 +37,18 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
 }
 
 #[test]
+fn shared_string_table_serialization_matches_get_stream_write_test() {
+  let (_parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<SharedStringTable>(fixtures::SPREADSHEET_SHARED_STRING_TABLE_XML);
+
+  assert_eq!(
+    trim_xml_declaration(&serialized),
+    "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><x:si><x:t>Test</x:t></x:si></x:sst>"
+  );
+  assert_eq!(reparsed.x_si.len(), 1);
+}
+
+#[test]
 fn empty_shared_string_table_round_trip_from_openxml_part_test() {
   let (parsed, serialized, reparsed) = assert_stable_roundtrip::<SharedStringTable>(
     fixtures::SPREADSHEET_SHARED_STRING_TABLE_EMPTY_XML,
@@ -53,6 +65,21 @@ fn empty_shared_string_table_round_trip_from_openxml_part_test() {
       == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
       || serialized
         == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>"
+  );
+  assert_eq!(reparsed.x_si.len(), 0);
+}
+
+#[test]
+fn empty_shared_string_table_serialization_matches_get_stream_write_no_updates_test() {
+  let (_parsed, serialized, reparsed) = assert_stable_roundtrip::<SharedStringTable>(
+    fixtures::SPREADSHEET_SHARED_STRING_TABLE_EMPTY_XML,
+  );
+
+  let serialized = trim_xml_declaration(&serialized);
+  assert!(
+    serialized == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>"
+      || serialized
+        == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
   );
   assert_eq!(reparsed.x_si.len(), 0);
 }

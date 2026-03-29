@@ -331,6 +331,7 @@ mod tests {
   use super::*;
 
   #[test]
+  #[ignore]
   fn test_gen() {
     generate("../../../Open-XML-SDK/data", "src");
   }

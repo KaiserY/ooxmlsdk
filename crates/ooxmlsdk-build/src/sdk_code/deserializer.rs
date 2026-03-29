@@ -5,7 +5,10 @@ use std::collections::{HashMap, HashSet};
 use syn::{Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
 
 use crate::generator::simple_type::simple_type_mapping;
-use crate::sdk_code::helpers::{is_composite_type, is_one_sequence_flatten, supports_xmlns_fields};
+use crate::sdk_code::helpers::{
+  AttrTypeKind, SimpleValueKind, classify_attr_type, classify_simple_type, is_composite_type,
+  is_one_sequence_flatten, supports_xmlns_fields,
+};
 use crate::sdk_code::schemas::CodegenContext;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeParticle,
@@ -139,7 +142,7 @@ pub fn gen_schema_deserializer(
         xml_content
       })?);
 
-      loop_match_arm_list.push(gen_simple_child_match_arm(
+      loop_match_arm_list.extend(gen_simple_child_match_arms(
         first_name,
         class_name_literal,
         context,
@@ -345,7 +348,7 @@ pub fn gen_schema_deserializer(
       if schema_type.children.is_empty() && base_class_type.base_class == "OpenXmlLeafTextElement" {
         let base_first_name = &base_class_type.name[0..base_class_type.name.find('/').unwrap()];
 
-        loop_match_arm_list.push(gen_simple_child_match_arm(
+        loop_match_arm_list.extend(gen_simple_child_match_arms(
           base_first_name,
           class_name_literal,
           context,
@@ -398,59 +401,59 @@ pub fn gen_schema_deserializer(
 
     let attr_match_stmt_opt: Option<Stmt> =
       if is_composite_type(schema_type) && supports_xmlns_fields(schema_type, schema) {
-      Some(parse2(quote! {
-        for attr in e.attributes().with_checks(false) {
-          let attr = attr?;
+        Some(parse2(quote! {
+          for attr in e.attributes().with_checks(false) {
+            let attr = attr?;
 
-          match attr.key.as_ref() {
-            #( #attr_match_list )*
-            b"xmlns" => {
-              xmlns = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-            }
-            b"mc:Ignorable" => {
-              mc_ignorable = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-            }
-            key => {
-              if key.starts_with(b"xmlns:") {
-                let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
-                let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
+            match attr.key.as_ref() {
+              #( #attr_match_list )*
+              b"xmlns" => {
+                xmlns = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+              }
+              b"mc:Ignorable" => {
+                mc_ignorable = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+              }
+              key => {
+                if key.starts_with(b"xmlns:") {
+                  let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
+                  let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
 
-                if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
-                  xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
-                } else {
-                  xmlns_map.insert(prefix, uri);
+                  if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
+                    xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
+                  } else {
+                    xmlns_map.insert(prefix, uri);
+                  }
                 }
               }
             }
           }
-        }
-      })?)
-    } else if !attr_match_list.is_empty() {
-      Some(parse2(quote! {
-        for attr in e.attributes().with_checks(false) {
-          let attr = attr?;
+        })?)
+      } else if !attr_match_list.is_empty() {
+        Some(parse2(quote! {
+          for attr in e.attributes().with_checks(false) {
+            let attr = attr?;
 
-          #[allow(clippy::single_match)]
-          match attr.key.as_ref() {
-            #( #attr_match_list )*
-            _ => {}
+            #[allow(clippy::single_match)]
+            match attr.key.as_ref() {
+              #( #attr_match_list )*
+              _ => {}
+            }
           }
-        }
-      })?)
-    } else {
-      expect_event_start_stmt = parse2(quote! {
-        let (_, empty_tag) = crate::common::expect_event_start!(
-          xml_reader,
-          xml_event,
-          #class_name_literal,
-          #prefix_type_name_str,
-          #prefix_type_name_literal,
-          #type_name_literal
-        );
-      })?;
+        })?)
+      } else {
+        expect_event_start_stmt = parse2(quote! {
+          let (_, empty_tag) = crate::common::expect_event_start!(
+            xml_reader,
+            xml_event,
+            #class_name_literal,
+            #prefix_type_name_str,
+            #prefix_type_name_literal,
+            #type_name_literal
+          );
+        })?;
 
-      None
-    };
+        None
+      };
 
     if !loop_children_match_list.is_empty() {
       loop_declaration_list.push(parse2(quote! {
@@ -691,11 +694,11 @@ fn gen_child_match_arm(
   }
 }
 
-fn gen_simple_child_match_arm(
+fn gen_simple_child_match_arms(
   first_name: &str,
   owner_type: &str,
   context: &CodegenContext<'_>,
-) -> Result<Arm> {
+) -> Result<Vec<Arm>> {
   if let Some(schema_enum) = context.enum_by_type(first_name) {
     let enum_module = context
       .enum_module_by_type(first_name)
@@ -707,46 +710,54 @@ fn gen_simple_child_match_arm(
       schema_enum.name.to_upper_camel_case()
     ))?;
 
-    Ok(parse2(quote! {
+    Ok(vec![parse2(quote! {
       quick_xml::events::Event::Text(t) => {
         xml_content = Some(#simple_type_name::from_bytes(&t.into_inner())?);
       }
-    })?)
+    })?])
   } else {
     let simple_type_str = simple_type_mapping(first_name);
     let simple_type: Type = parse_str(&format!("crate::schemas::simple_type::{simple_type_str}"))?;
 
-    Ok(parse2(match simple_type_str {
-      "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
-      | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
-        quick_xml::events::Event::Text(t) => {
-          xml_content = Some(t.decode()?.to_string());
+    Ok(
+      match classify_simple_type(simple_type_str).ok_or_else(|| simple_type_str.to_string())? {
+        SimpleValueKind::StringLike => vec![
+          parse2(quote! {
+            quick_xml::events::Event::Text(t) => {
+              crate::common::push_xml_text(&mut xml_content, t)?;
+            }
+          })?,
+          parse2(quote! {
+            quick_xml::events::Event::GeneralRef(t) => {
+              crate::common::push_xml_general_ref(&mut xml_content, t, #owner_type, "xml_content")?;
+            }
+          })?,
+        ],
+        SimpleValueKind::BoolLike => {
+          vec![parse2(quote! {
+            quick_xml::events::Event::Text(t) => {
+              xml_content = Some(crate::common::parse_bool_bytes(&t.into_inner())?);
+            }
+          })?]
         }
+        SimpleValueKind::NumericLike => vec![parse2(quote! {
+          quick_xml::events::Event::Text(t) => {
+            let value = t.decode()?;
+            xml_content = Some(crate::common::parse_value::<#simple_type>(
+              value.as_ref(),
+              #owner_type,
+              "xml_content",
+            )?);
+          }
+        })?],
       },
-      "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
-        quick_xml::events::Event::Text(t) => {
-          xml_content = Some(crate::common::parse_bool_bytes(&t.into_inner())?);
-        }
-      },
-      "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
-      | "UInt64Value" | "DoubleValue" | "SingleValue" => quote! {
-        quick_xml::events::Event::Text(t) => {
-          let value = t.decode()?;
-          xml_content = Some(crate::common::parse_value::<#simple_type>(
-            value.as_ref(),
-            #owner_type,
-            "xml_content",
-          )?);
-        }
-      },
-      _ => return Err(simple_type_str.to_string().into()),
-    })?)
+    )
   }
 }
 
 fn gen_field_match_arm(
   attr: &SchemaTypeAttribute,
-  _owner_type: &str,
+  owner_type: &str,
   context: &CodegenContext<'_>,
 ) -> Result<Arm> {
   let attr_name_str = if attr.q_name.starts_with(':') {
@@ -763,61 +774,72 @@ fn gen_field_match_arm(
 
   let attr_name_literal: LitByteStr = parse_str(&format!("b\"{attr_name_str}\""))?;
 
-  Ok(parse2(if attr.r#type.starts_with("ListValue<") {
-    quote! {
-      #attr_name_literal => {
-        #attr_name_ident = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
-      }
-    }
-  } else if attr.r#type.starts_with("EnumValue<") {
-    let typed_namespace =
-      &attr.r#type[attr.r#type.find('<').unwrap() + 1..attr.r#type.rfind('.').unwrap()];
-    let enum_name = &attr.r#type[attr.r#type.rfind('.').unwrap() + 1..attr.r#type.len() - 1];
-
-    let enum_module_name = context
-      .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
-      .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
-
-    let enum_type: Type = parse_str(&format!(
-      "crate::schemas::{}::{}",
-      enum_module_name,
-      enum_name.to_upper_camel_case()
-    ))?;
-
-    quote! {
-      #attr_name_literal => {
-        #attr_name_ident = Some(#enum_type::from_bytes(&attr.value)?);
-      }
-    }
-  } else {
-    match attr.r#type.as_str() {
-      "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue"
-      | "IntegerValue" | "SByteValue" | "StringValue" => quote! {
+  Ok(parse2(
+    match classify_attr_type(&attr.r#type).ok_or_else(|| attr.r#type.clone())? {
+      AttrTypeKind::List => quote! {
         #attr_name_literal => {
-          #attr_name_ident = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
+          #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
         }
       },
-      "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => quote! {
-        #attr_name_literal => {
-          #attr_name_ident = Some(crate::common::parse_bool_bytes(&attr.value)?);
-        }
-      },
-      "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
-      | "UInt64Value" | "DoubleValue" | "SingleValue" => {
-        let simple_type: Type =
-          parse_str(&format!("crate::schemas::simple_type::{}", &attr.r#type))?;
+      AttrTypeKind::Enum {
+        typed_namespace,
+        enum_name,
+      } => {
+        let enum_module_name = context
+          .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
+          .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
+
+        let enum_type: Type = parse_str(&format!(
+          "crate::schemas::{}::{}",
+          enum_module_name,
+          enum_name.to_upper_camel_case()
+        ))?;
 
         quote! {
           #attr_name_literal => {
-            #attr_name_ident = Some(
-              attr
-                .decode_and_unescape_value(xml_reader.decoder())?
-                .parse::<#simple_type>()?,
-            );
+            #attr_name_ident = Some(crate::common::parse_enum_attr::<#enum_type>(
+              &attr,
+              xml_reader.decoder(),
+              stringify!(#enum_type),
+            )?);
           }
         }
       }
-      _ => return Err(attr.r#type.to_string().into()),
-    }
-  })?)
+      AttrTypeKind::Simple {
+        simple_type,
+        value_kind,
+      } => match value_kind {
+        SimpleValueKind::StringLike => quote! {
+          #attr_name_literal => {
+            #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+          }
+        },
+        SimpleValueKind::BoolLike => quote! {
+          #attr_name_literal => {
+            #attr_name_ident = Some(crate::common::parse_bool_attr(
+              &attr,
+              xml_reader.decoder(),
+              #owner_type,
+              #attr_name_str,
+            )?);
+          }
+        },
+        SimpleValueKind::NumericLike => {
+          let simple_type: Type =
+            parse_str(&format!("crate::schemas::simple_type::{simple_type}"))?;
+
+          quote! {
+            #attr_name_literal => {
+              #attr_name_ident = Some(crate::common::parse_attr_value::<#simple_type>(
+                &attr,
+                xml_reader.decoder(),
+                #owner_type,
+                #attr_name_str,
+              )?);
+            }
+          }
+        }
+      },
+    },
+  )?)
 }

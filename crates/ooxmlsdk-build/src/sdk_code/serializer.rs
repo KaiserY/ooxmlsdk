@@ -102,11 +102,7 @@ fn gen_struct_serializer(
     schema_type.class_name.to_upper_camel_case()
   ))?;
 
-  let (_, last_name, last_name_prefix, last_name_suffix) = split_type_name(&schema_type.name)?;
-  let last_name_start_tag = format!("<{last_name}");
-  let last_name_suffix_start_tag = format!("<{last_name_suffix}");
-  let last_name_end_tag = format!("</{last_name}>");
-  let last_name_suffix_end_tag = format!("</{last_name_suffix}>");
+  let (_, _, last_name_prefix, last_name_suffix) = split_type_name(&schema_type.name)?;
 
   let mut attr_stmts: Vec<TokenStream> = vec![];
   let mut children_writer = quote! {};
@@ -122,7 +118,7 @@ fn gen_struct_serializer(
 
     children_writer = quote! {
       if let Some(xml_content) = &self.xml_content {
-        writer.write_str(&quick_xml::escape::escape(xml_content.to_string()))?;
+        crate::common::write_escaped_text(writer, xml_content)?;
       }
     };
 
@@ -131,11 +127,7 @@ fn gen_struct_serializer(
     };
 
     end_writer = quote! {
-      if xmlns_prefix == #last_name_prefix {
-        writer.write_str(#last_name_suffix_end_tag)?;
-      } else {
-        writer.write_str(#last_name_end_tag)?;
-      }
+      crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
     };
   } else if schema_type.base_class == "OpenXmlLeafElement" {
     for attr in &schema_type.attributes {
@@ -181,11 +173,7 @@ fn gen_struct_serializer(
       };
 
       end_writer = quote! {
-        if xmlns_prefix == #last_name_prefix {
-          writer.write_str(#last_name_suffix_end_tag)?;
-        } else {
-          writer.write_str(#last_name_end_tag)?;
-        }
+        crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
     } else {
       let mut child_arms: Vec<Arm> = vec![];
@@ -207,11 +195,7 @@ fn gen_struct_serializer(
       };
 
       end_writer = quote! {
-        if xmlns_prefix == #last_name_prefix {
-          writer.write_str(#last_name_suffix_end_tag)?;
-        } else {
-          writer.write_str(#last_name_end_tag)?;
-        }
+        crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
     }
   } else if schema_type.is_derived {
@@ -253,11 +237,7 @@ fn gen_struct_serializer(
       };
 
       end_writer = quote! {
-        if xmlns_prefix == #last_name_prefix {
-          writer.write_str(#last_name_suffix_end_tag)?;
-        } else {
-          writer.write_str(#last_name_end_tag)?;
-        }
+        crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
     } else if !schema_type.children.is_empty() {
       let mut child_arms: Vec<Arm> = vec![];
@@ -279,16 +259,12 @@ fn gen_struct_serializer(
       };
 
       end_writer = quote! {
-        if xmlns_prefix == #last_name_prefix {
-          writer.write_str(#last_name_suffix_end_tag)?;
-        } else {
-          writer.write_str(#last_name_end_tag)?;
-        }
+        crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
     } else if base_class_type.base_class == "OpenXmlLeafTextElement" {
       children_writer = quote! {
         if let Some(xml_content) = &self.xml_content {
-          writer.write_str(&quick_xml::escape::escape(xml_content.to_string()))?;
+          crate::common::write_escaped_text(writer, xml_content)?;
         }
       };
 
@@ -297,11 +273,7 @@ fn gen_struct_serializer(
       };
 
       end_writer = quote! {
-        if xmlns_prefix == #last_name_prefix {
-          writer.write_str(#last_name_suffix_end_tag)?;
-        } else {
-          writer.write_str(#last_name_end_tag)?;
-        }
+        crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
     } else {
       end_tag_writer = quote! {};
@@ -329,9 +301,7 @@ fn gen_struct_serializer(
   if supports_xmlns_fields(schema_type, schema) {
     xmlns_attr_writer_list.push(parse2(quote! {
       if let Some(xmlns) = &self.xmlns {
-        writer.write_str(r#" xmlns=""#)?;
-        writer.write_str(xmlns)?;
-        writer.write_char('"')?;
+        crate::common::write_xmlns_attr(writer, None, xmlns)?;
       }
     })?);
 
@@ -340,20 +310,14 @@ fn gen_struct_serializer(
         let mut xmlns_entries: Vec<_> = self.xmlns_map.iter().collect();
         xmlns_entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
         for (k, v) in xmlns_entries {
-          writer.write_str(" xmlns:")?;
-          writer.write_str(k)?;
-          writer.write_str("=\"")?;
-          writer.write_str(v)?;
-          writer.write_char('"')?;
+          crate::common::write_xmlns_attr(writer, Some(k), v)?;
         }
       }
     })?);
 
     xmlns_attr_writer_list.push(parse2(quote! {
       if let Some(mc_ignorable) = &self.mc_ignorable {
-        writer.write_str(r#" mc:Ignorable=""#)?;
-        writer.write_str(mc_ignorable)?;
-        writer.write_char('"')?;
+        crate::common::write_attr_value(writer, "mc:Ignorable", mc_ignorable)?;
       }
     })?);
   }
@@ -403,11 +367,12 @@ fn gen_struct_serializer(
       ) -> Result<(), std::fmt::Error> {
         #xml_header_writer
 
-        if xmlns_prefix == #last_name_prefix {
-          writer.write_str(#last_name_suffix_start_tag)?;
-        } else {
-          writer.write_str(#last_name_start_tag)?;
-        }
+        crate::common::write_start_tag_open(
+          writer,
+          xmlns_prefix,
+          #last_name_prefix,
+          #last_name_suffix,
+        )?;
 
         #( #xmlns_attr_writer_list )*
         #( #attr_stmts )*
@@ -443,7 +408,6 @@ fn gen_attr_stmt(attr: &SchemaTypeAttribute) -> Result<TokenStream> {
   } else {
     parse_str(&escape_snake_case(attr.property_name.to_snake_case()))?
   };
-  let attr_name_fmt_str = format!(" {attr_name_str}=\"");
   let required = attr
     .validators
     .iter()
@@ -451,16 +415,12 @@ fn gen_attr_stmt(attr: &SchemaTypeAttribute) -> Result<TokenStream> {
 
   Ok(if required {
     quote! {
-      writer.write_str(#attr_name_fmt_str)?;
-      writer.write_str(&quick_xml::escape::escape(self.#attr_name_ident.to_string()))?;
-      writer.write_char('"')?;
+      crate::common::write_attr_value(writer, #attr_name_str, &self.#attr_name_ident)?;
     }
   } else {
     quote! {
       if let Some(#attr_name_ident) = &self.#attr_name_ident {
-        writer.write_str(#attr_name_fmt_str)?;
-        writer.write_str(&quick_xml::escape::escape(#attr_name_ident.to_string()))?;
-        writer.write_char('"')?;
+        crate::common::write_attr_value(writer, #attr_name_str, #attr_name_ident)?;
       }
     }
   })

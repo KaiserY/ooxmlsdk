@@ -68,7 +68,12 @@ fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
   let file = File::open(path)?;
   let reader = BufReader::new(file);
   let mut namespaces: Vec<SdkDataNamespace> = serde_json::from_reader(reader)?;
-  namespaces.sort_by(|left, right| left.prefix.cmp(&right.prefix).then(left.uri.cmp(&right.uri)));
+  namespaces.sort_by(|left, right| {
+    left
+      .prefix
+      .cmp(&right.prefix)
+      .then(left.uri.cmp(&right.uri))
+  });
   Ok(namespaces)
 }
 

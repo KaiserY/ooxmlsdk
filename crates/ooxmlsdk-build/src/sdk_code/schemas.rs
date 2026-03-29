@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
 use crate::generator::simple_type::simple_type_mapping;
-use crate::sdk_code::helpers::{is_composite_type, is_one_sequence_flatten, supports_xmlns_fields};
+use crate::sdk_code::helpers::{
+  AttrTypeKind, classify_attr_type, is_composite_type, is_one_sequence_flatten,
+  supports_xmlns_fields,
+};
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
 };
@@ -245,28 +248,31 @@ fn gen_attr(
     parse_str(&escape_snake_case(attr.property_name.to_snake_case()))?
   };
 
-  let type_ident: Type = if attr.r#type.starts_with("ListValue<") {
-    parse_str("String")?
-  } else if attr.r#type.starts_with("EnumValue<") {
-    let typed_namespace =
-      &attr.r#type[attr.r#type.find('<').unwrap() + 1..attr.r#type.rfind('.').unwrap()];
-    let enum_name = &attr.r#type[attr.r#type.rfind('.').unwrap() + 1..attr.r#type.len() - 1];
-    let enum_module_name = context
-      .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
-      .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
+  let type_ident: Type =
+    match classify_attr_type(&attr.r#type).ok_or_else(|| attr.r#type.clone())? {
+      AttrTypeKind::List => parse_str("String")?,
+      AttrTypeKind::Enum {
+        typed_namespace,
+        enum_name,
+      } => {
+        let enum_module_name = context
+          .enum_module_by_typed_namespace_and_name(typed_namespace, enum_name)
+          .ok_or_else(|| format!("{typed_namespace:?}:{enum_name:?}"))?;
 
-    if enum_module_name != schema.module_name {
-      parse_str(&format!(
-        "crate::schemas::{}::{}",
-        enum_module_name,
-        enum_name.to_upper_camel_case()
-      ))?
-    } else {
-      parse_str(&enum_name.to_upper_camel_case())?
-    }
-  } else {
-    parse_str(&format!("crate::schemas::simple_type::{}", &attr.r#type))?
-  };
+        if enum_module_name != schema.module_name {
+          parse_str(&format!(
+            "crate::schemas::{}::{}",
+            enum_module_name,
+            enum_name.to_upper_camel_case()
+          ))?
+        } else {
+          parse_str(&enum_name.to_upper_camel_case())?
+        }
+      }
+      AttrTypeKind::Simple { simple_type, .. } => {
+        parse_str(&format!("crate::schemas::simple_type::{simple_type}"))?
+      }
+    };
 
   let required = attr
     .validators

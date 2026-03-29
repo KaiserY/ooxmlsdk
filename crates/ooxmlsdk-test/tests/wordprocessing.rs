@@ -68,7 +68,10 @@ fn document_round_trip_preserves_whitespace_only_text_from_openxml_reader_test()
   };
 
   assert_eq!(text.xml_content.as_deref(), Some("  "));
-  assert!(serialized.contains("<w:t>  </w:t>") || serialized.contains("<w:t xml:space=\"preserve\">  </w:t>"));
+  assert!(
+    serialized.contains("<w:t>  </w:t>")
+      || serialized.contains("<w:t xml:space=\"preserve\">  </w:t>")
+  );
 
   let Some(DocumentChildChoice::WBody(reparsed_body)) = reparsed.children.first() else {
     panic!("expected reparsed document body");
@@ -174,18 +177,36 @@ fn paragraph_round_trip_preserves_child_order_for_sdt_and_run() {
   let (parsed_2, serialized_2, reparsed_2) =
     assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_RUN_THEN_SDT_XML);
 
-  assert!(matches!(parsed_1.children[0], ParagraphChildChoice::WSdt(_)));
+  assert!(matches!(
+    parsed_1.children[0],
+    ParagraphChildChoice::WSdt(_)
+  ));
   assert!(matches!(parsed_1.children[1], ParagraphChildChoice::WR(_)));
   assert!(matches!(parsed_2.children[0], ParagraphChildChoice::WR(_)));
-  assert!(matches!(parsed_2.children[1], ParagraphChildChoice::WSdt(_)));
+  assert!(matches!(
+    parsed_2.children[1],
+    ParagraphChildChoice::WSdt(_)
+  ));
   assert_ne!(
     trim_xml_declaration(&serialized_1),
     trim_xml_declaration(&serialized_2)
   );
-  assert!(matches!(reparsed_1.children[0], ParagraphChildChoice::WSdt(_)));
-  assert!(matches!(reparsed_1.children[1], ParagraphChildChoice::WR(_)));
-  assert!(matches!(reparsed_2.children[0], ParagraphChildChoice::WR(_)));
-  assert!(matches!(reparsed_2.children[1], ParagraphChildChoice::WSdt(_)));
+  assert!(matches!(
+    reparsed_1.children[0],
+    ParagraphChildChoice::WSdt(_)
+  ));
+  assert!(matches!(
+    reparsed_1.children[1],
+    ParagraphChildChoice::WR(_)
+  ));
+  assert!(matches!(
+    reparsed_2.children[0],
+    ParagraphChildChoice::WR(_)
+  ));
+  assert!(matches!(
+    reparsed_2.children[1],
+    ParagraphChildChoice::WSdt(_)
+  ));
 }
 
 #[test]

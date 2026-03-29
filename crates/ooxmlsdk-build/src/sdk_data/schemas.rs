@@ -19,7 +19,12 @@ pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
     })
     .collect();
 
-  namespaces.sort_by(|left, right| left.prefix.cmp(&right.prefix).then(left.uri.cmp(&right.uri)));
+  namespaces.sort_by(|left, right| {
+    left
+      .prefix
+      .cmp(&right.prefix)
+      .then(left.uri.cmp(&right.uri))
+  });
 
   namespaces
 }

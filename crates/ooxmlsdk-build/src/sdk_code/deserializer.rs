@@ -4,7 +4,6 @@ use quote::quote;
 use std::collections::HashSet;
 use syn::{Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
 
-use crate::generator::simple_type::simple_type_mapping;
 use crate::sdk_code::helpers::{
   AttrTypeKind, SimpleValueKind, classify_attr_type, classify_simple_type,
   flatten_one_sequence_particles, is_composite_type, is_derived_type, is_leaf_element_type,
@@ -12,6 +11,7 @@ use crate::sdk_code::helpers::{
 };
 use crate::sdk_code::schemas::{CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild};
 use crate::sdk_data::sdk_data_model::{Schema, SchemaTypeAttribute};
+use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;

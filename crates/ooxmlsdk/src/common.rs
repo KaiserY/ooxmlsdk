@@ -87,3 +87,44 @@ pub(crate) fn push_xml_general_ref(
 ) -> Result<(), SdkError> {
   xml::push_xml_general_ref(value, text, ty, field)
 }
+
+pub(crate) fn is_foreign_prefixed_child(name: &[u8], expected_prefix: &str) -> bool {
+  let Some(separator_index) = name.iter().position(|b| *b == b':') else {
+    return false;
+  };
+  let prefix = &name[..separator_index];
+
+  prefix != b"mc" && prefix != expected_prefix.as_bytes()
+}
+
+pub(crate) fn process_foreign_element_children<'de, R, F>(
+  xml_reader: &mut R,
+  empty_tag: bool,
+  visitor: &mut F,
+) -> Result<(), SdkError>
+where
+  R: XmlReader<'de>,
+  F: FnMut(&mut R, quick_xml::events::BytesStart<'de>, bool) -> Result<bool, SdkError>,
+{
+  if empty_tag {
+    return Ok(());
+  }
+
+  loop {
+    match xml_reader.next()? {
+      quick_xml::events::Event::Start(e) => {
+        if !visitor(xml_reader, e, false)? {
+          process_foreign_element_children(xml_reader, false, visitor)?;
+        }
+      }
+      quick_xml::events::Event::Empty(e) => {
+        visitor(xml_reader, e, true)?;
+      }
+      quick_xml::events::Event::End(_) => break,
+      quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
+      _ => {}
+    }
+  }
+
+  Ok(())
+}

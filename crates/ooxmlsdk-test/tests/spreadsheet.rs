@@ -11,6 +11,24 @@ fn assert_cell_value_xml(serialized: &str, expected_value: &str) {
   assert!(serialized.contains(expected_value));
 }
 
+fn shared_string_items(
+  table: &SharedStringTable,
+) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringItem> {
+  table.x_si.iter().collect()
+}
+
+fn color_scale_cfvo(
+  scale: &ColorScale,
+) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormatValueObject>{
+  scale.x_cfvo.iter().collect()
+}
+
+fn color_scale_colors(
+  scale: &ColorScale,
+) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Color> {
+  scale.x_color.iter().collect()
+}
+
 #[test]
 fn shared_string_table_round_trip_from_openxml_part_test() {
   let (parsed, serialized, reparsed) =
@@ -20,8 +38,9 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
     parsed.xmlns_map.get("x").map(String::as_str),
     Some("http://schemas.openxmlformats.org/spreadsheetml/2006/main")
   );
-  assert_eq!(parsed.x_si.len(), 1);
-  let item = &parsed.x_si[0];
+  let items = shared_string_items(&parsed);
+  assert_eq!(items.len(), 1);
+  let item = items[0];
   assert_eq!(
     item
       .text
@@ -33,7 +52,7 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
     trim_xml_declaration(&serialized),
     trim_xml_declaration(fixtures::SPREADSHEET_SHARED_STRING_TABLE_XML)
   );
-  assert_eq!(reparsed.x_si.len(), 1);
+  assert_eq!(shared_string_items(&reparsed).len(), 1);
 }
 
 #[test]
@@ -45,7 +64,7 @@ fn shared_string_table_serialization_matches_get_stream_write_test() {
     trim_xml_declaration(&serialized),
     "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><x:si><x:t>Test</x:t></x:si></x:sst>"
   );
-  assert_eq!(reparsed.x_si.len(), 1);
+  assert_eq!(shared_string_items(&reparsed).len(), 1);
 }
 
 #[test]
@@ -54,7 +73,7 @@ fn empty_shared_string_table_round_trip_from_openxml_part_test() {
     fixtures::SPREADSHEET_SHARED_STRING_TABLE_EMPTY_XML,
   );
 
-  assert_eq!(parsed.x_si.len(), 0);
+  assert_eq!(shared_string_items(&parsed).len(), 0);
   let serialized = trim_xml_declaration(&serialized);
   assert!(
     serialized
@@ -66,7 +85,7 @@ fn empty_shared_string_table_round_trip_from_openxml_part_test() {
       || serialized
         == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>"
   );
-  assert_eq!(reparsed.x_si.len(), 0);
+  assert_eq!(shared_string_items(&reparsed).len(), 0);
 }
 
 #[test]
@@ -81,7 +100,7 @@ fn empty_shared_string_table_serialization_matches_get_stream_write_no_updates_t
       || serialized
         == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
   );
-  assert_eq!(reparsed.x_si.len(), 0);
+  assert_eq!(shared_string_items(&reparsed).len(), 0);
 }
 
 #[test]
@@ -89,21 +108,23 @@ fn color_scale_round_trip_from_bug_regression_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<ColorScale>(fixtures::SPREADSHEET_COLOR_SCALE_XML);
 
-  assert_eq!(parsed.x_cfvo.len(), 1);
-  assert_eq!(parsed.x_color.len(), 2);
+  let cfvo = color_scale_cfvo(&parsed);
+  let colors = color_scale_colors(&parsed);
+  assert_eq!(cfvo.len(), 1);
+  assert_eq!(colors.len(), 2);
   assert!(matches!(
-    parsed.x_cfvo[0].r#type,
+    cfvo[0].r#type,
     ConditionalFormatValueObjectValues::Min
   ));
-  assert_eq!(parsed.x_cfvo[0].val.as_deref(), Some("0"));
-  assert_eq!(parsed.x_color[0].theme, Some(4));
-  assert_eq!(parsed.x_color[1].theme, Some(6));
+  assert_eq!(cfvo[0].val.as_deref(), Some("0"));
+  assert_eq!(colors[0].theme, Some(4));
+  assert_eq!(colors[1].theme, Some(6));
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<x:colorScale"));
   assert!(serialized.contains("<x:cfvo type=\"min\" val=\"0\""));
   assert!(serialized.contains("<x:color theme=\"4\""));
   assert!(serialized.contains("<x:color theme=\"6\""));
-  assert_eq!(reparsed.x_color.len(), 2);
+  assert_eq!(color_scale_colors(&reparsed).len(), 2);
 }
 
 #[test]

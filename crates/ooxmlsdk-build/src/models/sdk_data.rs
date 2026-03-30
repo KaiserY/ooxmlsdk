@@ -193,7 +193,6 @@ pub struct SchemaType {
   pub summary: String,
   pub version: String,
   pub part: String,
-  pub composite_type: String,
   pub base_class: String,
   pub kind: SchemaTypeKind,
   pub composite_kind: SchemaTypeCompositeKind,

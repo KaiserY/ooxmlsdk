@@ -38,7 +38,7 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
     assert_stable_roundtrip::<CustomProperties>(fixtures::CUSTOM_PROPERTIES_BOOL_XML);
 
   assert_eq!(parsed.op_property.len(), 1);
-  let property = &parsed.op_property[0];
+  let property = parsed.op_property.first().expect("expected op:property");
   assert_eq!(property.name.as_deref(), Some("crap"));
   assert_eq!(property.property_id, 2);
   assert_eq!(

@@ -111,3 +111,9 @@ pub const SPREADSHEET_CELL_VALUE_DATETIME_XML: &str =
 // Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellDateTimeOffsetWithMillisecondsTest
 pub const SPREADSHEET_CELL_VALUE_DATETIME_OFFSET_XML: &str =
   include_str!("../samples/spreadsheet_cell_value_datetime_offset.xml");
+
+pub const DOC_SAMPLES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/doc_samples");
+
+pub fn doc_sample_path(file_name: &str) -> std::path::PathBuf {
+  std::path::Path::new(DOC_SAMPLES_DIR).join(file_name)
+}

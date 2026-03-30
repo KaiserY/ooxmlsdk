@@ -66,7 +66,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           summary: ty.summary.clone(),
           version: ty.version.clone(),
           part: ty.part.clone(),
-          composite_type: ty.composite_type.clone(),
           base_class: ty.base_class.clone(),
           kind: resolve_kind(ty, &type_map),
           composite_kind: resolve_composite_kind(ty),
@@ -183,13 +182,7 @@ fn resolve_kind(
 fn resolve_composite_kind(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
 ) -> SchemaTypeCompositeKind {
-  if schema_type.composite_type == "OneSequence" || schema_type.particle.kind == "Sequence" {
-    for particle in &schema_type.particle.items {
-      if !particle.kind.is_empty() || !particle.items.is_empty() {
-        return SchemaTypeCompositeKind::None;
-      }
-    }
-
+  if schema_type.composite_type == "OneSequence" {
     SchemaTypeCompositeKind::OneSequence
   } else {
     SchemaTypeCompositeKind::None

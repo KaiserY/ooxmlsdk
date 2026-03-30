@@ -1,17 +1,17 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
 use crate::generator::simple_type::simple_type_mapping;
 use crate::sdk_code::helpers::{
-  AttrTypeKind, classify_attr_type, is_composite_type, is_derived_type, is_leaf_element_type,
-  is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten, supports_xmlns_fields,
+  AttrTypeKind, classify_attr_type, flatten_one_sequence_particles, is_composite_type,
+  is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
+  is_one_sequence_flatten, supports_xmlns_fields,
 };
-use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
-};
+use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -25,6 +25,19 @@ pub struct CodegenContext<'a> {
   type_module_map: HashMap<&'a str, &'a str>,
   type_prefix_map: HashMap<&'a str, &'a str>,
   enum_module_by_typed_namespace_and_name: HashMap<(&'a str, &'a str), &'a str>,
+}
+
+#[derive(Debug)]
+pub struct ResolvedOneSequenceChild<'a> {
+  pub name: &'a str,
+  pub field_name: Cow<'a, str>,
+  pub property_comments: Cow<'a, str>,
+}
+
+#[derive(Debug)]
+pub struct ResolvedCompositeChild<'a> {
+  pub name: &'a str,
+  pub variant_name: Cow<'a, str>,
 }
 
 impl<'a> CodegenContext<'a> {
@@ -105,6 +118,98 @@ impl<'a> CodegenContext<'a> {
       .enum_module_by_typed_namespace_and_name
       .get(&(typed_namespace, enum_name))
       .copied()
+  }
+
+  pub fn resolve_one_sequence_child(
+    &self,
+    schema_type: &'a SchemaType,
+    particle_name: &'a str,
+  ) -> Result<ResolvedOneSequenceChild<'a>> {
+    if let Some(child) = schema_type
+      .children
+      .iter()
+      .find(|child| child.name == particle_name)
+    {
+      let field_name = if child.property_name.is_empty() {
+        let child_last_name = child
+          .name
+          .split('/')
+          .nth(1)
+          .ok_or_else(|| child.name.clone())?;
+        Cow::Owned(child_last_name.to_snake_case())
+      } else {
+        Cow::Owned(escape_snake_case(child.property_name.to_snake_case()))
+      };
+      let property_comments = if child.property_comments.is_empty() {
+        Cow::Borrowed(" _")
+      } else {
+        Cow::Borrowed(child.property_comments.as_str())
+      };
+
+      return Ok(ResolvedOneSequenceChild {
+        name: child.name.as_str(),
+        field_name,
+        property_comments,
+      });
+    }
+
+    let child_type = self
+      .type_by_name(particle_name)
+      .ok_or_else(|| particle_name.to_string())?;
+
+    Ok(ResolvedOneSequenceChild {
+      name: particle_name,
+      field_name: Cow::Owned(escape_snake_case(child_type.class_name.to_snake_case())),
+      property_comments: if child_type.summary.is_empty() {
+        Cow::Borrowed(" _")
+      } else {
+        Cow::Owned(child_type.summary.clone())
+      },
+    })
+  }
+
+  pub fn resolve_children(
+    &self,
+    schema_type: &'a SchemaType,
+  ) -> Result<Vec<ResolvedCompositeChild<'a>>> {
+    let mut resolved = Vec::new();
+
+    for child in &schema_type.children {
+      let child_last_name = child
+        .name
+        .split('/')
+        .nth(1)
+        .ok_or_else(|| child.name.clone())?;
+
+      resolved.push(ResolvedCompositeChild {
+        name: child.name.as_str(),
+        variant_name: Cow::Borrowed(child_last_name),
+      });
+    }
+
+    for particle in &schema_type.particle.items {
+      if particle.name.is_empty()
+        || schema_type
+          .children
+          .iter()
+          .any(|child| child.name == particle.name)
+      {
+        continue;
+      }
+
+      let particle_last_name = particle
+        .name
+        .split('/')
+        .nth(1)
+        .ok_or_else(|| particle.name.clone())?;
+
+      resolved.push(ResolvedCompositeChild {
+        name: particle.name.as_str(),
+        variant_name: Cow::Borrowed(particle_last_name),
+      });
+    }
+
+    Ok(resolved)
   }
 
   pub fn resolve_attr_enum_module<'b>(&self, attr_type: &'b str) -> Result<(&'a str, &'b str)> {
@@ -387,7 +492,9 @@ fn gen_children(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<(Option<TokenStream>, Option<ItemEnum>)> {
-  if schema_type.children.is_empty() {
+  let resolved_children = context.resolve_children(schema_type)?;
+
+  if resolved_children.is_empty() {
     return Ok((None, None));
   }
 
@@ -402,21 +509,20 @@ fn gen_children(
 
   let mut variants: Vec<TokenStream> = vec![];
 
-  for child in &schema_type.children {
+  for child in &resolved_children {
     let child_type = context
       .type_map
-      .get(child.name.as_str())
+      .get(child.name)
       .ok_or_else(|| format!("{:?}", child.name))?;
     let child_prefix = context
       .type_prefix_map
-      .get(child.name.as_str())
+      .get(child.name)
       .ok_or_else(|| format!("{:?}", child.name))?;
-    let child_last_name = &child.name[child.name.find('/').unwrap() + 1..];
-    let child_variant_name_ident: Ident = parse_str(&child_last_name.to_upper_camel_case())?;
+    let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
 
     let child_variant_type: Type = if *child_prefix != schema.prefix {
       let child_module_name = context
-        .type_module(child.name.as_str())
+        .type_module(child.name)
         .ok_or_else(|| format!("{:?}", child.name))?;
 
       parse_str(&format!(
@@ -478,28 +584,23 @@ fn gen_one_sequence_fields(
   context: &CodegenContext<'_>,
 ) -> Result<Vec<TokenStream>> {
   let mut fields: Vec<TokenStream> = vec![];
-  let mut child_map: HashMap<&str, &SchemaTypeChild> = HashMap::new();
+  let mut field_name_set = std::collections::HashSet::new();
 
-  for child in &schema_type.children {
-    child_map.insert(&child.name, child);
-  }
-
-  for particle in &schema_type.particle.items {
-    let child = child_map
-      .get(particle.name.as_str())
-      .ok_or_else(|| format!("{:?}", particle.name))?;
+  for flat_particle in flatten_one_sequence_particles(schema_type) {
+    let particle = flat_particle.particle;
+    let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
     let child_type = context
       .type_map
-      .get(particle.name.as_str())
+      .get(child.name)
       .ok_or_else(|| format!("{:?}", particle.name))?;
     let child_prefix = context
       .type_prefix_map
-      .get(child.name.as_str())
+      .get(child.name)
       .ok_or_else(|| format!("{:?}", child.name))?;
 
     let child_variant_type: Type = if *child_prefix != schema.prefix {
       let child_module_name = context
-        .type_module(child.name.as_str())
+        .type_module(child.name)
         .ok_or_else(|| format!("{:?}", child.name))?;
 
       parse_str(&format!(
@@ -511,25 +612,20 @@ fn gen_one_sequence_fields(
       parse_str(&child_type.class_name.to_upper_camel_case())?
     };
 
-    let child_name_ident: Ident = if child.property_name.is_empty() {
-      let child_last_name = &child.name[child.name.find('/').unwrap() + 1..];
-      parse_str(&child_last_name.to_snake_case())?
-    } else {
-      parse_str(&escape_snake_case(child.property_name.to_snake_case()))?
-    };
+    let child_name_ident: Ident = parse_str(&child.field_name)?;
 
-    let property_comments = if child.property_comments.is_empty() {
-      " _"
-    } else {
-      &child.property_comments
-    };
+    if !field_name_set.insert(child_name_ident.to_string()) {
+      continue;
+    }
 
-    if particle.occurs.is_empty() {
+    let property_comments = child.property_comments.as_ref();
+
+    if flat_particle.repeated {
       fields.push(quote! {
         #[doc = #property_comments]
-        pub #child_name_ident: std::boxed::Box<#child_variant_type>,
+        pub #child_name_ident: Vec<#child_variant_type>,
       });
-    } else if particle.occurs[0].min == 0 && particle.occurs[0].max == 1 {
+    } else if flat_particle.optional {
       fields.push(quote! {
         #[doc = #property_comments]
         pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
@@ -537,7 +633,7 @@ fn gen_one_sequence_fields(
     } else {
       fields.push(quote! {
         #[doc = #property_comments]
-        pub #child_name_ident: Vec<#child_variant_type>,
+        pub #child_name_ident: std::boxed::Box<#child_variant_type>,
       });
     }
   }

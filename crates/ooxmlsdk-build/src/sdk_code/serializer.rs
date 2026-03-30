@@ -1,17 +1,15 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::HashMap;
 use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::sdk_code::helpers::{
-  is_composite_type, is_derived_type, is_leaf_element_type, is_leaf_text_type,
-  is_leaf_text_wrapper, is_one_sequence_flatten, needs_xml_header, supports_xmlns_fields,
+  flatten_one_sequence_particles, is_composite_type, is_derived_type, is_leaf_element_type,
+  is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten, needs_xml_header,
+  supports_xmlns_fields,
 };
-use crate::sdk_code::schemas::CodegenContext;
-use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeParticle,
-};
+use crate::sdk_code::schemas::{CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild};
+use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -164,19 +162,24 @@ fn gen_struct_serializer(
         writer.write_str("/>")?;
       };
     } else if is_one_sequence_flatten(schema_type) {
-      let mut child_map: HashMap<&str, &SchemaTypeChild> = HashMap::new();
-
-      for child in &schema_type.children {
-        child_map.insert(&child.name, child);
-      }
+      let mut field_name_set = std::collections::HashSet::new();
 
       let mut child_stmt_list: Vec<Stmt> = vec![];
 
-      for particle in &schema_type.particle.items {
-        let child = child_map
-          .get(particle.name.as_str())
-          .ok_or_else(|| format!("{:?}", particle.name))?;
-        child_stmt_list.push(gen_one_sequence_child_stmt(particle, child)?);
+      for flat_particle in flatten_one_sequence_particles(schema_type) {
+        let particle = flat_particle.particle;
+        let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+
+        let child_name_ident = one_sequence_child_field_ident(&child)?;
+        if !field_name_set.insert(child_name_ident.to_string()) {
+          continue;
+        }
+
+        child_stmt_list.push(gen_one_sequence_child_stmt(
+          &child,
+          flat_particle.optional,
+          flat_particle.repeated,
+        )?);
       }
 
       children_writer = quote! {
@@ -192,8 +195,9 @@ fn gen_struct_serializer(
       };
     } else {
       let mut child_arms: Vec<Arm> = vec![];
+      let resolved_children = context.resolve_children(schema_type)?;
 
-      for child in &schema_type.children {
+      for child in &resolved_children {
         child_arms.push(gen_child_arm(child, &child_choice_enum_type)?);
       }
 
@@ -217,6 +221,7 @@ fn gen_struct_serializer(
     let base_class_type = context
       .derived_base_type(schema_type)
       .ok_or_else(|| format!("{:?}", schema_type.name))?;
+    let resolved_children = context.resolve_children(schema_type)?;
 
     for attr in &schema_type.attributes {
       attributes.push(attr);
@@ -227,19 +232,24 @@ fn gen_struct_serializer(
     }
 
     if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
-      let mut child_map: HashMap<&str, &SchemaTypeChild> = HashMap::new();
-
-      for child in &schema_type.children {
-        child_map.insert(&child.name, child);
-      }
+      let mut field_name_set = std::collections::HashSet::new();
 
       let mut child_stmt_list: Vec<Stmt> = vec![];
 
-      for particle in &schema_type.particle.items {
-        let child = child_map
-          .get(particle.name.as_str())
-          .ok_or_else(|| format!("{:?}", particle.name))?;
-        child_stmt_list.push(gen_one_sequence_child_stmt(particle, child)?);
+      for flat_particle in flatten_one_sequence_particles(schema_type) {
+        let particle = flat_particle.particle;
+        let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+
+        let child_name_ident = one_sequence_child_field_ident(&child)?;
+        if !field_name_set.insert(child_name_ident.to_string()) {
+          continue;
+        }
+
+        child_stmt_list.push(gen_one_sequence_child_stmt(
+          &child,
+          flat_particle.optional,
+          flat_particle.repeated,
+        )?);
       }
 
       children_writer = quote! {
@@ -253,10 +263,10 @@ fn gen_struct_serializer(
       end_writer = quote! {
         crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
       };
-    } else if !schema_type.children.is_empty() {
+    } else if !resolved_children.is_empty() {
       let mut child_arms: Vec<Arm> = vec![];
 
-      for child in &schema_type.children {
+      for child in &resolved_children {
         child_arms.push(gen_child_arm(child, &child_choice_enum_type)?);
       }
 
@@ -441,16 +451,19 @@ fn gen_attr_stmt(attr: &SchemaTypeAttribute) -> Result<TokenStream> {
 }
 
 fn gen_one_sequence_child_stmt(
-  particle: &SchemaTypeParticle,
-  child: &SchemaTypeChild,
+  child: &ResolvedOneSequenceChild<'_>,
+  optional: bool,
+  repeated: bool,
 ) -> Result<Stmt> {
-  let child_name_ident = child_field_ident(child)?;
+  let child_name_ident = one_sequence_child_field_ident(child)?;
 
-  if particle.occurs.is_empty() {
+  if repeated {
     Ok(parse2(quote! {
-      self.#child_name_ident.write_xml(writer, xmlns_prefix)?;
+      for child in &self.#child_name_ident {
+        child.write_xml(writer, xmlns_prefix)?;
+      }
     })?)
-  } else if particle.occurs[0].min == 0 && particle.occurs[0].max == 1 {
+  } else if optional {
     Ok(parse2(quote! {
       if let Some(#child_name_ident) = &self.#child_name_ident {
         #child_name_ident.write_xml(writer, xmlns_prefix)?;
@@ -458,31 +471,21 @@ fn gen_one_sequence_child_stmt(
     })?)
   } else {
     Ok(parse2(quote! {
-      for child in &self.#child_name_ident {
-        child.write_xml(writer, xmlns_prefix)?;
-      }
+      self.#child_name_ident.write_xml(writer, xmlns_prefix)?;
     })?)
   }
 }
 
-fn gen_child_arm(child: &SchemaTypeChild, child_choice_enum_type: &Type) -> Result<Arm> {
-  let (_, child_last_name, _, _) = split_type_name(&child.name)?;
-  let child_variant_name_ident: Ident = parse_str(&child_last_name.to_upper_camel_case())?;
+fn one_sequence_child_field_ident(child: &ResolvedOneSequenceChild<'_>) -> Result<Ident> {
+  Ok(parse_str(child.field_name.as_ref())?)
+}
+
+fn gen_child_arm(child: &ResolvedCompositeChild<'_>, child_choice_enum_type: &Type) -> Result<Arm> {
+  let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
 
   Ok(parse2(quote! {
     #child_choice_enum_type::#child_variant_name_ident(child) => child.write_xml(writer, xmlns_prefix)?,
   })?)
-}
-
-fn child_field_ident(child: &SchemaTypeChild) -> Result<Ident> {
-  if child.property_name.is_empty() {
-    let (_, child_last_name, _, _) = split_type_name(&child.name)?;
-    Ok(parse_str(&child_last_name.to_snake_case())?)
-  } else {
-    Ok(parse_str(&escape_snake_case(
-      child.property_name.to_snake_case(),
-    ))?)
-  }
 }
 
 fn split_type_name(name: &str) -> Result<(&str, &str, &str, &str)> {

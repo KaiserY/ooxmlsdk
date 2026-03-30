@@ -1,5 +1,6 @@
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind, SchemaTypeKind,
+  SchemaTypeParticle,
 };
 
 const DRAWINGML_MAIN_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -61,7 +62,42 @@ pub fn supports_xmlns_fields(schema_type: &SchemaType, schema: &Schema) -> bool 
 }
 
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
-  schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
+  if schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
+    || schema_type.particle.kind == "Sequence"
+  {
+    schema_type
+      .particle
+      .items
+      .iter()
+      .all(|particle| particle.kind.is_empty() && particle.items.is_empty())
+  } else {
+    false
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct FlatParticle<'a> {
+  pub particle: &'a SchemaTypeParticle,
+  pub optional: bool,
+  pub repeated: bool,
+}
+
+pub fn flatten_one_sequence_particles(schema_type: &SchemaType) -> Vec<FlatParticle<'_>> {
+  schema_type
+    .particle
+    .items
+    .iter()
+    .filter(|particle| !particle.name.is_empty())
+    .map(|particle| {
+      let occurs = particle.occurs.first();
+
+      FlatParticle {
+        particle,
+        optional: occurs.is_some_and(|occur| occur.min == 0),
+        repeated: occurs.is_some_and(|occur| occur.max != 1),
+      }
+    })
+    .collect()
 }
 
 pub fn classify_simple_type(simple_type: &str) -> Option<SimpleValueKind> {

@@ -16,8 +16,10 @@ use crate::sdk_data::{
 
 #[derive(Debug, Default)]
 pub struct Context {
+  pub parts: Vec<OpenXmlPart>,
   pub schemas: Vec<OpenXmlSchema>,
   pub namespaces: Vec<OpenXmlNamespace>,
+  pub part_name_type_name_map: HashMap<String, String>,
   pub type_name_module_name_map: HashMap<String, String>,
   pub namespace_uri_prefix_map: HashMap<String, String>,
   pub prefix_typed_namespace_map: HashMap<String, String>,
@@ -136,6 +138,15 @@ impl Context {
         }
       }
     }
+
+    part_name_type_name_map.insert(
+      "StyleDefinitionsPart".to_string(),
+      "w:CT_Styles/w:styles".to_string(),
+    );
+    part_name_type_name_map.insert(
+      "StylesWithEffectsPart".to_string(),
+      "w:CT_Styles/w:styles".to_string(),
+    );
 
     #[allow(unused_mut)]
     let mut part_name_set: HashSet<String> = HashSet::new();
@@ -274,8 +285,10 @@ impl Context {
     schemas.sort_by(|a, b| a.module_name.cmp(&b.module_name));
 
     Ok(Self {
+      parts,
       schemas,
       namespaces,
+      part_name_type_name_map,
       type_name_module_name_map,
       namespace_uri_prefix_map,
       prefix_typed_namespace_map,

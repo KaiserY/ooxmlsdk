@@ -8,19 +8,33 @@ pub mod open_xml;
 pub mod sdk_data_model;
 
 pub mod context;
+pub mod package_schemas;
+pub mod parts;
 pub mod schemas;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, BoxError>;
 
-use crate::sdk_data::{context::Context, schemas::gen_schemas};
+use crate::sdk_data::{
+  context::Context, package_schemas::read_package_schemas, parts::gen_parts, schemas::gen_schemas,
+};
 
-pub fn gen_sdk_data<P: AsRef<Path>>(data_dir: P, out_dir: P) -> Result<()> {
+pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
+  data_dir: P,
+  out_dir: P,
+  package_schemas_dir: Q,
+) -> Result<()> {
   let gen_context = Context::new(data_dir.as_ref())?;
   let out_dir = out_dir.as_ref();
+  let out_package_schemas_dir_path = out_dir.join("package_schemas");
+  let out_parts_dir_path = out_dir.join("parts");
   let out_schemas_dir_path = out_dir.join("schemas");
 
+  fs::create_dir_all(&out_package_schemas_dir_path)?;
+  fs::create_dir_all(&out_parts_dir_path)?;
   fs::create_dir_all(&out_schemas_dir_path)?;
+  clear_generated_json_files(&out_package_schemas_dir_path)?;
+  clear_generated_json_files(&out_parts_dir_path)?;
   clear_generated_json_files(&out_schemas_dir_path)?;
 
   write_json(
@@ -32,6 +46,20 @@ pub fn gen_sdk_data<P: AsRef<Path>>(data_dir: P, out_dir: P) -> Result<()> {
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
       &schema,
+    )?;
+  }
+
+  for package_schema in read_package_schemas(package_schemas_dir.as_ref())? {
+    write_json(
+      out_package_schemas_dir_path.join(format!("{}.json", package_schema.module_name)),
+      &package_schema,
+    )?;
+  }
+
+  for part in gen_parts(&gen_context) {
+    write_json(
+      out_parts_dir_path.join(format!("{}.json", part.module_name)),
+      &part,
     )?;
   }
 

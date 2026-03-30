@@ -18,6 +18,164 @@ pub struct Namespace {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
+pub struct Part {
+  pub name: String,
+  pub module_name: String,
+  pub base: String,
+  pub content_type: String,
+  pub relationship_type: String,
+  pub target: String,
+  pub root: String,
+  pub root_element: String,
+  pub extension: String,
+  pub version: String,
+  pub features: Vec<String>,
+  pub content_kind: PartContentKind,
+  pub paths: PartPaths,
+  pub root_type: String,
+  pub root_class_name: String,
+  pub schema_module: String,
+  pub children: Vec<PartChild>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum PartContentKind {
+  #[default]
+  None,
+  Xml,
+  Text,
+  Binary,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PartPaths {
+  pub general: String,
+  pub word: String,
+  pub excel: String,
+  pub power_point: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PartChild {
+  pub min_occurs_is_non_zero: bool,
+  pub max_occurs_great_than_one: bool,
+  pub api_name: String,
+  pub name: String,
+  pub has_fixed_content: bool,
+  pub is_data_part_reference: bool,
+  pub is_special_embedded_part: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageSchema {
+  pub module_name: String,
+  pub root: String,
+  pub xmlns_uri: String,
+  pub xml_header: PackageXmlHeader,
+  pub types: Vec<PackageType>,
+  pub enums: Vec<PackageEnum>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum PackageXmlHeader {
+  #[default]
+  None,
+  Plain,
+  Standalone,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageType {
+  pub name: String,
+  pub tag: String,
+  pub prefix: String,
+  pub kind: PackageTypeKind,
+  pub has_xmlns_fields: bool,
+  pub attributes: Vec<PackageAttribute>,
+  pub text_children: Vec<PackageTextChild>,
+  pub child_fields: Vec<PackageChildField>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum PackageTypeKind {
+  #[default]
+  Composite,
+  Leaf,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageAttribute {
+  pub field: String,
+  pub q_name: String,
+  pub r#type: String,
+  pub required: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageTextChild {
+  pub field: String,
+  pub q_name: String,
+  pub fixed_attributes: Vec<PackageFixedAttribute>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageFixedAttribute {
+  pub q_name: String,
+  pub value: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageChildField {
+  pub field: String,
+  pub kind: PackageChildFieldKind,
+  pub item_type: String,
+  pub enum_name: String,
+  pub variants: Vec<PackageChildVariant>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum PackageChildFieldKind {
+  #[default]
+  Vec,
+  ChoiceVec,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageChildVariant {
+  pub name: String,
+  pub r#type: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageEnum {
+  pub name: String,
+  pub variants: Vec<PackageEnumVariant>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct PackageEnumVariant {
+  pub name: String,
+  pub value: String,
+  pub is_default: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct Schema {
   pub target_namespace: String,
   pub prefix: String,

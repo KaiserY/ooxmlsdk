@@ -339,7 +339,12 @@ mod tests {
   #[test]
   #[ignore]
   fn test_gen_new() {
-    sdk_data::gen_sdk_data("../../../Open-XML-SDK/data", "../../sdk_data").unwrap();
+    sdk_data::gen_sdk_data(
+      "../../../Open-XML-SDK/data",
+      "../../sdk_data",
+      "../../schemas/OpenPackagingConventions-XMLSchema",
+    )
+    .unwrap();
     sdk_code::gen_sdk_code("../../sdk_data", "../ooxmlsdk/src").unwrap();
   }
 }

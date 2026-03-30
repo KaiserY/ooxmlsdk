@@ -8,12 +8,19 @@ use std::path::Path;
 use syn::{Arm, Ident, ItemMod, parse_str, parse2};
 
 use crate::sdk_code::deserializer::gen_schema_deserializer;
+use crate::sdk_code::package_schemas::gen_package_schema;
+use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{CodegenContext, gen_schema};
 use crate::sdk_code::serializer::gen_schema_serializer;
-use crate::sdk_data::sdk_data_model::{Namespace as SdkDataNamespace, Schema as SdkDataSchema};
+use crate::sdk_data::sdk_data_model::{
+  Namespace as SdkDataNamespace, PackageSchema as SdkDataPackageSchema, Part as SdkDataPart,
+  Schema as SdkDataSchema,
+};
 
 pub mod deserializer;
 pub mod helpers;
+pub mod package_schemas;
+pub mod parts;
 pub mod schemas;
 pub mod serializer;
 
@@ -29,14 +36,24 @@ type Result<T> = std::result::Result<T, BoxError>;
 
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
+  let sdk_data_package_schemas_dir_path = sdk_data_dir.as_ref().join("package_schemas");
+  let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
+  let sdk_data_package_schemas = read_package_schemas(&sdk_data_package_schemas_dir_path)?;
+  let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
   let context = CodegenContext::new(&sdk_data_schemas);
 
-  write_schemas(&sdk_data_schemas, &context, out_dir_path)?;
+  write_schemas(
+    &sdk_data_schemas,
+    &sdk_data_package_schemas,
+    &context,
+    out_dir_path,
+  )?;
   write_deserializers(&sdk_data_schemas, &context, out_dir_path)?;
   write_serializers(&sdk_data_schemas, &context, out_dir_path)?;
+  write_parts(&sdk_data_parts, out_dir_path)?;
   write_namespaces(&sdk_data_namespaces, out_dir_path)?;
 
   Ok(())
@@ -64,6 +81,58 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<SdkDataSchema>> 
   Ok(sdk_data_schemas)
 }
 
+fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<SdkDataPart>> {
+  let mut sdk_data_parts = vec![];
+
+  if !sdk_data_parts_dir_path.exists() {
+    return Ok(sdk_data_parts);
+  }
+
+  for entry in fs::read_dir(sdk_data_parts_dir_path)? {
+    let entry = entry?;
+    let path = entry.path();
+
+    if !path.is_file() || path.extension() != Some(OsStr::new("json")) {
+      continue;
+    }
+
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let sdk_data_part: SdkDataPart = serde_json::from_reader(reader)?;
+    sdk_data_parts.push(sdk_data_part);
+  }
+
+  sdk_data_parts.sort_by(|a, b| a.module_name.cmp(&b.module_name));
+  Ok(sdk_data_parts)
+}
+
+fn read_package_schemas(
+  sdk_data_package_schemas_dir_path: &Path,
+) -> Result<Vec<SdkDataPackageSchema>> {
+  let mut sdk_data_package_schemas = vec![];
+
+  if !sdk_data_package_schemas_dir_path.exists() {
+    return Ok(sdk_data_package_schemas);
+  }
+
+  for entry in fs::read_dir(sdk_data_package_schemas_dir_path)? {
+    let entry = entry?;
+    let path = entry.path();
+
+    if !path.is_file() || path.extension() != Some(OsStr::new("json")) {
+      continue;
+    }
+
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let package_schema: SdkDataPackageSchema = serde_json::from_reader(reader)?;
+    sdk_data_package_schemas.push(package_schema);
+  }
+
+  sdk_data_package_schemas.sort_by(|a, b| a.module_name.cmp(&b.module_name));
+  Ok(sdk_data_package_schemas)
+}
+
 fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
   let file = File::open(path)?;
   let reader = BufReader::new(file);
@@ -79,6 +148,7 @@ fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
 
 fn write_schemas(
   sdk_data_schemas: &[SdkDataSchema],
+  sdk_data_package_schemas: &[SdkDataPackageSchema],
   context: &CodegenContext<'_>,
   out_dir_path: &Path,
 ) -> Result<()> {
@@ -103,9 +173,26 @@ fn write_schemas(
     push_module_decl(&mut schemas_mod_list, &sdk_data_schema.module_name)?;
   }
 
-  write_include_module(
+  for package_schema in sdk_data_package_schemas {
+    let schema_path = out_schemas_dir_path.join(format!("{}.rs", package_schema.module_name));
+    write_generated_module(
+      &schema_path,
+      gen_package_schema(package_schema).map_err(|err| {
+        format!(
+          "failed to generate package schema {}: {err}",
+          package_schema.module_name
+        )
+      })?,
+    )?;
+
+    push_module_decl(&mut schemas_mod_list, &package_schema.module_name)?;
+  }
+
+  write_generated_module(
     &out_schemas_dir_path.join("simple_type.rs"),
-    include_str!("includes/simple_type.rs"),
+    quote! {
+      pub use crate::simple_type::*;
+    },
   )?;
 
   let token_stream: TokenStream = quote! {
@@ -150,6 +237,33 @@ fn write_deserializers(
   };
   let deserializers_mod_path = out_dir_path.join("deserializers.rs");
   write_generated_module(&deserializers_mod_path, token_stream)?;
+
+  Ok(())
+}
+
+fn write_parts(sdk_data_parts: &[SdkDataPart], out_dir_path: &Path) -> Result<()> {
+  let out_parts_dir_path = out_dir_path.join("parts");
+  fs::create_dir_all(&out_parts_dir_path)?;
+  clear_generated_rs_files(&out_parts_dir_path)?;
+  write_generated_module(&out_parts_dir_path.join("mod.rs"), quote! {})?;
+
+  for sdk_data_part in sdk_data_parts {
+    let part_path = out_parts_dir_path.join(format!("{}.rs", sdk_data_part.module_name));
+    write_generated_module(
+      &part_path,
+      gen_part_module(sdk_data_part).map_err(|err| {
+        format!(
+          "failed to generate part {}: {err}",
+          sdk_data_part.module_name
+        )
+      })?,
+    )?;
+  }
+
+  write_generated_module(
+    &out_parts_dir_path.join("mod.rs"),
+    gen_parts_mod(sdk_data_parts)?,
+  )?;
 
   Ok(())
 }
@@ -214,12 +328,6 @@ fn write_serializers(
   let serializers_mod_path = out_dir_path.join("serializers.rs");
   write_generated_module(&serializers_mod_path, token_stream)?;
 
-  Ok(())
-}
-
-fn write_include_module(path: &Path, source: &str) -> Result<()> {
-  let token_stream: TokenStream = parse_str(source)?;
-  write_generated_module(path, token_stream)?;
   Ok(())
 }
 

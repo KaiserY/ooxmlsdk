@@ -1,11 +1,17 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::{
   context::Context,
   sdk_data_model::{Part, PartChild, PartContentKind, PartPaths},
 };
 
 pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
+  let part_version_map: HashMap<&str, &str> = gen_context
+    .parts
+    .iter()
+    .map(|part| (part.name.as_str(), part.version.as_str()))
+    .collect();
   let type_map: std::collections::HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType> =
     gen_context
       .schemas
@@ -27,11 +33,16 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
         .get(root_type.as_str())
         .map(|schema_type| schema_type.class_name.clone())
         .unwrap_or_default();
+      let root_type_version = type_map
+        .get(root_type.as_str())
+        .map(|schema_type| schema_type.version.as_str())
+        .unwrap_or_default();
       let schema_module = gen_context
         .type_name_module_name_map
         .get(root_type.as_str())
         .cloned()
         .unwrap_or_default();
+      let part_version = effective_version(part.version.as_str(), root_type_version);
 
       Part {
         name: part.name.clone(),
@@ -43,8 +54,8 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
         root: part.root.clone(),
         root_element: part.root_element.clone(),
         extension: part.extension.clone(),
-        version: part.version.clone(),
-        features: gen_part_features(&part.version),
+        version: part_version.to_string(),
+        features: gen_part_features(part_version),
         content_kind: resolve_content_kind(part, !root_type.is_empty()),
         paths: PartPaths {
           general: part.paths.general.clone(),
@@ -63,6 +74,36 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
             max_occurs_great_than_one: child.max_occurs_great_than_one,
             api_name: child.api_name.clone(),
             name: child.name.clone(),
+            version: part_version_map
+              .get(child.name.as_str())
+              .copied()
+              .and_then(|child_part_version| {
+                gen_context
+                  .part_name_type_name_map
+                  .get(&child.name)
+                  .and_then(|type_name| type_map.get(type_name.as_str()))
+                  .map(|schema_type| {
+                    effective_version(child_part_version, schema_type.version.as_str()).to_string()
+                  })
+                  .or(Some(child_part_version.to_string()))
+              })
+              .unwrap_or_default(),
+            features: gen_part_features(
+              part_version_map
+                .get(child.name.as_str())
+                .copied()
+                .and_then(|child_part_version| {
+                  gen_context
+                    .part_name_type_name_map
+                    .get(&child.name)
+                    .and_then(|type_name| type_map.get(type_name.as_str()))
+                    .map(|schema_type| {
+                      effective_version(child_part_version, schema_type.version.as_str())
+                    })
+                    .or(Some(child_part_version))
+                })
+                .unwrap_or_default(),
+            ),
             has_fixed_content: child.has_fixed_content,
             is_data_part_reference: child.is_data_part_reference,
             is_special_embedded_part: child.is_special_embedded_part,
@@ -112,9 +153,7 @@ fn resolve_content_kind(
 fn gen_part_features(version: &str) -> Vec<String> {
   let mut features = vec!["parts".to_string()];
 
-  if version.is_empty() || version == "Office2007" {
-    features.push("office2007".to_string());
-  } else {
+  if !version.is_empty() && version != "Office2007" {
     features.push("microsoft365".to_string());
   }
 

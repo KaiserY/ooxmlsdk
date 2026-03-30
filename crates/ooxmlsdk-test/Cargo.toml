@@ -4,5 +4,10 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
+[features]
+default = ["microsoft365", "parts"]
+parts = ["ooxmlsdk/parts"]
+microsoft365 = ["ooxmlsdk/microsoft365"]
+
 [dependencies]
-ooxmlsdk = { workspace = true, features = ["parts", "docx", "xlsx", "pptx", "office2007", "microsoft365"] }
+ooxmlsdk = { workspace = true, default-features = false }

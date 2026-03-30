@@ -9,8 +9,7 @@ use std::{
 use crate::sdk_data::{
   Result,
   open_xml::{
-    OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeParticle,
-    TypedNamespace, TypedSchema,
+    OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, TypedNamespace, TypedSchema,
   },
 };
 
@@ -90,19 +89,9 @@ impl Context {
     let typed_namespaces: Vec<TypedNamespace> =
       serde_json::from_reader(File::open(data_dir.join("typed").join("namespaces.json"))?)?;
 
-    let mut part_name_part_map: HashMap<String, OpenXmlPart> = HashMap::new();
-    let mut part_name_version_map: HashMap<String, String> = HashMap::new();
-
-    for part in &parts {
-      part_name_part_map.insert(part.name.clone(), part.clone());
-      part_name_version_map.insert(part.name.clone(), part.version.clone());
-    }
-
-    let mut uri_namespace_version_map: HashMap<String, String> = HashMap::new();
     let mut namespace_uri_prefix_map: HashMap<String, String> = HashMap::new();
 
     for namespace in &namespaces {
-      uri_namespace_version_map.insert(namespace.uri.clone(), namespace.version.clone());
       namespace_uri_prefix_map.insert(namespace.uri.clone(), namespace.prefix.clone());
     }
 
@@ -113,14 +102,6 @@ impl Context {
         typed_namespace.prefix.clone(),
         typed_namespace.namespace.clone(),
       );
-    }
-
-    let mut type_name_version_map: HashMap<String, String> = HashMap::new();
-
-    for schema in &schemas {
-      for ty in &schema.types {
-        type_name_version_map.insert(ty.name.clone(), ty.version.clone());
-      }
     }
 
     let mut part_name_type_name_map = HashMap::new();
@@ -147,68 +128,6 @@ impl Context {
       "StylesWithEffectsPart".to_string(),
       "w:CT_Styles/w:styles".to_string(),
     );
-
-    #[allow(unused_mut)]
-    let mut part_name_set: HashSet<String> = HashSet::new();
-
-    #[cfg(feature = "docx")]
-    gen_part_name_set(
-      &mut part_name_set,
-      "WordprocessingDocument",
-      &part_name_part_map,
-    );
-
-    #[cfg(feature = "xlsx")]
-    gen_part_name_set(
-      &mut part_name_set,
-      "SpreadsheetDocument",
-      &part_name_part_map,
-    );
-
-    #[cfg(feature = "pptx")]
-    gen_part_name_set(
-      &mut part_name_set,
-      "PresentationDocument",
-      &part_name_part_map,
-    );
-
-    parts.retain(|part| part_name_set.contains(&part.name));
-
-    parts.retain(|part| {
-      if let Some(part_type_name) = part_name_type_name_map.get(&part.name) {
-        type_name_version_map
-          .get(part_type_name)
-          .map(|type_version| {
-            check_office_version(&part.version) && check_office_version(type_version)
-          })
-          .unwrap_or_else(|| check_office_version(&part.version))
-      } else {
-        check_office_version(&part.version)
-      }
-    });
-
-    for part in &mut parts {
-      part.children.retain(|child| {
-        if child.is_data_part_reference {
-          return true;
-        }
-
-        let Some(child_version) = part_name_version_map.get(&child.name) else {
-          return false;
-        };
-
-        if let Some(part_type_name) = part_name_type_name_map.get(&child.name) {
-          type_name_version_map
-            .get(part_type_name)
-            .map(|type_version| {
-              check_office_version(child_version) && check_office_version(type_version)
-            })
-            .unwrap_or_else(|| check_office_version(child_version))
-        } else {
-          check_office_version(child_version)
-        }
-      });
-    }
 
     for schema in &mut schemas {
       for ty in &mut schema.types {
@@ -245,38 +164,6 @@ impl Context {
     }
 
     for schema in &mut schemas {
-      for e in &mut schema.enums {
-        e.facets
-          .retain(|facet| check_office_version(&facet.version));
-      }
-
-      schema.enums.retain(|e| check_office_version(&e.version));
-
-      for ty in &mut schema.types {
-        ty.attributes
-          .retain(|attribute| check_office_version(&attribute.version));
-
-        ty.children.retain(|child| {
-          type_name_version_map
-            .get(&child.name)
-            .map(|version| check_office_version(version))
-            .unwrap_or(false)
-        });
-
-        check_particle_version(&mut ty.particle);
-      }
-
-      schema.types.retain(|ty| check_office_version(&ty.version));
-    }
-
-    schemas.retain(|schema| {
-      uri_namespace_version_map
-        .get(&schema.target_namespace)
-        .map(|version| check_office_version(version))
-        .unwrap_or(false)
-    });
-
-    for schema in &mut schemas {
       schema.types.retain(|ty| {
         type_name_set.is_empty() || type_name_set.contains(&ty.name) || !ty.part.is_empty()
       });
@@ -293,40 +180,6 @@ impl Context {
       namespace_uri_prefix_map,
       prefix_typed_namespace_map,
     })
-  }
-}
-
-fn check_particle_version(particle: &mut OpenXmlSchemaTypeParticle) {
-  particle
-    .items
-    .retain(|item| check_office_version(&item.initial_version));
-
-  for item in &mut particle.items {
-    check_particle_version(item);
-  }
-
-  particle
-    .occurs
-    .retain(|occur| check_office_version(&occur.version));
-}
-
-fn gen_part_name_set(
-  part_name_set: &mut HashSet<String>,
-  part_name: &str,
-  part_name_part_map: &HashMap<String, OpenXmlPart>,
-) {
-  if !part_name_set.insert(part_name.to_string()) {
-    return;
-  }
-
-  let Some(part) = part_name_part_map.get(part_name) else {
-    return;
-  };
-
-  for child in &part.children {
-    if !child.is_data_part_reference {
-      gen_part_name_set(part_name_set, &child.name, part_name_part_map);
-    }
   }
 }
 
@@ -360,22 +213,5 @@ fn gen_type_name_set(
 
   for child in &schema_type.children {
     gen_type_name_set(type_name_set, &child.name, type_name_type_map);
-  }
-}
-
-fn check_office_version(version: &str) -> bool {
-  if version.is_empty() || cfg!(feature = "microsoft365") {
-    return true;
-  }
-
-  match version {
-    "Office2007" => cfg!(feature = "office2007"),
-    "Office2010" => cfg!(feature = "office2010"),
-    "Office2013" => cfg!(feature = "office2013"),
-    "Office2016" => cfg!(feature = "office2016"),
-    "Office2019" => cfg!(feature = "office2019"),
-    "Office2021" => cfg!(feature = "office2021"),
-    "Microsoft365" => cfg!(feature = "microsoft365"),
-    _ => true,
   }
 }

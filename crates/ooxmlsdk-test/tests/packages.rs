@@ -1,3 +1,5 @@
+#![cfg(feature = "parts")]
+
 use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
@@ -111,6 +113,7 @@ fn open_presentation_document_asset_from_openxml_sdk() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn open_hello_world_docx_asset_from_openxml_sdk() {
   let path = test_file_path("HelloWorld.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();

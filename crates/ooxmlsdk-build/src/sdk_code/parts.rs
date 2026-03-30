@@ -6,12 +6,14 @@ use syn::{
   parse2,
 };
 
+use crate::sdk_code::versioning::{features_cfg_attrs, versioned_tokens};
 use crate::sdk_data::sdk_data_model::{Part, PartChild, PartContentKind};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 type Result<T> = std::result::Result<T, BoxError>;
 
 struct RelationshipBranch {
+  version: String,
   relationship_type: Expr,
   body: TokenStream,
 }
@@ -21,6 +23,31 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
   let relationship_type_stmt: Stmt = parse2(quote! {
     pub const RELATIONSHIP_TYPE: &str = #relationship_type_str;
   })?;
+  let parent_path_ident = if part.children.is_empty() {
+    parse_str::<Ident>("_parent_path")?
+  } else {
+    parse_str::<Ident>("parent_path")?
+  };
+  let path_ident = if part.content_kind == PartContentKind::None && part.children.is_empty() {
+    parse_str::<Ident>("_path")?
+  } else {
+    parse_str::<Ident>("path")?
+  };
+  let r_id_ident = if part.base == "OpenXmlPackage" {
+    parse_str::<Ident>("_r_id")?
+  } else {
+    parse_str::<Ident>("r_id")?
+  };
+  let file_path_set_ident = if part.children.is_empty() {
+    parse_str::<Ident>("_file_path_set")?
+  } else {
+    parse_str::<Ident>("file_path_set")?
+  };
+  let archive_ident = if part.content_kind == PartContentKind::None && part.children.is_empty() {
+    parse_str::<Ident>("_archive")?
+  } else {
+    parse_str::<Ident>("archive")?
+  };
 
   let struct_name_ident: Ident = parse_str(&part.name.to_upper_camel_case())?;
   let mut fields: Vec<TokenStream> = vec![];
@@ -118,10 +145,10 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
     })?);
     field_declaration_list.push(parse2(quote! {
       let part_target_str = if path.ends_with(".xml") {
-        &path[path
+        &#path_ident[#path_ident
           .rfind('/')
-          .ok_or_else(|| crate::common::SdkError::CommonError(path.to_string()))?
-          + 1..path.len()]
+          .ok_or_else(|| crate::common::SdkError::CommonError(#path_ident.to_string()))?
+          + 1..#path_ident.len()]
       } else {
         ""
       };
@@ -146,7 +173,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
   }
 
   self_field_value_list.push(parse2(quote! {
-    inner_path: path.to_string()
+    inner_path: #path_ident.to_string()
   })?);
 
   match part.content_kind {
@@ -159,7 +186,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
       })?);
       field_declaration_list.push(parse2(quote! {
         {
-          let mut file = std::io::BufReader::new(archive.by_name(path)?);
+          let mut file = std::io::BufReader::new(#archive_ident.by_name(#path_ident)?);
           file.read_to_string(&mut part_content)?;
         }
       })?);
@@ -174,7 +201,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
       })?);
       field_declaration_list.push(parse2(quote! {
         {
-          let mut zip_entry = archive.by_name(path)?;
+          let mut zip_entry = #archive_ident.by_name(#path_ident)?;
           part_content = Vec::with_capacity(zip_entry.size() as usize);
           zip_entry.read_to_end(&mut part_content)?;
         }
@@ -185,7 +212,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
       let root_type = part_root_type_tokens(part)?;
       field_declaration_list.push(parse2(quote! {
         let root_element = Some(#root_type::from_reader(std::io::BufReader::new(
-          archive.by_name(path)?,
+          #archive_ident.by_name(#path_ident)?,
         ))?);
       })?);
       field_unwrap_list.push(parse2(quote! {
@@ -212,9 +239,12 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
 
     if child.max_occurs_great_than_one {
       field_declaration_list.push(
-        parse2(quote! {
-          let mut #child_api_name_ident: Vec<#child_type> = vec![];
-        })
+        parse2(versioned_tokens(
+          &child.version,
+          quote! {
+            let mut #child_api_name_ident: Vec<#child_type> = vec![];
+          },
+        ))
         .map_err(|err| {
           format!(
             "{} repeated child declaration {}: {err}",
@@ -223,26 +253,33 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
         })?,
       );
       children_arm_list.push(RelationshipBranch {
+        version: child.version.clone(),
         relationship_type: relationship_type_expr.clone(),
-        body: quote! {
-          let target_path = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, relationship.target),
-          );
-          let #child_name_ident = #child_type::new_from_archive(
-            &child_parent_path,
-            &target_path,
-            &relationship.id,
-            file_path_set,
-            archive,
-          )?;
-          #child_api_name_ident.push(#child_name_ident);
-        },
+        body: versioned_tokens(
+          &child.version,
+          quote! {
+            let target_path = crate::common::resolve_zip_file_path(
+              &format!("{}{}", child_parent_path, relationship.target),
+            );
+            let #child_name_ident = #child_type::new_from_archive(
+              &child_parent_path,
+              &target_path,
+              &relationship.id,
+              file_path_set,
+              #archive_ident,
+            )?;
+            #child_api_name_ident.push(#child_name_ident);
+          },
+        ),
       });
     } else {
       field_declaration_list.push(
-        parse2(quote! {
-          let mut #child_api_name_ident: Option<std::boxed::Box<#child_type>> = None;
-        })
+        parse2(versioned_tokens(
+          &child.version,
+          quote! {
+            let mut #child_api_name_ident: Option<std::boxed::Box<#child_type>> = None;
+          },
+        ))
         .map_err(|err| {
           format!(
             "{} optional child declaration {}: {err}",
@@ -251,34 +288,41 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
         })?,
       );
       children_arm_list.push(RelationshipBranch {
+        version: child.version.clone(),
         relationship_type: relationship_type_expr.clone(),
-        body: quote! {
-          let target_path = crate::common::resolve_zip_file_path(
-            &format!("{}{}", child_parent_path, relationship.target),
-          );
-          #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
-            &child_parent_path,
-            &target_path,
-            &relationship.id,
-            file_path_set,
-            archive,
-          )?));
-        },
+        body: versioned_tokens(
+          &child.version,
+          quote! {
+            let target_path = crate::common::resolve_zip_file_path(
+              &format!("{}{}", child_parent_path, relationship.target),
+            );
+            #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
+              &child_parent_path,
+              &target_path,
+              &relationship.id,
+              file_path_set,
+              #archive_ident,
+            )?));
+          },
+        ),
       });
 
       if child.min_occurs_is_non_zero {
         let child_api_name_str = child.api_name.to_snake_case();
-        field_unwrap_list.push(parse2(quote! {
+        field_unwrap_list.push(parse2(versioned_tokens(&child.version, quote! {
           let #child_api_name_ident = #child_api_name_ident
             .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
-        }).map_err(|err| format!("{} required child unwrap {}: {err}", part.name, child.name))?);
+        })).map_err(|err| format!("{} required child unwrap {}: {err}", part.name, child.name))?);
       }
     }
 
     self_field_value_list.push(
-      parse2(quote! {
-        #child_api_name_ident
-      })
+      parse2(versioned_tokens(
+        &child.version,
+        quote! {
+          #child_api_name_ident
+        },
+      ))
       .map_err(|err| format!("{} self field value {}: {err}", part.name, child.name))?,
     );
   }
@@ -289,12 +333,16 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
       .map(|branch| {
         let relationship_type = &branch.relationship_type;
         let body = &branch.body;
+        let arm_version = branch.version.as_str();
 
-        parse2(quote! {
-          relationship_type if relationship_type == #relationship_type => {
-            #body
-          }
-        })
+        parse2(versioned_tokens(
+          arm_version,
+          quote! {
+            relationship_type if relationship_type == #relationship_type => {
+              #body
+            }
+          },
+        ))
       })
       .collect::<std::result::Result<Vec<_>, _>>()?;
 
@@ -314,13 +362,12 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
   }
 
   let part_new_from_archive_fn: ItemFn = parse2(quote! {
-    #[allow(unused_variables)]
     pub(crate) fn new_from_archive<R: std::io::Read + std::io::Seek>(
-      parent_path: &str,
-      path: &str,
-      r_id: &str,
-      file_path_set: &std::collections::HashSet<String>,
-      archive: &mut zip::ZipArchive<R>,
+      #parent_path_ident: &str,
+      #path_ident: &str,
+      #r_id_ident: &str,
+      #file_path_set_ident: &std::collections::HashSet<String>,
+      #archive_ident: &mut zip::ZipArchive<R>,
     ) -> Result<Self, crate::common::SdkError> {
       #( #field_declaration_list )*
       #children_stmt
@@ -442,27 +489,36 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
 
     if child.max_occurs_great_than_one {
       children_writer_stmt_list.push(
-        parse2(quote! {
-          for #child_name_ident in &self.#child_api_name_ident {
-            #child_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
-          }
-        })
+        parse2(versioned_tokens(
+          &child.version,
+          quote! {
+            for #child_name_ident in &self.#child_api_name_ident {
+              #child_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
+            }
+          },
+        ))
         .map_err(|err| format!("{} repeated child writer {}: {err}", part.name, child.name))?,
       );
     } else if child.min_occurs_is_non_zero {
       children_writer_stmt_list.push(
-        parse2(quote! {
-          self.#child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
-        })
+        parse2(versioned_tokens(
+          &child.version,
+          quote! {
+            self.#child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
+          },
+        ))
         .map_err(|err| format!("{} required child writer {}: {err}", part.name, child.name))?,
       );
     } else {
       children_writer_stmt_list.push(
-        parse2(quote! {
-          if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
-            #child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
-          }
-        })
+        parse2(versioned_tokens(
+          &child.version,
+          quote! {
+            if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
+              #child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
+            }
+          },
+        ))
         .map_err(|err| format!("{} optional child writer {}: {err}", part.name, child.name))?,
       );
     }
@@ -573,7 +629,9 @@ pub fn gen_parts_mod(parts: &[Part]) -> Result<TokenStream> {
 
   for part in parts {
     let mod_ident: Ident = parse_str(&part.module_name)?;
+    let part_attrs = part_module_attrs(part);
     mod_list.push(parse2(quote! {
+      #( #part_attrs )*
       pub mod #mod_ident;
     })?);
   }
@@ -581,6 +639,17 @@ pub fn gen_parts_mod(parts: &[Part]) -> Result<TokenStream> {
   Ok(quote! {
     #( #mod_list )*
   })
+}
+
+fn part_module_attrs(part: &Part) -> Vec<syn::Attribute> {
+  let filtered_features: Vec<String> = part
+    .features
+    .iter()
+    .filter(|feature| feature.as_str() != "parts")
+    .cloned()
+    .collect();
+
+  features_cfg_attrs(&filtered_features)
 }
 
 fn part_root_type_tokens(part: &Part) -> Result<Type> {
@@ -610,16 +679,25 @@ fn child_field_tokens(child: &PartChild) -> Result<TokenStream> {
   let child_type = child_type_tokens(child)?;
 
   if child.max_occurs_great_than_one {
-    Ok(quote! {
-      pub #field_ident: Vec<#child_type>,
-    })
+    Ok(versioned_tokens(
+      &child.version,
+      quote! {
+        pub #field_ident: Vec<#child_type>,
+      },
+    ))
   } else if child.min_occurs_is_non_zero {
-    Ok(quote! {
-      pub #field_ident: std::boxed::Box<#child_type>,
-    })
+    Ok(versioned_tokens(
+      &child.version,
+      quote! {
+        pub #field_ident: std::boxed::Box<#child_type>,
+      },
+    ))
   } else {
-    Ok(quote! {
-      pub #field_ident: Option<std::boxed::Box<#child_type>>,
-    })
+    Ok(versioned_tokens(
+      &child.version,
+      quote! {
+        pub #field_ident: Option<std::boxed::Box<#child_type>>,
+      },
+    ))
   }
 }

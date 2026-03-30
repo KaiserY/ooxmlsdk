@@ -9,6 +9,9 @@ use crate::sdk_code::helpers::{
   supports_xmlns_fields,
 };
 use crate::sdk_code::schemas::{CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild};
+use crate::sdk_code::versioning::{
+  effective_version, is_microsoft365_version, version_cfg_attrs, versioned_tokens,
+};
 use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
@@ -46,6 +49,7 @@ fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(Ite
     schema_enum.name.to_upper_camel_case()
   ))?;
   let mut variants: Vec<Arm> = vec![];
+  let enum_attrs = version_cfg_attrs(&schema_enum.version);
 
   for facet in &schema_enum.facets {
     let variant_ident: Ident = if facet.name.is_empty() {
@@ -55,12 +59,16 @@ fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(Ite
     };
     let variant_value = facet.value.as_str();
 
-    variants.push(parse2(quote! {
-      Self::#variant_ident => #variant_value,
-    })?);
+    variants.push(parse2(versioned_tokens(
+      &facet.version,
+      quote! {
+        Self::#variant_ident => #variant_value,
+      },
+    ))?);
   }
 
   let impl_block = parse2(quote! {
+    #( #enum_attrs )*
     impl #enum_type {
       pub fn as_xml_str(&self) -> &'static str {
         match self {
@@ -75,6 +83,7 @@ fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(Ite
   })?;
 
   let display_impl = parse2(quote! {
+    #( #enum_attrs )*
     impl std::fmt::Display for #enum_type {
       fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_xml_str())
@@ -175,11 +184,12 @@ fn gen_struct_serializer(
           continue;
         }
 
-        child_stmt_list.push(gen_one_sequence_child_stmt(
-          &child,
-          flat_particle.optional,
-          flat_particle.repeated,
-        )?);
+        let child_stmt =
+          gen_one_sequence_child_stmt(&child, flat_particle.optional, flat_particle.repeated)?;
+        child_stmt_list.push(parse2(versioned_tokens(
+          effective_version(child.version, particle.initial_version.as_str()),
+          quote! { #child_stmt },
+        ))?);
       }
 
       children_writer = quote! {
@@ -200,11 +210,13 @@ fn gen_struct_serializer(
       for child in &resolved_children {
         child_arms.push(gen_child_arm(child, &child_choice_enum_type)?);
       }
+      let fallback_arm = child_match_fallback(&resolved_children);
 
       children_writer = quote! {
         for child in &self.children {
           match child {
             #( #child_arms )*
+            #fallback_arm
           };
         }
       };
@@ -245,11 +257,12 @@ fn gen_struct_serializer(
           continue;
         }
 
-        child_stmt_list.push(gen_one_sequence_child_stmt(
-          &child,
-          flat_particle.optional,
-          flat_particle.repeated,
-        )?);
+        let child_stmt =
+          gen_one_sequence_child_stmt(&child, flat_particle.optional, flat_particle.repeated)?;
+        child_stmt_list.push(parse2(versioned_tokens(
+          effective_version(child.version, particle.initial_version.as_str()),
+          quote! { #child_stmt },
+        ))?);
       }
 
       children_writer = quote! {
@@ -269,11 +282,13 @@ fn gen_struct_serializer(
       for child in &resolved_children {
         child_arms.push(gen_child_arm(child, &child_choice_enum_type)?);
       }
+      let fallback_arm = child_match_fallback(&resolved_children);
 
       children_writer = quote! {
         for child in &self.children {
           match child {
             #( #child_arms )*
+            #fallback_arm
           };
         }
       };
@@ -310,7 +325,7 @@ fn gen_struct_serializer(
   }
 
   for attr in attributes {
-    attr_stmts.push(gen_attr_stmt(attr)?);
+    attr_stmts.push(versioned_tokens(&attr.version, gen_attr_stmt(attr)?));
   }
 
   let mut xmlns_attr_writer_list: Vec<Stmt> = vec![];
@@ -380,7 +395,9 @@ fn gen_struct_serializer(
     })?
   };
 
+  let type_attrs = version_cfg_attrs(&schema_type.version);
   let impl_block = parse2(quote! {
+    #( #type_attrs )*
     impl #struct_type {
       #to_xml_fn
 
@@ -411,6 +428,7 @@ fn gen_struct_serializer(
   })?;
 
   let display_impl = parse2(quote! {
+    #( #type_attrs )*
     impl std::fmt::Display for #struct_type {
       fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_xml()?)
@@ -483,9 +501,26 @@ fn one_sequence_child_field_ident(child: &ResolvedOneSequenceChild<'_>) -> Resul
 fn gen_child_arm(child: &ResolvedCompositeChild<'_>, child_choice_enum_type: &Type) -> Result<Arm> {
   let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
 
-  Ok(parse2(quote! {
+  Ok(parse2(versioned_tokens(
+    child.version,
+    quote! {
     #child_choice_enum_type::#child_variant_name_ident(child) => child.write_xml(writer, xmlns_prefix)?,
-  })?)
+    },
+  ))?)
+}
+
+fn child_match_fallback(children: &[ResolvedCompositeChild<'_>]) -> TokenStream {
+  if children
+    .iter()
+    .any(|child| is_microsoft365_version(child.version))
+  {
+    quote! {
+      #[cfg(not(feature = "microsoft365"))]
+      _ => {}
+    }
+  } else {
+    quote! {}
+  }
 }
 
 fn split_type_name(name: &str) -> Result<(&str, &str, &str, &str)> {

@@ -1,5 +1,3 @@
-use std::path::Path;
-
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, BoxError>;
 
@@ -9,40 +7,25 @@ pub mod sdk_data;
 pub mod simple_type;
 pub mod utils;
 
-pub fn generate<P: AsRef<Path>, Q: AsRef<Path>, R: AsRef<Path>, S: AsRef<Path>>(
-  data_dir: P,
-  sdk_data_dir: Q,
-  package_schemas_dir: R,
-  out_dir: S,
-) -> Result<()> {
-  sdk_data::gen_sdk_data(
-    data_dir.as_ref(),
-    sdk_data_dir.as_ref(),
-    package_schemas_dir.as_ref(),
-  )?;
-  sdk_code::gen_sdk_code(sdk_data_dir.as_ref(), out_dir.as_ref())?;
-  Ok(())
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::path::PathBuf;
 
   #[test]
   #[ignore]
   fn test_gen() {
-    sdk_code::gen_sdk_code("../../sdk_data", "../ooxmlsdk/src").unwrap();
-  }
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root");
+    let sdk_data_dir = workspace_root.join("sdk_data");
+    let package_schema_dir = workspace_root.join("schemas/OpenPackagingConventions-XMLSchema");
+    let runtime_src_dir = workspace_root.join("crates/ooxmlsdk/src");
+    let upstream_data_dir = workspace_root.join("../Open-XML-SDK/data");
 
-  #[test]
-  #[ignore]
-  fn test_sync_sdk_data() {
-    generate(
-      "../../../Open-XML-SDK/data",
-      "../../sdk_data",
-      "../../schemas/OpenPackagingConventions-XMLSchema",
-      "../ooxmlsdk/src",
-    )
-    .unwrap();
+    sdk_data::gen_sdk_data(&upstream_data_dir, &sdk_data_dir, &package_schema_dir).unwrap();
+    sdk_code::gen_sdk_code(&sdk_data_dir, &runtime_src_dir).unwrap();
   }
 }

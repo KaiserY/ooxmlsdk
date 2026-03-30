@@ -107,24 +107,24 @@ where
   F: FnMut(&mut R, quick_xml::events::BytesStart<'de>, bool) -> Result<bool, SdkError>,
 {
   if empty_tag {
-    return Ok(());
-  }
-
-  loop {
-    match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => {
-        if !visitor(xml_reader, e, false)? {
-          process_foreign_element_children(xml_reader, false, visitor)?;
+    Ok(())
+  } else {
+    loop {
+      match xml_reader.next()? {
+        quick_xml::events::Event::Start(e) => {
+          if !visitor(xml_reader, e, false)? {
+            process_foreign_element_children(xml_reader, false, visitor)?;
+          }
         }
+        quick_xml::events::Event::Empty(e) => {
+          visitor(xml_reader, e, true)?;
+        }
+        quick_xml::events::Event::End(_) => break,
+        quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
+        _ => {}
       }
-      quick_xml::events::Event::Empty(e) => {
-        visitor(xml_reader, e, true)?;
-      }
-      quick_xml::events::Event::End(_) => break,
-      quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
-      _ => {}
     }
-  }
 
-  Ok(())
+    Ok(())
+  }
 }

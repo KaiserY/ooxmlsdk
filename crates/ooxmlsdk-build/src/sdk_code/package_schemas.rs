@@ -345,32 +345,50 @@ fn gen_deserialize_inner_fn(
     quote! {}
   };
 
-  let xmlns_match = if package_type.has_xmlns_fields {
+  let attr_match = if package_type.has_xmlns_fields && attr_arms.is_empty() {
     quote! {
-      b"xmlns" => {
-        xmlns = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
-      }
-      b"mc:Ignorable" => {
-        mc_ignorable = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
-      }
-      key => {
-        if key.starts_with(b"xmlns:") {
+      match attr.key.as_ref() {
+        b"xmlns" => {
+          xmlns = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
+        }
+        b"mc:Ignorable" => {
+          mc_ignorable = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
+        }
+        key if key.starts_with(b"xmlns:") => {
           xmlns_map.insert(
             String::from_utf8_lossy(&key[6..]).to_string(),
             attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned(),
           );
-          continue;
         }
-
-        match key {
-          #( #attr_arms )*
-          _ => {}
-        }
+        _ => {}
       }
+    }
+  } else if package_type.has_xmlns_fields {
+    quote! {
+      match attr.key.as_ref() {
+        b"xmlns" => {
+          xmlns = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
+        }
+        b"mc:Ignorable" => {
+          mc_ignorable = Some(attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned());
+        }
+        key if key.starts_with(b"xmlns:") => {
+          xmlns_map.insert(
+            String::from_utf8_lossy(&key[6..]).to_string(),
+            attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned(),
+          );
+        }
+        #( #attr_arms )*
+        _ => {}
+      }
+    }
+  } else if attr_arms.is_empty() {
+    quote! {
+      let _ = attr;
     }
   } else {
     quote! {
-      key => match key {
+      match attr.key.as_ref() {
         #( #attr_arms )*
         _ => {}
       }
@@ -390,9 +408,7 @@ fn gen_deserialize_inner_fn(
       for attr in e.attributes().with_checks(false) {
         let attr = attr?;
 
-        match attr.key.as_ref() {
-          #xmlns_match
-        }
+        #attr_match
       }
 
       #child_match
@@ -443,7 +459,7 @@ fn gen_package_type_serializer(
   let write_body = if is_leaf {
     quote! {
       writer.write_str("/>")?;
-      return Ok(());
+      Ok(())
     }
   } else {
     quote! {

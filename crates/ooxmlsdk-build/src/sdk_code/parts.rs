@@ -2,13 +2,19 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-  Arm, FieldValue, Ident, ItemFn, ItemImpl, ItemMod, ItemStruct, Stmt, Type, parse_str, parse2,
+  Arm, Expr, FieldValue, Ident, ItemFn, ItemImpl, ItemMod, ItemStruct, Stmt, Type, parse_str,
+  parse2,
 };
 
 use crate::sdk_data::sdk_data_model::{Part, PartChild, PartContentKind};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 type Result<T> = std::result::Result<T, BoxError>;
+
+struct RelationshipBranch {
+  relationship_type: Expr,
+  body: TokenStream,
+}
 
 pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
   let relationship_type_str = part.relationship_type.as_str();
@@ -81,7 +87,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
   let mut field_unwrap_list: Vec<Stmt> = vec![];
   let mut self_field_value_list: Vec<FieldValue> = vec![];
   let mut children_stmt: Option<Stmt> = None;
-  let mut children_arm_list: Vec<Arm> = vec![];
+  let mut children_arm_list: Vec<RelationshipBranch> = vec![];
 
   let path_str = if part.paths.general.is_empty() {
     "".to_string()
@@ -199,17 +205,26 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
     let child_type = child_type_tokens(child)?;
     let child_api_name_ident: Ident = parse_str(&child.api_name.to_snake_case())?;
     let child_name_ident: Ident = parse_str(&child.name.to_snake_case())?;
-    let relationship_type_ty: Type = parse_str(&format!(
+    let relationship_type_expr: Expr = parse_str(&format!(
       "crate::parts::{}::RELATIONSHIP_TYPE",
       child.name.to_snake_case(),
     ))?;
 
     if child.max_occurs_great_than_one {
-      field_declaration_list.push(parse2(quote! {
-        let mut #child_api_name_ident: Vec<#child_type> = vec![];
-      })?);
-      children_arm_list.push(parse2(quote! {
-        #relationship_type_ty => {
+      field_declaration_list.push(
+        parse2(quote! {
+          let mut #child_api_name_ident: Vec<#child_type> = vec![];
+        })
+        .map_err(|err| {
+          format!(
+            "{} repeated child declaration {}: {err}",
+            part.name, child.name
+          )
+        })?,
+      );
+      children_arm_list.push(RelationshipBranch {
+        relationship_type: relationship_type_expr.clone(),
+        body: quote! {
           let target_path = crate::common::resolve_zip_file_path(
             &format!("{}{}", child_parent_path, relationship.target),
           );
@@ -221,14 +236,23 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
             archive,
           )?;
           #child_api_name_ident.push(#child_name_ident);
-        }
-      })?);
+        },
+      });
     } else {
-      field_declaration_list.push(parse2(quote! {
-        let mut #child_api_name_ident: Option<std::boxed::Box<#child_type>> = None;
-      })?);
-      children_arm_list.push(parse2(quote! {
-        #relationship_type_ty => {
+      field_declaration_list.push(
+        parse2(quote! {
+          let mut #child_api_name_ident: Option<std::boxed::Box<#child_type>> = None;
+        })
+        .map_err(|err| {
+          format!(
+            "{} optional child declaration {}: {err}",
+            part.name, child.name
+          )
+        })?,
+      );
+      children_arm_list.push(RelationshipBranch {
+        relationship_type: relationship_type_expr.clone(),
+        body: quote! {
           let target_path = crate::common::resolve_zip_file_path(
             &format!("{}{}", child_parent_path, relationship.target),
           );
@@ -239,37 +263,54 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
             file_path_set,
             archive,
           )?));
-        }
-      })?);
+        },
+      });
 
       if child.min_occurs_is_non_zero {
         let child_api_name_str = child.api_name.to_snake_case();
         field_unwrap_list.push(parse2(quote! {
           let #child_api_name_ident = #child_api_name_ident
             .ok_or_else(|| crate::common::SdkError::CommonError(#child_api_name_str.to_string()))?;
-        })?);
+        }).map_err(|err| format!("{} required child unwrap {}: {err}", part.name, child.name))?);
       }
     }
 
-    self_field_value_list.push(parse2(quote! {
-      #child_api_name_ident
-    })?);
+    self_field_value_list.push(
+      parse2(quote! {
+        #child_api_name_ident
+      })
+      .map_err(|err| format!("{} self field value {}: {err}", part.name, child.name))?,
+    );
   }
 
   if !part.children.is_empty() {
-    children_arm_list.push(parse2(quote! {
-      _ => ()
-    })?);
-    children_stmt = Some(parse2(quote! {
-      if let Some(relationships) = &relationships {
-        for relationship in &relationships.relationship {
-          #[allow(clippy::single_match)]
-          match relationship.r#type.as_str() {
-            #( #children_arm_list, )*
+    let children_match_arms: Vec<Arm> = children_arm_list
+      .iter()
+      .map(|branch| {
+        let relationship_type = &branch.relationship_type;
+        let body = &branch.body;
+
+        parse2(quote! {
+          relationship_type if relationship_type == #relationship_type => {
+            #body
+          }
+        })
+      })
+      .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    children_stmt = Some(
+      parse2(quote! {
+        if let Some(relationships) = &relationships {
+          for relationship in &relationships.relationship {
+            match relationship.r#type.as_str() {
+              #( #children_match_arms )*
+              _ => {}
+            }
           }
         }
-      }
-    })?);
+      })
+      .map_err(|err| format!("{} children stmt: {err}", part.name))?,
+    );
   }
 
   let part_new_from_archive_fn: ItemFn = parse2(quote! {
@@ -400,21 +441,30 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
     let child_name_ident: Ident = parse_str(&child.name.to_snake_case())?;
 
     if child.max_occurs_great_than_one {
-      children_writer_stmt_list.push(parse2(quote! {
-        for #child_name_ident in &self.#child_api_name_ident {
-          #child_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
-        }
-      })?);
+      children_writer_stmt_list.push(
+        parse2(quote! {
+          for #child_name_ident in &self.#child_api_name_ident {
+            #child_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
+          }
+        })
+        .map_err(|err| format!("{} repeated child writer {}: {err}", part.name, child.name))?,
+      );
     } else if child.min_occurs_is_non_zero {
-      children_writer_stmt_list.push(parse2(quote! {
-        self.#child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
-      })?);
+      children_writer_stmt_list.push(
+        parse2(quote! {
+          self.#child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
+        })
+        .map_err(|err| format!("{} required child writer {}: {err}", part.name, child.name))?,
+      );
     } else {
-      children_writer_stmt_list.push(parse2(quote! {
-        if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
-          #child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
-        }
-      })?);
+      children_writer_stmt_list.push(
+        parse2(quote! {
+          if let Some(#child_api_name_ident) = &self.#child_api_name_ident {
+            #child_api_name_ident.save_zip(&child_parent_path, zip, entry_set)?;
+          }
+        })
+        .map_err(|err| format!("{} optional child writer {}: {err}", part.name, child.name))?,
+      );
     }
   }
 

@@ -106,10 +106,10 @@ pub(crate) fn decode_attr_value(
   decoder: Decoder,
 ) -> Result<String, SdkError> {
   if let Some(value) = attr_raw_value(attr) {
-    return Ok(decoder.decode(value)?.into_owned());
+    Ok(decoder.decode(value)?.into_owned())
+  } else {
+    Ok(attr.decode_and_unescape_value(decoder)?.into_owned())
   }
-
-  Ok(attr.decode_and_unescape_value(decoder)?.into_owned())
 }
 
 #[inline(always)]
@@ -122,11 +122,11 @@ pub(crate) fn parse_bool_attr(
   if let Some(value) = attr_raw_value(attr)
     && let Ok(value) = parse_bool_bytes(value)
   {
-    return Ok(value);
+    Ok(value)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_bool_str(value.as_ref(), ty, field)
   }
-
-  let value = decode_attr_value(attr, decoder)?;
-  parse_bool_str(value.as_ref(), ty, field)
 }
 
 #[inline(always)]
@@ -143,11 +143,11 @@ where
     && let Ok(value) = std::str::from_utf8(value)
     && let Ok(value) = value.parse::<T>()
   {
-    return Ok(value);
+    Ok(value)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_value(value.as_ref(), ty, field)
   }
-
-  let value = decode_attr_value(attr, decoder)?;
-  parse_value(value.as_ref(), ty, field)
 }
 
 #[inline(always)]

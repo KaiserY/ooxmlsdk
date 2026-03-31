@@ -57,6 +57,45 @@ pub const WORDPROCESSING_DOCUMENT_TRAILING_WHITESPACE_XML: &str =
 pub const WORDPROCESSING_DOCUMENT_TRAILING_COMMENT_XML: &str =
   include_str!("../samples/wordprocessing_document_trailing_comment.xml");
 
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Hyperlink.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_HYPERLINK_XML: &str =
+  include_str!("../samples/wordprocessing_document_hyperlink.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Plain.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_PLAIN_XML: &str =
+  include_str!("../samples/wordprocessing_document_plain.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/HelloWorld.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_HELLO_WORLD_XML: &str =
+  include_str!("../samples/wordprocessing_document_hello_world.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/HelloO14.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_HELLO_O14_XML: &str =
+  include_str!("../samples/wordprocessing_document_hello_o14.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Comments.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_COMMENTS_XML: &str =
+  include_str!("../samples/wordprocessing_document_comments.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Comments.docx :: word/comments.xml
+pub const WORDPROCESSING_COMMENTS_XML: &str =
+  include_str!("../samples/wordprocessing_comments.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/simpleSdt.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_SIMPLE_SDT_XML: &str =
+  include_str!("../samples/wordprocessing_document_simple_sdt.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Document.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_DOCUMENT_XML: &str =
+  include_str!("../samples/wordprocessing_document_document.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Spreadsheet.xlsx :: xl/workbook.xml
+pub const SPREADSHEET_WORKBOOK_XML: &str = include_str!("../samples/spreadsheet_workbook.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Presentation.pptx :: ppt/presentation.xml
+pub const PRESENTATION_PRESENTATION_XML: &str =
+  include_str!("../samples/presentation_presentation.xml");
+
 // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementParsingTests.cs :: ParseOpenXmlAttributeWithEmbeddedXml
 pub const PRESENTATION_NON_VISUAL_DRAWING_PROPERTIES_XML: &str =
   include_str!("../samples/presentation_non_visual_drawing_properties.xml");

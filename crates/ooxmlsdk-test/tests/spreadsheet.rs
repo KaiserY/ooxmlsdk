@@ -1,5 +1,5 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
-  CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable,
+  CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -27,6 +27,19 @@ fn color_scale_colors(
   scale: &ColorScale,
 ) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Color> {
   scale.x_color.iter().collect()
+}
+
+#[test]
+fn workbook_round_trip_from_openxml_part_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Workbook>(fixtures::SPREADSHEET_WORKBOOK_XML);
+
+  assert_eq!(parsed.sheets.x_sheet.len(), 2);
+  assert_eq!(parsed.sheets.x_sheet[0].name.as_str(), "Sheet1");
+  assert_eq!(parsed.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert!(serialized.contains("<x:sheet name=\"Sheet1\""));
+  assert!(serialized.contains("<x:sheet name=\"Sheet2\""));
+  assert_eq!(reparsed.sheets.x_sheet.len(), 2);
 }
 
 #[test]

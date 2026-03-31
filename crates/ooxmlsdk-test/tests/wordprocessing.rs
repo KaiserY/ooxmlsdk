@@ -1,6 +1,7 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChildChoice, Document, DocumentChildChoice, Paragraph, ParagraphChildChoice, Run,
-  RunChildChoice, Text,
+  Body, BodyChildChoice, CommentChildChoice, Comments, Document, DocumentChildChoice, Hyperlink,
+  HyperlinkChildChoice, Paragraph, ParagraphChildChoice, Run, RunChildChoice, SdtBlock,
+  SdtBlockChildChoice, SdtPropertiesChildChoice, Text,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -37,6 +38,39 @@ fn first_run(paragraph: &Paragraph) -> &Run {
     .expect("expected paragraph run")
 }
 
+fn first_hyperlink(paragraph: &Paragraph) -> &Hyperlink {
+  paragraph
+    .children
+    .iter()
+    .find_map(|child| match child {
+      ParagraphChildChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
+      _ => None,
+    })
+    .expect("expected paragraph hyperlink")
+}
+
+fn first_hyperlink_run(hyperlink: &Hyperlink) -> &Run {
+  hyperlink
+    .children
+    .iter()
+    .find_map(|child| match child {
+      HyperlinkChildChoice::WR(run) => Some(run.as_ref()),
+      _ => None,
+    })
+    .expect("expected hyperlink run")
+}
+
+fn first_sdt_block(body: &Body) -> &SdtBlock {
+  body
+    .children
+    .iter()
+    .find_map(|child| match child {
+      BodyChildChoice::WSdt(sdt) => Some(sdt.as_ref()),
+      _ => None,
+    })
+    .expect("expected body sdt block")
+}
+
 fn first_text(run: &Run) -> &Text {
   run
     .children
@@ -59,6 +93,34 @@ fn run_texts(run: &Run) -> Vec<&Text> {
     .collect()
 }
 
+fn append_run_text(run: &Run, out: &mut String) {
+  for text in run_texts(run) {
+    if let Some(value) = text.xml_content.as_deref() {
+      out.push_str(value);
+    }
+  }
+}
+
+fn paragraph_text(paragraph: &Paragraph) -> String {
+  let mut text = String::new();
+
+  for child in &paragraph.children {
+    match child {
+      ParagraphChildChoice::WR(run) => append_run_text(run, &mut text),
+      ParagraphChildChoice::WHyperlink(hyperlink) => {
+        for hyperlink_child in &hyperlink.children {
+          if let HyperlinkChildChoice::WR(run) = hyperlink_child {
+            append_run_text(run, &mut text);
+          }
+        }
+      }
+      _ => {}
+    }
+  }
+
+  text
+}
+
 fn paragraph_run_count(paragraph: &Paragraph) -> usize {
   paragraph
     .children
@@ -72,6 +134,82 @@ fn paragraph_sdt_count(paragraph: &Paragraph) -> usize {
     .children
     .iter()
     .filter(|child| matches!(child, ParagraphChildChoice::WSdt(_)))
+    .count()
+}
+
+fn paragraph_bookmark_start_count(paragraph: &Paragraph) -> usize {
+  paragraph
+    .children
+    .iter()
+    .filter(|child| matches!(child, ParagraphChildChoice::WBookmarkStart(_)))
+    .count()
+}
+
+fn paragraph_bookmark_end_count(paragraph: &Paragraph) -> usize {
+  paragraph
+    .children
+    .iter()
+    .filter(|child| matches!(child, ParagraphChildChoice::WBookmarkEnd(_)))
+    .count()
+}
+
+fn paragraph_comment_range_start_count(paragraph: &Paragraph) -> usize {
+  paragraph
+    .children
+    .iter()
+    .filter(|child| matches!(child, ParagraphChildChoice::WCommentRangeStart(_)))
+    .count()
+}
+
+fn paragraph_comment_range_end_count(paragraph: &Paragraph) -> usize {
+  paragraph
+    .children
+    .iter()
+    .filter(|child| matches!(child, ParagraphChildChoice::WCommentRangeEnd(_)))
+    .count()
+}
+
+fn paragraph_comment_reference_count(paragraph: &Paragraph) -> usize {
+  paragraph
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      ParagraphChildChoice::WR(run) => Some(run.as_ref()),
+      _ => None,
+    })
+    .map(|run| {
+      run
+        .children
+        .iter()
+        .filter(|run_child| matches!(run_child, RunChildChoice::WCommentReference(_)))
+        .count()
+    })
+    .sum()
+}
+
+fn comment_text(
+  comment: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Comment,
+) -> String {
+  let mut text = String::new();
+
+  for child in &comment.children {
+    if let CommentChildChoice::WP(paragraph) = child {
+      for paragraph_child in &paragraph.children {
+        if let ParagraphChildChoice::WR(run) = paragraph_child {
+          append_run_text(run, &mut text);
+        }
+      }
+    }
+  }
+
+  text
+}
+
+fn body_paragraph_count(body: &Body) -> usize {
+  body
+    .children
+    .iter()
+    .filter(|child| matches!(child, BodyChildChoice::WP(_)))
     .count()
 }
 
@@ -175,6 +313,324 @@ fn document_round_trip_with_trailing_comment_after_document() {
 
   let reparsed_paragraph = first_paragraph(first_body(&reparsed));
   assert_eq!(paragraph_run_count(reparsed_paragraph), 0);
+}
+
+#[test]
+fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_HYPERLINK_XML);
+
+  let body = first_body(&parsed);
+  assert_eq!(body_paragraph_count(body), 2);
+  assert!(
+    body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WSectPr(_)))
+  );
+
+  let hyperlink_paragraph = body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+    .find(|paragraph| {
+      paragraph
+        .children
+        .iter()
+        .any(|child| matches!(child, ParagraphChildChoice::WHyperlink(_)))
+    })
+    .expect("expected paragraph with hyperlink");
+
+  let hyperlink = first_hyperlink(hyperlink_paragraph);
+  assert_eq!(hyperlink.id.as_deref(), Some("rId4"));
+  assert_eq!(hyperlink.history, Some(true));
+  let run = first_hyperlink_run(hyperlink);
+  let text = first_text(run);
+  assert_eq!(text.xml_content.as_deref(), Some("EricWhite.com"));
+  assert!(serialized.contains("<w:hyperlink"));
+  assert!(serialized.contains("r:id=\"rId4\""));
+  assert!(serialized.contains("w:history=\"true\"") || serialized.contains("w:history=\"1\""));
+  assert!(serialized.contains("EricWhite.com"));
+
+  let reparsed_body = first_body(&reparsed);
+  assert_eq!(body_paragraph_count(reparsed_body), 2);
+  let reparsed_hyperlink_paragraph = reparsed_body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+    .find(|paragraph| {
+      paragraph
+        .children
+        .iter()
+        .any(|child| matches!(child, ParagraphChildChoice::WHyperlink(_)))
+    })
+    .expect("expected reparsed paragraph with hyperlink");
+  let reparsed_hyperlink = first_hyperlink(reparsed_hyperlink_paragraph);
+  assert_eq!(reparsed_hyperlink.id.as_deref(), Some("rId4"));
+  assert_eq!(
+    first_text(first_hyperlink_run(reparsed_hyperlink))
+      .xml_content
+      .as_deref(),
+    Some("EricWhite.com")
+  );
+}
+
+#[test]
+fn document_round_trip_preserves_bookmarks_and_text_from_openxml_asset() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_PLAIN_XML);
+
+  let body = first_body(&parsed);
+  let paragraph = first_paragraph(body);
+  assert_eq!(body_paragraph_count(body), 1);
+  assert_eq!(paragraph_bookmark_start_count(paragraph), 1);
+  assert_eq!(paragraph_bookmark_end_count(paragraph), 1);
+
+  let text = first_text(first_run(paragraph));
+  assert!(
+    text
+      .xml_content
+      .as_deref()
+      .unwrap_or_default()
+      .starts_with("Video provides a powerful way")
+  );
+  assert!(serialized.contains("<w:bookmarkStart"));
+  assert!(serialized.contains("w:name=\"_GoBack\""));
+  assert!(serialized.contains("w:id=\"0\""));
+  assert!(serialized.contains("<w:bookmarkEnd"));
+  assert!(serialized.contains("Video provides a powerful way"));
+
+  let reparsed_body = first_body(&reparsed);
+  let reparsed_paragraph = first_paragraph(reparsed_body);
+  assert_eq!(body_paragraph_count(reparsed_body), 1);
+  assert_eq!(paragraph_bookmark_start_count(reparsed_paragraph), 1);
+  assert_eq!(paragraph_bookmark_end_count(reparsed_paragraph), 1);
+  assert!(
+    first_text(first_run(reparsed_paragraph))
+      .xml_content
+      .as_deref()
+      .unwrap_or_default()
+      .starts_with("Video provides a powerful way")
+  );
+}
+
+#[test]
+fn document_round_trip_preserves_hello_world_text_from_openxml_asset() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_HELLO_WORLD_XML);
+
+  let body = first_body(&parsed);
+  let paragraph = first_paragraph(body);
+  assert_eq!(body_paragraph_count(body), 1);
+  assert_eq!(paragraph_run_count(paragraph), 1);
+  assert_eq!(
+    first_text(first_run(paragraph)).xml_content.as_deref(),
+    Some("Hello World!")
+  );
+  assert!(serialized.contains("<w:t>Hello World!</w:t>"));
+
+  let reparsed_body = first_body(&reparsed);
+  let reparsed_paragraph = first_paragraph(reparsed_body);
+  assert_eq!(body_paragraph_count(reparsed_body), 1);
+  assert_eq!(paragraph_run_count(reparsed_paragraph), 1);
+  assert_eq!(
+    first_text(first_run(reparsed_paragraph))
+      .xml_content
+      .as_deref(),
+    Some("Hello World!")
+  );
+}
+
+#[test]
+fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_HELLO_O14_XML);
+
+  let body = first_body(&parsed);
+  let paragraph = body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+    .find(|paragraph| paragraph_text(paragraph).contains("Hello O14"))
+    .expect("expected paragraph with Hello O14");
+  assert_eq!(paragraph_bookmark_start_count(paragraph), 1);
+  assert_eq!(paragraph_bookmark_end_count(paragraph), 1);
+  assert_eq!(paragraph_text(paragraph).contains("Hello O14"), true);
+  assert!(serialized.contains("Hello O14"));
+  assert!(serialized.contains("<w:bookmarkStart"));
+  assert!(serialized.contains("<w:sectPr"));
+
+  let reparsed_body = first_body(&reparsed);
+  let reparsed_paragraph = reparsed_body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+    .find(|paragraph| paragraph_text(paragraph).contains("Hello O14"))
+    .expect("expected paragraph with Hello O14");
+  assert_eq!(paragraph_bookmark_start_count(reparsed_paragraph), 1);
+  assert_eq!(paragraph_bookmark_end_count(reparsed_paragraph), 1);
+  assert!(paragraph_text(reparsed_paragraph).contains("Hello O14"));
+}
+
+#[test]
+fn document_round_trip_preserves_comments_document_structure_from_openxml_asset() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_COMMENTS_XML);
+
+  let body = first_body(&parsed);
+  let paragraph = first_paragraph(body);
+  assert_eq!(paragraph_bookmark_start_count(paragraph), 1);
+  assert_eq!(paragraph_bookmark_end_count(paragraph), 1);
+  assert_eq!(paragraph_comment_range_start_count(paragraph), 1);
+  assert_eq!(paragraph_comment_range_end_count(paragraph), 1);
+  assert_eq!(paragraph_comment_reference_count(paragraph), 1);
+  assert!(
+    first_text(first_run(paragraph))
+      .xml_content
+      .as_deref()
+      .unwrap_or_default()
+      .starts_with("When ")
+  );
+  assert!(serialized.contains("<w:commentRangeStart"));
+  assert!(serialized.contains("<w:commentRangeEnd"));
+  assert!(serialized.contains("<w:commentReference"));
+  assert!(serialized.contains("you click Online Video"));
+  assert!(serialized.contains("<w:sectPr"));
+  assert_eq!(reparsed.children.len(), 1);
+
+  let reparsed_body = first_body(&reparsed);
+  let reparsed_paragraph = first_paragraph(reparsed_body);
+  assert_eq!(paragraph_comment_range_start_count(reparsed_paragraph), 1);
+  assert_eq!(paragraph_comment_range_end_count(reparsed_paragraph), 1);
+  assert_eq!(paragraph_comment_reference_count(reparsed_paragraph), 1);
+}
+
+#[test]
+fn comments_round_trip_from_openxml_part_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Comments>(fixtures::WORDPROCESSING_COMMENTS_XML);
+
+  assert_eq!(parsed.w_comment.len(), 1);
+  let comment = parsed.w_comment.first().expect("expected comment");
+  assert_eq!(comment.id.as_str(), "1");
+  assert_eq!(comment.author.as_str(), "Eric White");
+  assert_eq!(comment.initials.as_deref(), Some("EW"));
+  assert_eq!(comment_text(comment), "This is a comment.");
+  assert!(serialized.contains("<w:comment"));
+  assert!(serialized.contains("Eric White"));
+  assert!(serialized.contains("This is a comment."));
+  assert_eq!(reparsed.w_comment.len(), 1);
+}
+
+#[test]
+fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_DOCUMENT_XML);
+
+  let body = first_body(&parsed);
+  assert!(
+    body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WSdt(_)))
+  );
+  assert!(
+    body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WBookmarkStart(_)))
+  );
+  assert!(
+    body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WBookmarkEnd(_)))
+  );
+  assert!(
+    body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WP(_)))
+  );
+
+  let sdt = first_sdt_block(body);
+  let Some(SdtBlockChildChoice::WSdtPr(properties)) = sdt.children.first() else {
+    panic!("expected w:sdtPr");
+  };
+  let Some(SdtPropertiesChildChoice::WAlias(alias)) = properties.children.first() else {
+    panic!("expected sdt alias");
+  };
+  assert_eq!(alias.val.as_str(), "RichTextContentControl");
+
+  let hyperlink = body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
+    .find_map(|paragraph| {
+      paragraph.children.iter().find_map(|child| match child {
+        ParagraphChildChoice::WHyperlink(hyperlink)
+          if hyperlink
+            .children
+            .iter()
+            .any(|hyperlink_child| match hyperlink_child {
+              HyperlinkChildChoice::WR(run) => {
+                first_text(run.as_ref()).xml_content.as_deref() == Some("EricWhite.com")
+              }
+              _ => false,
+            }) =>
+        {
+          Some(hyperlink.as_ref())
+        }
+        _ => None,
+      })
+    })
+    .expect("expected EricWhite.com hyperlink");
+  assert_eq!(hyperlink.id.as_deref(), Some("rId26"));
+  assert_eq!(hyperlink.history, Some(true));
+  assert_eq!(
+    first_text(first_hyperlink_run(hyperlink))
+      .xml_content
+      .as_deref(),
+    Some("EricWhite.com")
+  );
+  assert!(serialized.contains("RichTextContentControl"));
+  assert!(serialized.contains("EricWhite.com"));
+  assert!(serialized.contains("Heading1"));
+
+  let reparsed_body = first_body(&reparsed);
+  assert!(
+    reparsed_body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WSdt(_)))
+  );
+  assert!(
+    reparsed_body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WBookmarkStart(_)))
+  );
+  assert!(
+    reparsed_body
+      .children
+      .iter()
+      .any(|child| matches!(child, BodyChildChoice::WBookmarkEnd(_)))
+  );
 }
 
 #[test]

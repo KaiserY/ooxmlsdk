@@ -3,6 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
+use crate::Result;
 use crate::sdk_code::helpers::{
   FlatParticleKind, flatten_one_sequence_particles, is_composite_type, is_derived_type,
   is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten,
@@ -14,9 +15,6 @@ use crate::sdk_code::versioning::{
 };
 use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
-
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, BoxError>;
 
 pub fn gen_schema_serializer(schema: &Schema, context: &CodegenContext<'_>) -> Result<TokenStream> {
   let mut token_stream_list: Vec<ItemImpl> = vec![];

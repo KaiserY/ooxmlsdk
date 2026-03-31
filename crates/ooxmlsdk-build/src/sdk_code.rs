@@ -7,6 +7,7 @@ use std::io::BufReader;
 use std::path::Path;
 use syn::{Arm, Ident, ItemMod, parse_str, parse2};
 
+use crate::Result;
 use crate::sdk_code::deserializer::gen_schema_deserializer;
 use crate::sdk_code::package_schemas::gen_package_schema;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
@@ -32,9 +33,6 @@ const FILE_HEADER: &str = r#"//
 // -----------------------------------------------------------------------------
 //
 "#;
-
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, BoxError>;
 
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");

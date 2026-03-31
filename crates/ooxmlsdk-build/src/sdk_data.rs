@@ -2,19 +2,14 @@ use serde::Serialize;
 use serde_json::to_writer_pretty;
 use std::{ffi::OsStr, fs, fs::File, io::BufWriter, path::Path};
 
-#[path = "models/open_xml.rs"]
-pub mod open_xml;
-#[path = "models/sdk_data.rs"]
-pub mod sdk_data_model;
-
 pub mod context;
+pub mod open_xml;
 pub mod package_schemas;
 pub mod parts;
 pub mod schemas;
+pub mod sdk_data_model;
 
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub type Result<T> = std::result::Result<T, BoxError>;
-
+use crate::Result;
 use crate::sdk_data::{
   context::Context, package_schemas::read_package_schemas, parts::gen_parts, schemas::gen_schemas,
 };

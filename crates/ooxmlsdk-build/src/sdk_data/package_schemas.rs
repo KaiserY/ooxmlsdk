@@ -6,13 +6,12 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
+use crate::Result;
 use crate::sdk_data::sdk_data_model::{
   PackageAttribute, PackageChildField, PackageChildFieldKind, PackageChildVariant, PackageEnum,
   PackageEnumVariant, PackageFixedAttribute, PackageSchema, PackageTextChild, PackageType,
   PackageTypeKind, PackageXmlHeader,
 };
-
-use super::Result;
 
 pub fn read_package_schemas(schemas_dir: &Path) -> Result<Vec<PackageSchema>> {
   let mut schemas = vec![];

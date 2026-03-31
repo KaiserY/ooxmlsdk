@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
+use crate::Result;
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, classify_attr_type, flatten_one_sequence_particles,
   is_composite_type, is_derived_type, is_leaf_element_type, is_leaf_text_type,
@@ -18,9 +19,6 @@ use crate::sdk_data::sdk_data_model::{
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
-
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, BoxError>;
 
 #[derive(Debug)]
 pub struct CodegenContext<'a> {

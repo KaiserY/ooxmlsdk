@@ -6,11 +6,9 @@ use syn::{
   parse2,
 };
 
+use crate::Result;
 use crate::sdk_code::versioning::{features_cfg_attrs, versioned_tokens};
 use crate::sdk_data::sdk_data_model::{Part, PartChild, PartContentKind};
-
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, BoxError>;
 
 struct RelationshipBranch {
   version: String,

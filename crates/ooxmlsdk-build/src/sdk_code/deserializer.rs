@@ -2,8 +2,9 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
-use syn::{Arm, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
+use syn::{Arm, Expr, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
 
+use crate::Result;
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, SimpleValueKind, classify_attr_type, classify_simple_type,
   flatten_one_sequence_particles, is_composite_type, is_derived_type, is_leaf_element_type,
@@ -14,9 +15,6 @@ use crate::sdk_code::versioning::{effective_version, version_cfg_attrs, versione
 use crate::sdk_data::sdk_data_model::{Schema, SchemaTypeAttribute};
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
-
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, BoxError>;
 
 struct MatchBranch {
   body: Stmt,
@@ -722,16 +720,16 @@ pub fn gen_schema_deserializer(
       }})?);
     }
 
-    let result_expr: TokenStream = if is_leaf_text_wrapper(schema_type) {
-      quote! {
-        Ok(Self(xml_content))
-      }
+    let result_expr: Expr = if is_leaf_text_wrapper(schema_type) {
+      parse2(quote! {
+          Ok(Self(xml_content))
+      })?
     } else {
-      quote! {
-        Ok(Self {
-          #( #field_ident_list, )*
-        })
-      }
+      parse2(quote! {
+          Ok(Self {
+              #( #field_ident_list, )*
+          })
+      })?
     };
 
     let deserialize_inner_fn: ItemFn = parse2(quote! {

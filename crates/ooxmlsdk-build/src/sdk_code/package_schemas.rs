@@ -1,16 +1,16 @@
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Arm, Ident, ItemImpl, ItemStruct, LitByteStr, Type, parse_str, parse2};
+use syn::{
+  Arm, Expr, Ident, ImplItemFn, ItemImpl, ItemStruct, LitByteStr, Stmt, Type, parse_str, parse2,
+};
 
+use crate::Result;
 use crate::sdk_data::sdk_data_model::{
   PackageAttribute, PackageChildFieldKind, PackageEnum, PackageFixedAttribute, PackageSchema,
   PackageTextChild, PackageType, PackageTypeKind, PackageXmlHeader,
 };
 use crate::utils::escape_snake_case;
-
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, BoxError>;
 
 pub fn gen_package_schema(schema: &PackageSchema) -> Result<TokenStream> {
   let mut token_stream_list = vec![];
@@ -148,14 +148,14 @@ fn gen_package_type(schema: &PackageSchema, package_type: &PackageType) -> Resul
     }
   })?;
 
-  let from_reader_fn = quote! {
+  let from_reader_fn: ImplItemFn = parse2(quote! {
     pub fn from_reader<R: std::io::BufRead>(
       reader: R,
     ) -> Result<Self, crate::common::SdkError> {
       let mut xml_reader = crate::common::from_reader_inner(reader)?;
       Self::deserialize_inner(&mut xml_reader, None)
     }
-  };
+  })?;
 
   let deserialize_inner_fn = gen_deserialize_inner_fn(
     schema,
@@ -230,7 +230,7 @@ fn gen_deserialize_inner_fn(
   package_type: &PackageType,
   prefixed_tag_literal: &LitByteStr,
   local_tag_literal: &LitByteStr,
-) -> Result<TokenStream> {
+) -> Result<ImplItemFn> {
   let mut declarations = vec![];
   let mut attr_arms: Vec<Arm> = vec![];
   let mut build_fields = vec![];
@@ -395,7 +395,7 @@ fn gen_deserialize_inner_fn(
     }
   };
 
-  Ok(quote! {
+  parse2(quote! {
     pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
       xml_reader: &mut R,
       xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
@@ -418,6 +418,7 @@ fn gen_deserialize_inner_fn(
       })
     }
   })
+  .map_err(Into::into)
 }
 
 fn gen_package_type_serializer(
@@ -542,16 +543,18 @@ fn attr_type_name(attr: &PackageAttribute) -> String {
   }
 }
 
-fn attr_parse_expr(attr: &PackageAttribute) -> Result<TokenStream> {
+fn attr_parse_expr(attr: &PackageAttribute) -> Result<Expr> {
   if attr.r#type == "String" {
-    Ok(quote! {
+    parse2(quote! {
       attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned()
     })
+    .map_err(Into::into)
   } else {
     let attr_type: Type = parse_str(&attr.r#type.to_upper_camel_case())?;
-    Ok(quote! {
+    parse2(quote! {
       <#attr_type as std::str::FromStr>::from_str(&attr.decode_and_unescape_value(xml_reader.decoder())?)?
     })
+    .map_err(Into::into)
   }
 }
 
@@ -585,16 +588,16 @@ fn gen_text_child_arm(child: &PackageTextChild) -> Result<Arm> {
   })?)
 }
 
-fn gen_attr_writers(package_type: &PackageType) -> Result<Vec<TokenStream>> {
-  let mut writers = vec![];
+fn gen_attr_writers(package_type: &PackageType) -> Result<Vec<Stmt>> {
+  let mut writers: Vec<Stmt> = vec![];
 
   if package_type.has_xmlns_fields {
-    writers.push(quote! {
+    writers.push(parse2(quote! {
       if let Some(xmlns) = &self.xmlns {
         crate::common::write_xmlns_attr(writer, None, xmlns)?;
       }
-    });
-    writers.push(quote! {
+    })?);
+    writers.push(parse2(quote! {
       {
         let mut xmlns_entries: Vec<_> = self.xmlns_map.iter().collect();
         xmlns_entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
@@ -602,27 +605,27 @@ fn gen_attr_writers(package_type: &PackageType) -> Result<Vec<TokenStream>> {
           crate::common::write_xmlns_attr(writer, Some(k), v)?;
         }
       }
-    });
-    writers.push(quote! {
+    })?);
+    writers.push(parse2(quote! {
       if let Some(mc_ignorable) = &self.mc_ignorable {
         crate::common::write_attr_value(writer, "mc:Ignorable", mc_ignorable)?;
       }
-    });
+    })?);
   }
 
   for attr in &package_type.attributes {
     let field_ident: Ident = parse_str(&escape_snake_case(attr.field.clone()))?;
     let q_name = attr.q_name.as_str();
     if attr.required {
-      writers.push(quote! {
+      writers.push(parse2(quote! {
         crate::common::write_attr_value(writer, #q_name, &self.#field_ident)?;
-      });
+      })?);
     } else {
-      writers.push(quote! {
+      writers.push(parse2(quote! {
         if let Some(value) = &self.#field_ident {
           crate::common::write_attr_value(writer, #q_name, value)?;
         }
-      });
+      })?);
     }
   }
 

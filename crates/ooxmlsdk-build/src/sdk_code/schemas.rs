@@ -6,14 +6,16 @@ use std::collections::HashMap;
 use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
 use crate::sdk_code::helpers::{
-  AttrTypeKind, classify_attr_type, flatten_one_sequence_particles, is_composite_type,
-  is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
-  is_one_sequence_flatten, supports_xmlns_fields,
+  AttrTypeKind, FlatParticleKind, classify_attr_type, flatten_one_sequence_particles,
+  is_composite_type, is_derived_type, is_leaf_element_type, is_leaf_text_type,
+  is_leaf_text_wrapper, is_one_sequence_flatten, supports_xmlns_fields,
 };
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, not_microsoft365_cfg_attrs, version_cfg_attrs,
 };
-use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
+use crate::sdk_data::sdk_data_model::{
+  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeParticle,
+};
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
@@ -36,6 +38,14 @@ pub struct ResolvedOneSequenceChild<'a> {
   pub field_name: Cow<'a, str>,
   pub property_comments: Cow<'a, str>,
   pub version: &'a str,
+}
+
+#[derive(Debug)]
+pub struct ResolvedOneSequenceChoice<'a> {
+  pub field_name: String,
+  pub enum_name: String,
+  pub property_comments: String,
+  pub variants: Vec<ResolvedOneSequenceChild<'a>>,
 }
 
 #[derive(Debug)]
@@ -178,6 +188,41 @@ impl<'a> CodegenContext<'a> {
     })
   }
 
+  pub fn resolve_one_sequence_choice(
+    &self,
+    schema_type: &'a SchemaType,
+    choice_particle: &'a SchemaTypeParticle,
+    slot_index: usize,
+  ) -> Result<ResolvedOneSequenceChoice<'a>> {
+    let mut variants = Vec::new();
+
+    for particle in &choice_particle.items {
+      variants.push(self.resolve_one_sequence_child(schema_type, particle.name.as_str())?);
+    }
+
+    let field_name = one_sequence_choice_field_name(schema_type, &variants, slot_index);
+    let enum_name = format!(
+      "{}{}Choice",
+      schema_type.class_name.to_upper_camel_case(),
+      field_name.to_upper_camel_case()
+    );
+    let property_comments = format!(
+      "Choice of {}",
+      variants
+        .iter()
+        .map(|child| child.name.split('/').nth(1).unwrap_or(child.name))
+        .collect::<Vec<_>>()
+        .join(", ")
+    );
+
+    Ok(ResolvedOneSequenceChoice {
+      field_name,
+      enum_name,
+      property_comments,
+      variants,
+    })
+  }
+
   pub fn resolve_children(
     &self,
     schema_type: &'a SchemaType,
@@ -222,8 +267,8 @@ impl<'a> CodegenContext<'a> {
         variant_name: Cow::Borrowed(particle_last_name),
         version: self
           .type_by_name(particle.name.as_str())
-          .map(|item| effective_version(item.version.as_str(), particle.initial_version.as_str()))
-          .unwrap_or(particle.initial_version.as_str()),
+          .map(|item| effective_version(item.version.as_str(), &particle.initial_version))
+          .unwrap_or(&particle.initial_version),
       });
     }
 
@@ -245,6 +290,18 @@ impl<'a> CodegenContext<'a> {
 
     Ok((enum_module_name, enum_name))
   }
+}
+
+fn one_sequence_choice_field_name(
+  schema_type: &SchemaType,
+  _variants: &[ResolvedOneSequenceChild<'_>],
+  slot_index: usize,
+) -> String {
+  format!(
+    "{}_choice_{}",
+    schema_type.class_name.to_snake_case(),
+    slot_index + 1
+  )
 }
 
 pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<TokenStream> {
@@ -318,7 +375,7 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
     }
 
     let mut fields: Vec<TokenStream> = vec![];
-    let mut child_choice_enum_option: Option<ItemEnum> = None;
+    let mut child_choice_enums: Vec<TokenStream> = vec![];
 
     if is_leaf_text_type(schema_type) {
       for attr in &schema_type.attributes {
@@ -351,7 +408,10 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
       }
 
       if is_one_sequence_flatten(schema_type) {
-        fields.extend(gen_one_sequence_fields(schema_type, schema, context)?);
+        let (one_sequence_fields, one_sequence_enums) =
+          gen_one_sequence_fields(schema_type, schema, context)?;
+        fields.extend(one_sequence_fields);
+        child_choice_enums.extend(one_sequence_enums);
       } else {
         let (field_option, enum_option) = gen_children(schema_type, schema, context)?;
 
@@ -359,7 +419,12 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
           fields.push(field);
         }
 
-        child_choice_enum_option = enum_option;
+        if let Some(enum_option) = enum_option {
+          child_choice_enums.push(quote! {
+            #( #type_attrs )*
+            #enum_option
+          });
+        }
       }
     } else if is_derived_type(schema_type) {
       let base_class_type = context
@@ -375,7 +440,10 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
       }
 
       if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
-        fields.extend(gen_one_sequence_fields(schema_type, schema, context)?);
+        let (one_sequence_fields, one_sequence_enums) =
+          gen_one_sequence_fields(schema_type, schema, context)?;
+        fields.extend(one_sequence_fields);
+        child_choice_enums.extend(one_sequence_enums);
       } else {
         let (field_option, enum_option) = gen_children(schema_type, schema, context)?;
 
@@ -383,7 +451,12 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
           fields.push(field);
         }
 
-        child_choice_enum_option = enum_option;
+        if let Some(enum_option) = enum_option {
+          child_choice_enums.push(quote! {
+            #( #type_attrs )*
+            #enum_option
+          });
+        }
       }
 
       if schema_type.children.is_empty() && is_leaf_text_type(base_class_type) {
@@ -396,10 +469,9 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
       return Err(format!("{schema_type:?}").into());
     }
 
-    let child_choice_tokens = if let Some(child_choice_enum) = child_choice_enum_option {
+    let child_choice_tokens = if !child_choice_enums.is_empty() {
       quote! {
-        #( #type_attrs )*
-        #child_choice_enum
+        #( #child_choice_enums )*
       }
     } else {
       quote! {}
@@ -695,68 +767,175 @@ fn gen_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
-) -> Result<Vec<TokenStream>> {
+) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
   let mut fields: Vec<TokenStream> = vec![];
+  let mut enums: Vec<TokenStream> = vec![];
   let mut field_name_set = std::collections::HashSet::new();
 
-  for flat_particle in flatten_one_sequence_particles(schema_type) {
-    let particle = flat_particle.particle;
-    let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
-    let child_type = context
-      .type_map
-      .get(child.name)
-      .ok_or_else(|| format!("{:?}", particle.name))?;
-    let child_prefix = context
-      .type_prefix_map
-      .get(child.name)
-      .ok_or_else(|| format!("{:?}", child.name))?;
+  for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
+    .into_iter()
+    .enumerate()
+  {
+    match flat_particle.kind {
+      FlatParticleKind::Leaf(particle) => {
+        let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+        let child_type = context
+          .type_map
+          .get(child.name)
+          .ok_or_else(|| format!("{:?}", particle.name))?;
+        let child_prefix = context
+          .type_prefix_map
+          .get(child.name)
+          .ok_or_else(|| format!("{:?}", child.name))?;
 
-    let child_variant_type: Type = if *child_prefix != schema.prefix {
-      let child_module_name = context
-        .type_module(child.name)
-        .ok_or_else(|| format!("{:?}", child.name))?;
+        let child_variant_type: Type = if *child_prefix != schema.prefix {
+          let child_module_name = context
+            .type_module(child.name)
+            .ok_or_else(|| format!("{:?}", child.name))?;
 
-      parse_str(&format!(
-        "crate::schemas::{}::{}",
-        child_module_name,
-        child_type.class_name.to_upper_camel_case()
-      ))?
-    } else {
-      parse_str(&child_type.class_name.to_upper_camel_case())?
-    };
+          parse_str(&format!(
+            "crate::schemas::{}::{}",
+            child_module_name,
+            child_type.class_name.to_upper_camel_case()
+          ))?
+        } else {
+          parse_str(&child_type.class_name.to_upper_camel_case())?
+        };
 
-    let child_name_ident: Ident = parse_str(&child.field_name)?;
+        let child_name_ident: Ident = parse_str(&child.field_name)?;
 
-    if !field_name_set.insert(child_name_ident.to_string()) {
-      continue;
-    }
+        if !field_name_set.insert(child_name_ident.to_string()) {
+          continue;
+        }
 
-    let property_comments = child.property_comments.as_ref();
-    let field_attrs = version_cfg_attrs(effective_version(
-      child.version,
-      particle.initial_version.as_str(),
-    ));
+        let property_comments = child.property_comments.as_ref();
+        let field_attrs = version_cfg_attrs(effective_version(
+          child.version,
+          flat_particle.initial_version,
+        ));
 
-    if flat_particle.repeated {
-      fields.push(quote! {
-        #( #field_attrs )*
-        #[doc = #property_comments]
-        pub #child_name_ident: Vec<#child_variant_type>,
-      });
-    } else if flat_particle.optional {
-      fields.push(quote! {
-        #( #field_attrs )*
-        #[doc = #property_comments]
-        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
-      });
-    } else {
-      fields.push(quote! {
-        #( #field_attrs )*
-        #[doc = #property_comments]
-        pub #child_name_ident: std::boxed::Box<#child_variant_type>,
-      });
+        if flat_particle.repeated {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = #property_comments]
+            pub #child_name_ident: Vec<#child_variant_type>,
+          });
+        } else if flat_particle.optional {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = #property_comments]
+            pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+          });
+        } else {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = #property_comments]
+            pub #child_name_ident: std::boxed::Box<#child_variant_type>,
+          });
+        }
+      }
+      FlatParticleKind::Choice(choice_particle) => {
+        let choice =
+          context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+        let choice_field_ident: Ident = parse_str(&choice.field_name)?;
+
+        if !field_name_set.insert(choice_field_ident.to_string()) {
+          continue;
+        }
+
+        let choice_enum_ident: Ident = parse_str(&choice.enum_name)?;
+        let property_comments = choice.property_comments.as_str();
+        let field_attrs = version_cfg_attrs(flat_particle.initial_version);
+
+        let mut variants = Vec::new();
+        let mut default_variant = None;
+
+        for variant in &choice.variants {
+          let variant_type = one_sequence_child_variant_type(variant, schema, context)?;
+          let variant_ident: Ident = parse_str(&variant.field_name.to_upper_camel_case())?;
+          let variant_attrs = version_cfg_attrs(variant.version);
+
+          if default_variant.is_none() {
+            default_variant = Some((variant_ident.clone(), variant_type.clone()));
+          }
+
+          variants.push(quote! {
+            #( #variant_attrs )*
+            #variant_ident(std::boxed::Box<#variant_type>),
+          });
+        }
+
+        let (default_variant_ident, default_variant_type) =
+          default_variant.ok_or_else(|| choice.enum_name.clone())?;
+        let enum_item = quote! {
+          #[derive(Clone, Debug)]
+          pub enum #choice_enum_ident {
+            #( #variants )*
+          }
+        };
+        enums.push(quote! {
+          #( #field_attrs )*
+          #enum_item
+        });
+        enums.push(quote! {
+          impl Default for #choice_enum_ident {
+            fn default() -> Self {
+              Self::#default_variant_ident(std::boxed::Box::<#default_variant_type>::default())
+            }
+          }
+        });
+
+        if flat_particle.repeated {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = #property_comments]
+            pub #choice_field_ident: Vec<#choice_enum_ident>,
+          });
+        } else if flat_particle.optional {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = #property_comments]
+            pub #choice_field_ident: Option<#choice_enum_ident>,
+          });
+        } else {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = #property_comments]
+            pub #choice_field_ident: #choice_enum_ident,
+          });
+        }
+      }
     }
   }
 
-  Ok(fields)
+  Ok((fields, enums))
+}
+
+pub fn one_sequence_child_variant_type(
+  child: &ResolvedOneSequenceChild<'_>,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<Type> {
+  let child_type = context
+    .type_map
+    .get(child.name)
+    .ok_or_else(|| format!("{:?}", child.name))?;
+  let child_prefix = context
+    .type_prefix_map
+    .get(child.name)
+    .ok_or_else(|| format!("{:?}", child.name))?;
+
+  if *child_prefix != schema.prefix {
+    let child_module_name = context
+      .type_module(child.name)
+      .ok_or_else(|| format!("{:?}", child.name))?;
+
+    Ok(parse_str(&format!(
+      "crate::schemas::{}::{}",
+      child_module_name,
+      child_type.class_name.to_upper_camel_case()
+    ))?)
+  } else {
+    Ok(parse_str(&child_type.class_name.to_upper_camel_case())?)
+  }
 }

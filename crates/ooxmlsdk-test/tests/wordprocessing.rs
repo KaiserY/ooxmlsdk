@@ -1,19 +1,12 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChildChoice, CommentChildChoice, Comments, Document, DocumentChildChoice, Hyperlink,
-  HyperlinkChildChoice, Paragraph, ParagraphChildChoice, Run, RunChildChoice, SdtBlock,
-  SdtBlockChildChoice, SdtPropertiesChildChoice, Text,
+  Body, BodyChildChoice, CommentChildChoice, Comments, Document, Hyperlink, HyperlinkChildChoice,
+  Paragraph, ParagraphChildChoice, Run, RunRunChoice2Choice, SdtBlock, SdtBlockChildChoice,
+  SdtPropertiesChildChoice, Text,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 fn first_body(document: &Document) -> &Body {
-  document
-    .children
-    .iter()
-    .find_map(|child| match child {
-      DocumentChildChoice::WBody(body) => Some(body.as_ref()),
-      _ => None,
-    })
-    .expect("expected document body")
+  document.body.as_deref().expect("expected document body")
 }
 
 fn first_paragraph(body: &Body) -> &Paragraph {
@@ -73,10 +66,10 @@ fn first_sdt_block(body: &Body) -> &SdtBlock {
 
 fn first_text(run: &Run) -> &Text {
   run
-    .children
+    .run_choice_2
     .iter()
     .find_map(|child| match child {
-      RunChildChoice::WT(text) => Some(text.as_ref()),
+      RunRunChoice2Choice::WT(text) => Some(text.as_ref()),
       _ => None,
     })
     .expect("expected run text")
@@ -84,10 +77,10 @@ fn first_text(run: &Run) -> &Text {
 
 fn run_texts(run: &Run) -> Vec<&Text> {
   run
-    .children
+    .run_choice_2
     .iter()
     .filter_map(|child| match child {
-      RunChildChoice::WT(text) => Some(text.as_ref()),
+      RunRunChoice2Choice::WT(text) => Some(text.as_ref()),
       _ => None,
     })
     .collect()
@@ -179,9 +172,9 @@ fn paragraph_comment_reference_count(paragraph: &Paragraph) -> usize {
     })
     .map(|run| {
       run
-        .children
+        .run_choice_2
         .iter()
-        .filter(|run_child| matches!(run_child, RunChildChoice::WCommentReference(_)))
+        .filter(|run_child| matches!(run_child, RunRunChoice2Choice::WCommentReference(_)))
         .count()
     })
     .sum()
@@ -231,7 +224,7 @@ fn document_round_trip_from_openxml_reader_test() {
 
   let paragraph = first_paragraph(first_body(&parsed));
   assert_eq!(paragraph.rsid_paragraph_properties.as_deref(), Some("001"));
-  assert_eq!(reparsed.children.len(), 1);
+  assert!(reparsed.body.is_some());
 }
 
 #[test]
@@ -257,7 +250,7 @@ fn document_round_trip_with_two_paragraphs_from_openxml_reader_test() {
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );
-  assert_eq!(reparsed.children.len(), 1);
+  assert!(reparsed.body.is_some());
 }
 
 #[test]
@@ -508,7 +501,7 @@ fn document_round_trip_preserves_comments_document_structure_from_openxml_asset(
   assert!(serialized.contains("<w:commentReference"));
   assert!(serialized.contains("you click Online Video"));
   assert!(serialized.contains("<w:sectPr"));
-  assert_eq!(reparsed.children.len(), 1);
+  assert!(reparsed.body.is_some());
 
   let reparsed_body = first_body(&reparsed);
   let reparsed_paragraph = first_paragraph(reparsed_body);

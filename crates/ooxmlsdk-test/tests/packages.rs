@@ -9,9 +9,8 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  AltChunk, Body, BodyChildChoice, CommentChildChoice, Document, DocumentChildChoice,
-  HyperlinkChildChoice, Paragraph, ParagraphChildChoice, Run, RunChildChoice, SdtBlockChildChoice,
-  SdtPropertiesChildChoice,
+  AltChunk, Body, BodyChildChoice, CommentChildChoice, Document, HyperlinkChildChoice, Paragraph,
+  ParagraphChildChoice, Run, RunRunChoice2Choice, SdtBlockChildChoice, SdtPropertiesChildChoice,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -68,34 +67,25 @@ fn main_document_body_child_count(
   document: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document,
 ) -> usize {
   document
-    .children
-    .iter()
-    .find_map(|child| match child {
-      DocumentChildChoice::WBody(body) => Some(body.children.len()),
-      _ => None,
-    })
+    .body
+    .as_deref()
+    .map(|body| body.children.len())
     .unwrap_or_default()
 }
 
 fn first_body_child(document: &Document) -> Option<&BodyChildChoice> {
-  document.children.iter().find_map(|child| match child {
-    DocumentChildChoice::WBody(body) => body.children.first(),
-    _ => None,
-  })
+  document
+    .body
+    .as_deref()
+    .and_then(|body| body.children.first())
 }
 
 fn first_body_mut(document: &mut Document) -> Option<&mut Body> {
-  document.children.iter_mut().find_map(|child| match child {
-    DocumentChildChoice::WBody(body) => Some(body.as_mut()),
-    _ => None,
-  })
+  document.body.as_deref_mut()
 }
 
 fn first_body(document: &Document) -> Option<&Body> {
-  document.children.iter().find_map(|child| match child {
-    DocumentChildChoice::WBody(body) => Some(body.as_ref()),
-    _ => None,
-  })
+  document.body.as_deref()
 }
 
 fn first_paragraph(
@@ -159,9 +149,9 @@ fn paragraph_comment_reference_count(
     })
     .map(|run| {
       run
-        .children
+        .run_choice_2
         .iter()
-        .filter(|run_child| matches!(run_child, RunChildChoice::WCommentReference(_)))
+        .filter(|run_child| matches!(run_child, RunRunChoice2Choice::WCommentReference(_)))
         .count()
     })
     .sum()
@@ -169,17 +159,22 @@ fn paragraph_comment_reference_count(
 
 fn first_paragraph_text(paragraph: &Paragraph) -> Option<&str> {
   paragraph.children.iter().find_map(|child| match child {
-    ParagraphChildChoice::WR(run) => run.children.iter().find_map(|run_child| match run_child {
-      RunChildChoice::WT(text) => text.xml_content.as_deref(),
-      _ => None,
-    }),
+    ParagraphChildChoice::WR(run) => {
+      run
+        .run_choice_2
+        .iter()
+        .find_map(|run_child| match run_child {
+          RunRunChoice2Choice::WT(text) => text.xml_content.as_deref(),
+          _ => None,
+        })
+    }
     _ => None,
   })
 }
 
 fn append_run_text(run: &Run, out: &mut String) {
-  for run_child in &run.children {
-    if let RunChildChoice::WT(text) = run_child {
+  for run_child in &run.run_choice_2 {
+    if let RunRunChoice2Choice::WT(text) = run_child {
       if let Some(value) = text.xml_content.as_deref() {
         out.push_str(value);
       }
@@ -422,14 +417,13 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
     package
       .main_document_part
       .root_element
-      .children
-      .iter()
-      .any(|child| match child {
-        DocumentChildChoice::WBody(body) => body
+      .body
+      .as_deref()
+      .is_some_and(|body| {
+        body
           .children
           .iter()
-          .any(|body_child| matches!(body_child, BodyChildChoice::WAltChunk(_))),
-        _ => false,
+          .any(|body_child| matches!(body_child, BodyChildChoice::WAltChunk(_)))
       })
   );
 
@@ -441,14 +435,13 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
     reopened
       .main_document_part
       .root_element
-      .children
-      .iter()
-      .any(|child| match child {
-        DocumentChildChoice::WBody(body) => body
+      .body
+      .as_deref()
+      .is_some_and(|body| {
+        body
           .children
           .iter()
-          .any(|body_child| matches!(body_child, BodyChildChoice::WAltChunk(_))),
-        _ => false,
+          .any(|body_child| matches!(body_child, BodyChildChoice::WAltChunk(_)))
       })
   );
   assert_eq!(

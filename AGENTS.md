@@ -23,7 +23,9 @@ The feature graph exposes `parts` and `validators`, and the generator has code p
 - `cargo fmt --all`: format the workspace.
 - `cargo clippy --workspace --all-targets -- -D warnings`: run lints before opening a PR.
 
-Run commands from the repository root. Because generated code is committed, regenerate first when changing generator logic or metadata, then format and lint after regeneration. Before every commit or pull request that affects generation, run `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`, `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace`.
+Run commands from the repository root. Because generated code is committed, regenerate first when changing generator logic or metadata, then lint and test against the generated output, and run formatting last so the generated Rust files are also normalized before review. Before every commit or pull request that affects generation, run `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `cargo fmt --all`.
+
+Execute Cargo commands in the repository's default `target/` directory. Do not introduce alternate `CARGO_TARGET_DIR` values to bypass locks or isolate builds. Run build, generation, format, lint, and test commands sequentially rather than in parallel. If Cargo reports a lock on the artifact directory, wait for the lock to clear and then continue; assume another local tool such as VS Code may still be using the shared target directory.
 
 ## Coding Style & Naming Conventions
 Follow standard Rust formatting and keep the workspace `rustfmt`-clean. Use snake_case for modules and functions, PascalCase for Rust types, and preserve the schema-derived module naming pattern already in use, for example `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
@@ -38,6 +40,8 @@ The generator entry point that is used in normal repository work is `test_gen` i
 Runtime behavior is currently covered by focused round-trip tests in `crates/ooxmlsdk-test/tests/wordprocessing.rs` and `crates/ooxmlsdk-test/tests/presentation.rs`. Add new tests close to the behavior they protect and keep assertions stable: verify both parsed fields and serialized XML where possible.
 
 `test_sync_sdk_data` is ignored and depends on an external `Open-XML-SDK` checkout. Only run it when you are explicitly updating the repository from upstream source data and have prepared that checkout locally.
+
+When validating work, do not overlap `cargo fmt`, `cargo test`, `cargo clippy`, or generation commands. Finish one command, capture its result, and only then start the next one. If you encounter a target directory lock, do not work around it with a new target path; wait for the existing lock to release.
 
 ## Commit & Pull Request Guidelines
 Keep commit subjects short, imperative, and scoped to the affected area, for example `Regenerate spreadsheet serializer output` or `Tighten XML attribute decoding errors`.

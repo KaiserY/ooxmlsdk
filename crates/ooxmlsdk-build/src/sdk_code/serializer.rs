@@ -4,9 +4,9 @@ use quote::quote;
 use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::sdk_code::helpers::{
-  flatten_one_sequence_particles, is_composite_type, is_derived_type, is_leaf_element_type,
-  is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten, needs_xml_header,
-  supports_xmlns_fields,
+  FlatParticleKind, flatten_one_sequence_particles, is_composite_type, is_derived_type,
+  is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten,
+  needs_xml_header, supports_xmlns_fields,
 };
 use crate::sdk_code::schemas::{CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild};
 use crate::sdk_code::versioning::{
@@ -175,21 +175,51 @@ fn gen_struct_serializer(
 
       let mut child_stmt_list: Vec<Stmt> = vec![];
 
-      for flat_particle in flatten_one_sequence_particles(schema_type) {
-        let particle = flat_particle.particle;
-        let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+      for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
+        .into_iter()
+        .enumerate()
+      {
+        match flat_particle.kind {
+          FlatParticleKind::Leaf(particle) => {
+            let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
 
-        let child_name_ident = one_sequence_child_field_ident(&child)?;
-        if !field_name_set.insert(child_name_ident.to_string()) {
-          continue;
+            let child_name_ident = one_sequence_child_field_ident(&child)?;
+            if !field_name_set.insert(child_name_ident.to_string()) {
+              continue;
+            }
+
+            let child_stmt =
+              gen_one_sequence_child_stmt(&child, flat_particle.optional, flat_particle.repeated)?;
+            child_stmt_list.push(parse2(versioned_tokens(
+              effective_version(child.version, flat_particle.initial_version),
+              quote! { #child_stmt },
+            ))?);
+          }
+          FlatParticleKind::Choice(choice_particle) => {
+            let choice =
+              context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+            let choice_name_ident: Ident = parse_str(&choice.field_name)?;
+
+            if !field_name_set.insert(choice_name_ident.to_string()) {
+              continue;
+            }
+
+            let choice_enum_type: Type = parse_str(&format!(
+              "crate::schemas::{}::{}",
+              &schema.module_name, choice.enum_name
+            ))?;
+
+            child_stmt_list.push(gen_one_sequence_choice_stmt(
+              &choice_name_ident,
+              &choice_enum_type,
+              &choice.variants,
+              flat_particle.optional,
+              flat_particle.repeated,
+              schema,
+              context,
+            )?);
+          }
         }
-
-        let child_stmt =
-          gen_one_sequence_child_stmt(&child, flat_particle.optional, flat_particle.repeated)?;
-        child_stmt_list.push(parse2(versioned_tokens(
-          effective_version(child.version, particle.initial_version.as_str()),
-          quote! { #child_stmt },
-        ))?);
       }
 
       children_writer = quote! {
@@ -248,21 +278,51 @@ fn gen_struct_serializer(
 
       let mut child_stmt_list: Vec<Stmt> = vec![];
 
-      for flat_particle in flatten_one_sequence_particles(schema_type) {
-        let particle = flat_particle.particle;
-        let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+      for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
+        .into_iter()
+        .enumerate()
+      {
+        match flat_particle.kind {
+          FlatParticleKind::Leaf(particle) => {
+            let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
 
-        let child_name_ident = one_sequence_child_field_ident(&child)?;
-        if !field_name_set.insert(child_name_ident.to_string()) {
-          continue;
+            let child_name_ident = one_sequence_child_field_ident(&child)?;
+            if !field_name_set.insert(child_name_ident.to_string()) {
+              continue;
+            }
+
+            let child_stmt =
+              gen_one_sequence_child_stmt(&child, flat_particle.optional, flat_particle.repeated)?;
+            child_stmt_list.push(parse2(versioned_tokens(
+              effective_version(child.version, flat_particle.initial_version),
+              quote! { #child_stmt },
+            ))?);
+          }
+          FlatParticleKind::Choice(choice_particle) => {
+            let choice =
+              context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+            let choice_name_ident: Ident = parse_str(&choice.field_name)?;
+
+            if !field_name_set.insert(choice_name_ident.to_string()) {
+              continue;
+            }
+
+            let choice_enum_type: Type = parse_str(&format!(
+              "crate::schemas::{}::{}",
+              &schema.module_name, choice.enum_name
+            ))?;
+
+            child_stmt_list.push(gen_one_sequence_choice_stmt(
+              &choice_name_ident,
+              &choice_enum_type,
+              &choice.variants,
+              flat_particle.optional,
+              flat_particle.repeated,
+              schema,
+              context,
+            )?);
+          }
         }
-
-        let child_stmt =
-          gen_one_sequence_child_stmt(&child, flat_particle.optional, flat_particle.repeated)?;
-        child_stmt_list.push(parse2(versioned_tokens(
-          effective_version(child.version, particle.initial_version.as_str()),
-          quote! { #child_stmt },
-        ))?);
       }
 
       children_writer = quote! {
@@ -490,6 +550,70 @@ fn gen_one_sequence_child_stmt(
   } else {
     Ok(parse2(quote! {
       self.#child_name_ident.write_xml(writer, xmlns_prefix)?;
+    })?)
+  }
+}
+
+fn gen_one_sequence_choice_stmt(
+  choice_name_ident: &Ident,
+  choice_enum_type: &Type,
+  variants: &[ResolvedOneSequenceChild<'_>],
+  optional: bool,
+  repeated: bool,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<Stmt> {
+  let mut arms: Vec<Arm> = vec![];
+
+  for variant in variants {
+    let variant_ident: Ident = parse_str(&variant.field_name.to_upper_camel_case())?;
+    let variant_type = {
+      let child_type = context
+        .type_by_name(variant.name)
+        .ok_or_else(|| format!("{:?}", variant.name))?;
+      let child_module_name = context
+        .type_module(variant.name)
+        .unwrap_or(&schema.module_name);
+
+      parse_str::<Type>(&format!(
+        "crate::schemas::{}::{}",
+        child_module_name,
+        child_type.class_name.to_upper_camel_case()
+      ))?
+    };
+
+    arms.push(parse2(versioned_tokens(
+      variant.version,
+      quote! {
+        #choice_enum_type::#variant_ident(child) => {
+          let child: &#variant_type = child.as_ref();
+          child.write_xml(writer, xmlns_prefix)?;
+        }
+      },
+    ))?);
+  }
+
+  if repeated {
+    Ok(parse2(quote! {
+      for choice in &self.#choice_name_ident {
+        match choice {
+          #( #arms )*
+        }
+      }
+    })?)
+  } else if optional {
+    Ok(parse2(quote! {
+      if let Some(choice) = &self.#choice_name_ident {
+        match choice {
+          #( #arms )*
+        }
+      }
+    })?)
+  } else {
+    Ok(parse2(quote! {
+      match &self.#choice_name_ident {
+        #( #arms )*
+      }
     })?)
   }
 }

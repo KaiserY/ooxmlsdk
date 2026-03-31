@@ -457,7 +457,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
     .expect("expected paragraph with Hello O14");
   assert_eq!(paragraph_bookmark_start_count(paragraph), 1);
   assert_eq!(paragraph_bookmark_end_count(paragraph), 1);
-  assert_eq!(paragraph_text(paragraph).contains("Hello O14"), true);
+  assert!(paragraph_text(paragraph).contains("Hello O14"));
   assert!(serialized.contains("Hello O14"));
   assert!(serialized.contains("<w:bookmarkStart"));
   assert!(serialized.contains("<w:sectPr"));

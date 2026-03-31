@@ -19,11 +19,13 @@ The feature graph exposes `parts` and `validators`, and the generator has code p
 - `cargo test -p ooxmlsdk-build test_sync_sdk_data -- --ignored --nocapture`: refresh `sdk_data/` from an external Open XML SDK checkout and regenerate `crates/ooxmlsdk/src/`.
 - `cargo test -p ooxmlsdk-test`: run the integration tests that exercise stable round trips for representative Wordprocessing and Presentation XML samples.
 - `cargo test --workspace`: run the full workspace test suite.
+- `cargo test --workspace --no-default-features`: run the workspace test suite against the Office2007 baseline feature set.
 - `cargo bench -p ooxmlsdk-build --bench serde_bench`: run the serde comparison benchmark in the generator crate.
 - `cargo fmt --all`: format the workspace.
 - `cargo clippy --workspace --all-targets -- -D warnings`: run lints before opening a PR.
+- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: run lints against the Office2007 baseline feature set.
 
-Run commands from the repository root. Because generated code is committed, regenerate first when changing generator logic or metadata, then lint and test against the generated output, and run formatting last so the generated Rust files are also normalized before review. Before every commit or pull request that affects generation, run `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `cargo fmt --all`.
+Run commands from the repository root. Because generated code is committed, regenerate first when changing generator logic or metadata, then lint and test against the generated output, and run formatting last so the generated Rust files are also normalized before review. Before every commit or pull request that affects generation, run `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`, `cargo test --workspace`, `cargo test --workspace --no-default-features`, and `cargo fmt --all`.
 
 Execute Cargo commands in the repository's default `target/` directory. Do not introduce alternate `CARGO_TARGET_DIR` values to bypass locks or isolate builds. Run build, generation, format, lint, and test commands sequentially rather than in parallel. If Cargo reports a lock on the artifact directory, wait for the lock to clear and then continue; assume another local tool such as VS Code may still be using the shared target directory.
 
@@ -37,6 +39,13 @@ The fixtures in `crates/ooxmlsdk-test/src/fixtures.rs` are intentionally tied ba
 ## Testing Guidelines
 The generator entry point that is used in normal repository work is `test_gen` in `crates/ooxmlsdk-build/src/lib.rs`. Run it first whenever you change generator code, checked-in metadata under `sdk_data/`, package schemas under `schemas/OpenPackagingConventions-XMLSchema/`, or feature-gated generation behavior. Review the generated diff in `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, `crates/ooxmlsdk/src/schemas.rs`, `crates/ooxmlsdk/src/deserializers.rs`, `crates/ooxmlsdk/src/serializers.rs`, and `crates/ooxmlsdk/src/namespaces.rs`.
 
+When validating generator changes, feature-gated code, or generated schema output, cover both feature surfaces explicitly:
+
+- `cargo test --workspace --no-default-features` for the Office2007 baseline
+- `cargo test --workspace` for the default `microsoft365` feature set
+- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings` for the Office2007 baseline
+- `cargo clippy --workspace --all-targets -- -D warnings` for the default `microsoft365` feature set
+
 Runtime behavior is currently covered by focused round-trip tests in `crates/ooxmlsdk-test/tests/wordprocessing.rs` and `crates/ooxmlsdk-test/tests/presentation.rs`. Add new tests close to the behavior they protect and keep assertions stable: verify both parsed fields and serialized XML where possible.
 
 `test_sync_sdk_data` is ignored and depends on an external `Open-XML-SDK` checkout. Only run it when you are explicitly updating the repository from upstream source data and have prepared that checkout locally.
@@ -49,6 +58,6 @@ Keep commit subjects short, imperative, and scoped to the affected area, for exa
 In pull requests, include:
 
 - a brief summary of the functional or generation change,
-- confirmation that you ran `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`, `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace`,
+- confirmation that you ran `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`, `cargo test --workspace`, `cargo test --workspace --no-default-features`, and `cargo fmt --all`,
 - notes on regenerated files when generator code, `sdk_data/`, or `schemas/OpenPackagingConventions-XMLSchema/` changed,
 - explicit mention if any work depended on an external `Open-XML-SDK` checkout or the ignored `test_sync_sdk_data` path.

@@ -1,3 +1,5 @@
+#![cfg_attr(doc, recursion_limit = "512")]
+
 pub mod common;
 pub mod deserializers;
 pub mod namespaces;

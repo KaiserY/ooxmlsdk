@@ -511,6 +511,29 @@ fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
     .iter()
     .any(|facet| is_microsoft365_version(&facet.version));
 
+  if baseline_facets.is_empty() && has_later_facets {
+    let later_enum_attrs = if is_microsoft365_version(&schema_enum.version) {
+      Vec::new()
+    } else {
+      version_cfg_attrs("Microsoft365")
+    };
+    let default_facet = schema_enum.facets.first().expect("schema enum facet");
+    let variants = gen_schema_enum_variants(
+      &schema_enum.facets.iter().collect::<Vec<_>>(),
+      default_facet,
+      false,
+    )?;
+
+    return Ok(quote! {
+      #( #later_enum_attrs )*
+      #( #enum_attrs )*
+      #[derive(Clone, Debug, Default)]
+      pub enum #enum_name_ident {
+        #( #variants, )*
+      }
+    });
+  }
+
   if !baseline_facets.is_empty()
     && has_later_facets
     && !is_microsoft365_version(&schema_enum.version)
@@ -878,6 +901,7 @@ fn gen_one_sequence_fields(
           #enum_item
         });
         enums.push(quote! {
+          #( #field_attrs )*
           impl Default for #choice_enum_ident {
             fn default() -> Self {
               Self::#default_variant_ident(std::boxed::Box::<#default_variant_type>::default())

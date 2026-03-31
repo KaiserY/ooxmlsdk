@@ -174,10 +174,10 @@ fn first_paragraph_text(paragraph: &Paragraph) -> Option<&str> {
 
 fn append_run_text(run: &Run, out: &mut String) {
   for run_child in &run.run_choice_2 {
-    if let RunRunChoice2Choice::WT(text) = run_child {
-      if let Some(value) = text.xml_content.as_deref() {
-        out.push_str(value);
-      }
+    if let RunRunChoice2Choice::WT(text) = run_child
+      && let Some(value) = text.xml_content.as_deref()
+    {
+      out.push_str(value);
     }
   }
 }

@@ -378,7 +378,6 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
 
   let mut writer_stmt_list: Vec<Stmt> = vec![];
   let mut children_writer_stmt_list: Vec<Stmt> = vec![];
-  let part_paths_general = part.paths.general.as_str();
   let part_name_dir_path_ident: Ident =
     parse_str(&format!("{}_dir_path", part.name.to_snake_case()))?;
 
@@ -397,9 +396,11 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
     }
   })?);
   writer_stmt_list.push(parse2(quote! {
-    let #part_name_dir_path_ident = crate::common::resolve_zip_file_path(
-      &format!("{}{}/", parent_path, #part_paths_general),
-    );
+    let #part_name_dir_path_ident = self
+      .inner_path
+      .rsplit_once('/')
+      .map(|(dir_path, _)| crate::common::resolve_zip_file_path(&format!("{dir_path}/")))
+      .unwrap_or_default();
   })?);
   writer_stmt_list.push(parse2(quote! {
     if !#part_name_dir_path_ident.is_empty() && !entry_set.contains(&#part_name_dir_path_ident) {

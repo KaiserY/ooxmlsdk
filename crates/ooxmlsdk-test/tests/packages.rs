@@ -9,8 +9,8 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  AltChunk, Body, BodyChildChoice, CommentCommentChoice1Choice, Document, HyperlinkChildChoice,
-  Paragraph, ParagraphParagraphChoice2Choice, Run, RunRunChoice2Choice, SdtPropertiesChildChoice,
+  AltChunk, Body, BodyChildChoice, CommentChoice, Document, HyperlinkChildChoice, Paragraph,
+  ParagraphChoice, Run, RunChoice, SdtPropertiesChildChoice,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -101,9 +101,9 @@ fn paragraph_bookmark_start_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WBookmarkStart(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WBookmarkStart(_)))
     .count()
 }
 
@@ -111,9 +111,9 @@ fn paragraph_bookmark_end_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WBookmarkEnd(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WBookmarkEnd(_)))
     .count()
 }
 
@@ -121,9 +121,9 @@ fn paragraph_comment_range_start_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WCommentRangeStart(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WCommentRangeStart(_)))
     .count()
 }
 
@@ -131,9 +131,9 @@ fn paragraph_comment_range_end_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WCommentRangeEnd(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WCommentRangeEnd(_)))
     .count()
 }
 
@@ -141,17 +141,17 @@ fn paragraph_comment_reference_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
     .filter_map(|child| match child {
-      ParagraphParagraphChoice2Choice::WR(run) => Some(run.as_ref()),
+      ParagraphChoice::WR(run) => Some(run.as_ref()),
       _ => None,
     })
     .map(|run| {
       run
-        .run_choice_2
+        .run_choice
         .iter()
-        .filter(|run_child| matches!(run_child, RunRunChoice2Choice::WCommentReference(_)))
+        .filter(|run_child| matches!(run_child, RunChoice::WCommentReference(_)))
         .count()
     })
     .sum()
@@ -159,25 +159,20 @@ fn paragraph_comment_reference_count(
 
 fn first_paragraph_text(paragraph: &Paragraph) -> Option<&str> {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
     .find_map(|child| match child {
-      ParagraphParagraphChoice2Choice::WR(run) => {
-        run
-          .run_choice_2
-          .iter()
-          .find_map(|run_child| match run_child {
-            RunRunChoice2Choice::WT(text) => text.xml_content.as_deref(),
-            _ => None,
-          })
-      }
+      ParagraphChoice::WR(run) => run.run_choice.iter().find_map(|run_child| match run_child {
+        RunChoice::WT(text) => text.xml_content.as_deref(),
+        _ => None,
+      }),
       _ => None,
     })
 }
 
 fn append_run_text(run: &Run, out: &mut String) {
-  for run_child in &run.run_choice_2 {
-    if let RunRunChoice2Choice::WT(text) = run_child
+  for run_child in &run.run_choice {
+    if let RunChoice::WT(text) = run_child
       && let Some(value) = text.xml_content.as_deref()
     {
       out.push_str(value);
@@ -188,13 +183,13 @@ fn append_run_text(run: &Run, out: &mut String) {
 fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
-  for child in &paragraph.paragraph_choice_2 {
+  for child in &paragraph.paragraph_choice {
     match child {
-      ParagraphParagraphChoice2Choice::WR(run) => append_run_text(run, &mut text),
-      ParagraphParagraphChoice2Choice::WHyperlink(hyperlink) => {
+      ParagraphChoice::WR(run) => append_run_text(run, &mut text),
+      ParagraphChoice::WHyperlink(hyperlink) => {
         for hyperlink_child in &hyperlink.children {
           if let HyperlinkChildChoice::WR(run) = hyperlink_child {
-            append_run_text(run, &mut text);
+            append_run_text(run.as_ref(), &mut text);
           }
         }
       }
@@ -210,8 +205,8 @@ fn comment_text(
 ) -> String {
   let mut text = String::new();
 
-  for child in &comment.comment_choice_1 {
-    if let CommentCommentChoice1Choice::WP(paragraph) = child {
+  for child in &comment.comment_choice {
+    if let CommentChoice::WP(paragraph) = child {
       text.push_str(&paragraph_text(paragraph.as_ref()));
     }
   }

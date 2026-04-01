@@ -222,6 +222,7 @@ impl<'a> CodegenContext<'a> {
     &self,
     schema_type: &'a SchemaType,
     choice_particle: &'a SchemaTypeParticle,
+    choice_slot_count: usize,
     slot_index: usize,
   ) -> Result<ResolvedOneSequenceChoice<'a>> {
     let mut variants = Vec::new();
@@ -230,12 +231,8 @@ impl<'a> CodegenContext<'a> {
       variants.push(self.resolve_one_sequence_child(schema_type, particle.name.as_str())?);
     }
 
-    let field_name = one_sequence_choice_field_name(schema_type, &variants, slot_index);
-    let enum_name = format!(
-      "{}{}Choice",
-      schema_type.class_name.to_upper_camel_case(),
-      field_name.to_upper_camel_case()
-    );
+    let field_name = one_sequence_choice_field_name(schema_type, choice_slot_count, slot_index);
+    let enum_name = one_sequence_choice_enum_name(schema_type, choice_slot_count, &field_name);
     let property_comments = format!(
       "Choice of {}",
       variants
@@ -257,14 +254,11 @@ impl<'a> CodegenContext<'a> {
     &self,
     schema_type: &'a SchemaType,
     choice: &StructuredChoice<'a>,
+    choice_slot_count: usize,
     slot_index: usize,
   ) -> Result<ResolvedOneSequenceStructuredChoice<'a>> {
-    let field_name = one_sequence_choice_field_name(schema_type, &[], slot_index);
-    let enum_name = format!(
-      "{}{}Choice",
-      schema_type.class_name.to_upper_camel_case(),
-      field_name.to_upper_camel_case()
-    );
+    let field_name = one_sequence_choice_field_name(schema_type, choice_slot_count, slot_index);
+    let enum_name = one_sequence_choice_enum_name(schema_type, choice_slot_count, &field_name);
     let mut variants = Vec::new();
     let mut property_comment_parts = Vec::new();
 
@@ -283,11 +277,11 @@ impl<'a> CodegenContext<'a> {
           variants.push(ResolvedOneSequenceChoiceVariant::Leaf(child));
         }
         StructuredChoiceVariant::Sequence(sequence_particles) => {
-          let struct_name = format!(
-            "{}{}Sequence{}",
-            schema_type.class_name.to_upper_camel_case(),
-            field_name.to_upper_camel_case(),
-            variant_index + 1
+          let struct_name = one_sequence_choice_sequence_struct_name(
+            schema_type,
+            choice_slot_count,
+            &field_name,
+            variant_index,
           );
           let variant_name = format!("Sequence{}", variant_index + 1);
           let mut fields = Vec::new();
@@ -406,14 +400,56 @@ impl<'a> CodegenContext<'a> {
 
 fn one_sequence_choice_field_name(
   schema_type: &SchemaType,
-  _variants: &[ResolvedOneSequenceChild<'_>],
+  choice_slot_count: usize,
   slot_index: usize,
 ) -> String {
-  format!(
-    "{}_choice_{}",
-    schema_type.class_name.to_snake_case(),
-    slot_index + 1
-  )
+  if choice_slot_count <= 1 {
+    format!("{}_choice", schema_type.class_name.to_snake_case())
+  } else {
+    format!(
+      "{}_choice_{}",
+      schema_type.class_name.to_snake_case(),
+      slot_index + 1
+    )
+  }
+}
+
+fn one_sequence_choice_enum_name(
+  schema_type: &SchemaType,
+  choice_slot_count: usize,
+  field_name: &str,
+) -> String {
+  if choice_slot_count <= 1 {
+    format!("{}Choice", schema_type.class_name.to_upper_camel_case())
+  } else {
+    format!(
+      "{}{}Choice",
+      schema_type.class_name.to_upper_camel_case(),
+      field_name.to_upper_camel_case()
+    )
+  }
+}
+
+fn one_sequence_choice_sequence_struct_name(
+  schema_type: &SchemaType,
+  choice_slot_count: usize,
+  field_name: &str,
+  variant_index: usize,
+) -> String {
+  if choice_slot_count <= 1 {
+    format!(
+      "{}ChoiceSequence{}",
+      schema_type.class_name.to_upper_camel_case(),
+      variant_index + 1
+    )
+  } else {
+    format!(
+      "{}{}Sequence{}",
+      schema_type.class_name.to_upper_camel_case(),
+      field_name.to_upper_camel_case(),
+      variant_index + 1
+    )
+  }
 }
 
 pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<TokenStream> {
@@ -931,11 +967,13 @@ fn gen_one_sequence_fields(
   let mut fields: Vec<TokenStream> = vec![];
   let mut enums: Vec<TokenStream> = vec![];
   let mut field_name_set = std::collections::HashSet::new();
+  let flat_particles = flatten_one_sequence_particles(schema_type);
+  let choice_slot_count = flat_particles
+    .iter()
+    .filter(|particle| matches!(particle.kind, FlatParticleKind::Choice(_)))
+    .count();
 
-  for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
-    .into_iter()
-    .enumerate()
-  {
+  for (slot_index, flat_particle) in flat_particles.into_iter().enumerate() {
     match flat_particle.kind {
       FlatParticleKind::Leaf(particle) => {
         let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
@@ -995,8 +1033,12 @@ fn gen_one_sequence_fields(
         }
       }
       FlatParticleKind::Choice(choice_particle) => {
-        let choice =
-          context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+        let choice = context.resolve_one_sequence_choice(
+          schema_type,
+          choice_particle,
+          choice_slot_count,
+          slot_index,
+        )?;
         let choice_field_ident: Ident = parse_str(&choice.field_name)?;
 
         if !field_name_set.insert(choice_field_ident.to_string()) {
@@ -1099,11 +1141,13 @@ fn gen_structured_one_sequence_fields(
   let mut fields: Vec<TokenStream> = vec![];
   let mut items: Vec<TokenStream> = vec![];
   let mut field_name_set = std::collections::HashSet::new();
+  let structured_particles = structure_one_sequence_particles(schema_type);
+  let choice_slot_count = structured_particles
+    .iter()
+    .filter(|particle| matches!(particle.kind, StructuredParticleKind::Choice(_)))
+    .count();
 
-  for (slot_index, particle) in structure_one_sequence_particles(schema_type)
-    .into_iter()
-    .enumerate()
-  {
+  for (slot_index, particle) in structured_particles.into_iter().enumerate() {
     match particle.kind {
       StructuredParticleKind::Leaf(leaf) => {
         let child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
@@ -1159,8 +1203,12 @@ fn gen_structured_one_sequence_fields(
         }
       }
       StructuredParticleKind::Choice(choice) => {
-        let choice =
-          context.resolve_one_sequence_structured_choice(schema_type, &choice, slot_index)?;
+        let choice = context.resolve_one_sequence_structured_choice(
+          schema_type,
+          &choice,
+          choice_slot_count,
+          slot_index,
+        )?;
         let choice_field_ident: Ident = parse_str(&choice.field_name)?;
 
         if !field_name_set.insert(choice_field_ident.to_string()) {

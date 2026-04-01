@@ -275,10 +275,13 @@ pub fn gen_schema_deserializer(
       if is_one_sequence_flatten(schema_type) {
         let mut field_name_set = HashSet::new();
 
-        for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
-          .into_iter()
-          .enumerate()
-        {
+        let flat_particles = flatten_one_sequence_particles(schema_type);
+        let choice_slot_count = flat_particles
+          .iter()
+          .filter(|particle| matches!(particle.kind, FlatParticleKind::Choice(_)))
+          .count();
+
+        for (slot_index, flat_particle) in flat_particles.into_iter().enumerate() {
           match flat_particle.kind {
             FlatParticleKind::Leaf(particle) => {
               let child =
@@ -343,8 +346,12 @@ pub fn gen_schema_deserializer(
               }
             }
             FlatParticleKind::Choice(choice_particle) => {
-              let choice =
-                context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+              let choice = context.resolve_one_sequence_choice(
+                schema_type,
+                choice_particle,
+                choice_slot_count,
+                slot_index,
+              )?;
               let choice_name_ident: Ident = parse_str(&choice.field_name)?;
               let choice_version = flat_choice_version(&choice, flat_particle.initial_version);
 
@@ -419,10 +426,13 @@ pub fn gen_schema_deserializer(
       } else if is_one_sequence_structurable(schema_type) {
         let mut field_name_set = HashSet::new();
 
-        for (slot_index, particle) in structure_one_sequence_particles(schema_type)
-          .into_iter()
-          .enumerate()
-        {
+        let structured_particles = structure_one_sequence_particles(schema_type);
+        let choice_slot_count = structured_particles
+          .iter()
+          .filter(|particle| matches!(particle.kind, StructuredParticleKind::Choice(_)))
+          .count();
+
+        for (slot_index, particle) in structured_particles.into_iter().enumerate() {
           match particle.kind {
             StructuredParticleKind::Leaf(leaf) => {
               let child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
@@ -486,8 +496,12 @@ pub fn gen_schema_deserializer(
               }
             }
             StructuredParticleKind::Choice(choice) => {
-              let choice =
-                context.resolve_one_sequence_structured_choice(schema_type, &choice, slot_index)?;
+              let choice = context.resolve_one_sequence_structured_choice(
+                schema_type,
+                &choice,
+                choice_slot_count,
+                slot_index,
+              )?;
               let choice_name_ident: Ident = parse_str(&choice.field_name)?;
               let choice_version =
                 structured_choice_version(&choice.variants, particle.initial_version);
@@ -648,10 +662,13 @@ pub fn gen_schema_deserializer(
       if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         let mut field_name_set = HashSet::new();
 
-        for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
-          .into_iter()
-          .enumerate()
-        {
+        let flat_particles = flatten_one_sequence_particles(schema_type);
+        let choice_slot_count = flat_particles
+          .iter()
+          .filter(|particle| matches!(particle.kind, FlatParticleKind::Choice(_)))
+          .count();
+
+        for (slot_index, flat_particle) in flat_particles.into_iter().enumerate() {
           match flat_particle.kind {
             FlatParticleKind::Leaf(particle) => {
               let child =
@@ -695,8 +712,12 @@ pub fn gen_schema_deserializer(
               ));
             }
             FlatParticleKind::Choice(choice_particle) => {
-              let choice =
-                context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+              let choice = context.resolve_one_sequence_choice(
+                schema_type,
+                choice_particle,
+                choice_slot_count,
+                slot_index,
+              )?;
               let choice_name_ident: Ident = parse_str(&choice.field_name)?;
               let choice_version = flat_choice_version(&choice, flat_particle.initial_version);
 
@@ -770,10 +791,13 @@ pub fn gen_schema_deserializer(
       ))?;
 
       if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
-        for (slot_index, flat_particle) in flatten_one_sequence_particles(schema_type)
-          .into_iter()
-          .enumerate()
-        {
+        let flat_particles = flatten_one_sequence_particles(schema_type);
+        let choice_slot_count = flat_particles
+          .iter()
+          .filter(|particle| matches!(particle.kind, FlatParticleKind::Choice(_)))
+          .count();
+
+        for (slot_index, flat_particle) in flat_particles.into_iter().enumerate() {
           match flat_particle.kind {
             FlatParticleKind::Leaf(particle) => {
               let child =
@@ -801,8 +825,12 @@ pub fn gen_schema_deserializer(
               }
             }
             FlatParticleKind::Choice(choice_particle) => {
-              let choice =
-                context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
+              let choice = context.resolve_one_sequence_choice(
+                schema_type,
+                choice_particle,
+                choice_slot_count,
+                slot_index,
+              )?;
               let choice_name_ident: Ident = parse_str(&choice.field_name)?;
               let choice_enum_type: Type = parse_str(&format!(
                 "crate::schemas::{}::{}",

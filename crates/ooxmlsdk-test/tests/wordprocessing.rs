@@ -1,7 +1,6 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChildChoice, CommentCommentChoice1Choice, Comments, Document, Hyperlink,
-  HyperlinkChildChoice, Paragraph, ParagraphParagraphChoice2Choice, Run, RunRunChoice2Choice,
-  SdtBlock, SdtPropertiesChildChoice, Text,
+  Body, BodyChildChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChildChoice,
+  Paragraph, ParagraphChoice, Run, RunChoice, SdtBlock, SdtPropertiesChildChoice, Text,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -22,10 +21,10 @@ fn first_paragraph(body: &Body) -> &Paragraph {
 
 fn first_run(paragraph: &Paragraph) -> &Run {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
     .find_map(|child| match child {
-      ParagraphParagraphChoice2Choice::WR(run) => Some(run.as_ref()),
+      ParagraphChoice::WR(run) => Some(run.as_ref()),
       _ => None,
     })
     .expect("expected paragraph run")
@@ -33,10 +32,10 @@ fn first_run(paragraph: &Paragraph) -> &Run {
 
 fn first_hyperlink(paragraph: &Paragraph) -> &Hyperlink {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
     .find_map(|child| match child {
-      ParagraphParagraphChoice2Choice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
+      ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
       _ => None,
     })
     .expect("expected paragraph hyperlink")
@@ -66,10 +65,10 @@ fn first_sdt_block(body: &Body) -> &SdtBlock {
 
 fn first_text(run: &Run) -> &Text {
   run
-    .run_choice_2
+    .run_choice
     .iter()
     .find_map(|child| match child {
-      RunRunChoice2Choice::WT(text) => Some(text.as_ref()),
+      RunChoice::WT(text) => Some(text.as_ref()),
       _ => None,
     })
     .expect("expected run text")
@@ -77,10 +76,10 @@ fn first_text(run: &Run) -> &Text {
 
 fn run_texts(run: &Run) -> Vec<&Text> {
   run
-    .run_choice_2
+    .run_choice
     .iter()
     .filter_map(|child| match child {
-      RunRunChoice2Choice::WT(text) => Some(text.as_ref()),
+      RunChoice::WT(text) => Some(text.as_ref()),
       _ => None,
     })
     .collect()
@@ -97,13 +96,13 @@ fn append_run_text(run: &Run, out: &mut String) {
 fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
-  for child in &paragraph.paragraph_choice_2 {
+  for child in &paragraph.paragraph_choice {
     match child {
-      ParagraphParagraphChoice2Choice::WR(run) => append_run_text(run, &mut text),
-      ParagraphParagraphChoice2Choice::WHyperlink(hyperlink) => {
+      ParagraphChoice::WR(run) => append_run_text(run, &mut text),
+      ParagraphChoice::WHyperlink(hyperlink) => {
         for hyperlink_child in &hyperlink.children {
           if let HyperlinkChildChoice::WR(run) = hyperlink_child {
-            append_run_text(run, &mut text);
+            append_run_text(run.as_ref(), &mut text);
           }
         }
       }
@@ -116,70 +115,65 @@ fn paragraph_text(paragraph: &Paragraph) -> String {
 
 fn paragraph_run_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ParagraphParagraphChoice2Choice::WR(_)))
+    .filter(|child| matches!(child, ParagraphChoice::WR(_)))
     .count()
 }
 
 fn paragraph_sdt_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ParagraphParagraphChoice2Choice::WSdt(_)))
+    .filter(|child| matches!(child, ParagraphChoice::WSdt(_)))
     .count()
 }
 
 fn paragraph_bookmark_start_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ParagraphParagraphChoice2Choice::WBookmarkStart(_)))
+    .filter(|child| matches!(child, ParagraphChoice::WBookmarkStart(_)))
     .count()
 }
 
 fn paragraph_bookmark_end_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ParagraphParagraphChoice2Choice::WBookmarkEnd(_)))
+    .filter(|child| matches!(child, ParagraphChoice::WBookmarkEnd(_)))
     .count()
 }
 
 fn paragraph_comment_range_start_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| {
-      matches!(
-        child,
-        ParagraphParagraphChoice2Choice::WCommentRangeStart(_)
-      )
-    })
+    .filter(|child| matches!(child, ParagraphChoice::WCommentRangeStart(_)))
     .count()
 }
 
 fn paragraph_comment_range_end_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
-    .filter(|child| matches!(child, ParagraphParagraphChoice2Choice::WCommentRangeEnd(_)))
+    .filter(|child| matches!(child, ParagraphChoice::WCommentRangeEnd(_)))
     .count()
 }
 
 fn paragraph_comment_reference_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice_2
+    .paragraph_choice
     .iter()
     .filter_map(|child| match child {
-      ParagraphParagraphChoice2Choice::WR(run) => Some(run.as_ref()),
+      ParagraphChoice::WR(run) => Some(run.as_ref()),
       _ => None,
     })
     .map(|run| {
       run
-        .run_choice_2
+        .run_choice
         .iter()
-        .filter(|run_child| matches!(run_child, RunRunChoice2Choice::WCommentReference(_)))
+        .filter(|run_child| matches!(run_child, RunChoice::WCommentReference(_)))
         .count()
     })
     .sum()
@@ -190,10 +184,10 @@ fn comment_text(
 ) -> String {
   let mut text = String::new();
 
-  for child in &comment.comment_choice_1 {
-    if let CommentCommentChoice1Choice::WP(paragraph) = child {
-      for paragraph_child in &paragraph.paragraph_choice_2 {
-        if let ParagraphParagraphChoice2Choice::WR(run) = paragraph_child {
+  for child in &comment.comment_choice {
+    if let CommentChoice::WP(paragraph) = child {
+      for paragraph_child in &paragraph.paragraph_choice {
+        if let ParagraphChoice::WR(run) = paragraph_child {
           append_run_text(run, &mut text);
         }
       }
@@ -336,9 +330,9 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
     })
     .find(|paragraph| {
       paragraph
-        .paragraph_choice_2
+        .paragraph_choice
         .iter()
-        .any(|child| matches!(child, ParagraphParagraphChoice2Choice::WHyperlink(_)))
+        .any(|child| matches!(child, ParagraphChoice::WHyperlink(_)))
     })
     .expect("expected paragraph with hyperlink");
 
@@ -364,9 +358,9 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
     })
     .find(|paragraph| {
       paragraph
-        .paragraph_choice_2
+        .paragraph_choice
         .iter()
-        .any(|child| matches!(child, ParagraphParagraphChoice2Choice::WHyperlink(_)))
+        .any(|child| matches!(child, ParagraphChoice::WHyperlink(_)))
     })
     .expect("expected reparsed paragraph with hyperlink");
   let reparsed_hyperlink = first_hyperlink(reparsed_hyperlink_paragraph);
@@ -581,10 +575,10 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
     })
     .find_map(|paragraph| {
       paragraph
-        .paragraph_choice_2
+        .paragraph_choice
         .iter()
         .find_map(|child| match child {
-          ParagraphParagraphChoice2Choice::WHyperlink(hyperlink)
+          ParagraphChoice::WHyperlink(hyperlink)
             if hyperlink
               .children
               .iter()

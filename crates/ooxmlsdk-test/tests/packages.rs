@@ -9,8 +9,8 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  AltChunk, Body, BodyChildChoice, CommentChildChoice, Document, HyperlinkChildChoice, Paragraph,
-  ParagraphChildChoice, Run, RunRunChoice2Choice, SdtBlockChildChoice, SdtPropertiesChildChoice,
+  AltChunk, Body, BodyChildChoice, CommentCommentChoice1Choice, Document, HyperlinkChildChoice,
+  Paragraph, ParagraphParagraphChoice2Choice, Run, RunRunChoice2Choice, SdtPropertiesChildChoice,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -101,9 +101,9 @@ fn paragraph_bookmark_start_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .children
+    .paragraph_choice_2
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChildChoice::WBookmarkStart(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WBookmarkStart(_)))
     .count()
 }
 
@@ -111,9 +111,9 @@ fn paragraph_bookmark_end_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .children
+    .paragraph_choice_2
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChildChoice::WBookmarkEnd(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WBookmarkEnd(_)))
     .count()
 }
 
@@ -121,9 +121,9 @@ fn paragraph_comment_range_start_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .children
+    .paragraph_choice_2
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChildChoice::WCommentRangeStart(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WCommentRangeStart(_)))
     .count()
 }
 
@@ -131,9 +131,9 @@ fn paragraph_comment_range_end_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .children
+    .paragraph_choice_2
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChildChoice::WCommentRangeEnd(_)))
+    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphParagraphChoice2Choice::WCommentRangeEnd(_)))
     .count()
 }
 
@@ -141,10 +141,10 @@ fn paragraph_comment_reference_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .children
+    .paragraph_choice_2
     .iter()
     .filter_map(|child| match child {
-      ParagraphChildChoice::WR(run) => Some(run.as_ref()),
+      ParagraphParagraphChoice2Choice::WR(run) => Some(run.as_ref()),
       _ => None,
     })
     .map(|run| {
@@ -158,18 +158,21 @@ fn paragraph_comment_reference_count(
 }
 
 fn first_paragraph_text(paragraph: &Paragraph) -> Option<&str> {
-  paragraph.children.iter().find_map(|child| match child {
-    ParagraphChildChoice::WR(run) => {
-      run
-        .run_choice_2
-        .iter()
-        .find_map(|run_child| match run_child {
-          RunRunChoice2Choice::WT(text) => text.xml_content.as_deref(),
-          _ => None,
-        })
-    }
-    _ => None,
-  })
+  paragraph
+    .paragraph_choice_2
+    .iter()
+    .find_map(|child| match child {
+      ParagraphParagraphChoice2Choice::WR(run) => {
+        run
+          .run_choice_2
+          .iter()
+          .find_map(|run_child| match run_child {
+            RunRunChoice2Choice::WT(text) => text.xml_content.as_deref(),
+            _ => None,
+          })
+      }
+      _ => None,
+    })
 }
 
 fn append_run_text(run: &Run, out: &mut String) {
@@ -185,10 +188,10 @@ fn append_run_text(run: &Run, out: &mut String) {
 fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
-  for child in &paragraph.children {
+  for child in &paragraph.paragraph_choice_2 {
     match child {
-      ParagraphChildChoice::WR(run) => append_run_text(run, &mut text),
-      ParagraphChildChoice::WHyperlink(hyperlink) => {
+      ParagraphParagraphChoice2Choice::WR(run) => append_run_text(run, &mut text),
+      ParagraphParagraphChoice2Choice::WHyperlink(hyperlink) => {
         for hyperlink_child in &hyperlink.children {
           if let HyperlinkChildChoice::WR(run) = hyperlink_child {
             append_run_text(run, &mut text);
@@ -207,8 +210,8 @@ fn comment_text(
 ) -> String {
   let mut text = String::new();
 
-  for child in &comment.children {
-    if let CommentChildChoice::WP(paragraph) = child {
+  for child in &comment.comment_choice_1 {
+    if let CommentCommentChoice1Choice::WP(paragraph) = child {
       text.push_str(&paragraph_text(paragraph.as_ref()));
     }
   }
@@ -313,16 +316,10 @@ fn open_simple_sdt_docx_asset_from_openxml_sdk() {
     panic!("expected first body child to be w:sdt");
   };
 
-  assert!(matches!(
-    sdt.children.first(),
-    Some(SdtBlockChildChoice::WSdtPr(_))
-  ));
-  assert!(matches!(
-    sdt.children.get(1),
-    Some(SdtBlockChildChoice::WSdtContent(_))
-  ));
+  assert!(sdt.sdt_properties.is_some());
+  assert!(sdt.sdt_content_block.is_some());
 
-  let Some(SdtBlockChildChoice::WSdtPr(properties)) = sdt.children.first() else {
+  let Some(properties) = sdt.sdt_properties.as_deref() else {
     panic!("expected w:sdtPr");
   };
   let Some(SdtPropertiesChildChoice::WAlias(alias)) = properties.children.first() else {
@@ -961,12 +958,10 @@ fn round_trip_simple_sdt_docx_asset_from_openxml_sdk() {
     panic!("expected first body child to be w:sdt");
   };
 
-  let Some(SdtBlockChildChoice::WSdtPr(original_properties)) = original_sdt.children.first() else {
+  let Some(original_properties) = original_sdt.sdt_properties.as_deref() else {
     panic!("expected original w:sdtPr");
   };
-  let Some(SdtBlockChildChoice::WSdtPr(roundtripped_properties)) =
-    roundtripped_sdt.children.first()
-  else {
+  let Some(roundtripped_properties) = roundtripped_sdt.sdt_properties.as_deref() else {
     panic!("expected roundtripped w:sdtPr");
   };
   let Some(SdtPropertiesChildChoice::WAlias(original_alias)) = original_properties.children.first()

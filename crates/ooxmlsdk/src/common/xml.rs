@@ -8,12 +8,14 @@ use super::{SdkError, invalid_field_value};
 
 pub trait XmlReader<'de> {
   fn next(&mut self) -> Result<Event<'de>, SdkError>;
+  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError>;
   fn decoder(&self) -> Decoder;
 }
 
 pub struct IoReader<R: BufRead> {
   reader: Reader<R>,
   buf: Vec<u8>,
+  pending: Option<Event<'static>>,
 }
 
 impl<R: BufRead> IoReader<R> {
@@ -21,6 +23,7 @@ impl<R: BufRead> IoReader<R> {
     Self {
       reader,
       buf: Vec::new(),
+      pending: None,
     }
   }
 }
@@ -28,8 +31,24 @@ impl<R: BufRead> IoReader<R> {
 impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
   #[inline]
   fn next(&mut self) -> Result<Event<'de>, SdkError> {
+    if let Some(event) = self.pending.take() {
+      return Ok(event);
+    }
+
     self.buf.clear();
     Ok(self.reader.read_event_into(&mut self.buf)?.into_owned())
+  }
+
+  #[inline]
+  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+    if self.pending.is_some() {
+      return Err(SdkError::CommonError(
+        "xml reader unread buffer already occupied".to_string(),
+      ));
+    }
+
+    self.pending = Some(event.into_owned());
+    Ok(())
   }
 
   #[inline]
@@ -40,18 +59,38 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
 
 pub struct SliceReader<'de> {
   reader: Reader<&'de [u8]>,
+  pending: Option<Event<'static>>,
 }
 
 impl<'de> SliceReader<'de> {
   pub fn new(reader: Reader<&'de [u8]>) -> Self {
-    Self { reader }
+    Self {
+      reader,
+      pending: None,
+    }
   }
 }
 
 impl<'de> XmlReader<'de> for SliceReader<'de> {
   #[inline]
   fn next(&mut self) -> Result<Event<'de>, SdkError> {
+    if let Some(event) = self.pending.take() {
+      return Ok(event);
+    }
+
     Ok(self.reader.read_event()?)
+  }
+
+  #[inline]
+  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+    if self.pending.is_some() {
+      return Err(SdkError::CommonError(
+        "xml reader unread buffer already occupied".to_string(),
+      ));
+    }
+
+    self.pending = Some(event.into_owned());
+    Ok(())
   }
 
   #[inline]

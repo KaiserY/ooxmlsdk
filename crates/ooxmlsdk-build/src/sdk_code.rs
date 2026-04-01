@@ -162,7 +162,6 @@ fn write_schemas(
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &schema_path,
-      &[],
       gen_schema(sdk_data_schema, context).map_err(|err| {
         format!(
           "failed to generate schema {}: {err}",
@@ -178,7 +177,6 @@ fn write_schemas(
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", package_schema.module_name));
     write_generated_module(
       &schema_path,
-      &[],
       gen_package_schema(package_schema).map_err(|err| {
         format!(
           "failed to generate package schema {}: {err}",
@@ -194,7 +192,7 @@ fn write_schemas(
     #( #schemas_mod_list )*
   };
   let schemas_mod_path = out_dir_path.join("schemas.rs");
-  write_generated_module(&schemas_mod_path, &[], token_stream)?;
+  write_generated_module(&schemas_mod_path, token_stream)?;
 
   Ok(())
 }
@@ -215,7 +213,6 @@ fn write_deserializers(
       out_deserializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &deserializer_path,
-      &[],
       gen_schema_deserializer(sdk_data_schema, context).map_err(|err| {
         format!(
           "failed to generate deserializer {}: {err}",
@@ -231,7 +228,7 @@ fn write_deserializers(
     #( #deserializers_mod_list )*
   };
   let deserializers_mod_path = out_dir_path.join("deserializers.rs");
-  write_generated_module(&deserializers_mod_path, &[], token_stream)?;
+  write_generated_module(&deserializers_mod_path, token_stream)?;
 
   Ok(())
 }
@@ -240,13 +237,12 @@ fn write_parts(sdk_data_parts: &[SdkDataPart], out_dir_path: &Path) -> Result<()
   let out_parts_dir_path = out_dir_path.join("parts");
   fs::create_dir_all(&out_parts_dir_path)?;
   clear_generated_rs_files(&out_parts_dir_path)?;
-  write_generated_module(&out_parts_dir_path.join("mod.rs"), &[], quote! {})?;
+  write_generated_module(&out_parts_dir_path.join("mod.rs"), quote! {})?;
 
   for sdk_data_part in sdk_data_parts {
     let part_path = out_parts_dir_path.join(format!("{}.rs", sdk_data_part.module_name));
     write_generated_module(
       &part_path,
-      &[],
       gen_part_module(sdk_data_part).map_err(|err| {
         format!(
           "failed to generate part {}: {err}",
@@ -258,7 +254,6 @@ fn write_parts(sdk_data_parts: &[SdkDataPart], out_dir_path: &Path) -> Result<()
 
   write_generated_module(
     &out_parts_dir_path.join("mod.rs"),
-    &[],
     gen_parts_mod(sdk_data_parts)?,
   )?;
 
@@ -289,7 +284,7 @@ fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Pat
   };
 
   let namespaces_path = out_dir_path.join("namespaces.rs");
-  write_generated_module(&namespaces_path, &[], token_stream)?;
+  write_generated_module(&namespaces_path, token_stream)?;
 
   Ok(())
 }
@@ -310,7 +305,6 @@ fn write_serializers(
       out_serializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &serializer_path,
-      &[],
       gen_schema_serializer(sdk_data_schema, context).map_err(|err| {
         format!(
           "failed to generate serializer {}: {err}",
@@ -326,28 +320,16 @@ fn write_serializers(
     #( #serializers_mod_list )*
   };
   let serializers_mod_path = out_dir_path.join("serializers.rs");
-  write_generated_module(&serializers_mod_path, &[], token_stream)?;
+  write_generated_module(&serializers_mod_path, token_stream)?;
 
   Ok(())
 }
 
-fn write_generated_module(
-  path: &Path,
-  lint_allows: &[&str],
-  token_stream: TokenStream,
-) -> Result<()> {
+fn write_generated_module(path: &Path, token_stream: TokenStream) -> Result<()> {
   let syntax_tree: syn::File = parse2(token_stream)
     .map_err(|err| format!("failed to parse generated module {}: {err}", path.display()))?;
   let formatted = prettyplease::unparse(&syntax_tree);
-  let generated_lint_allows = if lint_allows.is_empty() {
-    String::new()
-  } else {
-    format!("{}\n\n", lint_allows.join("\n"))
-  };
-  fs::write(
-    path,
-    format!("{FILE_HEADER}\n{generated_lint_allows}{formatted}"),
-  )?;
+  fs::write(path, format!("{FILE_HEADER}\n{formatted}"))?;
   Ok(())
 }
 

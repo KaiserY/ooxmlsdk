@@ -5,11 +5,15 @@ use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::helpers::{
-  FlatParticleKind, flatten_one_sequence_particles, is_composite_type, is_derived_type,
-  is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten,
-  needs_xml_header, supports_xmlns_fields,
+  FlatParticleKind, StructuredParticleKind, flatten_one_sequence_particles, is_composite_type,
+  is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
+  is_one_sequence_flatten, is_one_sequence_structurable, needs_xml_header,
+  structure_one_sequence_particles, supports_xmlns_fields,
 };
-use crate::sdk_code::schemas::{CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild};
+use crate::sdk_code::schemas::{
+  CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild,
+  ResolvedOneSequenceChoiceVariant, ResolvedOneSequenceSequenceVariant,
+};
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, version_cfg_attrs, versioned_tokens,
 };
@@ -38,6 +42,59 @@ pub fn gen_schema_serializer(schema: &Schema, context: &CodegenContext<'_>) -> R
   Ok(quote! {
     #( #token_stream_list )*
   })
+}
+
+fn structured_sequence_version(
+  sequence_variant: &ResolvedOneSequenceSequenceVariant<'_>,
+) -> &'static str {
+  if !sequence_variant.fields.is_empty()
+    && sequence_variant.fields.iter().all(|field| {
+      is_microsoft365_version(effective_version(
+        field.child.version,
+        field.initial_version,
+      ))
+    })
+  {
+    "Microsoft365"
+  } else {
+    ""
+  }
+}
+
+fn structured_choice_version(
+  choice: &[ResolvedOneSequenceChoiceVariant<'_>],
+  particle_version: &str,
+) -> &'static str {
+  if is_microsoft365_version(particle_version)
+    || (!choice.is_empty()
+      && choice.iter().all(|variant| match variant {
+        ResolvedOneSequenceChoiceVariant::Leaf(child) => is_microsoft365_version(child.version),
+        ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => {
+          is_microsoft365_version(structured_sequence_version(sequence_variant))
+        }
+      }))
+  {
+    "Microsoft365"
+  } else {
+    ""
+  }
+}
+
+fn flat_choice_version(
+  choice: &crate::sdk_code::schemas::ResolvedOneSequenceChoice<'_>,
+  particle_version: &str,
+) -> &'static str {
+  if is_microsoft365_version(particle_version)
+    || (!choice.variants.is_empty()
+      && choice
+        .variants
+        .iter()
+        .all(|variant| is_microsoft365_version(variant.version)))
+  {
+    "Microsoft365"
+  } else {
+    ""
+  }
 }
 
 fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(ItemImpl, ItemImpl)> {
@@ -197,6 +254,7 @@ fn gen_struct_serializer(
             let choice =
               context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
             let choice_name_ident: Ident = parse_str(&choice.field_name)?;
+            let choice_version = flat_choice_version(&choice, flat_particle.initial_version);
 
             if !field_name_set.insert(choice_name_ident.to_string()) {
               continue;
@@ -207,7 +265,7 @@ fn gen_struct_serializer(
               &schema.module_name, choice.enum_name
             ))?;
 
-            child_stmt_list.push(gen_one_sequence_choice_stmt(
+            let choice_stmt = gen_one_sequence_choice_stmt(
               &choice_name_ident,
               &choice_enum_type,
               &choice.variants,
@@ -215,7 +273,77 @@ fn gen_struct_serializer(
               flat_particle.repeated,
               schema,
               context,
-            )?);
+            )?;
+            child_stmt_list.push(parse2(versioned_tokens(
+              choice_version,
+              quote! { #choice_stmt },
+            ))?);
+          }
+        }
+      }
+
+      children_writer = quote! {
+        #( #child_stmt_list )*
+      };
+
+      end_tag_writer = quote! {
+        writer.write_char('>')?;
+      };
+
+      end_writer = quote! {
+        crate::common::write_end_tag(writer, xmlns_prefix, #last_name_prefix, #last_name_suffix)?;
+      };
+    } else if is_one_sequence_structurable(schema_type) {
+      let mut field_name_set = std::collections::HashSet::new();
+      let mut child_stmt_list: Vec<Stmt> = vec![];
+
+      for (slot_index, particle) in structure_one_sequence_particles(schema_type)
+        .into_iter()
+        .enumerate()
+      {
+        match particle.kind {
+          StructuredParticleKind::Leaf(leaf) => {
+            let child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
+            let child_name_ident = one_sequence_child_field_ident(&child)?;
+            if !field_name_set.insert(child_name_ident.to_string()) {
+              continue;
+            }
+
+            let child_stmt =
+              gen_one_sequence_child_stmt(&child, particle.optional, particle.repeated)?;
+            child_stmt_list.push(parse2(versioned_tokens(
+              effective_version(child.version, particle.initial_version),
+              quote! { #child_stmt },
+            ))?);
+          }
+          StructuredParticleKind::Choice(choice) => {
+            let choice =
+              context.resolve_one_sequence_structured_choice(schema_type, &choice, slot_index)?;
+            let choice_name_ident: Ident = parse_str(&choice.field_name)?;
+            let choice_version =
+              structured_choice_version(&choice.variants, particle.initial_version);
+            if !field_name_set.insert(choice_name_ident.to_string()) {
+              continue;
+            }
+
+            let choice_enum_type: Type = parse_str(&format!(
+              "crate::schemas::{}::{}",
+              &schema.module_name, choice.enum_name
+            ))?;
+
+            let choice_stmt = gen_structured_one_sequence_choice_stmt(
+              &choice_name_ident,
+              &choice_enum_type,
+              &choice.variants,
+              particle.optional,
+              particle.repeated,
+              schema,
+              context,
+            )?;
+            child_stmt_list.push(parse2(versioned_tokens(
+              choice_version,
+              quote! { #choice_stmt },
+            ))?);
           }
         }
       }
@@ -239,7 +367,6 @@ fn gen_struct_serializer(
         child_arms.push(gen_child_arm(child, &child_choice_enum_type)?);
       }
       let fallback_arm = child_match_fallback(&resolved_children);
-
       children_writer = quote! {
         for child in &self.children {
           match child {
@@ -300,6 +427,7 @@ fn gen_struct_serializer(
             let choice =
               context.resolve_one_sequence_choice(schema_type, choice_particle, slot_index)?;
             let choice_name_ident: Ident = parse_str(&choice.field_name)?;
+            let choice_version = flat_choice_version(&choice, flat_particle.initial_version);
 
             if !field_name_set.insert(choice_name_ident.to_string()) {
               continue;
@@ -310,7 +438,7 @@ fn gen_struct_serializer(
               &schema.module_name, choice.enum_name
             ))?;
 
-            child_stmt_list.push(gen_one_sequence_choice_stmt(
+            let choice_stmt = gen_one_sequence_choice_stmt(
               &choice_name_ident,
               &choice_enum_type,
               &choice.variants,
@@ -318,7 +446,11 @@ fn gen_struct_serializer(
               flat_particle.repeated,
               schema,
               context,
-            )?);
+            )?;
+            child_stmt_list.push(parse2(versioned_tokens(
+              choice_version,
+              quote! { #choice_stmt },
+            ))?);
           }
         }
       }
@@ -341,7 +473,6 @@ fn gen_struct_serializer(
         child_arms.push(gen_child_arm(child, &child_choice_enum_type)?);
       }
       let fallback_arm = child_match_fallback(&resolved_children);
-
       children_writer = quote! {
         for child in &self.children {
           match child {
@@ -616,6 +747,114 @@ fn gen_one_sequence_choice_stmt(
   }
 }
 
+fn gen_structured_one_sequence_choice_stmt(
+  choice_name_ident: &Ident,
+  choice_enum_type: &Type,
+  variants: &[ResolvedOneSequenceChoiceVariant<'_>],
+  optional: bool,
+  repeated: bool,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<Stmt> {
+  let mut arms: Vec<Arm> = vec![];
+
+  for variant in variants {
+    match variant {
+      ResolvedOneSequenceChoiceVariant::Leaf(child) => {
+        let variant_ident: Ident = parse_str(&child.field_name.to_upper_camel_case())?;
+        let variant_type = {
+          let child_type = context
+            .type_by_name(child.name)
+            .ok_or_else(|| format!("{:?}", child.name))?;
+          let child_module_name = context
+            .type_module(child.name)
+            .unwrap_or(&schema.module_name);
+
+          parse_str::<Type>(&format!(
+            "crate::schemas::{}::{}",
+            child_module_name,
+            child_type.class_name.to_upper_camel_case()
+          ))?
+        };
+
+        arms.push(parse2(versioned_tokens(
+          child.version,
+          quote! {
+            #choice_enum_type::#variant_ident(child) => {
+              let child: &#variant_type = child.as_ref();
+              child.write_xml(writer, xmlns_prefix)?;
+            }
+          },
+        ))?);
+      }
+      ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => {
+        let variant_ident: Ident = parse_str(&sequence_variant.variant_name)?;
+        let sequence_stmt = gen_sequence_variant_write_stmt(sequence_variant)?;
+        let sequence_version = structured_sequence_version(sequence_variant);
+
+        arms.push(parse2(versioned_tokens(
+          sequence_version,
+          quote! {
+            #choice_enum_type::#variant_ident(sequence) => {
+              #sequence_stmt
+            }
+          },
+        ))?);
+      }
+    }
+  }
+
+  if repeated {
+    Ok(parse2(quote! {
+      for choice in &self.#choice_name_ident {
+        match choice {
+          #( #arms )*
+        }
+      }
+    })?)
+  } else if optional {
+    Ok(parse2(quote! {
+      if let Some(choice) = &self.#choice_name_ident {
+        match choice {
+          #( #arms )*
+        }
+      }
+    })?)
+  } else {
+    Ok(parse2(quote! {
+      match &self.#choice_name_ident {
+        #( #arms )*
+      }
+    })?)
+  }
+}
+
+fn gen_sequence_variant_write_stmt(
+  sequence_variant: &ResolvedOneSequenceSequenceVariant<'_>,
+) -> Result<Stmt> {
+  let mut field_stmts: Vec<Stmt> = vec![];
+
+  for field in &sequence_variant.fields {
+    let child_name_ident = one_sequence_child_field_ident(&field.child)?;
+
+    if field.optional {
+      field_stmts.push(parse2(quote! {
+        if let Some(child) = &sequence.#child_name_ident {
+          child.write_xml(writer, xmlns_prefix)?;
+        }
+      })?);
+    } else {
+      field_stmts.push(parse2(quote! {
+        sequence.#child_name_ident.write_xml(writer, xmlns_prefix)?;
+      })?);
+    }
+  }
+
+  Ok(parse2(quote! {{
+    #( #field_stmts )*
+  }})?)
+}
+
 fn one_sequence_child_field_ident(child: &ResolvedOneSequenceChild<'_>) -> Result<Ident> {
   Ok(parse_str(child.field_name.as_ref())?)
 }
@@ -632,9 +871,10 @@ fn gen_child_arm(child: &ResolvedCompositeChild<'_>, child_choice_enum_type: &Ty
 }
 
 fn child_match_fallback(children: &[ResolvedCompositeChild<'_>]) -> TokenStream {
-  if children
-    .iter()
-    .any(|child| is_microsoft365_version(child.version))
+  if !children.is_empty()
+    && children
+      .iter()
+      .all(|child| is_microsoft365_version(child.version))
   {
     quote! {
       #[cfg(not(feature = "microsoft365"))]

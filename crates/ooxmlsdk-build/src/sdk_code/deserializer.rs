@@ -245,6 +245,24 @@ pub fn gen_schema_deserializer(
         context,
       )?);
     } else if is_leaf_text_type(schema_type) {
+      if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
+        field_declaration_list.push(parse2(quote! {
+          let mut xmlns = None;
+        })?);
+
+        field_declaration_list.push(parse2(quote! {
+          let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+        })?);
+
+        field_declaration_list.push(parse2(quote! {
+          let mut mc_ignorable = None;
+        })?);
+
+        field_ident_list.push(quote! { xmlns });
+        field_ident_list.push(quote! { xmlns_map });
+        field_ident_list.push(quote! { mc_ignorable });
+      }
+
       for attr in &schema_type.attributes {
         attributes.push(attr);
       }
@@ -275,6 +293,24 @@ pub fn gen_schema_deserializer(
         context,
       )?);
     } else if is_leaf_element_type(schema_type) {
+      if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
+        field_declaration_list.push(parse2(quote! {
+          let mut xmlns = None;
+        })?);
+
+        field_declaration_list.push(parse2(quote! {
+          let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+        })?);
+
+        field_declaration_list.push(parse2(quote! {
+          let mut mc_ignorable = None;
+        })?);
+
+        field_ident_list.push(quote! { xmlns });
+        field_ident_list.push(quote! { xmlns_map });
+        field_ident_list.push(quote! { mc_ignorable });
+      }
+
       for attr in &schema_type.attributes {
         attributes.push(attr);
       }
@@ -692,6 +728,24 @@ pub fn gen_schema_deserializer(
         .ok_or_else(|| format!("{:?}", schema_type.name))?;
       let resolved_children = context.resolve_children(schema_type)?;
 
+      if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
+        field_declaration_list.push(parse2(quote! {
+          let mut xmlns = None;
+        })?);
+
+        field_declaration_list.push(parse2(quote! {
+          let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+        })?);
+
+        field_declaration_list.push(parse2(quote! {
+          let mut mc_ignorable = None;
+        })?);
+
+        field_ident_list.push(quote! { xmlns });
+        field_ident_list.push(quote! { xmlns_map });
+        field_ident_list.push(quote! { mc_ignorable });
+      }
+
       for attr in &schema_type.attributes {
         attributes.push(attr);
       }
@@ -1035,52 +1089,51 @@ pub fn gen_schema_deserializer(
       .map(gen_attr_match_arm)
       .collect::<Result<_>>()?;
 
-    let attr_match_stmt_opt: Option<Stmt> = if is_composite_type(schema_type)
-      && supports_compat_xmlns_fields(schema_type, schema, compatibility_rules)
-    {
-      Some(parse2(quote! {
-        for attr in e.attributes().with_checks(false) {
-          let attr = attr?;
+    let attr_match_stmt_opt: Option<Stmt> =
+      if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
+        Some(parse2(quote! {
+          for attr in e.attributes().with_checks(false) {
+            let attr = attr?;
 
-          match attr.key.as_ref() {
-            #( #attr_match_list_arms )*
-            b"xmlns" => {
-              xmlns = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-            }
-            b"mc:Ignorable" => {
-              mc_ignorable = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-            }
-            key => {
-              if key.starts_with(b"xmlns:") {
-                let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
-                let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
+            match attr.key.as_ref() {
+              #( #attr_match_list_arms )*
+              b"xmlns" => {
+                xmlns = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+              }
+              b"mc:Ignorable" => {
+                mc_ignorable = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+              }
+              key => {
+                if key.starts_with(b"xmlns:") {
+                  let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
+                  let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
 
-                if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
-                  xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
-                } else {
-                  xmlns_map.insert(prefix, uri);
+                  if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
+                    xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
+                  } else {
+                    xmlns_map.insert(prefix, uri);
+                  }
                 }
               }
             }
           }
-        }
-      })?)
-    } else if !attr_match_list.is_empty() {
-      Some(gen_attr_stmt(&attr_match_list)?)
-    } else {
-      expect_event_start_stmt = parse2(quote! {
-        let (_, empty_tag) = crate::common::expect_event_start!(
-          xml_reader,
-          xml_event,
-          #class_name_literal,
-          #prefix_type_name_str,
-          #prefix_type_name_literal,
-          #type_name_literal
-        );
-      })?;
+        })?)
+      } else if !attr_match_list.is_empty() {
+        Some(gen_attr_stmt(&attr_match_list)?)
+      } else {
+        expect_event_start_stmt = parse2(quote! {
+          let (_, empty_tag) = crate::common::expect_event_start!(
+            xml_reader,
+            xml_event,
+            #class_name_literal,
+            #prefix_type_name_str,
+            #prefix_type_name_literal,
+            #type_name_literal
+          );
+        })?;
 
-      None
-    };
+        None
+      };
 
     if !loop_children_match_list.is_empty() || any_child_variant_ident_opt.is_some() {
       let any_child_choice_enum_type: Type = parse_str(&format!(
@@ -1088,7 +1141,11 @@ pub fn gen_schema_deserializer(
         &schema.module_name,
         schema_type.class_name.to_upper_camel_case()
       ))?;
-      let any_visit_fallback = if let Some(any_child_variant_ident) = &any_child_variant_ident_opt {
+      let has_known_child_match = !loop_children_match_list.is_empty();
+      let has_known_visit_match = !loop_children_visit_match_list.is_empty();
+      let any_visit_fallback_arm = if let Some(any_child_variant_ident) =
+        &any_child_variant_ident_opt
+      {
         quote! {
           _ => {
             children.push(#any_child_choice_enum_type::#any_child_variant_ident(std::boxed::Box::new(
@@ -1102,7 +1159,23 @@ pub fn gen_schema_deserializer(
           _ => Ok(false),
         }
       };
-      let any_main_fallback = if let Some(any_child_variant_ident) = &any_child_variant_ident_opt {
+      let any_visit_fallback_body = if let Some(any_child_variant_ident) =
+        &any_child_variant_ident_opt
+      {
+        quote! {
+          children.push(#any_child_choice_enum_type::#any_child_variant_ident(std::boxed::Box::new(
+            crate::common::read_outer_xml(_xml_reader, e, _e_empty)?,
+          )));
+          Ok(true)
+        }
+      } else {
+        quote! {
+          Ok(false)
+        }
+      };
+      let any_main_fallback_body = if let Some(any_child_variant_ident) =
+        &any_child_variant_ident_opt
+      {
         quote! {
           children.push(#any_child_choice_enum_type::#any_child_variant_ident(std::boxed::Box::new(
             crate::common::read_outer_xml(xml_reader, e, e_empty)?,
@@ -1123,6 +1196,41 @@ pub fn gen_schema_deserializer(
               e.name().as_ref(),
             ))?;
           }
+        }
+      };
+      let visit_foreign_child_body = if has_known_visit_match {
+        quote! {
+          match e.name().as_ref() {
+            #( #loop_children_visit_match_list )*
+            #any_visit_fallback_arm
+          }
+        }
+      } else {
+        quote! {
+          let _ = e.name().as_ref();
+          #any_visit_fallback_body
+        }
+      };
+      let main_child_body = if has_known_child_match {
+        quote! {
+          match e.name().as_ref() {
+            #( #loop_children_match_list )*
+            b"mc:AlternateContent" | b"AlternateContent" => {
+              crate::common::process_foreign_element_children(
+                xml_reader,
+                e_empty,
+                &mut visit_foreign_child,
+              )?;
+            }
+            _ => {
+              #any_main_fallback_body
+            }
+          }
+        }
+      } else {
+        quote! {
+          let _ = e.name().as_ref();
+          #any_main_fallback_body
         }
       };
 
@@ -1147,29 +1255,22 @@ pub fn gen_schema_deserializer(
         }
       })?);
 
+      let visit_foreign_child_decl = if has_known_child_match {
+        quote! {
+          let mut visit_foreign_child =
+            |_xml_reader: &mut R, e: quick_xml::events::BytesStart<'de>, _e_empty: bool| -> Result<bool, crate::common::SdkError> {
+              #visit_foreign_child_body
+            };
+        }
+      } else {
+        quote! {}
+      };
+
       loop_children_stmt_opt = Some(parse2(quote! {{
-        let mut visit_foreign_child =
-          |_xml_reader: &mut R, e: quick_xml::events::BytesStart<'de>, _e_empty: bool| -> Result<bool, crate::common::SdkError> {
-            match e.name().as_ref() {
-              #( #loop_children_visit_match_list )*
-              #any_visit_fallback
-            }
-          };
+        #visit_foreign_child_decl
 
         if let Some(e) = e_opt {
-          match e.name().as_ref() {
-            #( #loop_children_match_list )*
-            b"mc:AlternateContent" | b"AlternateContent" => {
-              crate::common::process_foreign_element_children(
-                xml_reader,
-                e_empty,
-                &mut visit_foreign_child,
-              )?;
-            }
-            _ => {
-              #any_main_fallback
-            }
-          }
+          #main_child_body
         }
       }})?);
     }

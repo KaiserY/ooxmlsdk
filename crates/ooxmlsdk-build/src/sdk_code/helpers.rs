@@ -5,10 +5,6 @@ use crate::sdk_data::sdk_data_model::{
   SchemaTypeKind, SchemaTypeParticle,
 };
 
-const DRAWINGML_MAIN_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
-const DRAWINGML_PICTURE_NAMESPACE: &str =
-  "http://schemas.openxmlformats.org/drawingml/2006/picture";
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SimpleValueKind {
   StringLike,
@@ -49,18 +45,12 @@ pub fn is_derived_type(schema_type: &SchemaType) -> bool {
   schema_type.kind == SchemaTypeKind::Derived
 }
 
-pub fn is_drawingml_namespace(schema: &Schema) -> bool {
-  schema.target_namespace == DRAWINGML_MAIN_NAMESPACE
-    || schema.target_namespace == DRAWINGML_PICTURE_NAMESPACE
-}
-
 pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
   !schema_type.part.is_empty() || schema_type.base_class == "OpenXmlPartRootElement"
 }
 
-pub fn supports_xmlns_fields(schema_type: &SchemaType, schema: &Schema) -> bool {
+pub fn supports_xmlns_fields(schema_type: &SchemaType) -> bool {
   needs_xml_header(schema_type)
-    || (is_composite_type(schema_type) && is_drawingml_namespace(schema))
 }
 
 pub fn supports_compat_xmlns_fields(
@@ -68,7 +58,7 @@ pub fn supports_compat_xmlns_fields(
   schema: &Schema,
   compatibility_rules: &[CompatibilityRule],
 ) -> bool {
-  supports_xmlns_fields(schema_type, schema)
+  supports_xmlns_fields(schema_type)
     || preserve_namespace_decls_rule_for_type(
       compatibility_rules,
       &schema.module_name,

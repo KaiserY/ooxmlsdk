@@ -259,6 +259,108 @@
       "Type": "StylesheetExtension",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",
+      "Type": "LaserColor",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",
+      "Type": "ShowMediaControls",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",
+      "Type": "DefaultImageDpi",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",
+      "Type": "DiscardImageEditData",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",
+      "Type": "CreationId",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",
+      "Type": "ModificationId",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2012_main",
+      "Type": "SlideGuideList",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_powerpoint_2012_main",
+      "Type": "ChartTrackingReferenceBased",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2010_main",
+      "Type": "UseLocalDpi",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2010_main",
+      "Type": "HiddenFillProperties",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2010_main",
+      "Type": "HiddenLineProperties",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2008_diagram",
+      "Type": "DataModelExtensionBlock",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2008_diagram",
+      "Type": "Drawing",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_diagram",
+      "Type": "RelationshipIds",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_diagram",
+      "Type": "Shape",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2014_main",
+      "Type": "CreationId",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_thememl_2012_main",
+      "Type": "ThemeFamily",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
     }
   ]
 }

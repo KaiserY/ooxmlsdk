@@ -298,7 +298,10 @@ fn resolve_general_ref_entity(entity: &str) -> Option<std::borrow::Cow<'_, str>>
     return Some(std::borrow::Cow::Borrowed(entity));
   }
 
-  if let Some(hex) = entity.strip_prefix("#x").or_else(|| entity.strip_prefix("#X")) {
+  if let Some(hex) = entity
+    .strip_prefix("#x")
+    .or_else(|| entity.strip_prefix("#X"))
+  {
     let code_point = u32::from_str_radix(hex, 16).ok()?;
     let ch = char::from_u32(code_point)?;
     return Some(std::borrow::Cow::Owned(ch.to_string()));

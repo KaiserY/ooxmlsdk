@@ -544,6 +544,18 @@ pub fn gen_schema(
     let mut fields: Vec<TokenStream> = vec![];
     let mut child_choice_enums: Vec<TokenStream> = vec![];
 
+    if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
+      fields.push(quote! {
+        pub xmlns: Option<String>,
+      });
+      fields.push(quote! {
+        pub xmlns_map: std::collections::HashMap<String, String>,
+      });
+      fields.push(quote! {
+        pub mc_ignorable: Option<String>,
+      });
+    }
+
     if is_leaf_text_type(schema_type) {
       for attr in &schema_type.attributes {
         fields.push(gen_attr(
@@ -573,18 +585,6 @@ pub fn gen_schema(
         )?);
       }
     } else if is_composite_type(schema_type) {
-      if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
-        fields.push(quote! {
-          pub xmlns: Option<String>,
-        });
-        fields.push(quote! {
-          pub xmlns_map: std::collections::HashMap<String, String>,
-        });
-        fields.push(quote! {
-          pub mc_ignorable: Option<String>,
-        });
-      }
-
       for attr in &schema_type.attributes {
         fields.push(gen_attr(
           attr,

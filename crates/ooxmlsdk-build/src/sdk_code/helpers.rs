@@ -1,7 +1,8 @@
 use crate::sdk_code::versioning::effective_version;
+use crate::sdk_data::compatibility::preserve_namespace_decls_rule_for_type;
 use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind, SchemaTypeKind,
-  SchemaTypeParticle,
+  CompatibilityRule, Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind,
+  SchemaTypeKind, SchemaTypeParticle,
 };
 
 const DRAWINGML_MAIN_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -60,6 +61,26 @@ pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
 pub fn supports_xmlns_fields(schema_type: &SchemaType, schema: &Schema) -> bool {
   needs_xml_header(schema_type)
     || (is_composite_type(schema_type) && is_drawingml_namespace(schema))
+}
+
+pub fn supports_compat_xmlns_fields(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
+) -> bool {
+  supports_xmlns_fields(schema_type, schema)
+    || preserve_namespace_decls_rule_for_type(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.class_name,
+    )
+    .is_some()
+    || preserve_namespace_decls_rule_for_type(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.name,
+    )
+    .is_some()
 }
 
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {

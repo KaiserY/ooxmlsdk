@@ -11,7 +11,7 @@ use crate::sdk_code::helpers::{
   StructuredParticleKind, classify_attr_type, flatten_one_sequence_particles, is_composite_type,
   is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
   is_one_sequence_flatten, is_one_sequence_structurable, structure_one_sequence_particles,
-  supports_xmlns_fields,
+  supports_compat_xmlns_fields,
 };
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, not_microsoft365_cfg_attrs, version_cfg_attrs,
@@ -84,6 +84,7 @@ pub struct ResolvedCompositeChild<'a> {
   pub name: &'a str,
   pub variant_name: Cow<'a, str>,
   pub version: &'a str,
+  pub is_any: bool,
 }
 
 impl<'a> CodegenContext<'a> {
@@ -350,10 +351,21 @@ impl<'a> CodegenContext<'a> {
           .type_by_name(child.name.as_str())
           .map(|item| item.version.as_str())
           .unwrap_or_default(),
+        is_any: false,
       });
     }
 
     for particle in &schema_type.particle.items {
+      if particle.kind == "Any" {
+        resolved.push(ResolvedCompositeChild {
+          name: "",
+          variant_name: Cow::Borrowed("UnknownXml"),
+          version: effective_version("", &particle.initial_version),
+          is_any: true,
+        });
+        continue;
+      }
+
       if particle.name.is_empty()
         || schema_type
           .children
@@ -376,6 +388,7 @@ impl<'a> CodegenContext<'a> {
           .type_by_name(particle.name.as_str())
           .map(|item| effective_version(item.version.as_str(), &particle.initial_version))
           .unwrap_or(&particle.initial_version),
+        is_any: false,
       });
     }
 
@@ -560,7 +573,7 @@ pub fn gen_schema(
         )?);
       }
     } else if is_composite_type(schema_type) {
-      if supports_xmlns_fields(schema_type, schema) {
+      if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
         fields.push(quote! {
           pub xmlns: Option<String>,
         });
@@ -970,28 +983,33 @@ fn gen_children(
   let mut variants: Vec<TokenStream> = vec![];
 
   for child in &resolved_children {
-    let child_type = context
-      .type_map
-      .get(child.name)
-      .ok_or_else(|| format!("{:?}", child.name))?;
-    let child_prefix = context
-      .type_prefix_map
-      .get(child.name)
-      .ok_or_else(|| format!("{:?}", child.name))?;
     let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
 
-    let child_variant_type: Type = if *child_prefix != schema.prefix {
-      let child_module_name = context
-        .type_module(child.name)
+    let child_variant_type: Type = if child.is_any {
+      parse_str("String")?
+    } else {
+      let child_type = context
+        .type_map
+        .get(child.name)
+        .ok_or_else(|| format!("{:?}", child.name))?;
+      let child_prefix = context
+        .type_prefix_map
+        .get(child.name)
         .ok_or_else(|| format!("{:?}", child.name))?;
 
-      parse_str(&format!(
-        "crate::schemas::{}::{}",
-        child_module_name,
-        child_type.class_name.to_upper_camel_case()
-      ))?
-    } else {
-      parse_str(&child_type.class_name.to_upper_camel_case())?
+      if *child_prefix != schema.prefix {
+        let child_module_name = context
+          .type_module(child.name)
+          .ok_or_else(|| format!("{:?}", child.name))?;
+
+        parse_str(&format!(
+          "crate::schemas::{}::{}",
+          child_module_name,
+          child_type.class_name.to_upper_camel_case()
+        ))?
+      } else {
+        parse_str(&child_type.class_name.to_upper_camel_case())?
+      }
     };
     let child_attrs = version_cfg_attrs(child.version);
 

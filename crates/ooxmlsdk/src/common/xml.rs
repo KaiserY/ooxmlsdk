@@ -1,10 +1,11 @@
 use quick_xml::{
-  Decoder, Reader,
+  Decoder, Reader, Writer,
   events::{BytesRef, BytesText, Event, attributes::Attribute},
 };
 use std::io::BufRead;
+use std::io::Cursor;
 
-use super::{SdkError, invalid_field_value};
+use super::{SdkError, invalid_field_value, unexpected_eof};
 
 pub trait XmlReader<'de> {
   fn next(&mut self) -> Result<Event<'de>, SdkError>;
@@ -279,16 +280,75 @@ pub(crate) fn push_xml_general_ref(
   field: &'static str,
 ) -> Result<(), SdkError> {
   let entity = text.xml10_content()?;
-  let entity = quick_xml::escape::resolve_predefined_entity(entity.as_ref())
+  let entity = resolve_general_ref_entity(entity.as_ref())
     .ok_or_else(|| invalid_field_value(ty, field, entity.to_string()))?;
 
   if let Some(value) = value {
-    value.push_str(entity);
+    value.push_str(entity.as_ref());
   } else {
-    *value = Some(entity.to_owned());
+    *value = Some(entity.into_owned());
   }
 
   Ok(())
+}
+
+#[inline(always)]
+fn resolve_general_ref_entity(entity: &str) -> Option<std::borrow::Cow<'_, str>> {
+  if let Some(entity) = quick_xml::escape::resolve_predefined_entity(entity) {
+    return Some(std::borrow::Cow::Borrowed(entity));
+  }
+
+  if let Some(hex) = entity.strip_prefix("#x").or_else(|| entity.strip_prefix("#X")) {
+    let code_point = u32::from_str_radix(hex, 16).ok()?;
+    let ch = char::from_u32(code_point)?;
+    return Some(std::borrow::Cow::Owned(ch.to_string()));
+  }
+
+  if let Some(decimal) = entity.strip_prefix('#') {
+    let code_point = decimal.parse::<u32>().ok()?;
+    let ch = char::from_u32(code_point)?;
+    return Some(std::borrow::Cow::Owned(ch.to_string()));
+  }
+
+  None
+}
+
+pub(crate) fn read_outer_xml<'de, R: XmlReader<'de>>(
+  xml_reader: &mut R,
+  start: quick_xml::events::BytesStart<'de>,
+  empty_tag: bool,
+) -> Result<String, SdkError> {
+  let mut writer = Writer::new(Cursor::new(Vec::new()));
+
+  if empty_tag {
+    writer.write_event(Event::Empty(start.into_owned()))?;
+  } else {
+    writer.write_event(Event::Start(start.into_owned()))?;
+
+    let mut depth = 1usize;
+    loop {
+      let event = xml_reader.next()?.into_owned();
+      match &event {
+        Event::Start(_) => {
+          depth += 1;
+        }
+        Event::End(_) => {
+          depth -= 1;
+        }
+        Event::Eof => return Err(unexpected_eof("read_outer_xml")),
+        _ => {}
+      }
+
+      writer.write_event(event)?;
+
+      if depth == 0 {
+        break;
+      }
+    }
+  }
+
+  String::from_utf8(writer.into_inner().into_inner())
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
 #[inline(always)]

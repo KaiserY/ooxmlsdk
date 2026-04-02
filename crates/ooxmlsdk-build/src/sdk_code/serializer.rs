@@ -8,7 +8,7 @@ use crate::sdk_code::helpers::{
   FlatParticleKind, StructuredParticleKind, flatten_one_sequence_particles, is_composite_type,
   is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
   is_one_sequence_flatten, is_one_sequence_structurable, needs_xml_header,
-  structure_one_sequence_particles, supports_xmlns_fields,
+  structure_one_sequence_particles, supports_compat_xmlns_fields,
 };
 use crate::sdk_code::schemas::{
   CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild,
@@ -17,10 +17,15 @@ use crate::sdk_code::schemas::{
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, version_cfg_attrs, versioned_tokens,
 };
+use crate::sdk_data::sdk_data_model::CompatibilityRule;
 use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
-pub fn gen_schema_serializer(schema: &Schema, context: &CodegenContext<'_>) -> Result<TokenStream> {
+pub fn gen_schema_serializer(
+  schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
+  context: &CodegenContext<'_>,
+) -> Result<TokenStream> {
   let mut token_stream_list: Vec<ItemImpl> = vec![];
 
   for schema_enum in &schema.enums {
@@ -34,7 +39,8 @@ pub fn gen_schema_serializer(schema: &Schema, context: &CodegenContext<'_>) -> R
       continue;
     }
 
-    let (impl_block, display_impl) = gen_struct_serializer(schema, schema_type, context)?;
+    let (impl_block, display_impl) =
+      gen_struct_serializer(schema, schema_type, compatibility_rules, context)?;
     token_stream_list.push(impl_block);
     token_stream_list.push(display_impl);
   }
@@ -152,6 +158,7 @@ fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(Ite
 fn gen_struct_serializer(
   schema: &Schema,
   schema_type: &SchemaType,
+  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
 ) -> Result<(ItemImpl, ItemImpl)> {
   let struct_type: Type = parse_str(&format!(
@@ -547,7 +554,7 @@ fn gen_struct_serializer(
     })?);
   }
 
-  if supports_xmlns_fields(schema_type, schema) {
+  if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
     xmlns_attr_writer_list.push(parse2(quote! {
       if let Some(xmlns) = &self.xmlns {
         crate::common::write_xmlns_attr(writer, None, xmlns)?;
@@ -574,7 +581,8 @@ fn gen_struct_serializer(
   let xmlns_uri = schema.target_namespace.as_str();
   let xmlns_prefix = schema.prefix.as_str();
 
-  let to_xml_fn: ItemFn = if supports_xmlns_fields(schema_type, schema) {
+  let to_xml_fn: ItemFn = if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules)
+  {
     parse2(quote! {
       pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
         let mut writer = String::with_capacity(32);
@@ -882,6 +890,15 @@ fn one_sequence_child_field_ident(child: &ResolvedOneSequenceChild<'_>) -> Resul
 
 fn gen_child_arm(child: &ResolvedCompositeChild<'_>, child_choice_enum_type: &Type) -> Result<Arm> {
   let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
+
+  if child.is_any {
+    return Ok(parse2(versioned_tokens(
+      child.version,
+      quote! {
+      #child_choice_enum_type::#child_variant_name_ident(child) => writer.write_str(child.as_ref())?,
+      },
+    ))?);
+  }
 
   Ok(parse2(versioned_tokens(
     child.version,

@@ -62,7 +62,12 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
     &context,
     out_dir_path,
   )?;
-  write_serializers(&sdk_data_schemas, &context, out_dir_path)?;
+  write_serializers(
+    &sdk_data_schemas,
+    &sdk_data_compatibility.rules,
+    &context,
+    out_dir_path,
+  )?;
   write_parts(&sdk_data_parts, out_dir_path)?;
   write_namespaces(&sdk_data_namespaces, out_dir_path)?;
 
@@ -303,6 +308,7 @@ fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Pat
 
 fn write_serializers(
   sdk_data_schemas: &[SdkDataSchema],
+  compatibility_rules: &[SdkDataCompatibilityRule],
   context: &CodegenContext<'_>,
   out_dir_path: &Path,
 ) -> Result<()> {
@@ -317,7 +323,7 @@ fn write_serializers(
       out_serializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &serializer_path,
-      gen_schema_serializer(sdk_data_schema, context).map_err(|err| {
+      gen_schema_serializer(sdk_data_schema, compatibility_rules, context).map_err(|err| {
         format!(
           "failed to generate serializer {}: {err}",
           sdk_data_schema.module_name

@@ -30,6 +30,7 @@ pub enum CompatibilityAction {
   #[default]
   None,
   TreatAsString,
+  PreserveNamespaceDecls,
   MapAttributeValue {
     #[serde(rename = "Mappings")]
     mappings: Vec<CompatibilityValueMapping>,

@@ -247,6 +247,18 @@
       "Type": "PercentageHeight",
       "Field": "xml_content",
       "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "WorkbookExtension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "StylesheetExtension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
     }
   ]
 }

@@ -63,6 +63,22 @@ fn roundtrip_presentation_document(
   (original, roundtripped)
 }
 
+fn stylesheet_extensions(
+  package: &SpreadsheetDocument,
+) -> &[ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::StylesheetExtension] {
+  package
+    .workbook_part
+    .workbook_styles_part
+    .as_ref()
+    .expect("expected workbook styles part")
+    .root_element
+    .stylesheet_extension_list
+    .as_ref()
+    .expect("expected stylesheet extension list")
+    .x_ext
+    .as_slice()
+}
+
 fn main_document_body_child_count(
   document: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document,
 ) -> usize {
@@ -495,6 +511,13 @@ fn open_comments_xlsx_asset_from_openxml_sdk() {
       .as_deref(),
     Some("robermc")
   );
+
+  let style_extensions = stylesheet_extensions(&package);
+  assert_eq!(style_extensions.len(), 1);
+  assert_eq!(
+    style_extensions[0].xmlns_map.get("x14").map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+  );
 }
 
 #[test]
@@ -516,6 +539,17 @@ fn open_complex01_xlsx_asset_from_openxml_sdk() {
   assert_eq!(workbook.sheets.x_sheet[1].name.as_str(), "Sheet2");
   assert_eq!(package.workbook_part.worksheet_parts.len(), 2);
   assert!(workbook.calculation_properties.is_some());
+
+  let style_extensions = stylesheet_extensions(&package);
+  assert_eq!(style_extensions.len(), 2);
+  assert_eq!(
+    style_extensions[0].xmlns_map.get("x14").map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+  );
+  assert_eq!(
+    style_extensions[1].xmlns_map.get("x15").map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2010/11/main")
+  );
 }
 
 #[test]
@@ -1477,6 +1511,25 @@ fn round_trip_comments_xlsx_asset_from_openxml_sdk() {
       .as_deref(),
     Some("robermc")
   );
+
+  let original_style_extensions = stylesheet_extensions(&original);
+  let roundtripped_style_extensions = stylesheet_extensions(&roundtripped);
+  assert_eq!(original_style_extensions.len(), 1);
+  assert_eq!(roundtripped_style_extensions.len(), 1);
+  assert_eq!(
+    original_style_extensions[0]
+      .xmlns_map
+      .get("x14")
+      .map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+  );
+  assert_eq!(
+    roundtripped_style_extensions[0]
+      .xmlns_map
+      .get("x14")
+      .map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+  );
 }
 
 #[test]
@@ -1500,6 +1553,39 @@ fn round_trip_complex01_xlsx_asset_from_openxml_sdk() {
   assert_eq!(
     roundtripped_workbook.sheets.x_sheet[1].name.as_str(),
     "Sheet2"
+  );
+
+  let original_style_extensions = stylesheet_extensions(&original);
+  let roundtripped_style_extensions = stylesheet_extensions(&roundtripped);
+  assert_eq!(original_style_extensions.len(), 2);
+  assert_eq!(roundtripped_style_extensions.len(), 2);
+  assert_eq!(
+    original_style_extensions[0]
+      .xmlns_map
+      .get("x14")
+      .map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+  );
+  assert_eq!(
+    roundtripped_style_extensions[0]
+      .xmlns_map
+      .get("x14")
+      .map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+  );
+  assert_eq!(
+    original_style_extensions[1]
+      .xmlns_map
+      .get("x15")
+      .map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2010/11/main")
+  );
+  assert_eq!(
+    roundtripped_style_extensions[1]
+      .xmlns_map
+      .get("x15")
+      .map(String::as_str),
+    Some("http://schemas.microsoft.com/office/spreadsheetml/2010/11/main")
   );
   assert_eq!(original.workbook_part.worksheet_parts.len(), 2);
   assert_eq!(roundtripped.workbook_part.worksheet_parts.len(), 2);

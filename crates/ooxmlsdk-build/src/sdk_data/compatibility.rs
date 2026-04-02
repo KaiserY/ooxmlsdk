@@ -38,6 +38,17 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
 
     match &rule.action {
       CompatibilityAction::TreatAsString => {}
+      CompatibilityAction::PreserveNamespaceDecls => {
+        if rule.field != "xmlns_map" {
+          return Err(
+            format!(
+              "compatibility rule {}.{}.{} PreserveNamespaceDecls field must be xmlns_map",
+              rule.schema, rule.type_name, rule.field
+            )
+            .into(),
+          );
+        }
+      }
       CompatibilityAction::MapAttributeValue { mappings } => {
         if mappings.is_empty() {
           return Err(
@@ -217,6 +228,19 @@ pub fn map_attribute_value_rule_for_field<'a>(
   })
 }
 
+pub fn preserve_namespace_decls_rule_for_type<'a>(
+  compatibility_rules: &'a [CompatibilityRule],
+  schema: &str,
+  type_name: &str,
+) -> Option<&'a CompatibilityRule> {
+  compatibility_rules.iter().find(|rule| {
+    rule.schema == schema
+      && rule.type_name == type_name
+      && rule.field == "xmlns_map"
+      && matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls)
+  })
+}
+
 pub fn treat_as_string_rule_for_field<'a>(
   compatibility_rules: &'a [CompatibilityRule],
   schema: &str,
@@ -280,6 +304,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         );
       }
     }
+    CompatibilityAction::PreserveNamespaceDecls => {}
     CompatibilityAction::StrictBitmaskAttributes { .. } => {}
     CompatibilityAction::None => {}
   }
@@ -385,5 +410,36 @@ mod tests {
     };
 
     apply_compatibility(&mut schemas, &compatibility).unwrap();
+  }
+
+  #[test]
+  fn preserve_namespace_decls_is_a_noop_for_schema_metadata() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
+      types: vec![SchemaType {
+        class_name: "WorkbookExtension".to_string(),
+        attributes: vec![SchemaTypeAttribute {
+          property_name: "Uri".to_string(),
+          q_name: "uri".to_string(),
+          r#type: "StringValue".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
+        type_name: "WorkbookExtension".to_string(),
+        field: "xmlns_map".to_string(),
+        action: CompatibilityAction::PreserveNamespaceDecls,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
   }
 }

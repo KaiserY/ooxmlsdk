@@ -19,7 +19,8 @@ use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, version_cfg_attrs, versioned_tokens,
 };
 use crate::sdk_data::compatibility::{
-  map_attribute_value_rule_for_field, strict_bitmask_rule_for_field, treat_as_string_rule_for_field,
+  fallback_to_raw_xml_rule_for_field, map_attribute_value_rule_for_field,
+  strict_bitmask_rule_for_field, treat_as_string_rule_for_field,
 };
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityRule, Schema, SchemaTypeAttribute,
@@ -695,6 +696,7 @@ pub fn gen_schema_deserializer(
           field_ident_list.push(quote! { children });
         }
 
+        let has_any_child = resolved_children.iter().any(|child| child.is_any);
         for child in &resolved_children {
           if child.is_any {
             any_child_variant_ident_opt =
@@ -705,6 +707,10 @@ pub fn gen_schema_deserializer(
           if let Some(arm) = gen_child_match_arm(
             child,
             &child_choice_enum_type,
+            &schema_type.class_name,
+            &schema_type.name,
+            compatibility_rules,
+            has_any_child,
             schema,
             context,
             &mut loop_children_suffix_match_set,
@@ -714,6 +720,10 @@ pub fn gen_schema_deserializer(
           if let Some(arm) = gen_child_visitor_arm(
             child,
             &child_choice_enum_type,
+            &schema_type.class_name,
+            &schema_type.name,
+            compatibility_rules,
+            has_any_child,
             schema,
             context,
             &mut loop_children_visit_suffix_match_set,
@@ -960,6 +970,7 @@ pub fn gen_schema_deserializer(
           }
         }
       } else {
+        let has_any_child = resolved_children.iter().any(|child| child.is_any);
         for child in &resolved_children {
           if child.is_any {
             any_child_variant_ident_opt =
@@ -970,6 +981,10 @@ pub fn gen_schema_deserializer(
           if let Some(arm) = gen_child_match_arm(
             child,
             &child_choice_enum_type,
+            &schema_type.class_name,
+            &schema_type.name,
+            compatibility_rules,
+            has_any_child,
             schema,
             context,
             &mut loop_children_suffix_match_set,
@@ -979,6 +994,10 @@ pub fn gen_schema_deserializer(
           if let Some(arm) = gen_child_visitor_arm(
             child,
             &child_choice_enum_type,
+            &schema_type.class_name,
+            &schema_type.name,
+            compatibility_rules,
+            has_any_child,
             schema,
             context,
             &mut loop_children_visit_suffix_match_set,
@@ -1216,7 +1235,7 @@ pub fn gen_schema_deserializer(
           match e.name().as_ref() {
             #( #loop_children_match_list )*
             b"mc:AlternateContent" | b"AlternateContent" => {
-              crate::common::process_foreign_element_children(
+              crate::common::process_markup_compatibility_children(
                 xml_reader,
                 e_empty,
                 &mut visit_foreign_child,
@@ -2026,9 +2045,14 @@ fn gen_one_sequence_choice_visitor_arm(
   }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn gen_child_match_arm(
   child: &ResolvedCompositeChild<'_>,
   child_choice_enum_ident: &Type,
+  owner_type_name: &str,
+  owner_type_qname: &str,
+  compatibility_rules: &[CompatibilityRule],
+  has_any_child: bool,
   schema: &Schema,
   context: &CodegenContext<'_>,
   loop_children_suffix_match_set: &mut HashSet<String>,
@@ -2069,40 +2093,118 @@ fn gen_child_match_arm(
     child_module_name,
     child_type.class_name.to_upper_camel_case()
   ))?;
+  let fallback_to_raw_xml = fallback_to_raw_xml_rule_for_field(
+    compatibility_rules,
+    &schema.module_name,
+    owner_type_name,
+    child_last_name,
+  )
+  .or_else(|| {
+    fallback_to_raw_xml_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      owner_type_qname,
+      child_last_name,
+    )
+  })
+  .is_some();
+
+  if fallback_to_raw_xml && !has_any_child {
+    return Err(
+      format!(
+        "FallbackToRawXml requires UnknownXml variant on {}.{} for child {}",
+        schema.module_name, owner_type_name, child_last_name
+      )
+      .into(),
+    );
+  }
 
   let insert_suffix = loop_children_suffix_match_set.insert(child_suffix_last_name.to_string());
   let insert_full = loop_children_suffix_match_set.insert(child_last_name.to_string());
 
   if insert_suffix && child_last_name != child_suffix_last_name {
-    Ok(Some(parse2(versioned_tokens(
-      child.version,
-      quote! {
-        #child_last_name_literal | #child_suffix_last_name_literal => {
-          children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
-            #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
-          )));
-        }
-      },
-    ))?))
+    if fallback_to_raw_xml {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal | #child_suffix_last_name_literal => {
+            let outer_xml = crate::common::read_outer_xml(xml_reader, e, e_empty)?;
+            match <#child_variant_type as std::str::FromStr>::from_str(&outer_xml) {
+              Ok(parsed_child) => {
+                children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+                  parsed_child,
+                )));
+              }
+              Err(crate::common::SdkError::MissingField { .. }) => {
+                children.push(#child_choice_enum_ident::UnknownXml(std::boxed::Box::new(
+                  outer_xml,
+                )));
+              }
+              Err(err) => Err(err)?,
+            }
+          }
+        },
+      ))?))
+    } else {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal | #child_suffix_last_name_literal => {
+            children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+              #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
+            )));
+          }
+        },
+      ))?))
+    }
   } else if insert_full {
-    Ok(Some(parse2(versioned_tokens(
-      child.version,
-      quote! {
-        #child_last_name_literal => {
-          children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
-            #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
-          )));
-        }
-      },
-    ))?))
+    if fallback_to_raw_xml {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal => {
+            let outer_xml = crate::common::read_outer_xml(xml_reader, e, e_empty)?;
+            match <#child_variant_type as std::str::FromStr>::from_str(&outer_xml) {
+              Ok(parsed_child) => {
+                children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+                  parsed_child,
+                )));
+              }
+              Err(crate::common::SdkError::MissingField { .. }) => {
+                children.push(#child_choice_enum_ident::UnknownXml(std::boxed::Box::new(
+                  outer_xml,
+                )));
+              }
+              Err(err) => Err(err)?,
+            }
+          }
+        },
+      ))?))
+    } else {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal => {
+            children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+              #child_variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
+            )));
+          }
+        },
+      ))?))
+    }
   } else {
     Ok(None)
   }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn gen_child_visitor_arm(
   child: &ResolvedCompositeChild<'_>,
   child_choice_enum_ident: &Type,
+  owner_type_name: &str,
+  owner_type_qname: &str,
+  compatibility_rules: &[CompatibilityRule],
+  has_any_child: bool,
   schema: &Schema,
   context: &CodegenContext<'_>,
   loop_children_suffix_match_set: &mut HashSet<String>,
@@ -2144,46 +2246,123 @@ fn gen_child_visitor_arm(
     child_module_name,
     child_type.class_name.to_upper_camel_case()
   ))?;
+  let fallback_to_raw_xml = fallback_to_raw_xml_rule_for_field(
+    compatibility_rules,
+    &schema.module_name,
+    owner_type_name,
+    child_last_name,
+  )
+  .or_else(|| {
+    fallback_to_raw_xml_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      owner_type_qname,
+      child_last_name,
+    )
+  })
+  .is_some();
+
+  if fallback_to_raw_xml && !has_any_child {
+    return Err(
+      format!(
+        "FallbackToRawXml requires UnknownXml variant on {}.{} for child {}",
+        schema.module_name, owner_type_name, child_last_name
+      )
+      .into(),
+    );
+  }
 
   let insert_suffix = loop_children_suffix_match_set.insert(child_suffix_last_name.to_string());
   let insert_full = loop_children_suffix_match_set.insert(child_last_name.to_string());
 
   if insert_suffix && child_last_name != child_suffix_last_name {
-    Ok(Some(parse2(versioned_tokens(
-      child.version,
-      quote! {
-        #child_last_name_literal | #child_suffix_last_name_literal => {
-          match #child_variant_type::deserialize_inner(_xml_reader, Some((e, _e_empty))) {
-            Ok(parsed_child) => {
-              children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
-                parsed_child,
-              )));
-              Ok(true)
+    if fallback_to_raw_xml {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal | #child_suffix_last_name_literal => {
+            let outer_xml = crate::common::read_outer_xml(_xml_reader, e, _e_empty)?;
+            match <#child_variant_type as std::str::FromStr>::from_str(&outer_xml) {
+              Ok(parsed_child) => {
+                children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+                  parsed_child,
+                )));
+                Ok(true)
+              }
+              Err(crate::common::SdkError::MissingField { .. }) => {
+                children.push(#child_choice_enum_ident::UnknownXml(std::boxed::Box::new(
+                  outer_xml,
+                )));
+                Ok(true)
+              }
+              Err(err) => Err(err),
             }
-            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-            Err(err) => Err(err),
           }
-        }
-      },
-    ))?))
+        },
+      ))?))
+    } else {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal | #child_suffix_last_name_literal => {
+            match #child_variant_type::deserialize_inner(_xml_reader, Some((e, _e_empty))) {
+              Ok(parsed_child) => {
+                children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+                  parsed_child,
+                )));
+                Ok(true)
+              }
+              Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+              Err(err) => Err(err),
+            }
+          }
+        },
+      ))?))
+    }
   } else if insert_full {
-    Ok(Some(parse2(versioned_tokens(
-      child.version,
-      quote! {
-        #child_last_name_literal => {
-          match #child_variant_type::deserialize_inner(_xml_reader, Some((e, _e_empty))) {
-            Ok(parsed_child) => {
-              children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
-                parsed_child,
-              )));
-              Ok(true)
+    if fallback_to_raw_xml {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal => {
+            let outer_xml = crate::common::read_outer_xml(_xml_reader, e, _e_empty)?;
+            match <#child_variant_type as std::str::FromStr>::from_str(&outer_xml) {
+              Ok(parsed_child) => {
+                children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+                  parsed_child,
+                )));
+                Ok(true)
+              }
+              Err(crate::common::SdkError::MissingField { .. }) => {
+                children.push(#child_choice_enum_ident::UnknownXml(std::boxed::Box::new(
+                  outer_xml,
+                )));
+                Ok(true)
+              }
+              Err(err) => Err(err),
             }
-            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-            Err(err) => Err(err),
           }
-        }
-      },
-    ))?))
+        },
+      ))?))
+    } else {
+      Ok(Some(parse2(versioned_tokens(
+        child.version,
+        quote! {
+          #child_last_name_literal => {
+            match #child_variant_type::deserialize_inner(_xml_reader, Some((e, _e_empty))) {
+              Ok(parsed_child) => {
+                children.push(#child_choice_enum_ident::#child_variant_name_ident(std::boxed::Box::new(
+                  parsed_child,
+                )));
+                Ok(true)
+              }
+              Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+              Err(err) => Err(err),
+            }
+          }
+        },
+      ))?))
+    }
   } else {
     Ok(None)
   }

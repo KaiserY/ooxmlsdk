@@ -361,6 +361,12 @@
       "Type": "ThemeFamily",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "GraphicData",
+      "Field": "we:webextension",
+      "Action": "FallbackToRawXml"
     }
   ]
 }

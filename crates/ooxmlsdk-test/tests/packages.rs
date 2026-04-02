@@ -2,6 +2,7 @@
 
 use std::io::Cursor;
 
+use ooxmlsdk::common::SdkError;
 use ooxmlsdk::parts::alternative_format_import_part::AlternativeFormatImportPart;
 use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
@@ -102,6 +103,21 @@ fn first_body_mut(document: &mut Document) -> Option<&mut Body> {
 
 fn first_body(document: &Document) -> Option<&Body> {
   document.body.as_deref()
+}
+
+fn assert_unexpected_tag(
+  result: Result<WordprocessingDocument, SdkError>,
+  expected_ty: &'static str,
+  expected_found: &str,
+) {
+  match result {
+    Err(SdkError::UnexpectedTag { ty, found, .. }) => {
+      assert_eq!(ty, expected_ty);
+      assert_eq!(found, expected_found);
+    }
+    Err(err) => panic!("expected UnexpectedTag, got {err:?}"),
+    Ok(_) => panic!("expected failure, got Ok(_)"),
+  }
 }
 
 fn first_paragraph(
@@ -348,6 +364,295 @@ fn open_presentation_document_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn open_presentation_potx_asset_from_openxml_sdk() {
+  let path = test_file_path("Presentation.potx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.inner_path, "");
+  assert_eq!(package.presentation_part.inner_path, "ppt/presentation.xml");
+  assert!(package.presentation_part.relationships.is_some());
+  assert!(!package.presentation_part.slide_parts.is_empty());
+  assert!(!package.presentation_part.slide_master_parts.is_empty());
+  assert!(package.presentation_part.theme_part.is_some());
+}
+
+#[test]
+fn open_spreadsheet_xltx_asset_from_openxml_sdk() {
+  let path = test_file_path("Spreadsheet.xltx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.inner_path, "");
+  assert_eq!(package.workbook_part.inner_path, "xl/workbook.xml");
+  assert!(package.workbook_part.relationships.is_some());
+  assert!(!package.workbook_part.worksheet_parts.is_empty());
+  assert!(!package.workbook_part.root_element.sheets.x_sheet.is_empty());
+}
+
+#[test]
+fn open_mcinleaf_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("mcinleaf.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_01_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-01.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_02_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-02.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_03_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-03.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_04_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-04.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_05_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-05.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_06_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-06.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_07_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-07.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_08_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-08.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_10_symex_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-10-SymEx.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_5errors_docx_asset_currently_fails() {
+  let path = test_file_path("5Errors.docx");
+
+  assert_unexpected_tag(
+    WordprocessingDocument::new_from_file(&path),
+    "ParagraphProperties",
+    "w:pPr",
+  );
+}
+
+#[test]
+fn open_of16_09_unknown_element_docx_asset_currently_fails_on_cx_chart_data_intentionally_changed()
+{
+  let path = test_file_path("Of16-09-UnknownElement.docx");
+
+  assert_unexpected_tag(
+    WordprocessingDocument::new_from_file(&path),
+    "ChartSpace",
+    "cx:chartDataIntentionallyChanged",
+  );
+}
+
+#[test]
+fn open_unknown_element_docx_asset_currently_fails_on_w_p2() {
+  let path = test_file_path("UnknownElement.docx");
+
+  assert_unexpected_tag(WordprocessingDocument::new_from_file(&path), "Body", "w:p2");
+}
+
+#[test]
+fn open_complex0_docx_asset_currently_fails_on_do_not_embed_smart_tags() {
+  let path = test_file_path("complex0.docx");
+
+  assert_unexpected_tag(
+    WordprocessingDocument::new_from_file(&path),
+    "Settings",
+    "w:doNotEmbedSmartTags",
+  );
+}
+
+#[test]
+fn open_complex2010_docx_asset_currently_fails_on_do_not_embed_smart_tags() {
+  let path = test_file_path("complex2010.docx");
+
+  assert_unexpected_tag(
+    WordprocessingDocument::new_from_file(&path),
+    "Settings",
+    "w:doNotEmbedSmartTags",
+  );
+}
+
+#[test]
+fn open_mailmerge_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("mailmerge.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_svg_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("svg.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn open_of16_01_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-01.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.inner_path, "ppt/presentation.xml");
+  assert!(package.presentation_part.relationships.is_some());
+  assert!(!package.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn open_of16_02_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-02.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.inner_path, "ppt/presentation.xml");
+  assert!(package.presentation_part.relationships.is_some());
+  assert!(!package.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn open_of16_03_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-03.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.inner_path, "ppt/presentation.xml");
+  assert!(package.presentation_part.relationships.is_some());
+  assert!(!package.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn round_trip_of16_01_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-01.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.inner_path,
+    roundtripped.presentation_part.inner_path
+  );
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert!(!original.presentation_part.slide_parts.is_empty());
+  assert!(!roundtripped.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn round_trip_of16_02_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-02.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.inner_path,
+    roundtripped.presentation_part.inner_path
+  );
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert!(!original.presentation_part.slide_parts.is_empty());
+  assert!(!roundtripped.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn round_trip_of16_03_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-03.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.inner_path,
+    roundtripped.presentation_part.inner_path
+  );
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert!(!original.presentation_part.slide_parts.is_empty());
+  assert!(!roundtripped.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn open_data_bound_content_controls_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Data-Bound-Content-Controls.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+  assert!(package.main_document_part.style_definitions_part.is_some());
+}
+
+#[test]
 #[cfg(feature = "microsoft365")]
 fn open_hello_world_docx_asset_from_openxml_sdk() {
   let path = test_file_path("HelloWorld.docx");
@@ -483,6 +788,135 @@ fn open_mcexecl_xlsx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn round_trip_spreadsheet_xltx_asset_from_openxml_sdk() {
+  let path = test_file_path("Spreadsheet.xltx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  assert_eq!(
+    original.workbook_part.inner_path,
+    roundtripped.workbook_part.inner_path
+  );
+  assert_eq!(
+    original.workbook_part.root_element.sheets.x_sheet.len(),
+    roundtripped.workbook_part.root_element.sheets.x_sheet.len()
+  );
+  assert!(
+    !original
+      .workbook_part
+      .root_element
+      .sheets
+      .x_sheet
+      .is_empty()
+  );
+  assert!(
+    !roundtripped
+      .workbook_part
+      .root_element
+      .sheets
+      .x_sheet
+      .is_empty()
+  );
+}
+
+#[test]
+fn round_trip_mcinleaf_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("mcinleaf.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_mailmerge_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("mailmerge.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_svg_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("svg.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_presentation_potx_asset_from_openxml_sdk() {
+  let path = test_file_path("Presentation.potx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.inner_path,
+    roundtripped.presentation_part.inner_path
+  );
+  assert_eq!(
+    original
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len()),
+    roundtripped
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len())
+  );
+  assert!(
+    original
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len())
+      .unwrap_or_default()
+      > 0
+  );
+}
+
+#[test]
 fn open_comments_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Comments.xlsx");
   let package = SpreadsheetDocument::new_from_file(&path).unwrap();
@@ -518,6 +952,355 @@ fn open_comments_xlsx_asset_from_openxml_sdk() {
     style_extensions[0].xmlns_map.get("x14").map(String::as_str),
     Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
   );
+}
+
+#[test]
+fn open_malformed_uri_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("malformed_uri.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  let worksheet_part = &package.workbook_part.worksheet_parts[0];
+  let hyperlink = worksheet_part
+    .root_element
+    .x_hyperlinks
+    .as_ref()
+    .and_then(|hyperlinks| hyperlinks.x_hyperlink.first())
+    .expect("expected worksheet hyperlink");
+  let relationship = worksheet_part
+    .relationships
+    .as_ref()
+    .and_then(|rels| rels.relationship.iter().find(|rel| rel.id == "rId1"))
+    .expect("expected hyperlink relationship");
+
+  assert_eq!(hyperlink.id.as_deref(), Some("rId1"));
+  assert_eq!(relationship.target.as_str(), "mailto:one@");
+  assert!(matches!(
+    relationship.target_mode,
+    Some(ooxmlsdk::schemas::opc_relationships::TargetMode::External)
+  ));
+}
+
+#[test]
+fn open_malformed_uri_long_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("malformed_uri_long.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  let worksheet_part = &package.workbook_part.worksheet_parts[0];
+  let hyperlink = worksheet_part
+    .root_element
+    .x_hyperlinks
+    .as_ref()
+    .and_then(|hyperlinks| hyperlinks.x_hyperlink.first())
+    .expect("expected worksheet hyperlink");
+  let relationship = worksheet_part
+    .relationships
+    .as_ref()
+    .and_then(|rels| rels.relationship.iter().find(|rel| rel.id == "rId1"))
+    .expect("expected hyperlink relationship");
+
+  assert_eq!(hyperlink.id.as_deref(), Some("rId1"));
+  assert_eq!(
+    relationship.target.as_str(),
+    "mailto:test@test.com;%20test2@test.com;%252test3@test.com;%20test3@test.com;%20test4@test.com;%20test5@test.com?subject=Unsubscribe%20Request&body=Please%20unsubscribe%20me%20from%20all%20future%20communications"
+  );
+  assert!(matches!(
+    relationship.target_mode,
+    Some(ooxmlsdk::schemas::opc_relationships::TargetMode::External)
+  ));
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn open_youtube_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Youtube.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  let worksheet_part = &package.workbook_part.worksheet_parts[0];
+  let drawings_part = worksheet_part
+    .drawings_part
+    .as_ref()
+    .expect("expected worksheet drawings part");
+
+  assert_eq!(drawings_part.web_extension_parts.len(), 1);
+  assert_eq!(drawings_part.image_parts.len(), 1);
+}
+
+#[test]
+fn open_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("DocProps.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.title.as_deref()),
+    Some(Some("Test-Title"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.subject.as_deref()),
+    Some(Some("Test-Subject"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.creator.as_deref()),
+    Some(Some("Eric White"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.keywords.as_deref()),
+    Some(Some("Test-Keywords"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.description.as_deref()),
+    Some(Some("Test-Comments"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.category.as_deref()),
+    Some(Some("Test-Category"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.content_status.as_deref()),
+    Some(Some("Test-Status"))
+  );
+  assert!(package.extended_file_properties_part.is_some());
+  assert!(package.custom_file_properties_part.is_some());
+  assert_eq!(
+    package
+      .main_document_part
+      .wordprocessing_comments_part
+      .as_ref()
+      .map(|part| part.root_element.w_comment.len()),
+    Some(1)
+  );
+}
+
+#[test]
+fn open_bad_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("BadDocProps.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert!(package.core_file_properties_part.is_some());
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.creator.as_deref()),
+    Some(Some("Eric White"))
+  );
+}
+
+#[test]
+fn open_invalid_doc_propsct_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("InvalidDocPropsct.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert!(package.core_file_properties_part.is_some());
+}
+
+#[test]
+fn round_trip_data_bound_content_controls_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Data-Bound-Content-Controls.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_01_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-01.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_02_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-02.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_03_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-03.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_04_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-04.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_05_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-05.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_06_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-06.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_07_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-07.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
+}
+
+#[test]
+fn round_trip_of16_08_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-08.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
 }
 
 #[test]
@@ -815,6 +1598,39 @@ fn round_trip_strict01_docx_asset_from_openxml_sdk() {
     original_body.children.len(),
     roundtripped_body.children.len()
   );
+}
+
+#[cfg(feature = "strict")]
+#[test]
+fn open_annotation_ref_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("AnnotationRef.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[cfg(feature = "strict")]
+#[test]
+fn round_trip_annotation_ref_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("AnnotationRef.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert!(!original_body.children.is_empty());
+  assert!(!roundtripped_body.children.is_empty());
 }
 
 #[test]
@@ -1213,6 +2029,113 @@ fn round_trip_no_doc_props_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn round_trip_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("DocProps.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_core_properties = original
+    .core_file_properties_part
+    .as_ref()
+    .expect("expected core properties part");
+  let roundtripped_core_properties = roundtripped
+    .core_file_properties_part
+    .as_ref()
+    .expect("expected core properties part");
+
+  assert_eq!(
+    original_core_properties.root_element.title.as_deref(),
+    Some("Test-Title")
+  );
+  assert_eq!(
+    roundtripped_core_properties.root_element.title.as_deref(),
+    Some("Test-Title")
+  );
+  assert_eq!(
+    original_core_properties.root_element.subject.as_deref(),
+    Some("Test-Subject")
+  );
+  assert_eq!(
+    roundtripped_core_properties.root_element.subject.as_deref(),
+    Some("Test-Subject")
+  );
+  assert_eq!(
+    original_core_properties.root_element.creator.as_deref(),
+    Some("Eric White")
+  );
+  assert_eq!(
+    roundtripped_core_properties.root_element.creator.as_deref(),
+    Some("Eric White")
+  );
+  assert_eq!(
+    original_core_properties.root_element.keywords.as_deref(),
+    Some("Test-Keywords")
+  );
+  assert_eq!(
+    roundtripped_core_properties
+      .root_element
+      .keywords
+      .as_deref(),
+    Some("Test-Keywords")
+  );
+  assert_eq!(
+    original_core_properties.root_element.description.as_deref(),
+    Some("Test-Comments")
+  );
+  assert_eq!(
+    roundtripped_core_properties
+      .root_element
+      .description
+      .as_deref(),
+    Some("Test-Comments")
+  );
+  assert_eq!(
+    original_core_properties.root_element.category.as_deref(),
+    Some("Test-Category")
+  );
+  assert_eq!(
+    roundtripped_core_properties
+      .root_element
+      .category
+      .as_deref(),
+    Some("Test-Category")
+  );
+  assert_eq!(
+    original_core_properties
+      .root_element
+      .content_status
+      .as_deref(),
+    Some("Test-Status")
+  );
+  assert_eq!(
+    roundtripped_core_properties
+      .root_element
+      .content_status
+      .as_deref(),
+    Some("Test-Status")
+  );
+  assert!(original.extended_file_properties_part.is_some());
+  assert!(roundtripped.extended_file_properties_part.is_some());
+  assert!(original.custom_file_properties_part.is_some());
+  assert!(roundtripped.custom_file_properties_part.is_some());
+  assert_eq!(
+    original
+      .main_document_part
+      .wordprocessing_comments_part
+      .as_ref()
+      .map(|part| part.root_element.w_comment.len()),
+    Some(1)
+  );
+  assert_eq!(
+    roundtripped
+      .main_document_part
+      .wordprocessing_comments_part
+      .as_ref()
+      .map(|part| part.root_element.w_comment.len()),
+    Some(1)
+  );
+}
+
+#[test]
 fn round_trip_spreadsheet_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Spreadsheet.xlsx");
   let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
@@ -1326,6 +2249,96 @@ fn round_trip_presentation_pptx_asset_from_openxml_sdk() {
   );
   assert!(original.presentation_part.slide_parts.len() >= 2);
   assert!(roundtripped.presentation_part.slide_parts.len() >= 2);
+}
+
+#[test]
+fn round_trip_3dtestdot_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("3dtestdot.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original
+      .presentation_part
+      .root_element
+      .slide_master_id_list
+      .as_ref()
+      .map(|list| list.p_sld_master_id.len()),
+    Some(1)
+  );
+  assert_eq!(
+    roundtripped
+      .presentation_part
+      .root_element
+      .slide_master_id_list
+      .as_ref()
+      .map(|list| list.p_sld_master_id.len()),
+    Some(1)
+  );
+  assert_eq!(
+    original
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len()),
+    Some(1)
+  );
+  assert_eq!(
+    roundtripped
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len()),
+    Some(1)
+  );
+  assert!(!original.presentation_part.slide_parts.is_empty());
+  assert!(!roundtripped.presentation_part.slide_parts.is_empty());
+}
+
+#[test]
+fn round_trip_3dtestdash_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("3dtestdash.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original
+      .presentation_part
+      .root_element
+      .slide_master_id_list
+      .as_ref()
+      .map(|list| list.p_sld_master_id.len()),
+    Some(1)
+  );
+  assert_eq!(
+    roundtripped
+      .presentation_part
+      .root_element
+      .slide_master_id_list
+      .as_ref()
+      .map(|list| list.p_sld_master_id.len()),
+    Some(1)
+  );
+  assert_eq!(
+    original
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len()),
+    Some(1)
+  );
+  assert_eq!(
+    roundtripped
+      .presentation_part
+      .root_element
+      .slide_id_list
+      .as_ref()
+      .map(|list| list.p_sld_id.len()),
+    Some(1)
+  );
+  assert!(!original.presentation_part.slide_parts.is_empty());
+  assert!(!roundtripped.presentation_part.slide_parts.is_empty());
 }
 
 #[test]
@@ -1530,6 +2543,77 @@ fn round_trip_comments_xlsx_asset_from_openxml_sdk() {
       .map(String::as_str),
     Some("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
   );
+}
+
+#[test]
+fn round_trip_malformed_uri_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("malformed_uri.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  let original_worksheet_part = &original.workbook_part.worksheet_parts[0];
+  let roundtripped_worksheet_part = &roundtripped.workbook_part.worksheet_parts[0];
+  let original_relationship = original_worksheet_part
+    .relationships
+    .as_ref()
+    .and_then(|rels| rels.relationship.iter().find(|rel| rel.id == "rId1"))
+    .expect("expected original hyperlink relationship");
+  let roundtripped_relationship = roundtripped_worksheet_part
+    .relationships
+    .as_ref()
+    .and_then(|rels| rels.relationship.iter().find(|rel| rel.id == "rId1"))
+    .expect("expected roundtripped hyperlink relationship");
+
+  assert_eq!(original_relationship.target.as_str(), "mailto:one@");
+  assert_eq!(roundtripped_relationship.target.as_str(), "mailto:one@");
+}
+
+#[test]
+fn round_trip_malformed_uri_long_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("malformed_uri_long.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  let original_worksheet_part = &original.workbook_part.worksheet_parts[0];
+  let roundtripped_worksheet_part = &roundtripped.workbook_part.worksheet_parts[0];
+  let original_relationship = original_worksheet_part
+    .relationships
+    .as_ref()
+    .and_then(|rels| rels.relationship.iter().find(|rel| rel.id == "rId1"))
+    .expect("expected original hyperlink relationship");
+  let roundtripped_relationship = roundtripped_worksheet_part
+    .relationships
+    .as_ref()
+    .and_then(|rels| rels.relationship.iter().find(|rel| rel.id == "rId1"))
+    .expect("expected roundtripped hyperlink relationship");
+
+  assert_eq!(
+    original_relationship.target.as_str(),
+    "mailto:test@test.com;%20test2@test.com;%252test3@test.com;%20test3@test.com;%20test4@test.com;%20test5@test.com?subject=Unsubscribe%20Request&body=Please%20unsubscribe%20me%20from%20all%20future%20communications"
+  );
+  assert_eq!(
+    roundtripped_relationship.target.as_str(),
+    "mailto:test@test.com;%20test2@test.com;%252test3@test.com;%20test3@test.com;%20test4@test.com;%20test5@test.com?subject=Unsubscribe%20Request&body=Please%20unsubscribe%20me%20from%20all%20future%20communications"
+  );
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn round_trip_youtube_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Youtube.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  let original_drawings_part = original.workbook_part.worksheet_parts[0]
+    .drawings_part
+    .as_ref()
+    .expect("expected original worksheet drawings part");
+  let roundtripped_drawings_part = roundtripped.workbook_part.worksheet_parts[0]
+    .drawings_part
+    .as_ref()
+    .expect("expected roundtripped worksheet drawings part");
+
+  assert_eq!(original_drawings_part.web_extension_parts.len(), 1);
+  assert_eq!(roundtripped_drawings_part.web_extension_parts.len(), 1);
+  assert_eq!(original_drawings_part.image_parts.len(), 1);
+  assert_eq!(roundtripped_drawings_part.image_parts.len(), 1);
 }
 
 #[test]

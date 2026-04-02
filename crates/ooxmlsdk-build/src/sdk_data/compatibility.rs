@@ -38,6 +38,7 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
 
     match &rule.action {
       CompatibilityAction::TreatAsString => {}
+      CompatibilityAction::FallbackToRawXml => {}
       CompatibilityAction::PreserveNamespaceDecls => {
         if rule.field != "xmlns_map" {
           return Err(
@@ -255,6 +256,20 @@ pub fn treat_as_string_rule_for_field<'a>(
   })
 }
 
+pub fn fallback_to_raw_xml_rule_for_field<'a>(
+  compatibility_rules: &'a [CompatibilityRule],
+  schema: &str,
+  type_name: &str,
+  field: &str,
+) -> Option<&'a CompatibilityRule> {
+  compatibility_rules.iter().find(|rule| {
+    rule.schema == schema
+      && rule.type_name == type_name
+      && rule.field == field
+      && matches!(rule.action, CompatibilityAction::FallbackToRawXml)
+  })
+}
+
 fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Result<()> {
   let schema = sdk_data_schemas
     .iter_mut()
@@ -293,6 +308,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         );
       }
     }
+    CompatibilityAction::FallbackToRawXml => {}
     CompatibilityAction::MapAttributeValue { .. } => {
       if attribute_index.is_none() {
         return Err(

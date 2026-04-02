@@ -1,5 +1,6 @@
 use quick_xml::Decoder;
 use quick_xml::events::attributes::Attribute;
+use std::collections::HashMap;
 
 mod error;
 mod xml;
@@ -167,6 +168,149 @@ where
 
     Ok(())
   }
+}
+
+pub(crate) fn process_markup_compatibility_children<'de, R, F>(
+  xml_reader: &mut R,
+  empty_tag: bool,
+  visitor: &mut F,
+) -> Result<(), SdkError>
+where
+  R: XmlReader<'de>,
+  F: FnMut(&mut R, quick_xml::events::BytesStart<'de>, bool) -> Result<bool, SdkError>,
+{
+  if empty_tag {
+    return Ok(());
+  }
+
+  let alternate_content_namespaces = HashMap::new();
+  let mut selected_branch = false;
+
+  loop {
+    match xml_reader.next()? {
+      quick_xml::events::Event::Start(e) => match e.name().as_ref() {
+        b"mc:Choice" | b"Choice" => {
+          let should_use = !selected_branch
+            && markup_compatibility_choice_supported(
+              &e,
+              xml_reader.decoder(),
+              &alternate_content_namespaces,
+            )?;
+          if should_use {
+            selected_branch = true;
+            process_foreign_element_children(xml_reader, false, visitor)?;
+          } else {
+            skip_foreign_element_children(xml_reader, false)?;
+          }
+        }
+        b"mc:Fallback" | b"Fallback" => {
+          if selected_branch {
+            skip_foreign_element_children(xml_reader, false)?;
+          } else {
+            selected_branch = true;
+            process_foreign_element_children(xml_reader, false, visitor)?;
+          }
+        }
+        _ => {
+          skip_foreign_element_children(xml_reader, false)?;
+        }
+      },
+      quick_xml::events::Event::Empty(e) => match e.name().as_ref() {
+        b"mc:Choice" | b"Choice" => {
+          if !selected_branch
+            && markup_compatibility_choice_supported(
+              &e,
+              xml_reader.decoder(),
+              &alternate_content_namespaces,
+            )?
+          {
+            selected_branch = true;
+          }
+        }
+        b"mc:Fallback" | b"Fallback" => {
+          if !selected_branch {
+            selected_branch = true;
+          }
+        }
+        _ => {}
+      },
+      quick_xml::events::Event::End(e) => match e.name().as_ref() {
+        b"mc:AlternateContent" | b"AlternateContent" => break,
+        _ => {}
+      },
+      quick_xml::events::Event::Eof => {
+        Err(unexpected_eof("process_markup_compatibility_children"))?
+      }
+      _ => {}
+    }
+  }
+
+  Ok(())
+}
+
+fn markup_compatibility_choice_supported<'a>(
+  choice_start: &quick_xml::events::BytesStart<'a>,
+  decoder: Decoder,
+  alternate_content_namespaces: &HashMap<String, String>,
+) -> Result<bool, SdkError> {
+  let mut requires = None;
+  let mut namespaces = alternate_content_namespaces.clone();
+  namespaces.extend(collect_namespace_declarations(choice_start, decoder)?);
+
+  for attr in choice_start.attributes().with_checks(false) {
+    let attr = attr?;
+    if attr.key.as_ref() == b"Requires" {
+      requires = Some(decode_attr_value(&attr, decoder)?);
+      break;
+    }
+  }
+
+  let Some(requires) = requires else {
+    return Ok(false);
+  };
+
+  for prefix in requires.split_ascii_whitespace() {
+    let Some(namespace_uri) = namespaces.get(prefix) else {
+      return Ok(false);
+    };
+
+    if crate::namespaces::prefix_by_uri(namespace_uri).is_none() {
+      return Ok(false);
+    }
+  }
+
+  Ok(true)
+}
+
+fn collect_namespace_declarations<'a>(
+  start: &quick_xml::events::BytesStart<'a>,
+  decoder: Decoder,
+) -> Result<HashMap<String, String>, SdkError> {
+  let mut namespaces = HashMap::new();
+
+  for attr in start.attributes().with_checks(false) {
+    let attr = attr?;
+    let key = attr.key.as_ref();
+    if key == b"xmlns" {
+      namespaces.insert(String::new(), decode_attr_value(&attr, decoder)?);
+    } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+      namespaces.insert(
+        String::from_utf8_lossy(prefix).into_owned(),
+        decode_attr_value(&attr, decoder)?,
+      );
+    }
+  }
+
+  Ok(namespaces)
+}
+
+fn skip_foreign_element_children<'de, R: XmlReader<'de>>(
+  xml_reader: &mut R,
+  empty_tag: bool,
+) -> Result<(), SdkError> {
+  process_foreign_element_children(xml_reader, empty_tag, &mut |_xml_reader, _e, _e_empty| {
+    Ok(false)
+  })
 }
 
 pub(crate) fn normalize_relationship_type(value: &str) -> &str {

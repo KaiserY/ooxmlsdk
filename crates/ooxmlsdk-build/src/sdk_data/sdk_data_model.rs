@@ -30,6 +30,7 @@ pub enum CompatibilityAction {
   #[default]
   None,
   TreatAsString,
+  FallbackToRawXml,
   PreserveNamespaceDecls,
   MapAttributeValue {
     #[serde(rename = "Mappings")]

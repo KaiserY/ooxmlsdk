@@ -92,6 +92,14 @@ pub const WORDPROCESSING_DOCUMENT_DOCUMENT_XML: &str =
 // Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Spreadsheet.xlsx :: xl/workbook.xml
 pub const SPREADSHEET_WORKBOOK_XML: &str = include_str!("../samples/spreadsheet_workbook.xml");
 
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Complex01.xlsx :: xl/workbook.xml
+pub const SPREADSHEET_WORKBOOK_COMPLEX01_XML: &str =
+  include_str!("../samples/spreadsheet_workbook_complex01.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Complex01.xlsx :: xl/worksheets/sheet1.xml
+pub const SPREADSHEET_WORKSHEET_COMPLEX01_SHEET1_XML: &str =
+  include_str!("../samples/spreadsheet_worksheet_complex01_sheet1.xml");
+
 // Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Presentation.pptx :: ppt/presentation.xml
 pub const PRESENTATION_PRESENTATION_XML: &str =
   include_str!("../samples/presentation_presentation.xml");
@@ -106,6 +114,10 @@ pub const EXTENDED_PROPERTIES_TITLES_OF_PARTS_XML: &str =
 
 // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlCompositeElementTest.cs :: Bug225919Test
 pub const CUSTOM_PROPERTIES_BOOL_XML: &str = include_str!("../samples/custom_properties_bool.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/HelloWorld.docx :: docProps/core.xml
+pub const OPC_CORE_PROPERTIES_HELLO_WORLD_XML: &str =
+  include_str!("../samples/opc_core_properties_hello_world.xml");
 
 // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs :: GetStreamWrite
 pub const SPREADSHEET_SHARED_STRING_TABLE_XML: &str =

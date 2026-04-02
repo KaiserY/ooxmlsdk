@@ -251,7 +251,7 @@ fn gen_deserialize_inner_fn(
     declarations.push(quote! { let mut #field_ident = None; });
     let q_name = attr.q_name.as_str();
     let q_name_literal: LitByteStr = parse_str(&format!("b\"{q_name}\""))?;
-    let assign_expr = attr_parse_expr(attr)?;
+    let assign_expr = attr_parse_expr(package_type, attr)?;
     attr_arms.push(parse2(quote! {
       #q_name_literal => {
         #field_ident = Some(#assign_expr);
@@ -543,8 +543,15 @@ fn attr_type_name(attr: &PackageAttribute) -> String {
   }
 }
 
-fn attr_parse_expr(attr: &PackageAttribute) -> Result<Expr> {
-  if attr.r#type == "String" {
+fn attr_parse_expr(package_type: &PackageType, attr: &PackageAttribute) -> Result<Expr> {
+  if package_type.name == "Relationship" && attr.field == "type" {
+    parse2(quote! {
+      crate::common::normalize_relationship_type(
+        &attr.decode_and_unescape_value(xml_reader.decoder())?,
+      ).to_string()
+    })
+    .map_err(Into::into)
+  } else if attr.r#type == "String" {
     parse2(quote! {
       attr.decode_and_unescape_value(xml_reader.decoder())?.into_owned()
     })

@@ -2,6 +2,7 @@ use serde::Serialize;
 use serde_json::to_writer_pretty;
 use std::{ffi::OsStr, fs, fs::File, io::BufWriter, path::Path};
 
+pub mod compatibility;
 pub mod context;
 pub mod open_xml;
 pub mod package_schemas;

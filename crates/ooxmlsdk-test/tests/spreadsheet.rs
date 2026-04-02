@@ -1,5 +1,5 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
-  CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook,
+  CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -40,6 +40,78 @@ fn workbook_round_trip_from_openxml_part_test() {
   assert!(serialized.contains("<x:sheet name=\"Sheet1\""));
   assert!(serialized.contains("<x:sheet name=\"Sheet2\""));
   assert_eq!(reparsed.sheets.x_sheet.len(), 2);
+}
+
+#[test]
+fn workbook_round_trip_from_complex01_part_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<Workbook>(fixtures::SPREADSHEET_WORKBOOK_COMPLEX01_XML);
+
+  assert_eq!(parsed.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(
+    parsed
+      .file_version
+      .as_ref()
+      .and_then(|file_version| file_version.application_name.as_ref())
+      .map(|value| value.as_str()),
+    Some("xl")
+  );
+  assert_eq!(
+    parsed
+      .file_version
+      .as_ref()
+      .and_then(|file_version| file_version.last_edited.as_ref())
+      .map(|value| value.as_str()),
+    Some("6")
+  );
+  assert_eq!(parsed.sheets.x_sheet.len(), 2);
+  assert_eq!(parsed.sheets.x_sheet[0].name.as_str(), "Sheet1");
+  assert_eq!(parsed.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert!(trim_xml_declaration(&serialized).contains("mc:Ignorable=\"x15\""));
+  assert!(trim_xml_declaration(&serialized).contains("<x:calcPr calcId=\"152511\""));
+  assert_eq!(reparsed.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(reparsed.sheets.x_sheet.len(), 2);
+}
+
+#[test]
+fn worksheet_round_trip_from_complex01_part_test() {
+  let (parsed, _serialized, reparsed) =
+    assert_stable_roundtrip::<Worksheet>(fixtures::SPREADSHEET_WORKSHEET_COMPLEX01_SHEET1_XML);
+
+  assert_eq!(parsed.mc_ignorable.as_deref(), Some("x14ac"));
+  assert_eq!(
+    parsed
+      .sheet_dimension
+      .as_ref()
+      .map(|dimension| dimension.reference.as_str()),
+    Some("A1:V19")
+  );
+  assert_eq!(parsed.x_sheet_data.x_row.len(), 13);
+  assert_eq!(
+    parsed
+      .x_hyperlinks
+      .as_ref()
+      .map(|links| links.x_hyperlink.len()),
+    Some(1)
+  );
+  assert_eq!(
+    parsed
+      .x_table_parts
+      .as_ref()
+      .and_then(|parts| parts.count.as_ref())
+      .copied(),
+    Some(1)
+  );
+  assert!(parsed.x_drawing.is_some());
+  assert!(parsed.x_legacy_drawing.is_some());
+  assert_eq!(
+    reparsed
+      .x_hyperlinks
+      .as_ref()
+      .map(|links| links.x_hyperlink.len()),
+    Some(1)
+  );
+  assert_eq!(reparsed.x_sheet_data.x_row.len(), 13);
 }
 
 #[test]

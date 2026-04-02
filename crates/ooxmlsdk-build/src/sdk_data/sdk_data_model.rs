@@ -2,6 +2,59 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
+pub struct CompatibilityConfig {
+  pub rules: Vec<CompatibilityRule>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct CompatibilityRule {
+  pub schema: String,
+  #[serde(rename = "Type")]
+  pub type_name: String,
+  pub field: String,
+  pub action: CompatibilityAction,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct CompatibilityBitmaskAttribute {
+  #[serde(rename = "QName")]
+  pub q_name: String,
+  pub bit: u32,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum CompatibilityAction {
+  #[default]
+  None,
+  TreatAsString,
+  MapAttributeValue {
+    #[serde(rename = "Mappings")]
+    mappings: Vec<CompatibilityValueMapping>,
+  },
+  StrictBitmaskAttributes {
+    #[serde(rename = "Radix")]
+    radix: u32,
+    #[serde(rename = "Width")]
+    width: usize,
+    #[serde(rename = "Attributes")]
+    attributes: Vec<CompatibilityBitmaskAttribute>,
+  },
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct CompatibilityValueMapping {
+  #[serde(rename = "From")]
+  pub from: String,
+  #[serde(rename = "To")]
+  pub to: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct TypedSchema {
   pub name: String,
   pub class_name: String,

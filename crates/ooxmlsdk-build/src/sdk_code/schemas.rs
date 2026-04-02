@@ -16,8 +16,9 @@ use crate::sdk_code::helpers::{
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, not_microsoft365_cfg_attrs, version_cfg_attrs,
 };
+use crate::sdk_data::compatibility::treat_as_string_rule_for_field;
 use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeParticle,
+  CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeParticle,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -452,7 +453,11 @@ fn one_sequence_choice_sequence_struct_name(
   }
 }
 
-pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<TokenStream> {
+pub fn gen_schema(
+  schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
+  context: &CodegenContext<'_>,
+) -> Result<TokenStream> {
   let mut token_stream_list: Vec<TokenStream> = vec![];
 
   for schema_enum in &schema.enums {
@@ -476,7 +481,8 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
     };
 
     if is_leaf_text_wrapper(schema_type) {
-      let xml_content_type = gen_xml_content_type(schema_type, schema, context)?;
+      let xml_content_type =
+        gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
 
       token_stream_list.push(quote! {
         #( #type_attrs )*
@@ -530,7 +536,8 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
         fields.push(gen_attr(attr, schema, context)?);
       }
 
-      let simple_type_name = gen_xml_content_type(schema_type, schema, context)?;
+      let simple_type_name =
+        gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
       fields.push(quote! {
         pub xml_content: Option<#simple_type_name>,
       });
@@ -620,7 +627,8 @@ pub fn gen_schema(schema: &Schema, context: &CodegenContext<'_>) -> Result<Token
       }
 
       if schema_type.children.is_empty() && is_leaf_text_type(base_class_type) {
-        let simple_type_name = gen_xml_content_type(base_class_type, schema, context)?;
+        let simple_type_name =
+          gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
         fields.push(quote! {
           pub xml_content: Option<#simple_type_name>,
         });
@@ -933,8 +941,27 @@ fn gen_children(
 fn gen_xml_content_type(
   schema_type: &SchemaType,
   schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
 ) -> Result<Type> {
+  if treat_as_string_rule_for_field(
+    compatibility_rules,
+    &schema.module_name,
+    &schema_type.class_name,
+    "xml_content",
+  )
+  .is_some()
+    || treat_as_string_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.name,
+      "xml_content",
+    )
+    .is_some()
+  {
+    return Ok(parse_str("crate::simple_type::StringValue")?);
+  }
+
   let first_name = &schema_type.name[0..schema_type.name.find('/').unwrap()];
 
   if let Some(schema_enum) = context.enum_by_type(first_name) {

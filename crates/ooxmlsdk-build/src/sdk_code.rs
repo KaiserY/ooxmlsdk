@@ -14,9 +14,10 @@ use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{CodegenContext, gen_schema};
 use crate::sdk_code::serializer::gen_schema_serializer;
 use crate::sdk_code::versioning::version_cfg_attrs;
+use crate::sdk_data::compatibility::{apply_compatibility, read_compatibility};
 use crate::sdk_data::sdk_data_model::{
-  Namespace as SdkDataNamespace, PackageSchema as SdkDataPackageSchema, Part as SdkDataPart,
-  Schema as SdkDataSchema,
+  CompatibilityRule as SdkDataCompatibilityRule, Namespace as SdkDataNamespace,
+  PackageSchema as SdkDataPackageSchema, Part as SdkDataPart, Schema as SdkDataSchema,
 };
 
 pub mod deserializer;
@@ -38,20 +39,29 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
   let sdk_data_package_schemas_dir_path = sdk_data_dir.as_ref().join("package_schemas");
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
-  let sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
+  let sdk_data_compatibility_path = sdk_data_dir.as_ref().join("compatibility.json");
+  let mut sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
   let sdk_data_package_schemas = read_package_schemas(&sdk_data_package_schemas_dir_path)?;
   let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
+  let sdk_data_compatibility = read_compatibility(&sdk_data_compatibility_path)?;
   let out_dir_path = out_dir.as_ref();
+  apply_compatibility(&mut sdk_data_schemas, &sdk_data_compatibility)?;
   let context = CodegenContext::new(&sdk_data_schemas);
 
   write_schemas(
     &sdk_data_schemas,
     &sdk_data_package_schemas,
+    &sdk_data_compatibility.rules,
     &context,
     out_dir_path,
   )?;
-  write_deserializers(&sdk_data_schemas, &context, out_dir_path)?;
+  write_deserializers(
+    &sdk_data_schemas,
+    &sdk_data_compatibility.rules,
+    &context,
+    out_dir_path,
+  )?;
   write_serializers(&sdk_data_schemas, &context, out_dir_path)?;
   write_parts(&sdk_data_parts, out_dir_path)?;
   write_namespaces(&sdk_data_namespaces, out_dir_path)?;
@@ -149,6 +159,7 @@ fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
 fn write_schemas(
   sdk_data_schemas: &[SdkDataSchema],
   sdk_data_package_schemas: &[SdkDataPackageSchema],
+  compatibility_rules: &[SdkDataCompatibilityRule],
   context: &CodegenContext<'_>,
   out_dir_path: &Path,
 ) -> Result<()> {
@@ -162,7 +173,7 @@ fn write_schemas(
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &schema_path,
-      gen_schema(sdk_data_schema, context).map_err(|err| {
+      gen_schema(sdk_data_schema, compatibility_rules, context).map_err(|err| {
         format!(
           "failed to generate schema {}: {err}",
           sdk_data_schema.module_name
@@ -199,6 +210,7 @@ fn write_schemas(
 
 fn write_deserializers(
   sdk_data_schemas: &[SdkDataSchema],
+  compatibility_rules: &[SdkDataCompatibilityRule],
   context: &CodegenContext<'_>,
   out_dir_path: &Path,
 ) -> Result<()> {
@@ -213,7 +225,7 @@ fn write_deserializers(
       out_deserializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &deserializer_path,
-      gen_schema_deserializer(sdk_data_schema, context).map_err(|err| {
+      gen_schema_deserializer(sdk_data_schema, compatibility_rules, context).map_err(|err| {
         format!(
           "failed to generate deserializer {}: {err}",
           sdk_data_schema.module_name

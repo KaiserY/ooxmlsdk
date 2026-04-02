@@ -18,7 +18,12 @@ use crate::sdk_code::schemas::{
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, version_cfg_attrs, versioned_tokens,
 };
-use crate::sdk_data::sdk_data_model::{Schema, SchemaTypeAttribute};
+use crate::sdk_data::compatibility::{
+  map_attribute_value_rule_for_field, strict_bitmask_rule_for_field, treat_as_string_rule_for_field,
+};
+use crate::sdk_data::sdk_data_model::{
+  CompatibilityAction, CompatibilityRule, Schema, SchemaTypeAttribute,
+};
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
@@ -90,6 +95,7 @@ fn composite_children_all_microsoft365(children: &[ResolvedCompositeChild<'_>]) 
 
 pub fn gen_schema_deserializer(
   schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
 ) -> Result<TokenStream> {
   let mut token_stream_list: Vec<ItemImpl> = vec![];
@@ -128,6 +134,23 @@ pub fn gen_schema_deserializer(
           #variant_value_literal => Ok(Self::#variant_ident),
         },
       ))?);
+    }
+
+    if schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main"
+      && schema_enum.name == "LevelJustificationValues"
+    {
+      variants.push(parse2(quote! {
+        "start" => Ok(Self::Left),
+      })?);
+      variants.push(parse2(quote! {
+        "end" => Ok(Self::Right),
+      })?);
+      byte_variants.push(parse2(quote! {
+        b"start" => Ok(Self::Left),
+      })?);
+      byte_variants.push(parse2(quote! {
+        b"end" => Ok(Self::Right),
+      })?);
     }
 
     let enum_attrs = version_cfg_attrs(&schema_enum.version);
@@ -221,6 +244,20 @@ pub fn gen_schema_deserializer(
       loop_match_arm_list.extend(gen_simple_child_match_arms(
         first_name,
         class_name_literal,
+        treat_as_string_rule_for_field(
+          compatibility_rules,
+          &schema.module_name,
+          &schema_type.class_name,
+          "xml_content",
+        )
+        .is_some()
+          || treat_as_string_rule_for_field(
+            compatibility_rules,
+            &schema.module_name,
+            &schema_type.name,
+            "xml_content",
+          )
+          .is_some(),
         context,
       )?);
     } else if is_leaf_text_type(schema_type) {
@@ -237,6 +274,20 @@ pub fn gen_schema_deserializer(
       loop_match_arm_list.extend(gen_simple_child_match_arms(
         first_name,
         class_name_literal,
+        treat_as_string_rule_for_field(
+          compatibility_rules,
+          &schema.module_name,
+          &schema_type.class_name,
+          "xml_content",
+        )
+        .is_some()
+          || treat_as_string_rule_for_field(
+            compatibility_rules,
+            &schema.module_name,
+            &schema_type.name,
+            "xml_content",
+          )
+          .is_some(),
         context,
       )?);
     } else if is_leaf_element_type(schema_type) {
@@ -893,6 +944,20 @@ pub fn gen_schema_deserializer(
         loop_match_arm_list.extend(gen_simple_child_match_arms(
           base_first_name,
           class_name_literal,
+          treat_as_string_rule_for_field(
+            compatibility_rules,
+            &schema.module_name,
+            &schema_type.class_name,
+            "xml_content",
+          )
+          .is_some()
+            || treat_as_string_rule_for_field(
+              compatibility_rules,
+              &schema.module_name,
+              &schema_type.name,
+              "xml_content",
+            )
+            .is_some(),
           context,
         )?);
       }
@@ -916,7 +981,29 @@ pub fn gen_schema_deserializer(
         },
       ))?);
 
-      attr_match_list.push(gen_field_match_arm(attr, class_name_literal, context)?);
+      attr_match_list.push(gen_field_match_arm(
+        attr,
+        &schema.module_name,
+        &schema_type.class_name,
+        &schema_type.name,
+        compatibility_rules,
+        class_name_literal,
+        context,
+      )?);
+
+      if let Some(rule) = strict_bitmask_rule_for_field(
+        compatibility_rules,
+        &schema.module_name,
+        &schema_type.class_name,
+        &attr.property_name,
+      ) {
+        attr_match_list.extend(gen_strict_bitmask_match_branches(
+          rule,
+          &attr_name_ident,
+          class_name_literal,
+          &attr_name_str,
+        )?);
+      }
 
       let required = attr
         .validators
@@ -1945,6 +2032,7 @@ fn gen_child_visitor_arm(
 fn gen_simple_child_match_arms(
   first_name: &str,
   owner_type: &str,
+  treat_as_string: bool,
   context: &CodegenContext<'_>,
 ) -> Result<Vec<Arm>> {
   if let Some(schema_enum) = context.enum_by_type(first_name) {
@@ -1964,7 +2052,11 @@ fn gen_simple_child_match_arms(
       }
     })?])
   } else {
-    let simple_type_str = simple_type_mapping(first_name);
+    let simple_type_str = if treat_as_string {
+      "StringValue"
+    } else {
+      simple_type_mapping(first_name)
+    };
     let simple_type: Type = parse_str(&format!("crate::simple_type::{simple_type_str}"))?;
 
     Ok(
@@ -2064,6 +2156,10 @@ fn gen_attr_match_arm(branch: &MatchBranch) -> Result<Arm> {
 
 fn gen_field_match_arm(
   attr: &SchemaTypeAttribute,
+  schema_name: &str,
+  type_name: &str,
+  type_qname: &str,
+  compatibility_rules: &[CompatibilityRule],
   owner_type: &str,
   context: &CodegenContext<'_>,
 ) -> Result<MatchBranch> {
@@ -2080,8 +2176,52 @@ fn gen_field_match_arm(
   };
 
   let attr_name_literal: LitByteStr = parse_str(&format!("b\"{attr_name_str}\""))?;
+  let map_value_rule = map_attribute_value_rule_for_field(
+    compatibility_rules,
+    schema_name,
+    type_name,
+    &attr.property_name,
+  )
+  .or_else(|| {
+    map_attribute_value_rule_for_field(
+      compatibility_rules,
+      schema_name,
+      type_qname,
+      &attr.property_name,
+    )
+  })
+  .or_else(|| {
+    map_attribute_value_rule_for_field(compatibility_rules, schema_name, type_name, &attr.q_name)
+  })
+  .or_else(|| {
+    map_attribute_value_rule_for_field(compatibility_rules, schema_name, type_qname, &attr.q_name)
+  });
 
-  let body: Stmt = match classify_attr_type(&attr.r#type).ok_or_else(|| attr.r#type.clone())? {
+  let mapped_value_stmt: Option<Stmt> = if let Some(rule) = map_value_rule {
+    let CompatibilityAction::MapAttributeValue { mappings } = &rule.action else {
+      unreachable!()
+    };
+    let mut mapping_entries = Vec::<TokenStream>::new();
+    for mapping in mappings {
+      let from = &mapping.from;
+      let to = &mapping.to;
+      mapping_entries.push(quote! { (#from, #to) });
+    }
+
+    Some(parse2(quote! {
+      let raw_value = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
+      let mapped_value = crate::common::map_compat_attr_value(
+        raw_value,
+        &[ #( #mapping_entries ),* ],
+      );
+    })?)
+  } else {
+    None
+  };
+
+  let body_core: TokenStream = match classify_attr_type(&attr.r#type)
+    .ok_or_else(|| attr.r#type.clone())?
+  {
     AttrTypeKind::List => parse2(quote! {
       #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
     })?,
@@ -2094,21 +2234,37 @@ fn gen_field_match_arm(
         enum_name.to_upper_camel_case()
       ))?;
 
-      parse2(quote! {
-        #attr_name_ident = Some(crate::common::parse_enum_attr::<#enum_type>(
-          &attr,
-          xml_reader.decoder(),
-          stringify!(#enum_type),
-        )?);
-      })?
+      if mapped_value_stmt.is_some() {
+        parse2(quote! {
+          #attr_name_ident = Some(mapped_value.parse::<#enum_type>().map_err(|_| {
+            crate::common::invalid_enum_value(stringify!(#enum_type), mapped_value.clone())
+          })?);
+        })?
+      } else {
+        parse2(quote! {
+          #attr_name_ident = Some(crate::common::parse_enum_attr::<#enum_type>(
+            &attr,
+            xml_reader.decoder(),
+            stringify!(#enum_type),
+          )?);
+        })?
+      }
     }
     AttrTypeKind::Simple {
       simple_type,
       value_kind,
     } => match value_kind {
-      SimpleValueKind::StringLike => parse2(quote! {
-        #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-      })?,
+      SimpleValueKind::StringLike => {
+        if mapped_value_stmt.is_some() {
+          parse2(quote! {
+            #attr_name_ident = Some(mapped_value);
+          })?
+        } else {
+          parse2(quote! {
+            #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+          })?
+        }
+      }
       SimpleValueKind::BoolLike => parse2(quote! {
         #attr_name_ident = Some(crate::common::parse_bool_attr(
           &attr,
@@ -2131,9 +2287,65 @@ fn gen_field_match_arm(
       }
     },
   };
+  let body: Stmt = if let Some(mapped_value_stmt) = mapped_value_stmt {
+    parse2(quote! {
+      {
+        #mapped_value_stmt
+        #body_core
+      }
+    })?
+  } else {
+    parse2(body_core)?
+  };
   Ok(MatchBranch {
     version: attr.version.clone(),
     key: attr_name_literal,
     body,
   })
+}
+
+fn gen_strict_bitmask_match_branches(
+  rule: &CompatibilityRule,
+  target_ident: &Ident,
+  owner_type: &str,
+  field_name: &str,
+) -> Result<Vec<MatchBranch>> {
+  let CompatibilityAction::StrictBitmaskAttributes {
+    radix,
+    width,
+    attributes,
+  } = &rule.action
+  else {
+    return Ok(vec![]);
+  };
+
+  let mut branches = Vec::with_capacity(attributes.len());
+
+  for attribute in attributes {
+    let key: LitByteStr = parse_str(&format!("b\"{}\"", attribute.q_name))?;
+    let bit = attribute.bit;
+    let radix = *radix;
+    let width = *width;
+
+    branches.push(MatchBranch {
+      version: String::new(),
+      key,
+      body: parse2(quote! {
+        {
+          let raw_value = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
+          #target_ident = Some(crate::common::merge_strict_bitmask_attr(
+            #target_ident.as_deref(),
+            raw_value.as_ref(),
+            #bit,
+            #radix,
+            #width,
+            #owner_type,
+            #field_name,
+          )?);
+        }
+      })?,
+    });
+  }
+
+  Ok(branches)
 }

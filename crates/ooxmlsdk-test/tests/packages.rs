@@ -9,8 +9,8 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  AltChunk, Body, BodyChildChoice, CommentChoice, Document, HyperlinkChildChoice, Paragraph,
-  ParagraphChoice, Run, RunChoice, SdtPropertiesChildChoice,
+  AltChunk, Body, BodyChildChoice, CommentChoice, Document, Hyperlink, HyperlinkChildChoice,
+  Paragraph, ParagraphChoice, Run, RunChoice, SdtPropertiesChildChoice,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -95,6 +95,24 @@ fn first_paragraph(
     BodyChildChoice::WP(paragraph) => Some(paragraph.as_ref()),
     _ => None,
   })
+}
+
+fn body_paragraph_count(body: &Body) -> usize {
+  body
+    .children
+    .iter()
+    .filter(|child| matches!(child, BodyChildChoice::WP(_)))
+    .count()
+}
+
+fn first_hyperlink(paragraph: &Paragraph) -> Option<&Hyperlink> {
+  paragraph
+    .paragraph_choice
+    .iter()
+    .find_map(|child| match child {
+      ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
+      _ => None,
+    })
 }
 
 fn paragraph_bookmark_start_count(
@@ -241,6 +259,29 @@ fn open_document_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn open_document_dotx_asset_from_openxml_sdk() {
+  let path = test_file_path("Document.dotx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.document_settings_part.is_some());
+  assert!(package.main_document_part.style_definitions_part.is_some());
+  assert_eq!(
+    main_document_body_child_count(&package.main_document_part.root_element),
+    6
+  );
+}
+
+#[test]
+fn open_strict01_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Strict01.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
 fn open_spreadsheet_document_asset_from_openxml_sdk() {
   let path = test_file_path("basicspreadsheet.xlsx");
   let package = SpreadsheetDocument::new_from_file(&path).unwrap();
@@ -325,6 +366,68 @@ fn open_simple_sdt_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn open_hyperlink_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Hyperlink.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert_eq!(
+    package
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    Some(6)
+  );
+
+  let body = first_body(&package.main_document_part.root_element).expect("expected body");
+  assert_eq!(body_paragraph_count(body), 2);
+
+  let hyperlink_paragraph = body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph)
+        if paragraph
+          .paragraph_choice
+          .iter()
+          .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
+      {
+        Some(paragraph.as_ref())
+      }
+      _ => None,
+    })
+    .next()
+    .expect("expected paragraph with hyperlink");
+
+  let hyperlink = first_hyperlink(hyperlink_paragraph).expect("expected hyperlink");
+  assert_eq!(hyperlink.id.as_deref(), Some("rId4"));
+  assert_eq!(hyperlink.history, Some(true));
+  assert_eq!(paragraph_text(hyperlink_paragraph), "EricWhite.com");
+}
+
+#[test]
+fn open_empty_relationship_element_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("EmptyRelationshipElement.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.main_document_part.relationships.is_some());
+  assert_eq!(
+    package
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    Some(6)
+  );
+
+  let body = first_body(&package.main_document_part.root_element).expect("expected body");
+  assert_eq!(body_paragraph_count(body), 2);
+}
+
+#[test]
 fn open_mcexecl_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("MCExecl.xlsx");
   let package = SpreadsheetDocument::new_from_file(&path).unwrap();
@@ -348,6 +451,58 @@ fn open_mcexecl_xlsx_asset_from_openxml_sdk() {
       .map(|value| value.as_str()),
     Some("abc")
   );
+}
+
+#[test]
+fn open_comments_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Comments.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.workbook_part.root_element.sheets.x_sheet.len(), 1);
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 1);
+
+  let worksheet_part = &package.workbook_part.worksheet_parts[0];
+  assert_eq!(worksheet_part.inner_path, "xl/worksheets/sheet1.xml");
+  assert!(worksheet_part.worksheet_comments_part.is_some());
+
+  let comments_part = worksheet_part
+    .worksheet_comments_part
+    .as_ref()
+    .expect("expected worksheet comments part");
+  assert_eq!(comments_part.inner_path, "xl/comments1.xml");
+  assert_eq!(comments_part.root_element.authors.x_author.len(), 1);
+  assert_eq!(comments_part.root_element.comment_list.x_comment.len(), 1);
+
+  let comment = &comments_part.root_element.comment_list.x_comment[0];
+  assert_eq!(comment.reference.as_str(), "A1");
+  assert_eq!(comment.author_id, 0);
+  assert_eq!(
+    comments_part.root_element.authors.x_author[0]
+      .xml_content
+      .as_deref(),
+    Some("robermc")
+  );
+}
+
+#[test]
+fn open_complex01_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Complex01.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  let workbook = &package.workbook_part.root_element;
+  assert_eq!(workbook.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(
+    workbook
+      .file_version
+      .as_ref()
+      .and_then(|file_version| file_version.application_name.as_deref()),
+    Some("xl")
+  );
+  assert_eq!(workbook.sheets.x_sheet.len(), 2);
+  assert_eq!(workbook.sheets.x_sheet[0].name.as_str(), "Sheet1");
+  assert_eq!(workbook.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 2);
+  assert!(workbook.calculation_properties.is_some());
 }
 
 #[test]
@@ -548,6 +703,69 @@ fn round_trip_document_docx_asset_from_openxml_sdk() {
       .map(|relationships| relationships.relationship.len())
       .unwrap_or_default()
       > 5
+  );
+}
+
+#[test]
+fn round_trip_document_dotx_asset_from_openxml_sdk() {
+  let path = test_file_path("Document.dotx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
+  );
+  assert_eq!(
+    main_document_body_child_count(&original.main_document_part.root_element),
+    6
+  );
+  assert_eq!(
+    main_document_body_child_count(&roundtripped.main_document_part.root_element),
+    6
+  );
+
+  let original_first_paragraph = first_paragraph(original_body).expect("expected paragraph");
+  let roundtripped_first_paragraph =
+    first_paragraph(roundtripped_body).expect("expected paragraph");
+  assert_eq!(
+    first_paragraph_text(original_first_paragraph),
+    Some("Document Title")
+  );
+  assert_eq!(
+    first_paragraph_text(roundtripped_first_paragraph),
+    Some("Document Title")
+  );
+}
+
+#[test]
+fn round_trip_strict01_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Strict01.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(original.inner_path, roundtripped.inner_path);
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert!(original.main_document_part.document_settings_part.is_some());
+  assert!(
+    roundtripped
+      .main_document_part
+      .document_settings_part
+      .is_some()
+  );
+  assert!(original_body.children.len() > 1);
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
   );
 }
 
@@ -806,6 +1024,122 @@ fn round_trip_comments_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn round_trip_hyperlink_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Hyperlink.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(original.inner_path, roundtripped.inner_path);
+  assert_eq!(
+    original
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(
+    original
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(body_paragraph_count(original_body), 2);
+  assert_eq!(body_paragraph_count(roundtripped_body), 2);
+
+  let original_hyperlink_paragraph = original_body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph)
+        if paragraph
+          .paragraph_choice
+          .iter()
+          .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
+      {
+        Some(paragraph.as_ref())
+      }
+      _ => None,
+    })
+    .next()
+    .expect("expected paragraph with hyperlink");
+  let roundtripped_hyperlink_paragraph = roundtripped_body
+    .children
+    .iter()
+    .filter_map(|child| match child {
+      BodyChildChoice::WP(paragraph)
+        if paragraph
+          .paragraph_choice
+          .iter()
+          .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
+      {
+        Some(paragraph.as_ref())
+      }
+      _ => None,
+    })
+    .next()
+    .expect("expected paragraph with hyperlink");
+
+  let original_hyperlink =
+    first_hyperlink(original_hyperlink_paragraph).expect("expected hyperlink");
+  let roundtripped_hyperlink =
+    first_hyperlink(roundtripped_hyperlink_paragraph).expect("expected hyperlink");
+
+  assert_eq!(original_hyperlink.id.as_deref(), Some("rId4"));
+  assert_eq!(roundtripped_hyperlink.id.as_deref(), Some("rId4"));
+  assert_eq!(original_hyperlink.history, Some(true));
+  assert_eq!(roundtripped_hyperlink.history, Some(true));
+  assert_eq!(
+    paragraph_text(original_hyperlink_paragraph),
+    "EricWhite.com"
+  );
+  assert_eq!(
+    paragraph_text(roundtripped_hyperlink_paragraph),
+    "EricWhite.com"
+  );
+}
+
+#[test]
+fn round_trip_empty_relationship_element_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("EmptyRelationshipElement.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert_eq!(body_paragraph_count(original_body), 2);
+  assert_eq!(body_paragraph_count(roundtripped_body), 2);
+  assert_eq!(
+    original
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    Some(6)
+  );
+  assert_eq!(
+    roundtripped
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    Some(6)
+  );
+}
+
+#[test]
 fn round_trip_spreadsheet_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Spreadsheet.xlsx");
   let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
@@ -1028,6 +1362,108 @@ fn round_trip_mc_execl_xlsx_asset_from_openxml_sdk() {
       .and_then(|text| text.xml_content.as_deref()),
     Some("abc")
   );
+}
+
+#[test]
+fn round_trip_comments_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Comments.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  assert_eq!(original.workbook_part.root_element.sheets.x_sheet.len(), 1);
+  assert_eq!(
+    roundtripped.workbook_part.root_element.sheets.x_sheet.len(),
+    1
+  );
+  assert_eq!(original.workbook_part.worksheet_parts.len(), 1);
+  assert_eq!(roundtripped.workbook_part.worksheet_parts.len(), 1);
+
+  let original_comments_part = original.workbook_part.worksheet_parts[0]
+    .worksheet_comments_part
+    .as_ref()
+    .expect("expected original worksheet comments part");
+  let roundtripped_comments_part = roundtripped.workbook_part.worksheet_parts[0]
+    .worksheet_comments_part
+    .as_ref()
+    .expect("expected roundtripped worksheet comments part");
+
+  assert_eq!(original_comments_part.inner_path, "xl/comments1.xml");
+  assert_eq!(roundtripped_comments_part.inner_path, "xl/comments1.xml");
+  assert_eq!(
+    original_comments_part.root_element.authors.x_author.len(),
+    1
+  );
+  assert_eq!(
+    roundtripped_comments_part
+      .root_element
+      .authors
+      .x_author
+      .len(),
+    1
+  );
+  assert_eq!(
+    original_comments_part
+      .root_element
+      .comment_list
+      .x_comment
+      .len(),
+    1
+  );
+  assert_eq!(
+    roundtripped_comments_part
+      .root_element
+      .comment_list
+      .x_comment
+      .len(),
+    1
+  );
+
+  let original_comment = &original_comments_part.root_element.comment_list.x_comment[0];
+  let roundtripped_comment = &roundtripped_comments_part
+    .root_element
+    .comment_list
+    .x_comment[0];
+  assert_eq!(original_comment.reference.as_str(), "A1");
+  assert_eq!(roundtripped_comment.reference.as_str(), "A1");
+  assert_eq!(original_comment.author_id, 0);
+  assert_eq!(roundtripped_comment.author_id, 0);
+  assert_eq!(
+    original_comments_part.root_element.authors.x_author[0]
+      .xml_content
+      .as_deref(),
+    Some("robermc")
+  );
+  assert_eq!(
+    roundtripped_comments_part.root_element.authors.x_author[0]
+      .xml_content
+      .as_deref(),
+    Some("robermc")
+  );
+}
+
+#[test]
+fn round_trip_complex01_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Complex01.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  let original_workbook = &original.workbook_part.root_element;
+  let roundtripped_workbook = &roundtripped.workbook_part.root_element;
+
+  assert_eq!(original_workbook.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(roundtripped_workbook.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(original_workbook.sheets.x_sheet.len(), 2);
+  assert_eq!(roundtripped_workbook.sheets.x_sheet.len(), 2);
+  assert_eq!(original_workbook.sheets.x_sheet[0].name.as_str(), "Sheet1");
+  assert_eq!(
+    roundtripped_workbook.sheets.x_sheet[0].name.as_str(),
+    "Sheet1"
+  );
+  assert_eq!(original_workbook.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert_eq!(
+    roundtripped_workbook.sheets.x_sheet[1].name.as_str(),
+    "Sheet2"
+  );
+  assert_eq!(original.workbook_part.worksheet_parts.len(), 2);
+  assert_eq!(roundtripped.workbook_part.worksheet_parts.len(), 2);
 }
 
 #[test]

@@ -1,0 +1,233 @@
+{
+  "Rules": [
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageSize",
+      "Field": "Width",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageSize",
+      "Field": "Height",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Top",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Bottom",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Left",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Right",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Header",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Footer",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "PageMargin",
+      "Field": "Gutter",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "TabStop",
+      "Field": "Position",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "TableIndentation",
+      "Field": "Width",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "DefaultTabStop",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "TextCharacterPropertiesType",
+      "Field": "Baseline",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "PercentageType",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "PositivePercentageType",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "PositiveFixedPercentageType",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "AlphaOffset",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "Miter",
+      "Field": "Limit",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "RgbColorModelPercentage",
+      "Field": "RedPortion",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "RgbColorModelPercentage",
+      "Field": "GreenPortion",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "RgbColorModelPercentage",
+      "Field": "BluePortion",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "SpacingPercent",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "BulletSizePercentage",
+      "Field": "Val",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "GradientStop",
+      "Field": "Position",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "ConditionalFormatStyle",
+      "Field": "Val",
+      "Action": {
+        "StrictBitmaskAttributes": {
+          "Radix": 2,
+          "Width": 12,
+          "Attributes": [
+            {
+              "QName": "w:firstRow",
+              "Bit": 2048
+            },
+            {
+              "QName": "w:lastRow",
+              "Bit": 1024
+            },
+            {
+              "QName": "w:firstColumn",
+              "Bit": 512
+            },
+            {
+              "QName": "w:lastColumn",
+              "Bit": 256
+            },
+            {
+              "QName": "w:oddVBand",
+              "Bit": 128
+            },
+            {
+              "QName": "w:evenVBand",
+              "Bit": 64
+            },
+            {
+              "QName": "w:oddHBand",
+              "Bit": 32
+            },
+            {
+              "QName": "w:evenHBand",
+              "Bit": 16
+            },
+            {
+              "QName": "w:firstRowLastColumn",
+              "Bit": 8
+            },
+            {
+              "QName": "w:firstRowFirstColumn",
+              "Bit": 4
+            },
+            {
+              "QName": "w:lastRowFirstColumn",
+              "Bit": 2
+            },
+            {
+              "QName": "w:lastRowLastColumn",
+              "Bit": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_word_2010_wordprocessing_drawing",
+      "Type": "PercentagePositionHeightOffset",
+      "Field": "xml_content",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_word_2010_wordprocessing_drawing",
+      "Type": "PercentagePositionVerticalOffset",
+      "Field": "xml_content",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_word_2010_wordprocessing_drawing",
+      "Type": "PercentageWidth",
+      "Field": "xml_content",
+      "Action": "TreatAsString"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_word_2010_wordprocessing_drawing",
+      "Type": "PercentageHeight",
+      "Field": "xml_content",
+      "Action": "TreatAsString"
+    }
+  ]
+}

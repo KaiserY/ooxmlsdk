@@ -1,3 +1,4 @@
+use ooxmlsdk::schemas::opc_core_properties::CoreProperties;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_custom_properties::{
   CustomDocumentPropertyChildChoice, Properties as CustomProperties,
 };
@@ -6,6 +7,31 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_extended_
   Properties as ExtendedProperties, PropertiesChildChoice,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
+
+#[test]
+fn core_properties_round_trip_from_hello_world_doc_props_test() {
+  let parsed = fixtures::OPC_CORE_PROPERTIES_HELLO_WORLD_XML
+    .parse::<CoreProperties>()
+    .unwrap();
+  let serialized = parsed.to_xml().unwrap();
+  let reparsed = serialized.parse::<CoreProperties>().unwrap();
+  let serialized_twice = reparsed.to_xml().unwrap();
+
+  assert_eq!(serialized, serialized_twice);
+
+  assert_eq!(parsed.title.as_deref(), None);
+  assert_eq!(parsed.subject.as_deref(), None);
+  assert_eq!(parsed.creator.as_deref(), Some("Thomas Barnekow"));
+  assert_eq!(parsed.last_modified_by.as_deref(), Some("Thomas Barnekow"));
+  assert_eq!(parsed.revision.as_deref(), Some("1"));
+  assert_eq!(parsed.created.as_deref(), Some("2024-10-26T22:14:00Z"));
+  assert_eq!(parsed.modified.as_deref(), Some("2024-10-26T22:15:00Z"));
+  let serialized = trim_xml_declaration(&serialized);
+  assert!(serialized.starts_with("<cp:coreProperties"));
+  assert!(serialized.contains("<dc:creator>Thomas Barnekow</dc:creator>"));
+  assert!(serialized.contains("<cp:lastModifiedBy>Thomas Barnekow</cp:lastModifiedBy>"));
+  assert_eq!(reparsed.creator.as_deref(), Some("Thomas Barnekow"));
+}
 
 #[test]
 fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {

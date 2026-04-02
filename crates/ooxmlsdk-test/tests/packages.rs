@@ -272,6 +272,7 @@ fn open_document_dotx_asset_from_openxml_sdk() {
   );
 }
 
+#[cfg(feature = "strict")]
 #[test]
 fn open_strict01_docx_asset_from_openxml_sdk() {
   let path = test_file_path("Strict01.docx");
@@ -425,6 +426,18 @@ fn open_empty_relationship_element_docx_asset_from_openxml_sdk() {
 
   let body = first_body(&package.main_document_part.root_element).expect("expected body");
   assert_eq!(body_paragraph_count(body), 2);
+}
+
+#[test]
+fn open_no_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("NoDocProps.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+  assert!(package.core_file_properties_part.is_none());
+  assert!(package.extended_file_properties_part.is_none());
+  assert!(package.custom_file_properties_part.is_none());
+  assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
 }
 
 #[test]
@@ -741,6 +754,7 @@ fn round_trip_document_dotx_asset_from_openxml_sdk() {
   );
 }
 
+#[cfg(feature = "strict")]
 #[test]
 fn round_trip_strict01_docx_asset_from_openxml_sdk() {
   let path = test_file_path("Strict01.docx");
@@ -1136,6 +1150,31 @@ fn round_trip_empty_relationship_element_docx_asset_from_openxml_sdk() {
       .as_ref()
       .map(|relationships| relationships.relationship.len()),
     Some(6)
+  );
+}
+
+#[test]
+fn round_trip_no_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("NoDocProps.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_body = first_body(&original.main_document_part.root_element).expect("expected body");
+  let roundtripped_body =
+    first_body(&roundtripped.main_document_part.root_element).expect("expected body");
+
+  assert!(original.core_file_properties_part.is_none());
+  assert!(original.extended_file_properties_part.is_none());
+  assert!(original.custom_file_properties_part.is_none());
+  assert!(roundtripped.core_file_properties_part.is_none());
+  assert!(roundtripped.extended_file_properties_part.is_none());
+  assert!(roundtripped.custom_file_properties_part.is_none());
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original_body.children.len(),
+    roundtripped_body.children.len()
   );
 }
 

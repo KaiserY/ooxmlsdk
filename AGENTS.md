@@ -11,12 +11,13 @@ Treat the checked-in `sdk_data/` directory and `schemas/OpenPackagingConventions
 
 The repository also keeps checked-in `sdk_data/`, but the current ignored generator test still reads upstream data from `../Open-XML-SDK/data` before regenerating `sdk_data/` and runtime code. Do not assume that external checkout is available unless you have explicitly prepared it.
 
-The runtime crate currently exports `common`, `deserializers`, `namespaces`, `parts` behind the `parts` feature, `schemas`, `serializers`, and `simple_type`. The public feature surface in this repository is currently `microsoft365` and `parts`. There is no shipped `validators` module.
+The runtime crate currently exports `common`, `deserializers`, `namespaces`, `parts` behind the `parts` feature, `schemas`, `serializers`, and `simple_type`. The public feature surface in this repository is currently `microsoft365`, `parts`, and `strict`. The `strict` feature gates strict OOXML compatibility coverage and the corresponding feature-gated integration tests. There is no shipped `validators` module.
 
 ## Build, Test, and Development Commands
 - `cargo build --workspace`: build all workspace crates.
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and the checked-in Rust code in `crates/ooxmlsdk/src/`. This currently requires an external `../Open-XML-SDK/data` checkout.
 - `cargo test -p ooxmlsdk-test`: run the integration tests that exercise stable round trips for representative Wordprocessing and Presentation XML samples.
+- `cargo test -p ooxmlsdk-test --features strict`: run the integration tests including strict OOXML package coverage such as `Strict01.docx`.
 - `cargo test --workspace`: run the full workspace test suite.
 - `cargo test --workspace --no-default-features`: run the workspace test suite with default features disabled.
 - `cargo bench -p ooxmlsdk-build --bench serde_bench`: run the serde comparison benchmark in the generator crate.
@@ -57,6 +58,8 @@ When validating generator changes, feature-gated code, or generated schema outpu
 Runtime behavior is currently covered by focused round-trip tests in `crates/ooxmlsdk-test/tests/wordprocessing.rs` and `crates/ooxmlsdk-test/tests/presentation.rs`. Add new tests close to the behavior they protect and keep assertions stable: verify both parsed fields and serialized XML where possible.
 
 Additional integration coverage also lives in `crates/ooxmlsdk-test/tests/spreadsheet.rs`, `crates/ooxmlsdk-test/tests/properties.rs`, and `crates/ooxmlsdk-test/tests/packages.rs`. Add new tests close to the behavior they protect.
+
+Feature-gated strict OOXML coverage lives in `crates/ooxmlsdk-test/tests/packages.rs` behind `#[cfg(feature = "strict")]`. Keep strict-only fixtures and assertions under the `strict` feature instead of expanding the default test surface.
 
 When validating work, do not overlap `cargo fmt`, `cargo test`, `cargo clippy`, or generation commands. Finish one command, capture its result, and only then start the next one. Do not switch target directories to avoid locks. If you encounter a target directory lock, wait for the existing lock to release.
 

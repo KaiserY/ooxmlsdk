@@ -250,8 +250,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
   match &rule.action {
     CompatibilityAction::TreatAsString => {
       if let Some((attribute_type_index, attribute_index)) = attribute_index {
-        let attribute = &mut schema.types[attribute_type_index].attributes[attribute_index];
-        attribute.r#type = "StringValue".to_string();
+        if attribute_type_index == schema_type_index {
+          let attribute = &mut schema.types[attribute_type_index].attributes[attribute_index];
+          attribute.r#type = "StringValue".to_string();
+        }
       } else if rule.field == "xml_content"
         && (schema.types[schema_type_index].api_kind == SchemaTypeApiKind::LeafTextWrapper
           || schema.types[schema_type_index].kind == SchemaTypeKind::LeafText)
@@ -319,6 +321,45 @@ mod tests {
     apply_compatibility(&mut schemas, &compatibility).unwrap();
 
     assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
+  }
+
+  #[test]
+  fn treat_as_string_on_derived_attribute_does_not_rewrite_base_type() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+      types: vec![
+        SchemaType {
+          name: "w:CT_NonNegativeShort/".to_string(),
+          class_name: "NonNegativeShortType".to_string(),
+          attributes: vec![SchemaTypeAttribute {
+            property_name: "Val".to_string(),
+            q_name: "w:val".to_string(),
+            r#type: "Int16Value".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_NonNegativeShort/w:defaultTabStop".to_string(),
+          class_name: "DefaultTabStop".to_string(),
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        type_name: "DefaultTabStop".to_string(),
+        field: "Val".to_string(),
+        action: CompatibilityAction::TreatAsString,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert_eq!(schemas[0].types[0].attributes[0].r#type, "Int16Value");
   }
 
   #[test]

@@ -115,6 +115,14 @@ pub fn resolve_zip_file_path(path: &str) -> String {
   stack.join("/")
 }
 
+pub fn resolve_relationship_target_path(parent_path: &str, target: &str) -> String {
+  if target.starts_with('/') {
+    resolve_zip_file_path(target)
+  } else {
+    resolve_zip_file_path(&format!("{parent_path}{target}"))
+  }
+}
+
 #[inline(always)]
 pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> Result<IoReader<R>, SdkError> {
   let mut xml_reader = quick_xml::Reader::from_reader(reader);

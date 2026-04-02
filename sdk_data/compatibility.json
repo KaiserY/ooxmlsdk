@@ -73,6 +73,25 @@
       "Action": "TreatAsString"
     },
     {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "LevelJustification",
+      "Field": "w:val",
+      "Action": {
+        "MapAttributeValue": {
+          "Mappings": [
+            {
+              "From": "start",
+              "To": "left"
+            },
+            {
+              "From": "end",
+              "To": "right"
+            }
+          ]
+        }
+      }
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
       "Type": "TextCharacterPropertiesType",
       "Field": "Baseline",

@@ -7,6 +7,7 @@ mod xml;
 pub use error::{
   SdkError, invalid_enum_value, invalid_field_value, missing_field, unexpected_eof, unexpected_tag,
 };
+pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   XmlReader, decode_attr_value, expect_event_start, from_reader_inner, from_str_inner,
@@ -96,6 +97,16 @@ pub(crate) fn merge_strict_bitmask_attr(
       "unsupported strict bitmask radix: {radix}"
     ))),
   }
+}
+
+pub(crate) fn map_compat_attr_value(raw_value: String, mappings: &[(&str, &str)]) -> String {
+  for (from, to) in mappings {
+    if raw_value == *from {
+      return (*to).to_string();
+    }
+  }
+
+  raw_value
 }
 
 #[inline(always)]

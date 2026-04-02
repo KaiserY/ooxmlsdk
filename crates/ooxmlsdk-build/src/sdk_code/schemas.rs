@@ -533,7 +533,14 @@ pub fn gen_schema(
 
     if is_leaf_text_type(schema_type) {
       for attr in &schema_type.attributes {
-        fields.push(gen_attr(attr, schema, context)?);
+        fields.push(gen_attr(
+          attr,
+          &schema_type.class_name,
+          &schema_type.name,
+          schema,
+          compatibility_rules,
+          context,
+        )?);
       }
 
       let simple_type_name =
@@ -543,7 +550,14 @@ pub fn gen_schema(
       });
     } else if is_leaf_element_type(schema_type) {
       for attr in &schema_type.attributes {
-        fields.push(gen_attr(attr, schema, context)?);
+        fields.push(gen_attr(
+          attr,
+          &schema_type.class_name,
+          &schema_type.name,
+          schema,
+          compatibility_rules,
+          context,
+        )?);
       }
     } else if is_composite_type(schema_type) {
       if supports_xmlns_fields(schema_type, schema) {
@@ -559,7 +573,14 @@ pub fn gen_schema(
       }
 
       for attr in &schema_type.attributes {
-        fields.push(gen_attr(attr, schema, context)?);
+        fields.push(gen_attr(
+          attr,
+          &schema_type.class_name,
+          &schema_type.name,
+          schema,
+          compatibility_rules,
+          context,
+        )?);
       }
 
       if is_one_sequence_flatten(schema_type) {
@@ -592,11 +613,25 @@ pub fn gen_schema(
         .ok_or_else(|| format!("{:?}", schema_type.name))?;
 
       for attr in &schema_type.attributes {
-        fields.push(gen_attr(attr, schema, context)?);
+        fields.push(gen_attr(
+          attr,
+          &schema_type.class_name,
+          &schema_type.name,
+          schema,
+          compatibility_rules,
+          context,
+        )?);
       }
 
       for attr in &base_class_type.attributes {
-        fields.push(gen_attr(attr, schema, context)?);
+        fields.push(gen_attr(
+          attr,
+          &schema_type.class_name,
+          &schema_type.name,
+          schema,
+          compatibility_rules,
+          context,
+        )?);
       }
 
       if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
@@ -805,7 +840,10 @@ fn gen_schema_enum_variants(
 
 fn gen_attr(
   attr: &SchemaTypeAttribute,
+  owner_class_name: &str,
+  owner_type_name: &str,
   schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
 ) -> Result<TokenStream> {
   let attr_name_ident: Ident = if attr.property_name.is_empty() {
@@ -814,26 +852,61 @@ fn gen_attr(
     parse_str(&escape_snake_case(attr.property_name.to_snake_case()))?
   };
 
-  let type_ident: Type =
-    match classify_attr_type(&attr.r#type).ok_or_else(|| attr.r#type.clone())? {
-      AttrTypeKind::List => parse_str("String")?,
-      AttrTypeKind::Enum { .. } => {
-        let (enum_module_name, enum_name) = context.resolve_attr_enum_module(&attr.r#type)?;
+  let effective_attr_type = if treat_as_string_rule_for_field(
+    compatibility_rules,
+    &schema.module_name,
+    owner_class_name,
+    &attr.property_name,
+  )
+  .is_some()
+    || treat_as_string_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      owner_type_name,
+      &attr.property_name,
+    )
+    .is_some()
+    || treat_as_string_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      owner_class_name,
+      &attr.q_name,
+    )
+    .is_some()
+    || treat_as_string_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      owner_type_name,
+      &attr.q_name,
+    )
+    .is_some()
+  {
+    "StringValue"
+  } else {
+    attr.r#type.as_str()
+  };
 
-        if enum_module_name != schema.module_name {
-          parse_str(&format!(
-            "crate::schemas::{}::{}",
-            enum_module_name,
-            enum_name.to_upper_camel_case()
-          ))?
-        } else {
-          parse_str(&enum_name.to_upper_camel_case())?
-        }
+  let type_ident: Type = match classify_attr_type(effective_attr_type)
+    .ok_or_else(|| effective_attr_type.to_string())?
+  {
+    AttrTypeKind::List => parse_str("String")?,
+    AttrTypeKind::Enum { .. } => {
+      let (enum_module_name, enum_name) = context.resolve_attr_enum_module(effective_attr_type)?;
+
+      if enum_module_name != schema.module_name {
+        parse_str(&format!(
+          "crate::schemas::{}::{}",
+          enum_module_name,
+          enum_name.to_upper_camel_case()
+        ))?
+      } else {
+        parse_str(&enum_name.to_upper_camel_case())?
       }
-      AttrTypeKind::Simple { simple_type, .. } => {
-        parse_str(&format!("crate::simple_type::{simple_type}"))?
-      }
-    };
+    }
+    AttrTypeKind::Simple { simple_type, .. } => {
+      parse_str(&format!("crate::simple_type::{simple_type}"))?
+    }
+  };
 
   let required = attr
     .validators

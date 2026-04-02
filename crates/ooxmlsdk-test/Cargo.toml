@@ -8,6 +8,7 @@ publish = false
 default = ["microsoft365", "parts"]
 parts = ["ooxmlsdk/parts"]
 microsoft365 = ["ooxmlsdk/microsoft365"]
+strict = ["ooxmlsdk/strict"]
 
 [dependencies]
 ooxmlsdk = { workspace = true, default-features = false }

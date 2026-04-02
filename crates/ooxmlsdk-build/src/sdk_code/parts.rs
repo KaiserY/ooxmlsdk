@@ -257,7 +257,10 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
           &child.version,
           quote! {
             let target_path = crate::common::resolve_zip_file_path(
-              &format!("{}{}", child_parent_path, relationship.target),
+              &crate::common::resolve_relationship_target_path(
+                &child_parent_path,
+                &relationship.target,
+              ),
             );
             let #child_name_ident = #child_type::new_from_archive(
               &child_parent_path,
@@ -292,7 +295,10 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
           &child.version,
           quote! {
             let target_path = crate::common::resolve_zip_file_path(
-              &format!("{}{}", child_parent_path, relationship.target),
+              &crate::common::resolve_relationship_target_path(
+                &child_parent_path,
+                &relationship.target,
+              ),
             );
             #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
               &child_parent_path,

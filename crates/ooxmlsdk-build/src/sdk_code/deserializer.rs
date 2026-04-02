@@ -136,23 +136,6 @@ pub fn gen_schema_deserializer(
       ))?);
     }
 
-    if schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main"
-      && schema_enum.name == "LevelJustificationValues"
-    {
-      variants.push(parse2(quote! {
-        "start" => Ok(Self::Left),
-      })?);
-      variants.push(parse2(quote! {
-        "end" => Ok(Self::Right),
-      })?);
-      byte_variants.push(parse2(quote! {
-        b"start" => Ok(Self::Left),
-      })?);
-      byte_variants.push(parse2(quote! {
-        b"end" => Ok(Self::Right),
-      })?);
-    }
-
     let enum_attrs = version_cfg_attrs(&schema_enum.version);
     token_stream_list.push(parse2(quote! {
       #( #enum_attrs )*
@@ -2176,6 +2159,24 @@ fn gen_field_match_arm(
   };
 
   let attr_name_literal: LitByteStr = parse_str(&format!("b\"{attr_name_str}\""))?;
+  let treat_as_string = treat_as_string_rule_for_field(
+    compatibility_rules,
+    schema_name,
+    type_name,
+    &attr.property_name,
+  )
+  .is_some()
+    || treat_as_string_rule_for_field(
+      compatibility_rules,
+      schema_name,
+      type_qname,
+      &attr.property_name,
+    )
+    .is_some()
+    || treat_as_string_rule_for_field(compatibility_rules, schema_name, type_name, &attr.q_name)
+      .is_some()
+    || treat_as_string_rule_for_field(compatibility_rules, schema_name, type_qname, &attr.q_name)
+      .is_some();
   let map_value_rule = map_attribute_value_rule_for_field(
     compatibility_rules,
     schema_name,
@@ -2197,7 +2198,7 @@ fn gen_field_match_arm(
     map_attribute_value_rule_for_field(compatibility_rules, schema_name, type_qname, &attr.q_name)
   });
 
-  let mapped_value_stmt: Option<Stmt> = if let Some(rule) = map_value_rule {
+  let mapped_value_stmt: Option<TokenStream> = if let Some(rule) = map_value_rule {
     let CompatibilityAction::MapAttributeValue { mappings } = &rule.action else {
       unreachable!()
     };
@@ -2208,19 +2209,25 @@ fn gen_field_match_arm(
       mapping_entries.push(quote! { (#from, #to) });
     }
 
-    Some(parse2(quote! {
+    Some(quote! {
       let raw_value = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
       let mapped_value = crate::common::map_compat_attr_value(
         raw_value,
         &[ #( #mapping_entries ),* ],
       );
-    })?)
+    })
   } else {
     None
   };
 
-  let body_core: TokenStream = match classify_attr_type(&attr.r#type)
-    .ok_or_else(|| attr.r#type.clone())?
+  let effective_attr_type = if treat_as_string {
+    "StringValue"
+  } else {
+    attr.r#type.as_str()
+  };
+
+  let body_core: TokenStream = match classify_attr_type(effective_attr_type)
+    .ok_or_else(|| effective_attr_type.to_string())?
   {
     AttrTypeKind::List => parse2(quote! {
       #attr_name_ident = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);

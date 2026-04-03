@@ -5,7 +5,7 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use syn::{Arm, Ident, ItemMod, parse_str, parse2};
+use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::deserializer::gen_schema_deserializer;
@@ -178,7 +178,13 @@ fn write_schemas(
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &schema_path,
-      gen_schema(sdk_data_schema, compatibility_rules, context).map_err(|err| {
+      gen_schema(
+        sdk_data_schema,
+        compatibility_rules,
+        context,
+        schema_module_is_microsoft365_only(sdk_data_schema),
+      )
+      .map_err(|err| {
         format!(
           "failed to generate schema {}: {err}",
           sdk_data_schema.module_name
@@ -186,7 +192,11 @@ fn write_schemas(
       })?,
     )?;
 
-    push_module_decl(&mut schemas_mod_list, &sdk_data_schema.module_name)?;
+    push_module_decl(
+      &mut schemas_mod_list,
+      &sdk_data_schema.module_name,
+      schema_module_cfg_attrs(sdk_data_schema),
+    )?;
   }
 
   for package_schema in sdk_data_package_schemas {
@@ -201,7 +211,11 @@ fn write_schemas(
       })?,
     )?;
 
-    push_module_decl(&mut schemas_mod_list, &package_schema.module_name)?;
+    push_module_decl(
+      &mut schemas_mod_list,
+      &package_schema.module_name,
+      Vec::new(),
+    )?;
   }
 
   let token_stream: TokenStream = quote! {
@@ -230,7 +244,13 @@ fn write_deserializers(
       out_deserializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &deserializer_path,
-      gen_schema_deserializer(sdk_data_schema, compatibility_rules, context).map_err(|err| {
+      gen_schema_deserializer(
+        sdk_data_schema,
+        compatibility_rules,
+        context,
+        schema_module_is_microsoft365_only(sdk_data_schema),
+      )
+      .map_err(|err| {
         format!(
           "failed to generate deserializer {}: {err}",
           sdk_data_schema.module_name
@@ -238,7 +258,11 @@ fn write_deserializers(
       })?,
     )?;
 
-    push_module_decl(&mut deserializers_mod_list, &sdk_data_schema.module_name)?;
+    push_module_decl(
+      &mut deserializers_mod_list,
+      &sdk_data_schema.module_name,
+      schema_module_cfg_attrs(sdk_data_schema),
+    )?;
   }
 
   let token_stream: TokenStream = quote! {
@@ -323,7 +347,13 @@ fn write_serializers(
       out_serializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
     write_generated_module(
       &serializer_path,
-      gen_schema_serializer(sdk_data_schema, compatibility_rules, context).map_err(|err| {
+      gen_schema_serializer(
+        sdk_data_schema,
+        compatibility_rules,
+        context,
+        schema_module_is_microsoft365_only(sdk_data_schema),
+      )
+      .map_err(|err| {
         format!(
           "failed to generate serializer {}: {err}",
           sdk_data_schema.module_name
@@ -331,7 +361,11 @@ fn write_serializers(
       })?,
     )?;
 
-    push_module_decl(&mut serializers_mod_list, &sdk_data_schema.module_name)?;
+    push_module_decl(
+      &mut serializers_mod_list,
+      &sdk_data_schema.module_name,
+      schema_module_cfg_attrs(sdk_data_schema),
+    )?;
   }
 
   let token_stream: TokenStream = quote! {
@@ -351,12 +385,37 @@ fn write_generated_module(path: &Path, token_stream: TokenStream) -> Result<()> 
   Ok(())
 }
 
-fn push_module_decl(mod_list: &mut Vec<ItemMod>, module_name: &str) -> Result<()> {
+fn push_module_decl(
+  mod_list: &mut Vec<ItemMod>,
+  module_name: &str,
+  cfg_attrs: Vec<Attribute>,
+) -> Result<()> {
   let module_ident: Ident = parse_str(module_name)?;
   mod_list.push(parse2(quote! {
+    #( #cfg_attrs )*
     pub mod #module_ident;
   })?);
   Ok(())
+}
+
+fn schema_module_cfg_attrs(schema: &SdkDataSchema) -> Vec<Attribute> {
+  if schema_module_is_microsoft365_only(schema) {
+    version_cfg_attrs("Microsoft365")
+  } else {
+    Vec::new()
+  }
+}
+
+fn schema_module_is_microsoft365_only(schema: &SdkDataSchema) -> bool {
+  !schema.types.is_empty()
+    && schema
+      .types
+      .iter()
+      .all(|schema_type| versioning::is_microsoft365_version(&schema_type.version))
+    && schema
+      .enums
+      .iter()
+      .all(|schema_enum| versioning::is_microsoft365_version(&schema_enum.version))
 }
 
 fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {

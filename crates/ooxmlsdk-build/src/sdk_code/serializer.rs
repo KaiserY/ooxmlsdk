@@ -1,6 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::cell::Cell;
 use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::Result;
@@ -25,7 +26,9 @@ pub fn gen_schema_serializer(
   schema: &Schema,
   compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
+  suppress_version_cfg_attrs: bool,
 ) -> Result<TokenStream> {
+  let _version_cfg_scope = SerializerVersionCfgScope::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<ItemImpl> = vec![];
 
   for schema_enum in &schema.enums {
@@ -39,8 +42,13 @@ pub fn gen_schema_serializer(
       continue;
     }
 
-    let (impl_block, display_impl) =
-      gen_struct_serializer(schema, schema_type, compatibility_rules, context)?;
+    let (impl_block, display_impl) = gen_struct_serializer(
+      schema,
+      schema_type,
+      compatibility_rules,
+      context,
+      suppress_version_cfg_attrs,
+    )?;
     token_stream_list.push(impl_block);
     token_stream_list.push(display_impl);
   }
@@ -110,7 +118,7 @@ fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(Ite
     schema_enum.name.to_upper_camel_case()
   ))?;
   let mut variants: Vec<Arm> = vec![];
-  let enum_attrs = version_cfg_attrs(&schema_enum.version);
+  let enum_attrs = module_version_cfg_attrs(&schema_enum.version, false);
 
   for facet in &schema_enum.facets {
     let variant_ident: Ident = if facet.name.is_empty() {
@@ -155,11 +163,44 @@ fn gen_enum_serializer(schema: &Schema, schema_enum: &SchemaEnum) -> Result<(Ite
   Ok((impl_block, display_impl))
 }
 
+thread_local! {
+  static SERIALIZER_VERSION_CFG_SUPPRESS: Cell<bool> = const { Cell::new(false) };
+}
+
+struct SerializerVersionCfgScope {
+  previous: bool,
+}
+
+impl SerializerVersionCfgScope {
+  fn new(suppress: bool) -> Self {
+    let previous = SERIALIZER_VERSION_CFG_SUPPRESS.with(|cell| cell.replace(suppress));
+    Self { previous }
+  }
+}
+
+impl Drop for SerializerVersionCfgScope {
+  fn drop(&mut self) {
+    SERIALIZER_VERSION_CFG_SUPPRESS.with(|cell| cell.set(self.previous));
+  }
+}
+
+fn module_version_cfg_attrs(
+  version: &str,
+  suppress_version_cfg_attrs: bool,
+) -> Vec<syn::Attribute> {
+  if suppress_version_cfg_attrs || SERIALIZER_VERSION_CFG_SUPPRESS.with(|cell| cell.get()) {
+    Vec::new()
+  } else {
+    version_cfg_attrs(version)
+  }
+}
+
 fn gen_struct_serializer(
   schema: &Schema,
   schema_type: &SchemaType,
   compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
+  suppress_version_cfg_attrs: bool,
 ) -> Result<(ItemImpl, ItemImpl)> {
   let struct_type: Type = parse_str(&format!(
     "crate::schemas::{}::{}",
@@ -613,7 +654,7 @@ fn gen_struct_serializer(
     })?
   };
 
-  let type_attrs = version_cfg_attrs(&schema_type.version);
+  let type_attrs = module_version_cfg_attrs(&schema_type.version, suppress_version_cfg_attrs);
   let impl_block = parse2(quote! {
     #( #type_attrs )*
     impl #struct_type {

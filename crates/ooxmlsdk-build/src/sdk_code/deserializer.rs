@@ -1,6 +1,7 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::cell::Cell;
 use std::collections::HashSet;
 use syn::{Arm, Expr, Ident, ItemFn, ItemImpl, LitByteStr, Stmt, Type, parse_str, parse2};
 
@@ -32,6 +33,27 @@ struct MatchBranch {
   version: String,
   key: LitByteStr,
   body: Stmt,
+}
+
+thread_local! {
+  static DESERIALIZER_VERSION_CFG_SUPPRESS: Cell<bool> = const { Cell::new(false) };
+}
+
+struct DeserializerVersionCfgScope {
+  previous: bool,
+}
+
+impl DeserializerVersionCfgScope {
+  fn new(suppress: bool) -> Self {
+    let previous = DESERIALIZER_VERSION_CFG_SUPPRESS.with(|cell| cell.replace(suppress));
+    Self { previous }
+  }
+}
+
+impl Drop for DeserializerVersionCfgScope {
+  fn drop(&mut self) {
+    DESERIALIZER_VERSION_CFG_SUPPRESS.with(|cell| cell.set(self.previous));
+  }
 }
 
 fn structured_sequence_version(
@@ -98,7 +120,9 @@ pub fn gen_schema_deserializer(
   schema: &Schema,
   compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
+  suppress_version_cfg_attrs: bool,
 ) -> Result<TokenStream> {
+  let _version_cfg_scope = DeserializerVersionCfgScope::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<ItemImpl> = vec![];
 
   for schema_enum in &schema.enums {
@@ -137,7 +161,7 @@ pub fn gen_schema_deserializer(
       ))?);
     }
 
-    let enum_attrs = version_cfg_attrs(&schema_enum.version);
+    let enum_attrs = module_version_cfg_attrs(&schema_enum.version, suppress_version_cfg_attrs);
     token_stream_list.push(parse2(quote! {
       #( #enum_attrs )*
       impl std::str::FromStr for #enum_type {
@@ -187,7 +211,7 @@ pub fn gen_schema_deserializer(
     ))?;
 
     let from_str_impl = gen_from_str_impl(&struct_type)?;
-    let type_attrs = version_cfg_attrs(&schema_type.version);
+    let type_attrs = module_version_cfg_attrs(&schema_type.version, suppress_version_cfg_attrs);
     token_stream_list.push(parse2(quote! {
       #( #type_attrs )*
       #from_str_impl
@@ -650,6 +674,7 @@ pub fn gen_schema_deserializer(
                       sequence_variant,
                       schema,
                       context,
+                      suppress_version_cfg_attrs,
                     )?);
 
                     loop_children_match_list.extend(gen_structured_sequence_variant_match_arms(
@@ -1387,6 +1412,17 @@ fn gen_from_reader_fn() -> Result<ItemFn> {
   })?)
 }
 
+fn module_version_cfg_attrs(
+  version: &str,
+  suppress_version_cfg_attrs: bool,
+) -> Vec<syn::Attribute> {
+  if suppress_version_cfg_attrs || DESERIALIZER_VERSION_CFG_SUPPRESS.with(|cell| cell.get()) {
+    Vec::new()
+  } else {
+    version_cfg_attrs(version)
+  }
+}
+
 fn gen_one_sequence_match_arm(
   child: &ResolvedOneSequenceChild<'_>,
   version: &str,
@@ -1556,6 +1592,7 @@ fn gen_structured_sequence_variant_deserialize_fn(
   sequence_variant: &ResolvedOneSequenceSequenceVariant<'_>,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  suppress_version_cfg_attrs: bool,
 ) -> Result<ItemFn> {
   let fn_ident: Ident = parse_str(&format!(
     "deserialize_{}",
@@ -1567,7 +1604,7 @@ fn gen_structured_sequence_variant_deserialize_fn(
   ))?;
   let variant_type_name = sequence_variant.struct_name.as_str();
   let helper_version = structured_sequence_version(sequence_variant);
-  let helper_attrs = version_cfg_attrs(helper_version);
+  let helper_attrs = module_version_cfg_attrs(helper_version, suppress_version_cfg_attrs);
 
   let mut field_declarations: Vec<Stmt> = vec![];
   let mut field_unwraps: Vec<Stmt> = vec![];

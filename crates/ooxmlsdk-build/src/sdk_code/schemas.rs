@@ -2,6 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::collections::HashMap;
 use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
@@ -31,6 +32,27 @@ pub struct CodegenContext<'a> {
   type_module_map: HashMap<&'a str, &'a str>,
   type_prefix_map: HashMap<&'a str, &'a str>,
   enum_module_by_typed_namespace_and_name: HashMap<(&'a str, &'a str), &'a str>,
+}
+
+thread_local! {
+  static SCHEMA_VERSION_CFG_SUPPRESS: Cell<bool> = const { Cell::new(false) };
+}
+
+struct SchemaVersionCfgScope {
+  previous: bool,
+}
+
+impl SchemaVersionCfgScope {
+  fn new(suppress: bool) -> Self {
+    let previous = SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.replace(suppress));
+    Self { previous }
+  }
+}
+
+impl Drop for SchemaVersionCfgScope {
+  fn drop(&mut self) {
+    SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.set(self.previous));
+  }
 }
 
 #[derive(Debug)]
@@ -470,7 +492,9 @@ pub fn gen_schema(
   schema: &Schema,
   compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
+  suppress_version_cfg_attrs: bool,
 ) -> Result<TokenStream> {
+  let _version_cfg_scope = SchemaVersionCfgScope::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<TokenStream> = vec![];
 
   for schema_enum in &schema.enums {
@@ -479,7 +503,7 @@ pub fn gen_schema(
 
   for schema_type in &schema.types {
     let struct_name_ident: Ident = parse_str(&schema_type.class_name.to_upper_camel_case())?;
-    let type_attrs = version_cfg_attrs(&schema_type.version);
+    let type_attrs = module_version_cfg_attrs(&schema_type.version, suppress_version_cfg_attrs);
     let summary_doc = format!(" {}", schema_type.summary);
     let version_doc = if schema_type.version.is_empty() {
       " Available in Office2007 and above.".to_string()
@@ -729,7 +753,7 @@ fn common_choice_version<'a>(container_version: &'a str, variant_versions: &[&st
 
 fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
   let enum_name_ident: Ident = parse_str(&schema_enum.name.to_upper_camel_case())?;
-  let enum_attrs = version_cfg_attrs(&schema_enum.version);
+  let enum_attrs = module_version_cfg_attrs(&schema_enum.version, false);
   let baseline_facets: Vec<_> = schema_enum
     .facets
     .iter()
@@ -744,7 +768,7 @@ fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
     let later_enum_attrs = if is_microsoft365_version(&schema_enum.version) {
       Vec::new()
     } else {
-      version_cfg_attrs("Microsoft365")
+      module_version_cfg_attrs("Microsoft365", false)
     };
     let default_facet = schema_enum.facets.first().expect("schema enum facet");
     let variants = gen_schema_enum_variants(
@@ -767,7 +791,7 @@ fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
     && has_later_facets
     && !is_microsoft365_version(&schema_enum.version)
   {
-    let baseline_enum_attrs = not_microsoft365_cfg_attrs();
+    let baseline_enum_attrs = module_not_microsoft365_cfg_attrs(false);
     let baseline_default = baseline_facets
       .first()
       .copied()
@@ -831,7 +855,7 @@ fn gen_schema_enum_variants(
       parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case()))?
     };
     let variant_attrs = if emit_version_cfgs {
-      version_cfg_attrs(&facet.version)
+      module_version_cfg_attrs(&facet.version, false)
     } else {
       Vec::new()
     };
@@ -849,6 +873,25 @@ fn gen_schema_enum_variants(
   }
 
   Ok(variants)
+}
+
+fn module_version_cfg_attrs(
+  version: &str,
+  suppress_version_cfg_attrs: bool,
+) -> Vec<syn::Attribute> {
+  if suppress_version_cfg_attrs || SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.get()) {
+    Vec::new()
+  } else {
+    version_cfg_attrs(version)
+  }
+}
+
+fn module_not_microsoft365_cfg_attrs(suppress_version_cfg_attrs: bool) -> Vec<syn::Attribute> {
+  if suppress_version_cfg_attrs || SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.get()) {
+    Vec::new()
+  } else {
+    not_microsoft365_cfg_attrs()
+  }
 }
 
 fn gen_attr(
@@ -925,7 +968,7 @@ fn gen_attr(
     .validators
     .iter()
     .any(|validator| validator.name == "RequiredValidator");
-  let attr_attrs = version_cfg_attrs(&attr.version);
+  let attr_attrs = module_version_cfg_attrs(&attr.version, false);
   let property_comments_doc = format!(" {}", attr.property_comments);
   let version_doc = if attr.version.is_empty() {
     " Available in Office2007 and above.".to_string()
@@ -1011,7 +1054,7 @@ fn gen_children(
         parse_str(&child_type.class_name.to_upper_camel_case())?
       }
     };
-    let child_attrs = version_cfg_attrs(child.version);
+    let child_attrs = module_version_cfg_attrs(child.version, false);
 
     variants.push(quote! {
       #( #child_attrs )*
@@ -1125,10 +1168,10 @@ fn gen_one_sequence_fields(
         }
 
         let property_comments = child.property_comments.as_ref();
-        let field_attrs = version_cfg_attrs(effective_version(
-          child.version,
-          flat_particle.initial_version,
-        ));
+        let field_attrs = module_version_cfg_attrs(
+          effective_version(child.version, flat_particle.initial_version),
+          false,
+        );
 
         if flat_particle.repeated {
           fields.push(quote! {
@@ -1173,7 +1216,7 @@ fn gen_one_sequence_fields(
             .map(|variant| variant.version)
             .collect::<Vec<_>>(),
         );
-        let field_attrs = version_cfg_attrs(choice_version);
+        let field_attrs = module_version_cfg_attrs(choice_version, false);
 
         let mut variants = Vec::new();
         let mut default_variant = None;
@@ -1181,7 +1224,7 @@ fn gen_one_sequence_fields(
         for variant in &choice.variants {
           let variant_type = one_sequence_child_variant_type(variant, schema, context)?;
           let variant_ident: Ident = parse_str(&variant.field_name.to_upper_camel_case())?;
-          let variant_attrs = version_cfg_attrs(variant.version);
+          let variant_attrs = module_version_cfg_attrs(variant.version, false);
 
           if default_variant.is_none()
             && (choice_version == variant.version
@@ -1297,8 +1340,10 @@ fn gen_structured_one_sequence_fields(
         }
 
         let property_comments = child.property_comments.as_ref();
-        let field_attrs =
-          version_cfg_attrs(effective_version(child.version, particle.initial_version));
+        let field_attrs = module_version_cfg_attrs(
+          effective_version(child.version, particle.initial_version),
+          false,
+        );
 
         if particle.repeated {
           fields.push(quote! {
@@ -1355,7 +1400,7 @@ fn gen_structured_one_sequence_fields(
             })
             .collect::<Vec<_>>(),
         );
-        let field_attrs = version_cfg_attrs(choice_version);
+        let field_attrs = module_version_cfg_attrs(choice_version, false);
         let mut variants = Vec::new();
         let mut default_variant = None;
 
@@ -1364,7 +1409,7 @@ fn gen_structured_one_sequence_fields(
             ResolvedOneSequenceChoiceVariant::Leaf(child) => {
               let variant_type = one_sequence_child_variant_type(child, schema, context)?;
               let variant_ident: Ident = parse_str(&child.field_name.to_upper_camel_case())?;
-              let variant_attrs = version_cfg_attrs(child.version);
+              let variant_attrs = module_version_cfg_attrs(child.version, false);
 
               if default_variant.is_none()
                 && (choice_version == child.version
@@ -1391,7 +1436,7 @@ fn gen_structured_one_sequence_fields(
                   .map(|field| effective_version(field.child.version, field.initial_version))
                   .collect::<Vec<_>>(),
               );
-              let sequence_attrs = version_cfg_attrs(sequence_version);
+              let sequence_attrs = module_version_cfg_attrs(sequence_version, false);
 
               items.push(quote! {
                 #( #sequence_attrs )*
@@ -1508,7 +1553,10 @@ fn gen_sequence_variant_fields(
 
     let child_name_ident: Ident = parse_str(&child.field_name)?;
     let property_comments = child.property_comments.as_ref();
-    let field_attrs = version_cfg_attrs(effective_version(child.version, field.initial_version));
+    let field_attrs = module_version_cfg_attrs(
+      effective_version(child.version, field.initial_version),
+      false,
+    );
 
     if field.repeated {
       fields.push(quote! {

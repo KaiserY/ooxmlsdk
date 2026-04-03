@@ -34,6 +34,44 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
 }
 
 #[test]
+fn core_properties_round_trip_from_more_doc_props_test() {
+  let parsed = fixtures::OPC_CORE_PROPERTIES_MORE_DOC_PROPS_XML
+    .parse::<CoreProperties>()
+    .unwrap();
+  let serialized = parsed.to_xml().unwrap();
+  let reparsed = serialized.parse::<CoreProperties>().unwrap();
+  let serialized_twice = reparsed.to_xml().unwrap();
+
+  assert_eq!(serialized, serialized_twice);
+
+  assert_eq!(parsed.creator.as_deref(), Some("Eric White"));
+  assert_eq!(parsed.last_modified_by.as_deref(), Some("Eric White"));
+  assert_eq!(parsed.revision.as_deref(), Some("6"));
+  assert_eq!(parsed.created.as_deref(), Some("2014-10-28T11:34:00Z"));
+  assert_eq!(parsed.modified.as_deref(), Some("2015-06-20T07:40:00Z"));
+  let serialized = trim_xml_declaration(&serialized);
+  assert!(serialized.starts_with("<cp:coreProperties"));
+  assert!(serialized.contains("<dc:creator>Eric White</dc:creator>"));
+  assert!(serialized.contains("<cp:lastModifiedBy>Eric White</cp:lastModifiedBy>"));
+  assert_eq!(reparsed.creator.as_deref(), Some("Eric White"));
+}
+
+#[test]
+fn extended_properties_round_trip_from_more_doc_props_test() {
+  let (parsed, serialized, reparsed) =
+    assert_stable_roundtrip::<ExtendedProperties>(fixtures::EXTENDED_PROPERTIES_MORE_DOC_PROPS_XML);
+
+  assert!(!parsed.children.is_empty());
+  let serialized = trim_xml_declaration(&serialized);
+  assert!(serialized.starts_with("<Properties"));
+  assert!(serialized.contains("extended-properties"));
+  assert!(serialized.contains("<Template>Normal.dotm</Template>"));
+  assert!(serialized.contains("<Application>Microsoft Office Word</Application>"));
+  assert!(serialized.contains("<AppVersion>15.0000</AppVersion>"));
+  assert_eq!(parsed.children.len(), reparsed.children.len());
+}
+
+#[test]
 fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
   let (parsed, serialized, reparsed) = assert_stable_roundtrip::<ExtendedProperties>(
     fixtures::EXTENDED_PROPERTIES_TITLES_OF_PARTS_XML,

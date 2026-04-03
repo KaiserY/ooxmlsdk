@@ -363,6 +363,12 @@
       "Action": "PreserveNamespaceDecls"
     },
     {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "Settings",
+      "Field": "w:compatSetting",
+      "Action": "ExtraChild"
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
       "Type": "GraphicData",
       "Field": "we:webextension",

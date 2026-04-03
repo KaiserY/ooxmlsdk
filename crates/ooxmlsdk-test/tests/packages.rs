@@ -1026,6 +1026,16 @@ fn open_youtube_xlsx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn open_missingcalcchainpart_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("missingcalcchainpart.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 6);
+  assert!(package.workbook_part.shared_string_table_part.is_some());
+  assert!(package.workbook_part.calculation_chain_part.is_none());
+}
+
+#[test]
 fn open_doc_props_docx_asset_from_openxml_sdk() {
   let path = test_file_path("DocProps.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
@@ -1092,6 +1102,93 @@ fn open_doc_props_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn open_more_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("MoreDocProps.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.creator.as_deref()),
+    Some(Some("Eric White"))
+  );
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.revision.as_deref()),
+    Some(Some("6"))
+  );
+  assert!(package.extended_file_properties_part.is_some());
+  assert!(package.custom_file_properties_part.is_none());
+  assert!(package.main_document_part.style_definitions_part.is_some());
+  assert!(package.main_document_part.theme_part.is_some());
+}
+
+#[test]
+fn open_notes_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Notes.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(
+    package
+      .core_file_properties_part
+      .as_ref()
+      .map(|part| part.root_element.creator.as_deref()),
+    Some(Some("Eric"))
+  );
+  assert_eq!(package.main_document_part.image_parts.len(), 2);
+  assert!(package.main_document_part.style_definitions_part.is_some());
+  assert!(
+    package
+      .main_document_part
+      .styles_with_effects_part
+      .is_some()
+  );
+  assert!(package.main_document_part.web_settings_part.is_some());
+}
+
+#[test]
+fn open_complex01_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Complex01.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.header_parts.len(), 9);
+  assert_eq!(package.main_document_part.footer_parts.len(), 9);
+  assert_eq!(package.main_document_part.image_parts.len(), 3);
+  assert_eq!(package.main_document_part.chart_parts.len(), 1);
+  assert_eq!(package.main_document_part.diagram_data_parts.len(), 1);
+  assert_eq!(
+    package
+      .main_document_part
+      .diagram_layout_definition_parts
+      .len(),
+    1
+  );
+  assert_eq!(package.main_document_part.diagram_style_parts.len(), 1);
+  assert_eq!(package.main_document_part.diagram_colors_parts.len(), 1);
+  assert_eq!(package.main_document_part.embedded_package_parts.len(), 1);
+  assert!(
+    package.main_document_part.chart_parts[0]
+      .embedded_package_part
+      .is_some()
+  );
+  assert!(
+    package
+      .main_document_part
+      .wordprocessing_comments_part
+      .is_some()
+  );
+  assert!(
+    package
+      .main_document_part
+      .numbering_definitions_part
+      .is_some()
+  );
+}
+
+#[test]
 fn open_bad_doc_props_docx_asset_from_openxml_sdk() {
   let path = test_file_path("BadDocProps.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
@@ -1112,6 +1209,169 @@ fn open_invalid_doc_propsct_docx_asset_from_openxml_sdk() {
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
 
   assert!(package.core_file_properties_part.is_some());
+}
+
+#[test]
+fn open_mcdoc_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("mcdoc.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.main_document_part.custom_xml_parts.len(), 1);
+  assert!(package.main_document_part.style_definitions_part.is_some());
+  assert!(
+    package
+      .main_document_part
+      .styles_with_effects_part
+      .is_some()
+  );
+  assert!(package.main_document_part.theme_part.is_some());
+  assert!(package.main_document_part.web_settings_part.is_some());
+}
+
+#[test]
+fn open_autosave_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("autosave.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.slide_parts.len(), 2);
+  assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
+  assert!(package.presentation_part.theme_part.is_some());
+  assert!(
+    package
+      .presentation_part
+      .presentation_properties_part
+      .is_some()
+  );
+  assert!(package.presentation_part.view_properties_part.is_some());
+  assert!(package.presentation_part.table_styles_part.is_some());
+}
+
+#[test]
+fn open_mediareference_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("mediareference.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.slide_parts.len(), 2);
+  assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
+  assert_eq!(
+    package.presentation_part.slide_parts[0].image_parts.len(),
+    1
+  );
+  assert!(package.presentation_part.theme_part.is_some());
+}
+
+#[test]
+fn open_algn_tab_tab_alignment_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Algn_tab_TabAlignment.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.slide_parts.len(), 1);
+  assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
+  assert!(package.presentation_part.theme_part.is_some());
+  assert!(
+    package
+      .presentation_part
+      .presentation_properties_part
+      .is_some()
+  );
+  assert!(package.presentation_part.view_properties_part.is_some());
+}
+
+#[test]
+fn open_animation_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("animation.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.slide_parts.len(), 2);
+  assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
+  assert_eq!(package.presentation_part.custom_xml_parts.len(), 1);
+  assert_eq!(
+    package.presentation_part.slide_parts[1].image_parts.len(),
+    1
+  );
+}
+
+#[test]
+fn open_excel14_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("excel14.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+  let sheet1_part = package
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 3);
+  assert!(package.workbook_part.shared_string_table_part.is_some());
+  assert!(package.workbook_part.workbook_styles_part.is_some());
+  assert!(sheet1_part.drawings_part.is_some());
+  assert_eq!(
+    sheet1_part
+      .drawings_part
+      .as_ref()
+      .expect("expected drawing part")
+      .image_parts
+      .len(),
+    1
+  );
+}
+
+#[test]
+fn open_extlst_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("extlst.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+  let sheet1_part = package
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 4);
+  assert_eq!(
+    package
+      .workbook_part
+      .pivot_table_cache_definition_parts
+      .len(),
+    1
+  );
+  assert!(sheet1_part.drawings_part.is_some());
+  assert_eq!(sheet1_part.pivot_table_parts.len(), 1);
+}
+
+#[test]
+fn open_revision_name_comment_change_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Revision_NameCommentChange.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 3);
+  assert!(
+    package
+      .workbook_part
+      .workbook_revision_header_part
+      .is_some()
+  );
+  assert!(package.workbook_part.workbook_user_data_part.is_some());
+  assert!(package.workbook_part.workbook_styles_part.is_some());
+}
+
+#[test]
+fn open_vmldrawingroot_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("vmldrawingroot.xlsx");
+  let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+  let sheet1_part = package
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+
+  assert_eq!(package.workbook_part.worksheet_parts.len(), 3);
+  assert!(package.workbook_part.workbook_styles_part.is_some());
+  assert_eq!(sheet1_part.vml_drawing_parts.len(), 1);
+  assert!(sheet1_part.worksheet_comments_part.is_some());
+  assert!(sheet1_part.drawings_part.is_none());
 }
 
 #[test]
@@ -2136,6 +2396,425 @@ fn round_trip_doc_props_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+fn round_trip_more_doc_props_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("MoreDocProps.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  let original_core_properties = original
+    .core_file_properties_part
+    .as_ref()
+    .expect("expected core properties part");
+  let roundtripped_core_properties = roundtripped
+    .core_file_properties_part
+    .as_ref()
+    .expect("expected core properties part");
+
+  assert_eq!(
+    original_core_properties.root_element.creator.as_deref(),
+    Some("Eric White")
+  );
+  assert_eq!(
+    roundtripped_core_properties.root_element.creator.as_deref(),
+    Some("Eric White")
+  );
+  assert_eq!(
+    original_core_properties.root_element.revision.as_deref(),
+    Some("6")
+  );
+  assert_eq!(
+    roundtripped_core_properties
+      .root_element
+      .revision
+      .as_deref(),
+    Some("6")
+  );
+  assert!(original.extended_file_properties_part.is_some());
+  assert!(roundtripped.extended_file_properties_part.is_some());
+  assert!(original.custom_file_properties_part.is_none());
+  assert!(roundtripped.custom_file_properties_part.is_none());
+}
+
+#[test]
+fn round_trip_mcdoc_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("mcdoc.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  assert_eq!(
+    original.main_document_part.custom_xml_parts.len(),
+    roundtripped.main_document_part.custom_xml_parts.len()
+  );
+  assert!(original.main_document_part.style_definitions_part.is_some());
+  assert!(
+    roundtripped
+      .main_document_part
+      .style_definitions_part
+      .is_some()
+  );
+  assert!(
+    original
+      .main_document_part
+      .styles_with_effects_part
+      .is_some()
+  );
+  assert!(
+    roundtripped
+      .main_document_part
+      .styles_with_effects_part
+      .is_some()
+  );
+  assert!(original.main_document_part.theme_part.is_some());
+  assert!(roundtripped.main_document_part.theme_part.is_some());
+  assert!(original.main_document_part.web_settings_part.is_some());
+  assert!(roundtripped.main_document_part.web_settings_part.is_some());
+}
+
+#[test]
+fn round_trip_notes_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Notes.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  assert_eq!(original.main_document_part.image_parts.len(), 2);
+  assert_eq!(roundtripped.main_document_part.image_parts.len(), 2);
+  assert!(
+    original
+      .main_document_part
+      .styles_with_effects_part
+      .is_some()
+  );
+  assert!(
+    roundtripped
+      .main_document_part
+      .styles_with_effects_part
+      .is_some()
+  );
+  assert!(original.main_document_part.web_settings_part.is_some());
+  assert!(roundtripped.main_document_part.web_settings_part.is_some());
+}
+
+#[test]
+fn round_trip_complex01_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Complex01.docx");
+  let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
+
+  assert_eq!(
+    original.main_document_part.header_parts.len(),
+    roundtripped.main_document_part.header_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.footer_parts.len(),
+    roundtripped.main_document_part.footer_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.image_parts.len(),
+    roundtripped.main_document_part.image_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.chart_parts.len(),
+    roundtripped.main_document_part.chart_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.diagram_data_parts.len(),
+    roundtripped.main_document_part.diagram_data_parts.len()
+  );
+  assert_eq!(
+    original
+      .main_document_part
+      .diagram_layout_definition_parts
+      .len(),
+    roundtripped
+      .main_document_part
+      .diagram_layout_definition_parts
+      .len()
+  );
+  assert_eq!(
+    original.main_document_part.diagram_style_parts.len(),
+    roundtripped.main_document_part.diagram_style_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.diagram_colors_parts.len(),
+    roundtripped.main_document_part.diagram_colors_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.embedded_package_parts.len(),
+    roundtripped.main_document_part.embedded_package_parts.len()
+  );
+  assert_eq!(
+    original.main_document_part.chart_parts[0]
+      .embedded_package_part
+      .is_some(),
+    roundtripped.main_document_part.chart_parts[0]
+      .embedded_package_part
+      .is_some()
+  );
+}
+
+#[test]
+fn round_trip_autosave_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("autosave.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_master_parts.len(),
+    roundtripped.presentation_part.slide_master_parts.len()
+  );
+  assert!(original.presentation_part.theme_part.is_some());
+  assert!(roundtripped.presentation_part.theme_part.is_some());
+  assert!(
+    original
+      .presentation_part
+      .presentation_properties_part
+      .is_some()
+  );
+  assert!(
+    roundtripped
+      .presentation_part
+      .presentation_properties_part
+      .is_some()
+  );
+  assert!(original.presentation_part.view_properties_part.is_some());
+  assert!(
+    roundtripped
+      .presentation_part
+      .view_properties_part
+      .is_some()
+  );
+}
+
+#[test]
+fn round_trip_mediareference_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("mediareference.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_master_parts.len(),
+    roundtripped.presentation_part.slide_master_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_parts[0].image_parts.len(),
+    1
+  );
+  assert_eq!(
+    roundtripped.presentation_part.slide_parts[0]
+      .image_parts
+      .len(),
+    1
+  );
+}
+
+#[test]
+fn round_trip_algn_tab_tab_alignment_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("Algn_tab_TabAlignment.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_master_parts.len(),
+    roundtripped.presentation_part.slide_master_parts.len()
+  );
+  assert!(original.presentation_part.theme_part.is_some());
+  assert!(roundtripped.presentation_part.theme_part.is_some());
+}
+
+#[test]
+fn round_trip_animation_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("animation.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.custom_xml_parts.len(),
+    roundtripped.presentation_part.custom_xml_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_parts[1].image_parts.len(),
+    1
+  );
+  assert_eq!(
+    roundtripped.presentation_part.slide_parts[1]
+      .image_parts
+      .len(),
+    1
+  );
+}
+
+#[test]
+fn round_trip_excel14_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("excel14.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+  let original_sheet1_part = original
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+  let roundtripped_sheet1_part = roundtripped
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+
+  assert_eq!(
+    original.workbook_part.worksheet_parts.len(),
+    roundtripped.workbook_part.worksheet_parts.len()
+  );
+  assert!(original.workbook_part.shared_string_table_part.is_some());
+  assert!(
+    roundtripped
+      .workbook_part
+      .shared_string_table_part
+      .is_some()
+  );
+  assert!(original_sheet1_part.drawings_part.is_some());
+  assert!(roundtripped_sheet1_part.drawings_part.is_some());
+  assert_eq!(
+    original_sheet1_part
+      .drawings_part
+      .as_ref()
+      .expect("expected drawing part")
+      .image_parts
+      .len(),
+    1
+  );
+  assert_eq!(
+    roundtripped_sheet1_part
+      .drawings_part
+      .as_ref()
+      .expect("expected drawing part")
+      .image_parts
+      .len(),
+    1
+  );
+}
+
+#[test]
+fn round_trip_extlst_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("extlst.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+  let original_sheet1_part = original
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+  let roundtripped_sheet1_part = roundtripped
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+
+  assert_eq!(
+    original.workbook_part.worksheet_parts.len(),
+    roundtripped.workbook_part.worksheet_parts.len()
+  );
+  assert_eq!(
+    original
+      .workbook_part
+      .pivot_table_cache_definition_parts
+      .len(),
+    roundtripped
+      .workbook_part
+      .pivot_table_cache_definition_parts
+      .len()
+  );
+  assert!(original_sheet1_part.drawings_part.is_some());
+  assert!(roundtripped_sheet1_part.drawings_part.is_some());
+  assert_eq!(
+    original_sheet1_part.pivot_table_parts.len(),
+    roundtripped_sheet1_part.pivot_table_parts.len()
+  );
+}
+
+#[test]
+fn round_trip_revision_name_comment_change_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("Revision_NameCommentChange.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  assert_eq!(
+    original.workbook_part.worksheet_parts.len(),
+    roundtripped.workbook_part.worksheet_parts.len()
+  );
+  assert!(
+    original
+      .workbook_part
+      .workbook_revision_header_part
+      .is_some()
+  );
+  assert!(
+    roundtripped
+      .workbook_part
+      .workbook_revision_header_part
+      .is_some()
+  );
+  assert!(original.workbook_part.workbook_user_data_part.is_some());
+  assert!(roundtripped.workbook_part.workbook_user_data_part.is_some());
+}
+
+#[test]
+fn round_trip_vmldrawingroot_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("vmldrawingroot.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+  let original_sheet1_part = original
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+  let roundtripped_sheet1_part = roundtripped
+    .workbook_part
+    .worksheet_parts
+    .iter()
+    .find(|part| part.inner_path == "xl/worksheets/sheet1.xml")
+    .expect("expected sheet1 worksheet part");
+
+  assert_eq!(
+    original.workbook_part.worksheet_parts.len(),
+    roundtripped.workbook_part.worksheet_parts.len()
+  );
+  assert_eq!(
+    original_sheet1_part.vml_drawing_parts.len(),
+    roundtripped_sheet1_part.vml_drawing_parts.len()
+  );
+  assert!(original_sheet1_part.worksheet_comments_part.is_some());
+  assert!(roundtripped_sheet1_part.worksheet_comments_part.is_some());
+}
+
+#[test]
+fn round_trip_missingcalcchainpart_xlsx_asset_from_openxml_sdk() {
+  let path = test_file_path("missingcalcchainpart.xlsx");
+  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+
+  assert_eq!(
+    original.workbook_part.worksheet_parts.len(),
+    roundtripped.workbook_part.worksheet_parts.len()
+  );
+  assert!(original.workbook_part.calculation_chain_part.is_none());
+  assert!(roundtripped.workbook_part.calculation_chain_part.is_none());
+  assert!(original.workbook_part.shared_string_table_part.is_some());
+  assert!(
+    roundtripped
+      .workbook_part
+      .shared_string_table_part
+      .is_some()
+  );
+}
+
+#[test]
 fn round_trip_spreadsheet_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Spreadsheet.xlsx");
   let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
@@ -2720,5 +3399,66 @@ fn round_trip_mcppt_pptx_asset_from_openxml_sdk() {
   assert_eq!(
     roundtripped_table_style_list.default.as_str(),
     "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
+  );
+}
+
+#[test]
+fn open_o09_performance_typical_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("o09_Performance_typical.pptx");
+  let package = PresentationDocument::new_from_file(&path).unwrap();
+
+  assert_eq!(package.presentation_part.slide_parts.len(), 11);
+  assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
+  assert!(package.presentation_part.notes_master_part.is_some());
+  assert!(
+    package
+      .presentation_part
+      .presentation_properties_part
+      .is_some()
+  );
+  assert!(package.presentation_part.view_properties_part.is_some());
+  assert!(package.presentation_part.table_styles_part.is_some());
+  assert!(
+    package
+      .presentation_part
+      .slide_parts
+      .iter()
+      .any(|slide| slide.notes_slide_part.is_some())
+  );
+}
+
+#[test]
+fn round_trip_o09_performance_typical_pptx_asset_from_openxml_sdk() {
+  let path = test_file_path("o09_Performance_typical.pptx");
+  let (original, roundtripped) = roundtrip_presentation_document(&path);
+
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_master_parts.len(),
+    roundtripped.presentation_part.slide_master_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.notes_master_part.is_some(),
+    roundtripped.presentation_part.notes_master_part.is_some()
+  );
+  assert_eq!(
+    original
+      .presentation_part
+      .presentation_properties_part
+      .is_some(),
+    roundtripped
+      .presentation_part
+      .presentation_properties_part
+      .is_some()
+  );
+  assert_eq!(
+    original.presentation_part.view_properties_part.is_some(),
+    roundtripped
+      .presentation_part
+      .view_properties_part
+      .is_some()
   );
 }

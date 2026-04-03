@@ -236,6 +236,31 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
     ))?;
 
     if child.max_occurs_great_than_one {
+      let repeated_child_load = if child.min_occurs_is_non_zero {
+        quote! {
+          let #child_name_ident = #child_type::new_from_archive(
+            &child_parent_path,
+            &target_path,
+            &relationship.id,
+            file_path_set,
+            #archive_ident,
+          )?;
+          #child_api_name_ident.push(#child_name_ident);
+        }
+      } else {
+        quote! {
+          if file_path_set.contains(&target_path) {
+            let #child_name_ident = #child_type::new_from_archive(
+              &child_parent_path,
+              &target_path,
+              &relationship.id,
+              file_path_set,
+              #archive_ident,
+            )?;
+            #child_api_name_ident.push(#child_name_ident);
+          }
+        }
+      };
       field_declaration_list.push(
         parse2(versioned_tokens(
           &child.version,
@@ -262,18 +287,34 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
                 &relationship.target,
               ),
             );
-            let #child_name_ident = #child_type::new_from_archive(
+            #repeated_child_load
+          },
+        ),
+      });
+    } else {
+      let optional_child_load = if child.min_occurs_is_non_zero {
+        quote! {
+          #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
+            &child_parent_path,
+            &target_path,
+            &relationship.id,
+            file_path_set,
+            #archive_ident,
+          )?));
+        }
+      } else {
+        quote! {
+          if file_path_set.contains(&target_path) {
+            #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
               &child_parent_path,
               &target_path,
               &relationship.id,
               file_path_set,
               #archive_ident,
-            )?;
-            #child_api_name_ident.push(#child_name_ident);
-          },
-        ),
-      });
-    } else {
+            )?));
+          }
+        }
+      };
       field_declaration_list.push(
         parse2(versioned_tokens(
           &child.version,
@@ -300,13 +341,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
                 &relationship.target,
               ),
             );
-            #child_api_name_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              &target_path,
-              &relationship.id,
-              file_path_set,
-              #archive_ident,
-            )?));
+            #optional_child_load
           },
         ),
       });
@@ -352,9 +387,9 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
 
     children_stmt = Some(
       parse2(quote! {
-        if let Some(relationships) = &relationships {
-          for relationship in &relationships.relationship {
-            match relationship.r#type.as_str() {
+          if let Some(relationships) = &relationships {
+            for relationship in &relationships.relationship {
+              match crate::common::normalize_relationship_type(relationship.r#type.as_str()) {
               #( #children_match_arms )*
               _ => {}
             }

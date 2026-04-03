@@ -507,6 +507,9 @@ pub(crate) fn normalize_relationship_type(value: &str) -> &str {
     "http://purl.oclc.org/ooxml/officeDocument/relationships/styles" => {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
     }
+    "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects" => {
+      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects"
+    }
     "http://purl.oclc.org/ooxml/officeDocument/relationships/subDocument" => {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/subDocument"
     }

@@ -32,6 +32,7 @@ pub enum CompatibilityAction {
   TreatAsString,
   FallbackToRawXml,
   PreserveNamespaceDecls,
+  ExtraChild,
   MapAttributeValue {
     #[serde(rename = "Mappings")]
     mappings: Vec<CompatibilityValueMapping>,

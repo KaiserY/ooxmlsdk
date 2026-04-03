@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::Result;
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityConfig, CompatibilityRule, Schema, SchemaTypeApiKind,
-  SchemaTypeKind,
+  SchemaTypeCompositeKind, SchemaTypeKind, SchemaTypeParticle, SchemaTypeParticleOccur,
 };
 
 pub fn read_compatibility(path: &Path) -> Result<CompatibilityConfig> {
@@ -50,6 +50,7 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
           );
         }
       }
+      CompatibilityAction::ExtraChild => {}
       CompatibilityAction::MapAttributeValue { mappings } => {
         if mappings.is_empty() {
           return Err(
@@ -198,6 +199,19 @@ fn find_attribute_index_in_type_or_base(
   None
 }
 
+fn find_child_type_index_by_qname(schema: &Schema, field: &str) -> Option<usize> {
+  let field_suffix = field.rsplit(':').next().unwrap_or(field);
+  let field_tail = format!("/{field}");
+  let field_suffix_tail = format!("/{field_suffix}");
+
+  schema.types.iter().position(|item| {
+    item.name == field
+      || item.name.ends_with(&field_tail)
+      || item.name.ends_with(&field_suffix_tail)
+      || item.class_name == field_suffix
+  })
+}
+
 pub fn strict_bitmask_rule_for_field<'a>(
   compatibility_rules: &'a [CompatibilityRule],
   schema: &str,
@@ -321,6 +335,57 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       }
     }
     CompatibilityAction::PreserveNamespaceDecls => {}
+    CompatibilityAction::ExtraChild => {
+      let child_type_index =
+        find_child_type_index_by_qname(schema, &rule.field).ok_or_else(|| {
+          format!(
+            "compatibility child {}.{}.{} not found",
+            rule.schema, rule.type_name, rule.field
+          )
+        })?;
+      let child_name = schema.types[child_type_index].name.clone();
+      let child_property_comments = schema.types[child_type_index].summary.clone();
+      let child_version = schema.types[child_type_index].version.clone();
+      let child_name_for_particle = child_name.clone();
+
+      if schema.types[schema_type_index]
+        .children
+        .iter()
+        .any(|child| child.name == child_name)
+      {
+        return Ok(());
+      }
+
+      schema.types[schema_type_index].children.push(
+        crate::sdk_data::sdk_data_model::SchemaTypeChild {
+          name: child_name,
+          property_name: String::new(),
+          property_comments: child_property_comments,
+        },
+      );
+
+      if schema.types[schema_type_index].particle.kind == "Sequence"
+        || schema.types[schema_type_index].composite_kind == SchemaTypeCompositeKind::OneSequence
+      {
+        schema.types[schema_type_index]
+          .particle
+          .items
+          .push(SchemaTypeParticle {
+            kind: String::new(),
+            name: child_name_for_particle,
+            occurs: vec![SchemaTypeParticleOccur {
+              max: 1,
+              min: 0,
+              include_version: false,
+              version: String::new(),
+            }],
+            items: vec![],
+            initial_version: child_version,
+            require_filter: false,
+            namespace: String::new(),
+          });
+      }
+    }
     CompatibilityAction::StrictBitmaskAttributes { .. } => {}
     CompatibilityAction::None => {}
   }
@@ -457,5 +522,44 @@ mod tests {
     apply_compatibility(&mut schemas, &compatibility).unwrap();
 
     assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
+  }
+
+  #[test]
+  fn extra_child_appends_schema_child() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+      types: vec![
+        SchemaType {
+          name: "w:CT_CompatSetting/w:compatSetting".to_string(),
+          class_name: "CompatibilitySetting".to_string(),
+          summary: "Defines the CompatibilitySetting Class.".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_Settings/w:settings".to_string(),
+          class_name: "Settings".to_string(),
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        type_name: "Settings".to_string(),
+        field: "w:compatSetting".to_string(),
+        action: CompatibilityAction::ExtraChild,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert_eq!(schemas[0].types[1].children.len(), 1);
+    assert_eq!(
+      schemas[0].types[1].children[0].name,
+      "w:CT_CompatSetting/w:compatSetting"
+    );
+    assert_eq!(schemas[0].types[1].children[0].property_name, "");
   }
 }

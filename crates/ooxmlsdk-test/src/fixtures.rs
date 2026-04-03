@@ -119,6 +119,14 @@ pub const CUSTOM_PROPERTIES_BOOL_XML: &str = include_str!("../samples/custom_pro
 pub const OPC_CORE_PROPERTIES_HELLO_WORLD_XML: &str =
   include_str!("../samples/opc_core_properties_hello_world.xml");
 
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/MoreDocProps.docx :: docProps/core.xml
+pub const OPC_CORE_PROPERTIES_MORE_DOC_PROPS_XML: &str =
+  include_str!("../samples/opc_core_properties_more_doc_props.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/MoreDocProps.docx :: docProps/app.xml
+pub const EXTENDED_PROPERTIES_MORE_DOC_PROPS_XML: &str =
+  include_str!("../samples/extended_properties_more_doc_props.xml");
+
 // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs :: GetStreamWrite
 pub const SPREADSHEET_SHARED_STRING_TABLE_XML: &str =
   include_str!("../samples/spreadsheet_shared_string_table.xml");

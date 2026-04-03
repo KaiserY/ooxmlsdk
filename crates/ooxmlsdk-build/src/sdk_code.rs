@@ -407,7 +407,7 @@ fn schema_module_cfg_attrs(schema: &SdkDataSchema) -> Vec<Attribute> {
 }
 
 fn schema_module_is_microsoft365_only(schema: &SdkDataSchema) -> bool {
-  !schema.types.is_empty()
+  (!schema.types.is_empty() || !schema.enums.is_empty())
     && schema
       .types
       .iter()
@@ -416,6 +416,60 @@ fn schema_module_is_microsoft365_only(schema: &SdkDataSchema) -> bool {
       .enums
       .iter()
       .all(|schema_enum| versioning::is_microsoft365_version(&schema_enum.version))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::sdk_data::sdk_data_model::{
+    SchemaEnum as SdkDataSchemaEnum, SchemaType as SdkDataSchemaType,
+  };
+
+  fn schema(types: Vec<SdkDataSchemaType>, enums: Vec<SdkDataSchemaEnum>) -> SdkDataSchema {
+    SdkDataSchema {
+      types,
+      enums,
+      ..SdkDataSchema::default()
+    }
+  }
+
+  fn schema_type(version: &str) -> SdkDataSchemaType {
+    SdkDataSchemaType {
+      version: version.to_string(),
+      ..SdkDataSchemaType::default()
+    }
+  }
+
+  fn schema_enum(version: &str) -> SdkDataSchemaEnum {
+    SdkDataSchemaEnum {
+      version: version.to_string(),
+      ..SdkDataSchemaEnum::default()
+    }
+  }
+
+  #[test]
+  fn treats_enum_only_microsoft365_schema_modules_as_microsoft365_only() {
+    let schema = schema(vec![], vec![schema_enum("Office2016")]);
+
+    assert!(schema_module_is_microsoft365_only(&schema));
+  }
+
+  #[test]
+  fn does_not_treat_empty_schema_modules_as_microsoft365_only() {
+    let schema = schema(vec![], vec![]);
+
+    assert!(!schema_module_is_microsoft365_only(&schema));
+  }
+
+  #[test]
+  fn does_not_treat_mixed_version_schema_modules_as_microsoft365_only() {
+    let schema = schema(
+      vec![schema_type("Office2013")],
+      vec![schema_enum("Office2007")],
+    );
+
+    assert!(!schema_module_is_microsoft365_only(&schema));
+  }
 }
 
 fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {

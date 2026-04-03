@@ -6,10 +6,11 @@ use syn::{Arm, Ident, ItemFn, ItemImpl, Stmt, Type, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::helpers::{
-  FlatParticleKind, StructuredParticleKind, flatten_one_sequence_particles, is_composite_type,
-  is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
-  is_one_sequence_flatten, is_one_sequence_structurable, needs_xml_header,
-  structure_one_sequence_particles, supports_compat_xmlns_fields,
+  AttrTypeKind, FlatParticleKind, SimpleValueKind, StructuredParticleKind, classify_attr_type,
+  classify_simple_type, flatten_one_sequence_particles, is_composite_type, is_derived_type,
+  is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper, is_one_sequence_flatten,
+  is_one_sequence_structurable, needs_xml_header, structure_one_sequence_particles,
+  supports_compat_xmlns_fields,
 };
 use crate::sdk_code::schemas::{
   CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild,
@@ -18,9 +19,17 @@ use crate::sdk_code::schemas::{
 use crate::sdk_code::versioning::{
   effective_version, is_microsoft365_version, version_cfg_attrs, versioned_tokens,
 };
+use crate::sdk_data::compatibility::treat_as_string_rule_for_field;
 use crate::sdk_data::sdk_data_model::CompatibilityRule;
 use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaType, SchemaTypeAttribute};
+use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
+
+enum XmlContentWriteKind {
+  StringLike,
+  Enum,
+  Generic,
+}
 
 pub fn gen_schema_serializer(
   schema: &Schema,
@@ -195,6 +204,64 @@ fn module_version_cfg_attrs(
   }
 }
 
+fn xml_content_write_kind(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
+  context: &CodegenContext<'_>,
+) -> Result<XmlContentWriteKind> {
+  if treat_as_string_rule_for_field(
+    compatibility_rules,
+    &schema.module_name,
+    &schema_type.class_name,
+    "xml_content",
+  )
+  .is_some()
+    || treat_as_string_rule_for_field(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.name,
+      "xml_content",
+    )
+    .is_some()
+  {
+    return Ok(XmlContentWriteKind::StringLike);
+  }
+
+  let first_name = &schema_type.name[0..schema_type.name.find('/').unwrap()];
+
+  if context.enum_by_type(first_name).is_some() {
+    Ok(XmlContentWriteKind::Enum)
+  } else {
+    let simple_type = simple_type_mapping(first_name);
+    match classify_simple_type(simple_type) {
+      Some(SimpleValueKind::StringLike) => Ok(XmlContentWriteKind::StringLike),
+      _ => Ok(XmlContentWriteKind::Generic),
+    }
+  }
+}
+
+fn gen_xml_content_write_stmt(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
+  context: &CodegenContext<'_>,
+) -> Result<TokenStream> {
+  Ok(
+    match xml_content_write_kind(schema_type, schema, compatibility_rules, context)? {
+      XmlContentWriteKind::StringLike => {
+        quote! { crate::common::write_escaped_text_str(writer, xml_content.as_str())?; }
+      }
+      XmlContentWriteKind::Enum => {
+        quote! { crate::common::write_escaped_text_str(writer, xml_content.as_xml_str())?; }
+      }
+      XmlContentWriteKind::Generic => {
+        quote! { crate::common::write_escaped_text(writer, xml_content)?; }
+      }
+    },
+  )
+}
+
 fn gen_struct_serializer(
   schema: &Schema,
   schema_type: &SchemaType,
@@ -214,6 +281,8 @@ fn gen_struct_serializer(
   ))?;
 
   let (_, _, last_name_prefix, last_name_suffix) = split_type_name(&schema_type.name)?;
+  let xml_content_write_stmt =
+    gen_xml_content_write_stmt(schema_type, schema, compatibility_rules, context)?;
 
   let mut attr_stmts: Vec<TokenStream> = vec![];
   let mut children_writer = quote! {};
@@ -225,7 +294,7 @@ fn gen_struct_serializer(
   if is_leaf_text_wrapper(schema_type) {
     children_writer = quote! {
       if let Some(xml_content) = &self.0 {
-        crate::common::write_escaped_text(writer, xml_content)?;
+        #xml_content_write_stmt
       }
     };
 
@@ -243,7 +312,7 @@ fn gen_struct_serializer(
 
     children_writer = quote! {
       if let Some(xml_content) = &self.xml_content {
-        crate::common::write_escaped_text(writer, xml_content)?;
+        #xml_content_write_stmt
       }
     };
 
@@ -561,7 +630,7 @@ fn gen_struct_serializer(
     } else if is_leaf_text_type(base_class_type) {
       children_writer = quote! {
         if let Some(xml_content) = &self.xml_content {
-          crate::common::write_escaped_text(writer, xml_content)?;
+          #xml_content_write_stmt
         }
       };
 
@@ -713,18 +782,63 @@ fn gen_attr_stmt(attr: &SchemaTypeAttribute) -> Result<TokenStream> {
     .validators
     .iter()
     .any(|validator| validator.name == "RequiredValidator");
+  let attr_kind =
+    classify_attr_type(attr.r#type.as_str()).ok_or_else(|| attr.r#type.to_string())?;
 
-  Ok(if required {
-    quote! {
-      crate::common::write_attr_value(writer, #attr_name_str, &self.#attr_name_ident)?;
-    }
-  } else {
-    quote! {
-      if let Some(#attr_name_ident) = &self.#attr_name_ident {
-        crate::common::write_attr_value(writer, #attr_name_str, #attr_name_ident)?;
+  let writer = match attr_kind {
+    AttrTypeKind::Simple {
+      value_kind: SimpleValueKind::StringLike,
+      ..
+    } => {
+      if required {
+        quote! {
+          crate::common::write_attr_value_str(writer, #attr_name_str, &self.#attr_name_ident)?;
+        }
+      } else {
+        quote! {
+          if let Some(#attr_name_ident) = &self.#attr_name_ident {
+            crate::common::write_attr_value_str(writer, #attr_name_str, #attr_name_ident.as_str())?;
+          }
+        }
       }
     }
-  })
+    AttrTypeKind::Enum { .. } => {
+      if required {
+        quote! {
+          crate::common::write_attr_value_str(
+            writer,
+            #attr_name_str,
+            self.#attr_name_ident.as_xml_str(),
+          )?;
+        }
+      } else {
+        quote! {
+          if let Some(#attr_name_ident) = &self.#attr_name_ident {
+            crate::common::write_attr_value_str(
+              writer,
+              #attr_name_str,
+              #attr_name_ident.as_xml_str(),
+            )?;
+          }
+        }
+      }
+    }
+    _ => {
+      if required {
+        quote! {
+          crate::common::write_attr_value(writer, #attr_name_str, &self.#attr_name_ident)?;
+        }
+      } else {
+        quote! {
+          if let Some(#attr_name_ident) = &self.#attr_name_ident {
+            crate::common::write_attr_value(writer, #attr_name_str, #attr_name_ident)?;
+          }
+        }
+      }
+    }
+  };
+
+  Ok(writer)
 }
 
 fn gen_one_sequence_child_stmt(

@@ -12,8 +12,8 @@ pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   XmlReader, decode_attr_value, expect_event_start, from_reader_inner, from_str_inner,
-  read_outer_xml, write_attr_value, write_end_tag, write_escaped_text, write_start_tag_open,
-  write_xmlns_attr,
+  read_outer_xml, write_attr_value, write_attr_value_str, write_end_tag, write_escaped_text,
+  write_escaped_text_str, write_start_tag_open, write_xmlns_attr,
 };
 
 #[inline(always)]

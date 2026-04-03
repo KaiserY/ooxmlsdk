@@ -12,3 +12,14 @@ strict = ["ooxmlsdk/strict"]
 
 [dependencies]
 ooxmlsdk = { workspace = true, default-features = false }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "xml"
+harness = false
+
+[[bench]]
+name = "packages"
+harness = false

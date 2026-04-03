@@ -183,19 +183,14 @@ where
     return Ok(());
   }
 
-  let alternate_content_namespaces = HashMap::new();
   let mut selected_branch = false;
 
   loop {
     match xml_reader.next()? {
       quick_xml::events::Event::Start(e) => match e.name().as_ref() {
         b"mc:Choice" | b"Choice" => {
-          let should_use = !selected_branch
-            && markup_compatibility_choice_supported(
-              &e,
-              xml_reader.decoder(),
-              &alternate_content_namespaces,
-            )?;
+          let should_use =
+            !selected_branch && markup_compatibility_choice_supported(&e, xml_reader.decoder())?;
           if should_use {
             selected_branch = true;
             process_foreign_element_children(xml_reader, false, visitor)?;
@@ -217,13 +212,7 @@ where
       },
       quick_xml::events::Event::Empty(e) => match e.name().as_ref() {
         b"mc:Choice" | b"Choice" => {
-          if !selected_branch
-            && markup_compatibility_choice_supported(
-              &e,
-              xml_reader.decoder(),
-              &alternate_content_namespaces,
-            )?
-          {
+          if !selected_branch && markup_compatibility_choice_supported(&e, xml_reader.decoder())? {
             selected_branch = true;
           }
         }
@@ -251,11 +240,9 @@ where
 fn markup_compatibility_choice_supported<'a>(
   choice_start: &quick_xml::events::BytesStart<'a>,
   decoder: Decoder,
-  alternate_content_namespaces: &HashMap<String, String>,
 ) -> Result<bool, SdkError> {
   let mut requires = None;
-  let mut namespaces = alternate_content_namespaces.clone();
-  namespaces.extend(collect_namespace_declarations(choice_start, decoder)?);
+  let namespaces = collect_namespace_declarations(choice_start, decoder)?;
 
   for attr in choice_start.attributes().with_checks(false) {
     let attr = attr?;

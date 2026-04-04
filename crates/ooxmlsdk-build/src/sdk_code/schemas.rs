@@ -510,6 +510,17 @@ pub fn gen_schema(
     } else {
       VersionCfgContext::new(true)
     };
+    let sdk_type_attrs = if schema_type.name.is_empty() {
+      quote! {}
+    } else {
+      let qname = &schema_type.name;
+      quote! {
+        #[sdk(qname = #qname)]
+      }
+    };
+    let sdk_text_attrs = quote! {
+      #[sdk(text)]
+    };
     let summary_doc = format!(" {}", schema_type.summary);
     let version_doc = if schema_type.version.is_empty() {
       " Available in Office2007 and above.".to_string()
@@ -534,7 +545,9 @@ pub fn gen_schema(
         #[doc = #version_doc]
         #[doc = ""]
         #[doc = #qualified_doc]
-        #[derive(Clone, Debug, Default)]
+        #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+        #sdk_text_attrs
+        #sdk_type_attrs
         pub struct #struct_name_ident(pub Option<#xml_content_type>);
 
         #( #type_attrs )*
@@ -602,6 +615,7 @@ pub fn gen_schema(
       let simple_type_name =
         gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
       fields.push(quote! {
+        #[sdk(text)]
         pub xml_content: Option<#simple_type_name>,
       });
     } else if is_leaf_element_type(schema_type) {
@@ -725,6 +739,7 @@ pub fn gen_schema(
         let simple_type_name =
           gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
         fields.push(quote! {
+          #[sdk(text)]
           pub xml_content: Option<#simple_type_name>,
         });
       }
@@ -747,7 +762,8 @@ pub fn gen_schema(
       #[doc = #version_doc]
       #[doc = ""]
       #[doc = #qualified_doc]
-      #[derive(Clone, Debug, Default)]
+      #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+      #sdk_type_attrs
       pub struct #struct_name_ident {
         #( #fields )*
       }
@@ -867,6 +883,7 @@ fn gen_attr(
   context: &CodegenContext<'_>,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
+  let attr_qname = &attr.q_name;
   let attr_name_ident: Ident = if attr.property_name.is_empty() {
     parse_str(&escape_snake_case(attr.q_name.to_snake_case()))?
   } else {
@@ -934,6 +951,9 @@ fn gen_attr(
     .iter()
     .any(|validator| validator.name == "RequiredValidator");
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
+  let sdk_attr_attrs = quote! {
+    #[sdk(attr(qname = #attr_qname))]
+  };
   let property_comments_doc = format!(" {}", attr.property_comments);
   let version_doc = if attr.version.is_empty() {
     " Available in Office2007 and above.".to_string()
@@ -948,6 +968,7 @@ fn gen_attr(
   Ok(if required {
     quote! {
       #( #attr_attrs )*
+      #sdk_attr_attrs
       #[doc = #property_comments_doc]
       #[doc = ""]
       #[doc = #version_doc]
@@ -958,6 +979,7 @@ fn gen_attr(
   } else {
     quote! {
       #( #attr_attrs )*
+      #sdk_attr_attrs
       #[doc = #property_comments_doc]
       #[doc = ""]
       #[doc = #version_doc]
@@ -999,8 +1021,12 @@ fn gen_children(
     VersionCfgContext::new(true)
   };
   let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+  let sdk_choice_attrs = quote! {
+    #[sdk(choice)]
+  };
   let field_option = Some(quote! {
     #( #field_attrs )*
+    #sdk_choice_attrs
     pub children: Vec<#child_choice_enum_ident>,
   });
 
@@ -1008,6 +1034,7 @@ fn gen_children(
 
   for child in &resolved_children {
     let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
+    let child_qname = child.name;
 
     let child_variant_type: Type = if child.is_any {
       parse_str("String")?
@@ -1036,9 +1063,19 @@ fn gen_children(
       }
     };
     let child_attrs = module_version_cfg_attrs(child.version, variant_cfg);
+    let sdk_variant_attrs = if child.is_any {
+      quote! {
+        #[sdk(any)]
+      }
+    } else {
+      quote! {
+        #[sdk(child(qname = #child_qname))]
+      }
+    };
 
     variants.push(quote! {
       #( #child_attrs )*
+      #sdk_variant_attrs
       #child_variant_name_ident(std::boxed::Box<#child_variant_type>),
     });
   }
@@ -1046,7 +1083,7 @@ fn gen_children(
   let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
   let enum_option = Some(parse2(quote! {
     #( #enum_attrs )*
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
     pub enum #child_choice_enum_ident {
       #( #variants )*
     }
@@ -1147,6 +1184,7 @@ fn gen_one_sequence_fields(
         };
 
         let child_name_ident: Ident = parse_str(&child.field_name)?;
+        let child_qname = &child.name;
 
         if !field_name_set.insert(child_name_ident.to_string()) {
           continue;
@@ -1157,22 +1195,28 @@ fn gen_one_sequence_fields(
           effective_version(child.version, flat_particle.initial_version),
           field_cfg,
         );
+        let sdk_field_attrs = quote! {
+          #[sdk(child(qname = #child_qname))]
+        };
 
         if flat_particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_field_attrs
             #[doc = #property_comments]
             pub #child_name_ident: Vec<#child_variant_type>,
           });
         } else if flat_particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_field_attrs
             #[doc = #property_comments]
             pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_field_attrs
             #[doc = #property_comments]
             pub #child_name_ident: std::boxed::Box<#child_variant_type>,
           });
@@ -1202,6 +1246,9 @@ fn gen_one_sequence_fields(
             .collect::<Vec<_>>(),
         );
         let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+        let sdk_choice_attrs = quote! {
+          #[sdk(choice)]
+        };
         let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
         let variant_cfg = if enum_attrs.is_empty() {
           item_cfg
@@ -1215,17 +1262,21 @@ fn gen_one_sequence_fields(
         for variant in &choice.variants {
           let variant_type = one_sequence_child_variant_type(variant, schema, context)?;
           let variant_ident: Ident = parse_str(&variant.field_name.to_upper_camel_case())?;
+          let child_qname = variant.name;
           let variant_attrs = module_version_cfg_attrs(variant.version, variant_cfg);
-
           if default_variant.is_none()
             && (choice_version == variant.version
               || (choice_version.is_empty() && !is_microsoft365_version(variant.version)))
           {
             default_variant = Some((variant_ident.clone(), variant_type.clone()));
           }
+          let sdk_variant_attrs = quote! {
+            #[sdk(child(qname = #child_qname))]
+          };
 
           variants.push(quote! {
             #( #variant_attrs )*
+            #sdk_variant_attrs
             #variant_ident(std::boxed::Box<#variant_type>),
           });
         }
@@ -1242,7 +1293,7 @@ fn gen_one_sequence_fields(
           .ok_or_else(|| choice.enum_name.clone())?;
         let enum_item = quote! {
           #( #enum_attrs )*
-          #[derive(Clone, Debug)]
+          #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
           pub enum #choice_enum_ident {
             #( #variants )*
           }
@@ -1260,18 +1311,21 @@ fn gen_one_sequence_fields(
         if flat_particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_choice_attrs
             #[doc = #property_comments]
             pub #choice_field_ident: Vec<#choice_enum_ident>,
           });
         } else if flat_particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_choice_attrs
             #[doc = #property_comments]
             pub #choice_field_ident: Option<#choice_enum_ident>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_choice_attrs
             #[doc = #property_comments]
             pub #choice_field_ident: #choice_enum_ident,
           });
@@ -1325,6 +1379,7 @@ fn gen_structured_one_sequence_fields(
           parse_str(&child_type.class_name.to_upper_camel_case())?
         };
         let child_name_ident: Ident = parse_str(&child.field_name)?;
+        let child_qname = &child.name;
 
         if !field_name_set.insert(child_name_ident.to_string()) {
           continue;
@@ -1335,22 +1390,28 @@ fn gen_structured_one_sequence_fields(
           effective_version(child.version, particle.initial_version),
           field_cfg,
         );
+        let sdk_field_attrs = quote! {
+          #[sdk(child(qname = #child_qname))]
+        };
 
         if particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_field_attrs
             #[doc = #property_comments]
             pub #child_name_ident: Vec<#child_variant_type>,
           });
         } else if particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_field_attrs
             #[doc = #property_comments]
             pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_field_attrs
             #[doc = #property_comments]
             pub #child_name_ident: std::boxed::Box<#child_variant_type>,
           });
@@ -1392,6 +1453,9 @@ fn gen_structured_one_sequence_fields(
             .collect::<Vec<_>>(),
         );
         let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+        let sdk_choice_attrs = quote! {
+          #[sdk(choice)]
+        };
         let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
         let variant_cfg = if enum_attrs.is_empty() {
           item_cfg
@@ -1406,17 +1470,21 @@ fn gen_structured_one_sequence_fields(
             ResolvedOneSequenceChoiceVariant::Leaf(child) => {
               let variant_type = one_sequence_child_variant_type(child, schema, context)?;
               let variant_ident: Ident = parse_str(&child.field_name.to_upper_camel_case())?;
+              let child_qname = child.name;
               let variant_attrs = module_version_cfg_attrs(child.version, variant_cfg);
-
               if default_variant.is_none()
                 && (choice_version == child.version
                   || (choice_version.is_empty() && !is_microsoft365_version(child.version)))
               {
                 default_variant = Some((variant_ident.clone(), variant_type.clone()));
               }
+              let sdk_variant_attrs = quote! {
+                #[sdk(child(qname = #child_qname))]
+              };
 
               variants.push(quote! {
                 #( #variant_attrs )*
+                #sdk_variant_attrs
                 #variant_ident(std::boxed::Box<#variant_type>),
               });
             }
@@ -1424,6 +1492,11 @@ fn gen_structured_one_sequence_fields(
               let struct_ident: Ident = parse_str(&sequence_variant.struct_name)?;
               let variant_ident: Ident = parse_str(&sequence_variant.variant_name)?;
               let sequence_property_comments = sequence_variant.property_comments.as_str();
+              let sequence_child_qnames: Vec<&str> = sequence_variant
+                .fields
+                .iter()
+                .map(|field| field.child.name)
+                .collect();
               let sequence_version = common_choice_version(
                 "",
                 &sequence_variant
@@ -1440,16 +1513,6 @@ fn gen_structured_one_sequence_fields(
               };
               let sequence_fields =
                 gen_sequence_variant_fields(sequence_variant, schema, context, sequence_field_cfg)?;
-
-              items.push(quote! {
-                #( #sequence_attrs )*
-                #[doc = #sequence_property_comments]
-                #[derive(Clone, Debug, Default)]
-                pub struct #struct_ident {
-                  #( #sequence_fields )*
-                }
-              });
-
               if default_variant.is_none()
                 && (choice_version == sequence_version
                   || (choice_version.is_empty() && !is_microsoft365_version(sequence_version)))
@@ -1457,8 +1520,18 @@ fn gen_structured_one_sequence_fields(
                 default_variant = Some((variant_ident.clone(), parse2(quote! { #struct_ident })?));
               }
 
+              items.push(quote! {
+                #( #sequence_attrs )*
+                #[doc = #sequence_property_comments]
+                #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+                pub struct #struct_ident {
+                  #( #sequence_fields )*
+                }
+              });
+
               variants.push(quote! {
                 #( #sequence_attrs )*
+                #( #[sdk(child(qname = #sequence_child_qnames))] )*
                 #variant_ident(#struct_ident),
               });
             }
@@ -1482,7 +1555,7 @@ fn gen_structured_one_sequence_fields(
 
         items.push(quote! {
           #( #enum_attrs )*
-          #[derive(Clone, Debug)]
+          #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
           pub enum #choice_enum_ident {
             #( #variants )*
           }
@@ -1499,18 +1572,21 @@ fn gen_structured_one_sequence_fields(
         if particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_choice_attrs
             #[doc = #property_comments]
             pub #choice_field_ident: Vec<#choice_enum_ident>,
           });
         } else if particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_choice_attrs
             #[doc = #property_comments]
             pub #choice_field_ident: Option<#choice_enum_ident>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
+            #sdk_choice_attrs
             #[doc = #property_comments]
             pub #choice_field_ident: #choice_enum_ident,
           });
@@ -1556,27 +1632,34 @@ fn gen_sequence_variant_fields(
     };
 
     let child_name_ident: Ident = parse_str(&child.field_name)?;
+    let child_qname = &child.name;
     let property_comments = child.property_comments.as_ref();
     let field_attrs = module_version_cfg_attrs(
       effective_version(child.version, field.initial_version),
       version_cfg,
     );
+    let sdk_field_attrs = quote! {
+      #[sdk(child(qname = #child_qname))]
+    };
 
     if field.repeated {
       fields.push(quote! {
         #( #field_attrs )*
+        #sdk_field_attrs
         #[doc = #property_comments]
         pub #child_name_ident: Vec<#child_variant_type>,
       });
     } else if field.optional {
       fields.push(quote! {
         #( #field_attrs )*
+        #sdk_field_attrs
         #[doc = #property_comments]
         pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
       });
     } else {
       fields.push(quote! {
         #( #field_attrs )*
+        #sdk_field_attrs
         #[doc = #property_comments]
         pub #child_name_ident: std::boxed::Box<#child_variant_type>,
       });

@@ -6,5 +6,6 @@ pub mod namespaces;
 #[cfg(feature = "parts")]
 pub mod parts;
 pub mod schemas;
+pub mod sdk;
 pub mod serializers;
 pub mod simple_type;

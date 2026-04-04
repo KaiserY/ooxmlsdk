@@ -1,7 +1,6 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use ooxmlsdk::parts::{
-  presentation_document::PresentationDocument,
-  spreadsheet_document::SpreadsheetDocument,
+  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk_test::fixtures;

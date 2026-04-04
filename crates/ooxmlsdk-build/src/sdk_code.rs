@@ -418,6 +418,19 @@ fn schema_module_is_microsoft365_only(schema: &SdkDataSchema) -> bool {
       .all(|schema_enum| versioning::is_microsoft365_version(&schema_enum.version))
 }
 
+fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {
+  for entry in fs::read_dir(out_dir_path)? {
+    let entry = entry?;
+    let path = entry.path();
+
+    if path.is_file() && path.extension() == Some(OsStr::new("rs")) {
+      fs::remove_file(path)?;
+    }
+  }
+
+  Ok(())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -470,17 +483,4 @@ mod tests {
 
     assert!(!schema_module_is_microsoft365_only(&schema));
   }
-}
-
-fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {
-  for entry in fs::read_dir(out_dir_path)? {
-    let entry = entry?;
-    let path = entry.path();
-
-    if path.is_file() && path.extension() == Some(OsStr::new("rs")) {
-      fs::remove_file(path)?;
-    }
-  }
-
-  Ok(())
 }

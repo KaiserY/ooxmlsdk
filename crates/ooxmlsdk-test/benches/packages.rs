@@ -1,6 +1,7 @@
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ooxmlsdk::parts::{
-  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
+  presentation_document::PresentationDocument,
+  spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk_test::fixtures;
@@ -14,24 +15,27 @@ macro_rules! bench_package_round_trip {
     let mut group = $c.benchmark_group($group_name);
 
     group.throughput(Throughput::Bytes(bytes.len() as u64));
+
     group.bench_with_input(BenchmarkId::new("read", "cursor"), &bytes, |b, bytes| {
       b.iter(|| <$ty>::new(Cursor::new(black_box(bytes.as_slice()))).unwrap())
     });
+
     group.bench_with_input(BenchmarkId::new("write", "parsed"), &parsed, |b, value| {
       b.iter(|| {
-        let mut output = Cursor::new(Vec::new());
-        black_box(value).save(&mut output).unwrap();
+        let mut output = Cursor::new(Vec::with_capacity(bytes.len()));
+        value.save(&mut output).unwrap();
         black_box(output.into_inner())
       })
     });
+
     group.bench_with_input(
       BenchmarkId::new("round_trip", "cursor"),
       &bytes,
       |b, bytes| {
         b.iter(|| {
           let parsed = <$ty>::new(Cursor::new(black_box(bytes.as_slice()))).unwrap();
-          let mut output = Cursor::new(Vec::new());
-          black_box(&parsed).save(&mut output).unwrap();
+          let mut output = Cursor::new(Vec::with_capacity(bytes.len()));
+          parsed.save(&mut output).unwrap();
           let round_tripped = <$ty>::new(Cursor::new(output.into_inner())).unwrap();
           black_box(round_tripped)
         })

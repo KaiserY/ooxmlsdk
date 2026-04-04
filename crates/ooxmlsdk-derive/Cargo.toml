@@ -1,5 +1,5 @@
 [package]
-name = "ooxmlsdk"
+name = "ooxmlsdk-derive"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,14 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
-[features]
-default = ["microsoft365", "parts"]
-parts = ["dep:zip"]
-microsoft365 = []
-strict = []
+[lib]
+proc-macro = true
 
 [dependencies]
-ooxmlsdk-derive = { workspace = true }
-quick-xml = { workspace = true }
-thiserror = { workspace = true }
-zip = { workspace = true, optional = true }

@@ -2,9 +2,8 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::borrow::Cow;
-use std::cell::Cell;
 use std::collections::HashMap;
-use syn::{Ident, ItemEnum, Type, Variant, parse_str, parse2};
+use syn::{Attribute, Ident, ItemEnum, Type, Variant, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::helpers::{
@@ -14,9 +13,7 @@ use crate::sdk_code::helpers::{
   is_one_sequence_flatten, is_one_sequence_structurable, structure_one_sequence_particles,
   supports_compat_xmlns_fields,
 };
-use crate::sdk_code::versioning::{
-  effective_version, is_microsoft365_version, not_microsoft365_cfg_attrs, version_cfg_attrs,
-};
+use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
 use crate::sdk_data::compatibility::treat_as_string_rule_for_field;
 use crate::sdk_data::sdk_data_model::{
   CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeParticle,
@@ -34,24 +31,28 @@ pub struct CodegenContext<'a> {
   enum_module_by_typed_namespace_and_name: HashMap<(&'a str, &'a str), &'a str>,
 }
 
-thread_local! {
-  static SCHEMA_VERSION_CFG_SUPPRESS: Cell<bool> = const { Cell::new(false) };
+#[derive(Copy, Clone, Debug, Default)]
+struct VersionCfgContext {
+  suppress: bool,
 }
 
-struct SchemaVersionCfgScope {
-  previous: bool,
-}
-
-impl SchemaVersionCfgScope {
+impl VersionCfgContext {
   fn new(suppress: bool) -> Self {
-    let previous = SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.replace(suppress));
-    Self { previous }
+    Self { suppress }
   }
-}
 
-impl Drop for SchemaVersionCfgScope {
-  fn drop(&mut self) {
-    SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.set(self.previous));
+  fn attrs(self, version: &str) -> Vec<Attribute> {
+    if self.suppress {
+      Vec::new()
+    } else {
+      version_cfg_attrs(version)
+    }
+  }
+
+  fn child(self, version: &str) -> Self {
+    Self {
+      suppress: self.suppress || is_microsoft365_version(version),
+    }
   }
 }
 
@@ -494,16 +495,21 @@ pub fn gen_schema(
   context: &CodegenContext<'_>,
   suppress_version_cfg_attrs: bool,
 ) -> Result<TokenStream> {
-  let _version_cfg_scope = SchemaVersionCfgScope::new(suppress_version_cfg_attrs);
+  let version_cfg = VersionCfgContext::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<TokenStream> = vec![];
 
   for schema_enum in &schema.enums {
-    token_stream_list.push(gen_schema_enum(schema_enum)?);
+    token_stream_list.push(gen_schema_enum(schema_enum, version_cfg)?);
   }
 
   for schema_type in &schema.types {
     let struct_name_ident: Ident = parse_str(&schema_type.class_name.to_upper_camel_case())?;
-    let type_attrs = module_version_cfg_attrs(&schema_type.version, suppress_version_cfg_attrs);
+    let type_attrs = version_cfg.attrs(&schema_type.version);
+    let field_version_cfg = if type_attrs.is_empty() {
+      version_cfg
+    } else {
+      VersionCfgContext::new(true)
+    };
     let summary_doc = format!(" {}", schema_type.summary);
     let version_doc = if schema_type.version.is_empty() {
       " Available in Office2007 and above.".to_string()
@@ -589,6 +595,7 @@ pub fn gen_schema(
           schema,
           compatibility_rules,
           context,
+          field_version_cfg,
         )?);
       }
 
@@ -606,6 +613,7 @@ pub fn gen_schema(
           schema,
           compatibility_rules,
           context,
+          field_version_cfg,
         )?);
       }
     } else if is_composite_type(schema_type) {
@@ -617,21 +625,28 @@ pub fn gen_schema(
           schema,
           compatibility_rules,
           context,
+          field_version_cfg,
         )?);
       }
 
       if is_one_sequence_flatten(schema_type) {
         let (one_sequence_fields, one_sequence_enums) =
-          gen_one_sequence_fields(schema_type, schema, context)?;
+          gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_enums);
       } else if is_one_sequence_structurable(schema_type) {
-        let (one_sequence_fields, one_sequence_items) =
-          gen_structured_one_sequence_fields(schema_type, schema, context)?;
+        let (one_sequence_fields, one_sequence_items) = gen_structured_one_sequence_fields(
+          schema_type,
+          schema,
+          context,
+          field_version_cfg,
+          version_cfg,
+        )?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_items);
       } else {
-        let (field_option, enum_option) = gen_children(schema_type, schema, context)?;
+        let (field_option, enum_option) =
+          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
 
         if let Some(field) = field_option {
           fields.push(field);
@@ -657,6 +672,7 @@ pub fn gen_schema(
           schema,
           compatibility_rules,
           context,
+          field_version_cfg,
         )?);
       }
 
@@ -668,23 +684,30 @@ pub fn gen_schema(
           schema,
           compatibility_rules,
           context,
+          field_version_cfg,
         )?);
       }
 
       if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         let (one_sequence_fields, one_sequence_enums) =
-          gen_one_sequence_fields(schema_type, schema, context)?;
+          gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_enums);
       } else if is_one_sequence_structurable(schema_type)
         && is_one_sequence_structurable(base_class_type)
       {
-        let (one_sequence_fields, one_sequence_items) =
-          gen_structured_one_sequence_fields(schema_type, schema, context)?;
+        let (one_sequence_fields, one_sequence_items) = gen_structured_one_sequence_fields(
+          schema_type,
+          schema,
+          context,
+          field_version_cfg,
+          version_cfg,
+        )?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_items);
       } else {
-        let (field_option, enum_option) = gen_children(schema_type, schema, context)?;
+        let (field_option, enum_option) =
+          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
 
         if let Some(field) = field_option {
           fields.push(field);
@@ -751,76 +774,26 @@ fn common_choice_version<'a>(container_version: &'a str, variant_versions: &[&st
   }
 }
 
-fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
+fn gen_schema_enum(
+  schema_enum: &SchemaEnum,
+  version_cfg: VersionCfgContext,
+) -> Result<TokenStream> {
   let enum_name_ident: Ident = parse_str(&schema_enum.name.to_upper_camel_case())?;
-  let enum_attrs = module_version_cfg_attrs(&schema_enum.version, false);
+  let enum_attrs = version_cfg.attrs(&schema_enum.version);
+  let nested_version_cfg = version_cfg.child(&schema_enum.version);
+  let sdk_enum_attrs = if schema_enum.r#type.is_empty() {
+    quote! {}
+  } else {
+    let qname = &schema_enum.r#type;
+    quote! {
+      #[sdk(qname = #qname)]
+    }
+  };
   let baseline_facets: Vec<_> = schema_enum
     .facets
     .iter()
     .filter(|facet| !is_microsoft365_version(&facet.version))
     .collect();
-  let has_later_facets = schema_enum
-    .facets
-    .iter()
-    .any(|facet| is_microsoft365_version(&facet.version));
-
-  if baseline_facets.is_empty() && has_later_facets {
-    let later_enum_attrs = if is_microsoft365_version(&schema_enum.version) {
-      Vec::new()
-    } else {
-      module_version_cfg_attrs("Microsoft365", false)
-    };
-    let default_facet = schema_enum.facets.first().expect("schema enum facet");
-    let variants = gen_schema_enum_variants(
-      &schema_enum.facets.iter().collect::<Vec<_>>(),
-      default_facet,
-      false,
-    )?;
-
-    return Ok(quote! {
-      #( #later_enum_attrs )*
-      #( #enum_attrs )*
-      #[derive(Clone, Debug, Default)]
-      pub enum #enum_name_ident {
-        #( #variants, )*
-      }
-    });
-  }
-
-  if !baseline_facets.is_empty()
-    && has_later_facets
-    && !is_microsoft365_version(&schema_enum.version)
-  {
-    let baseline_enum_attrs = module_not_microsoft365_cfg_attrs(false);
-    let baseline_default = baseline_facets
-      .first()
-      .copied()
-      .expect("baseline schema enum facet");
-    let later_default = baseline_default;
-
-    let baseline_variants = gen_schema_enum_variants(&baseline_facets, baseline_default, false)?;
-    let later_variants = gen_schema_enum_variants(
-      &schema_enum.facets.iter().collect::<Vec<_>>(),
-      later_default,
-      true,
-    )?;
-
-    return Ok(quote! {
-      #( #baseline_enum_attrs )*
-      #( #enum_attrs )*
-      #[derive(Clone, Debug, Default)]
-      pub enum #enum_name_ident {
-        #( #baseline_variants, )*
-      }
-
-      #[cfg(feature = "microsoft365")]
-      #( #enum_attrs )*
-      #[derive(Clone, Debug, Default)]
-      pub enum #enum_name_ident {
-        #( #later_variants, )*
-      }
-    });
-  }
 
   let default_facet = baseline_facets
     .first()
@@ -829,12 +802,13 @@ fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
   let variants = gen_schema_enum_variants(
     &schema_enum.facets.iter().collect::<Vec<_>>(),
     default_facet,
-    true,
+    nested_version_cfg,
   )?;
 
   Ok(quote! {
     #( #enum_attrs )*
-    #[derive(Clone, Debug, Default)]
+    #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+    #sdk_enum_attrs
     pub enum #enum_name_ident {
       #( #variants, )*
     }
@@ -844,7 +818,7 @@ fn gen_schema_enum(schema_enum: &SchemaEnum) -> Result<TokenStream> {
 fn gen_schema_enum_variants(
   facets: &[&crate::sdk_data::sdk_data_model::SchemaEnumFacet],
   default_facet: &crate::sdk_data::sdk_data_model::SchemaEnumFacet,
-  emit_version_cfgs: bool,
+  version_cfg: VersionCfgContext,
 ) -> Result<Vec<Variant>> {
   let mut variants = Vec::with_capacity(facets.len());
 
@@ -854,10 +828,14 @@ fn gen_schema_enum_variants(
     } else {
       parse_str(&escape_upper_camel_case(facet.name.to_upper_camel_case()))?
     };
-    let variant_attrs = if emit_version_cfgs {
-      module_version_cfg_attrs(&facet.version, false)
+    let variant_attrs = version_cfg.attrs(&facet.version);
+    let rename_attrs = if facet.value.is_empty() {
+      quote! {}
     } else {
-      Vec::new()
+      let value = &facet.value;
+      quote! {
+        #[sdk(rename = #value)]
+      }
     };
     let default_attr = if std::ptr::eq(*facet, default_facet) {
       quote! { #[default] }
@@ -867,6 +845,7 @@ fn gen_schema_enum_variants(
 
     variants.push(parse2(quote! {
       #( #variant_attrs )*
+      #rename_attrs
       #default_attr
       #variant_ident
     })?);
@@ -875,23 +854,8 @@ fn gen_schema_enum_variants(
   Ok(variants)
 }
 
-fn module_version_cfg_attrs(
-  version: &str,
-  suppress_version_cfg_attrs: bool,
-) -> Vec<syn::Attribute> {
-  if suppress_version_cfg_attrs || SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.get()) {
-    Vec::new()
-  } else {
-    version_cfg_attrs(version)
-  }
-}
-
-fn module_not_microsoft365_cfg_attrs(suppress_version_cfg_attrs: bool) -> Vec<syn::Attribute> {
-  if suppress_version_cfg_attrs || SCHEMA_VERSION_CFG_SUPPRESS.with(|cell| cell.get()) {
-    Vec::new()
-  } else {
-    not_microsoft365_cfg_attrs()
-  }
+fn module_version_cfg_attrs(version: &str, version_cfg: VersionCfgContext) -> Vec<Attribute> {
+  version_cfg.attrs(version)
 }
 
 fn gen_attr(
@@ -901,6 +865,7 @@ fn gen_attr(
   schema: &Schema,
   compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
+  version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
   let attr_name_ident: Ident = if attr.property_name.is_empty() {
     parse_str(&escape_snake_case(attr.q_name.to_snake_case()))?
@@ -968,7 +933,7 @@ fn gen_attr(
     .validators
     .iter()
     .any(|validator| validator.name == "RequiredValidator");
-  let attr_attrs = module_version_cfg_attrs(&attr.version, false);
+  let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
   let property_comments_doc = format!(" {}", attr.property_comments);
   let version_doc = if attr.version.is_empty() {
     " Available in Office2007 and above.".to_string()
@@ -1007,6 +972,8 @@ fn gen_children(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  field_cfg: VersionCfgContext,
+  item_cfg: VersionCfgContext,
 ) -> Result<(Option<TokenStream>, Option<ItemEnum>)> {
   let resolved_children = context.resolve_children(schema_type)?;
 
@@ -1019,7 +986,21 @@ fn gen_children(
     schema_type.class_name.to_upper_camel_case()
   ))?;
 
+  let choice_version = common_choice_version(
+    "",
+    &resolved_children
+      .iter()
+      .map(|child| child.version)
+      .collect::<Vec<_>>(),
+  );
+  let variant_cfg = if version_cfg_attrs(choice_version).is_empty() {
+    item_cfg
+  } else {
+    VersionCfgContext::new(true)
+  };
+  let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
   let field_option = Some(quote! {
+    #( #field_attrs )*
     pub children: Vec<#child_choice_enum_ident>,
   });
 
@@ -1054,7 +1035,7 @@ fn gen_children(
         parse_str(&child_type.class_name.to_upper_camel_case())?
       }
     };
-    let child_attrs = module_version_cfg_attrs(child.version, false);
+    let child_attrs = module_version_cfg_attrs(child.version, variant_cfg);
 
     variants.push(quote! {
       #( #child_attrs )*
@@ -1062,7 +1043,9 @@ fn gen_children(
     });
   }
 
+  let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
   let enum_option = Some(parse2(quote! {
+    #( #enum_attrs )*
     #[derive(Clone, Debug)]
     pub enum #child_choice_enum_ident {
       #( #variants )*
@@ -1124,6 +1107,8 @@ fn gen_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  field_cfg: VersionCfgContext,
+  item_cfg: VersionCfgContext,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
   let mut fields: Vec<TokenStream> = vec![];
   let mut enums: Vec<TokenStream> = vec![];
@@ -1170,7 +1155,7 @@ fn gen_one_sequence_fields(
         let property_comments = child.property_comments.as_ref();
         let field_attrs = module_version_cfg_attrs(
           effective_version(child.version, flat_particle.initial_version),
-          false,
+          field_cfg,
         );
 
         if flat_particle.repeated {
@@ -1216,7 +1201,13 @@ fn gen_one_sequence_fields(
             .map(|variant| variant.version)
             .collect::<Vec<_>>(),
         );
-        let field_attrs = module_version_cfg_attrs(choice_version, false);
+        let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+        let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
+        let variant_cfg = if enum_attrs.is_empty() {
+          item_cfg
+        } else {
+          VersionCfgContext::new(true)
+        };
 
         let mut variants = Vec::new();
         let mut default_variant = None;
@@ -1224,7 +1215,7 @@ fn gen_one_sequence_fields(
         for variant in &choice.variants {
           let variant_type = one_sequence_child_variant_type(variant, schema, context)?;
           let variant_ident: Ident = parse_str(&variant.field_name.to_upper_camel_case())?;
-          let variant_attrs = module_version_cfg_attrs(variant.version, false);
+          let variant_attrs = module_version_cfg_attrs(variant.version, variant_cfg);
 
           if default_variant.is_none()
             && (choice_version == variant.version
@@ -1250,17 +1241,15 @@ fn gen_one_sequence_fields(
           })
           .ok_or_else(|| choice.enum_name.clone())?;
         let enum_item = quote! {
+          #( #enum_attrs )*
           #[derive(Clone, Debug)]
           pub enum #choice_enum_ident {
             #( #variants )*
           }
         };
+        enums.push(enum_item);
         enums.push(quote! {
-          #( #field_attrs )*
-          #enum_item
-        });
-        enums.push(quote! {
-          #( #field_attrs )*
+          #( #enum_attrs )*
           impl Default for #choice_enum_ident {
             fn default() -> Self {
               Self::#default_variant_ident(std::boxed::Box::<#default_variant_type>::default())
@@ -1298,6 +1287,8 @@ fn gen_structured_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  field_cfg: VersionCfgContext,
+  item_cfg: VersionCfgContext,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
   let mut fields: Vec<TokenStream> = vec![];
   let mut items: Vec<TokenStream> = vec![];
@@ -1342,7 +1333,7 @@ fn gen_structured_one_sequence_fields(
         let property_comments = child.property_comments.as_ref();
         let field_attrs = module_version_cfg_attrs(
           effective_version(child.version, particle.initial_version),
-          false,
+          field_cfg,
         );
 
         if particle.repeated {
@@ -1400,7 +1391,13 @@ fn gen_structured_one_sequence_fields(
             })
             .collect::<Vec<_>>(),
         );
-        let field_attrs = module_version_cfg_attrs(choice_version, false);
+        let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+        let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
+        let variant_cfg = if enum_attrs.is_empty() {
+          item_cfg
+        } else {
+          VersionCfgContext::new(true)
+        };
         let mut variants = Vec::new();
         let mut default_variant = None;
 
@@ -1409,7 +1406,7 @@ fn gen_structured_one_sequence_fields(
             ResolvedOneSequenceChoiceVariant::Leaf(child) => {
               let variant_type = one_sequence_child_variant_type(child, schema, context)?;
               let variant_ident: Ident = parse_str(&child.field_name.to_upper_camel_case())?;
-              let variant_attrs = module_version_cfg_attrs(child.version, false);
+              let variant_attrs = module_version_cfg_attrs(child.version, variant_cfg);
 
               if default_variant.is_none()
                 && (choice_version == child.version
@@ -1426,7 +1423,6 @@ fn gen_structured_one_sequence_fields(
             ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => {
               let struct_ident: Ident = parse_str(&sequence_variant.struct_name)?;
               let variant_ident: Ident = parse_str(&sequence_variant.variant_name)?;
-              let sequence_fields = gen_sequence_variant_fields(sequence_variant, schema, context)?;
               let sequence_property_comments = sequence_variant.property_comments.as_str();
               let sequence_version = common_choice_version(
                 "",
@@ -1436,7 +1432,14 @@ fn gen_structured_one_sequence_fields(
                   .map(|field| effective_version(field.child.version, field.initial_version))
                   .collect::<Vec<_>>(),
               );
-              let sequence_attrs = module_version_cfg_attrs(sequence_version, false);
+              let sequence_attrs = module_version_cfg_attrs(sequence_version, item_cfg);
+              let sequence_field_cfg = if sequence_attrs.is_empty() {
+                item_cfg
+              } else {
+                VersionCfgContext::new(true)
+              };
+              let sequence_fields =
+                gen_sequence_variant_fields(sequence_variant, schema, context, sequence_field_cfg)?;
 
               items.push(quote! {
                 #( #sequence_attrs )*
@@ -1478,14 +1481,14 @@ fn gen_structured_one_sequence_fields(
           .ok_or_else(|| choice.enum_name.clone())?;
 
         items.push(quote! {
-          #( #field_attrs )*
+          #( #enum_attrs )*
           #[derive(Clone, Debug)]
           pub enum #choice_enum_ident {
             #( #variants )*
           }
         });
         items.push(quote! {
-          #( #field_attrs )*
+          #( #enum_attrs )*
           impl Default for #choice_enum_ident {
             fn default() -> Self {
               Self::#default_variant_ident(Default::default())
@@ -1523,6 +1526,7 @@ fn gen_sequence_variant_fields(
   sequence_variant: &ResolvedOneSequenceSequenceVariant<'_>,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  version_cfg: VersionCfgContext,
 ) -> Result<Vec<TokenStream>> {
   let mut fields = Vec::new();
 
@@ -1555,7 +1559,7 @@ fn gen_sequence_variant_fields(
     let property_comments = child.property_comments.as_ref();
     let field_attrs = module_version_cfg_attrs(
       effective_version(child.version, field.initial_version),
-      false,
+      version_cfg,
     );
 
     if field.repeated {
@@ -1608,5 +1612,79 @@ pub fn one_sequence_child_variant_type(
     ))?)
   } else {
     Ok(parse_str(&child_type.class_name.to_upper_camel_case())?)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::sdk_data::sdk_data_model::SchemaEnumFacet;
+
+  #[test]
+  fn gen_schema_enum_emits_sdk_enum_attributes() {
+    let schema_enum = SchemaEnum {
+      name: "SizeValues".to_string(),
+      r#type: "mso:ST_Size".to_string(),
+      facets: vec![
+        SchemaEnumFacet {
+          name: String::new(),
+          value: "normal".to_string(),
+          version: String::new(),
+        },
+        SchemaEnumFacet {
+          name: String::new(),
+          value: "large".to_string(),
+          version: String::new(),
+        },
+      ],
+      ..Default::default()
+    };
+
+    let tokens = gen_schema_enum(&schema_enum, VersionCfgContext::default())
+      .expect("schema enum tokens")
+      .to_string();
+
+    assert!(tokens.contains("qname"));
+    assert!(tokens.contains("mso:ST_Size"));
+    assert!(tokens.contains("ooxmlsdk_derive"));
+    assert!(tokens.contains("SdkEnum"));
+    assert!(tokens.contains("rename"));
+    assert!(tokens.contains("normal"));
+    assert!(tokens.contains("large"));
+  }
+
+  #[test]
+  fn gen_schema_enum_keeps_mixed_version_variants_in_one_enum() {
+    let schema_enum = SchemaEnum {
+      name: "TriggerEventValues".to_string(),
+      r#type: "p:ST_TLTriggerEvent".to_string(),
+      facets: vec![
+        SchemaEnumFacet {
+          name: String::new(),
+          value: "none".to_string(),
+          version: String::new(),
+        },
+        SchemaEnumFacet {
+          name: String::new(),
+          value: "onBegin".to_string(),
+          version: String::new(),
+        },
+        SchemaEnumFacet {
+          name: String::new(),
+          value: "onMediaBookmark".to_string(),
+          version: "Office2010".to_string(),
+        },
+      ],
+      ..Default::default()
+    };
+
+    let tokens = gen_schema_enum(&schema_enum, VersionCfgContext::default())
+      .expect("schema enum tokens")
+      .to_string();
+
+    assert_eq!(tokens.matches("pub enum TriggerEventValues").count(), 1);
+    assert!(tokens.contains("OnMediaBookmark"));
+    assert!(tokens.contains("cfg"));
+    assert!(tokens.contains("microsoft365"));
   }
 }

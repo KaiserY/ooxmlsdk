@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crates/ooxmlsdk", "crates/ooxmlsdk-build", "crates/ooxmlsdk-test"]
+members = [
+  "crates/ooxmlsdk",
+  "crates/ooxmlsdk-build",
+  "crates/ooxmlsdk-derive",
+  "crates/ooxmlsdk-test",
+]
 
 [workspace.package]
 version = "0.4.0"
@@ -18,6 +23,7 @@ readme = "README.md"
 [workspace.dependencies]
 ooxmlsdk = { version = "0.4.0", path = "crates/ooxmlsdk", default-features = false }
 ooxmlsdk-build = { version = "0.4.0", path = "crates/ooxmlsdk-build" }
+ooxmlsdk-derive = { version = "0.4.0", path = "crates/ooxmlsdk-derive" }
 quick-xml = "0.39.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_derive = "1.0.228"

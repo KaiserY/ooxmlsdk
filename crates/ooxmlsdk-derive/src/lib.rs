@@ -1,31 +1,16 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use std::{
-  env,
-  io::Write,
-  sync::{Mutex, OnceLock},
-};
 use syn::{
   Attribute, Data, DataEnum, DeriveInput, Fields, Ident, LitByteStr, LitStr, Meta, Token, Type,
   TypePath, parse_macro_input, parse_str,
 };
 
-static SNAPSHOT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-static SNAPSHOT_INIT: OnceLock<()> = OnceLock::new();
-const SNAPSHOT_DIR: &str = concat!(
-  env!("CARGO_MANIFEST_DIR"),
-  "/../../tmp/ooxmlsdk_macro_expanded"
-);
-
 #[proc_macro_derive(SdkEnum, attributes(sdk))]
 pub fn sdk_enum(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match expand_sdk_enum(&input) {
-    Ok(tokens) => {
-      dump_macro_expansion("SdkEnum", &input, &tokens);
-      tokens.into()
-    }
+    Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }
 }
@@ -34,10 +19,7 @@ pub fn sdk_enum(input: TokenStream) -> TokenStream {
 pub fn sdk_type(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match expand_sdk_type(&input) {
-    Ok(tokens) => {
-      dump_macro_expansion("SdkType", &input, &tokens);
-      tokens.into()
-    }
+    Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }
 }
@@ -46,10 +28,7 @@ pub fn sdk_type(input: TokenStream) -> TokenStream {
 pub fn sdk_choice(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match expand_sdk_choice(&input) {
-    Ok(tokens) => {
-      dump_macro_expansion("SdkChoice", &input, &tokens);
-      tokens.into()
-    }
+    Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }
 }
@@ -58,43 +37,9 @@ pub fn sdk_choice(input: TokenStream) -> TokenStream {
 pub fn sdk_part(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match expand_sdk_part(&input) {
-    Ok(tokens) => {
-      dump_macro_expansion("SdkPart", &input, &tokens);
-      tokens.into()
-    }
+    Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }
-}
-
-fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::TokenStream) {
-  if !macro_snapshot_enabled() {
-    return;
-  }
-  let lock = SNAPSHOT_LOCK.get_or_init(|| Mutex::new(()));
-  let _guard = lock.lock().expect("snapshot lock");
-  SNAPSHOT_INIT.get_or_init(|| {
-    let _ = std::fs::remove_dir_all(SNAPSHOT_DIR);
-    let _ = std::fs::create_dir_all(SNAPSHOT_DIR);
-  });
-  let kind_dir = format!("{SNAPSHOT_DIR}/{kind}");
-  if std::fs::create_dir_all(&kind_dir).is_err() {
-    return;
-  }
-  let snapshot_name = snapshot_file_stem(input);
-  let file_path = format!("{kind_dir}/{snapshot_name}.rs");
-  let mut file = match std::fs::File::create(&file_path) {
-    Ok(file) => file,
-    Err(_) => return,
-  };
-  let _ = writeln!(
-    file,
-    "// ===== {}: {} =====\n{}\n",
-    kind, input.ident, tokens
-  );
-}
-
-fn macro_snapshot_enabled() -> bool {
-  env::var_os("OOXMLSDK_DUMP_MACRO_EXPANSIONS").is_some()
 }
 
 fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
@@ -878,6 +823,7 @@ fn to_snake_case_local(value: &str) -> String {
   out
 }
 
+#[cfg(test)]
 fn snapshot_file_stem(input: &DeriveInput) -> String {
   let raw_name = parse_sdk_qname(&input.attrs)
     .ok()
@@ -920,6 +866,7 @@ fn sdk_type_impl_tokens(
   }
 }
 
+#[cfg(test)]
 fn sanitize_snapshot_component(value: &str) -> String {
   let mut out = String::with_capacity(value.len());
   for ch in value.chars() {
@@ -3038,5 +2985,155 @@ fn choice_variant_inner_type(ty: &Type) -> proc_macro2::TokenStream {
     quote! { #inner_ty }
   } else {
     quote! { #ty }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::{
+    fs,
+    io::Write,
+    sync::{Mutex, OnceLock},
+  };
+
+  static SNAPSHOT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+  static SNAPSHOT_INIT: OnceLock<()> = OnceLock::new();
+  const SNAPSHOT_DIR: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../target/ooxmlsdk_macro_expanded"
+  );
+
+  fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::TokenStream) {
+    let lock = SNAPSHOT_LOCK.get_or_init(|| Mutex::new(()));
+    let _guard = lock.lock().expect("snapshot lock");
+    SNAPSHOT_INIT.get_or_init(|| {
+      let _ = fs::remove_dir_all(SNAPSHOT_DIR);
+      let _ = fs::create_dir_all(SNAPSHOT_DIR);
+    });
+    let kind_dir = format!("{SNAPSHOT_DIR}/{kind}");
+    if fs::create_dir_all(&kind_dir).is_err() {
+      return;
+    }
+    let snapshot_name = snapshot_file_stem(input);
+    let file_path = format!("{kind_dir}/{snapshot_name}.rs");
+    let mut file = match fs::File::create(&file_path) {
+      Ok(file) => file,
+      Err(_) => return,
+    };
+    let _ = writeln!(
+      file,
+      "// ===== {}: {} =====\n{}\n",
+      kind, input.ident, tokens
+    );
+  }
+
+  #[test]
+  #[ignore]
+  fn dump_context_node_expansion() {
+    dump_one_expansion(
+      &std::env::var("OOXMLSDK_DUMP_KIND").unwrap_or_else(|_| "SdkPart".to_string()),
+      &std::env::var("OOXMLSDK_DUMP_FILE")
+        .unwrap_or_else(|_| "parts/main_document_part.rs".to_string()),
+      &std::env::var("OOXMLSDK_DUMP_TARGET").unwrap_or_else(|_| "MainDocumentPart".to_string()),
+    );
+  }
+
+  fn dump_one_expansion(kind: &str, file: &str, target: &str) {
+    let source = fs::read_to_string(format!(
+      "{}/../../crates/ooxmlsdk/src/{}",
+      env!("CARGO_MANIFEST_DIR"),
+      file
+    ))
+    .expect("read runtime source file");
+    let item_src = extract_derive_item(&source, kind, target)
+      .unwrap_or_else(|| panic!("no {kind} derive named {target} found in runtime source"));
+    let input = syn::parse_str::<DeriveInput>(&item_src).expect("parse part derive");
+    let tokens = match kind {
+      "SdkEnum" => expand_sdk_enum(&input).expect("SdkEnum expansion"),
+      "SdkType" => expand_sdk_type(&input).expect("SdkType expansion"),
+      "SdkChoice" => expand_sdk_choice(&input).expect("SdkChoice expansion"),
+      "SdkPart" => expand_sdk_part(&input).expect("SdkPart expansion"),
+      other => panic!("unexpected kind: {other}"),
+    };
+    dump_macro_expansion(kind, &input, &tokens);
+  }
+
+  fn extract_derive_item(source: &str, kind: &str, target: &str) -> Option<String> {
+    let target_patterns = [
+      format!("pub struct {target} {{"),
+      format!("struct {target} {{"),
+      format!("pub enum {target} {{"),
+      format!("enum {target} {{"),
+    ];
+    let target_pos = target_patterns
+      .iter()
+      .find_map(|pattern| source.find(pattern))?;
+    let derive_pos = source[..target_pos].rfind("#[derive(")?;
+    if !source[derive_pos..target_pos].contains(kind) {
+      return None;
+    }
+    let start = derive_pos;
+
+    let mut item = String::new();
+    let mut started = false;
+    let mut brace_depth = 0isize;
+    let mut item_name = None::<String>;
+    for line in source[start..].lines() {
+      item.push_str(line);
+      item.push('\n');
+      if item_name.is_none() {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("pub struct ") {
+          item_name = rest
+            .split_whitespace()
+            .next()
+            .map(|s| s.trim_end_matches('{').to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("struct ") {
+          item_name = rest
+            .split_whitespace()
+            .next()
+            .map(|s| s.trim_end_matches('{').to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("pub enum ") {
+          item_name = rest
+            .split_whitespace()
+            .next()
+            .map(|s| s.trim_end_matches('{').to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("enum ") {
+          item_name = rest
+            .split_whitespace()
+            .next()
+            .map(|s| s.trim_end_matches('{').to_string());
+        }
+      }
+      if !started {
+        if line.contains(" struct ")
+          || line.trim_start().starts_with("struct ")
+          || line.contains(" enum ")
+          || line.trim_start().starts_with("enum ")
+        {
+          started = true;
+          brace_depth += line.chars().filter(|ch| *ch == '{').count() as isize;
+          brace_depth -= line.chars().filter(|ch| *ch == '}').count() as isize;
+          if brace_depth <= 0 && line.contains(';') {
+            break;
+          }
+          continue;
+        }
+        continue;
+      }
+
+      brace_depth += line.chars().filter(|ch| *ch == '{').count() as isize;
+      brace_depth -= line.chars().filter(|ch| *ch == '}').count() as isize;
+      if brace_depth <= 0 {
+        break;
+      }
+    }
+
+    if item_name.as_deref() == Some(target) {
+      Some(item)
+    } else {
+      None
+    }
   }
 }

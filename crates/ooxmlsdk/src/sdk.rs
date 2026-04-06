@@ -43,3 +43,5 @@ pub trait SdkChoice: Sized {
     Ok(())
   }
 }
+
+pub trait SdkPart: Sized {}

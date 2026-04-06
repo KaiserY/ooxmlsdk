@@ -3,6 +3,7 @@ name = "ooxmlsdk-test"
 version.workspace = true
 edition.workspace = true
 publish = false
+build = "build.rs"
 
 [features]
 default = ["microsoft365", "parts"]
@@ -15,6 +16,8 @@ ooxmlsdk = { workspace = true, default-features = false }
 
 [dev-dependencies]
 criterion = { workspace = true }
+quick-xml = { workspace = true }
+zip = { workspace = true }
 
 [[bench]]
 name = "xml"

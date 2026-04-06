@@ -100,6 +100,22 @@ pub(crate) fn is_foreign_prefixed_child(name: &[u8], expected_prefix: &str) -> b
   prefix != b"mc" && prefix != expected_prefix.as_bytes()
 }
 
+#[inline(always)]
+#[cfg(feature = "parts")]
+pub(crate) fn parent_zip_path(path: &str) -> String {
+  path
+    .rsplit_once('/')
+    .map(|(dir_path, _)| {
+      let resolved = resolve_zip_file_path(&format!("{dir_path}/"));
+      if resolved.is_empty() {
+        resolved
+      } else {
+        format!("{resolved}/")
+      }
+    })
+    .unwrap_or_default()
+}
+
 pub(crate) fn process_foreign_element_children<'de, R, F>(
   xml_reader: &mut R,
   empty_tag: bool,

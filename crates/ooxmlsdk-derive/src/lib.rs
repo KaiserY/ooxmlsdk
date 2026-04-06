@@ -236,11 +236,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
       let mut rels_path = String::new();
     });
     field_declarations.push(quote! {
-      let child_parent_path = if PATH_PREFIX.is_empty() {
-        format!("{}", #parent_path_ident)
-      } else {
-        format!("{}{}/", #parent_path_ident, PATH_PREFIX)
-      };
+      let child_parent_path = crate::common::parent_zip_path(#path_ident);
     });
     field_declarations.push(quote! {
       let part_target_str = if #path_ident.ends_with(".xml") {
@@ -293,13 +289,15 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
                 &relationship.target,
               ),
             );
-            if #file_path_set_ident.contains(&target_path) {
+            if !visited.contains(&target_path) && #file_path_set_ident.contains(&target_path) {
+              visited.insert(target_path.clone());
               let #child_item_ident = #child_type::new_from_archive(
                 &child_parent_path,
                 &target_path,
                 &relationship.id,
                 #file_path_set_ident,
                 #archive_ident,
+                visited,
               )?;
               #child_field_ident.push(#child_item_ident);
             }
@@ -307,7 +305,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
         });
         child_save_stmts.push(quote! {
           for #child_item_ident in &self.#child_field_ident {
-            #child_item_ident.save_zip(&child_parent_path, zip, entry_set)?;
+            #child_item_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
           }
         });
         self_field_values.push(quote! { #child_field_ident });
@@ -324,13 +322,17 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
                 &relationship.target,
               ),
             );
-            #child_field_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
-              &child_parent_path,
-              &target_path,
-              &relationship.id,
-              #file_path_set_ident,
-              #archive_ident,
-            )?));
+            if !visited.contains(&target_path) && #file_path_set_ident.contains(&target_path) {
+              visited.insert(target_path.clone());
+              #child_field_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
+                &child_parent_path,
+                &target_path,
+                &relationship.id,
+                #file_path_set_ident,
+                #archive_ident,
+                visited,
+              )?));
+            }
           }
         });
         field_unwraps.push(quote! {
@@ -341,7 +343,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
             ))?;
         });
         child_save_stmts.push(quote! {
-          self.#child_field_ident.save_zip(&child_parent_path, zip, entry_set)?;
+          self.#child_field_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
         });
         self_field_values.push(quote! { #child_field_ident });
       }
@@ -357,20 +359,22 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
                 &relationship.target,
               ),
             );
-            if #file_path_set_ident.contains(&target_path) {
+            if !visited.contains(&target_path) && #file_path_set_ident.contains(&target_path) {
+              visited.insert(target_path.clone());
               #child_field_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
                 &child_parent_path,
                 &target_path,
                 &relationship.id,
                 #file_path_set_ident,
                 #archive_ident,
+                visited,
               )?));
             }
           }
         });
         child_save_stmts.push(quote! {
           if let Some(#child_item_ident) = &self.#child_field_ident {
-            #child_item_ident.save_zip(&child_parent_path, zip, entry_set)?;
+            #child_item_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
           }
         });
         self_field_values.push(quote! { #child_field_ident });
@@ -448,6 +452,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
       #r_id_ident: &str,
       #file_path_set_ident: &std::collections::HashSet<String>,
       #archive_ident: &mut zip::ZipArchive<R>,
+      visited: &mut std::collections::HashSet<String>,
     ) -> Result<Self, crate::common::SdkError> {
       #( #field_declarations )*
       #( #field_unwraps )*
@@ -494,8 +499,9 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
   let relationships_write_tokens = if needs_relationships {
     quote! {
       if let Some(relationships) = &self.relationships {
+        let rels_parent_path = crate::common::parent_zip_path(&self.inner_path);
         let rels_dir_path = crate::common::resolve_zip_file_path(
-          &format!("{child_parent_path}_rels"),
+          &format!("{rels_parent_path}_rels"),
         );
         if !rels_dir_path.is_empty() && !entry_set.contains(&rels_dir_path) {
           zip.add_directory(&rels_dir_path, options)?;
@@ -518,8 +524,12 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
       parent_path: &str,
       zip: &mut zip::ZipWriter<W>,
       entry_set: &mut std::collections::HashSet<String>,
+      visited: &mut std::collections::HashSet<String>,
     ) -> Result<(), crate::common::SdkError> {
       use std::io::Write;
+      if !visited.insert(self.inner_path.clone()) {
+        return Ok(());
+      }
       let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o755);
@@ -528,11 +538,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
         zip.add_directory(&directory_path, options)?;
         entry_set.insert(directory_path);
       }
-      let child_parent_path = if PATH_PREFIX.is_empty() {
-        format!("{}", parent_path)
-      } else {
-        format!("{}{}/", parent_path, PATH_PREFIX)
-      };
+      let child_parent_path = crate::common::parent_zip_path(&self.inner_path);
       let dir_path = self
         .inner_path
         .rsplit_once('/')
@@ -558,6 +564,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
       ) -> Result<Self, crate::common::SdkError> {
         let mut archive = zip::ZipArchive::new(reader)?;
         let mut file_path_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
         for i in 0..archive.len() {
           let file = archive.by_index(i)?;
           let file_path = match file.enclosed_name() {
@@ -566,7 +573,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
           };
           file_path_set.insert(file_path);
         }
-        Self::new_from_archive("", "", "", &file_path_set, &mut archive)
+        Self::new_from_archive("", "", "", &file_path_set, &mut archive, &mut visited)
       }
     });
     impl_items.insert(
@@ -588,13 +595,14 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
         ) -> Result<(), crate::common::SdkError> {
           use std::io::Write;
           let mut entry_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+          let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
           let mut zip = zip::ZipWriter::new(writer);
           let options = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .unix_permissions(0o755);
           zip.start_file("[Content_Types].xml", options)?;
           zip.write_all(self.content_types.to_xml()?.as_bytes())?;
-          self.save_zip("", &mut zip, &mut entry_set)?;
+          self.save_zip("", &mut zip, &mut entry_set, &mut visited)?;
           zip.finish()?;
           Ok(())
         }
@@ -2266,12 +2274,8 @@ fn expand_named_struct(
   };
   let to_xml_prefix_tokens = if has_namespace_fields {
     quote! {
-      if let Some(xmlns) = &self.xmlns {
-        if crate::namespaces::prefix_by_uri(xmlns.as_str()) == Some(#tag_prefix) {
-          #tag_prefix
-        } else {
-          ""
-        }
+      if self.xmlns.is_some() {
+        #tag_prefix
       } else {
         ""
       }

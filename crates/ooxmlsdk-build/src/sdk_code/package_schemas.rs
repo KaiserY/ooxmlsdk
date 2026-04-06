@@ -554,15 +554,34 @@ fn gen_text_child_arm(child: &PackageTextChild) -> Result<Arm> {
   let field_ident: Ident = parse_str(&escape_snake_case(child.field.clone()))?;
   let q_name = child.q_name.as_str();
   let q_name_literal: LitByteStr = parse_str(&format!("b\"{q_name}\""))?;
+  let field_name_lit = LitStr::new(&child.field, proc_macro2::Span::call_site());
   Ok(parse2(quote! {
     #q_name_literal => {
       if e_empty {
         #field_ident = Some(String::new());
       } else {
-        if let quick_xml::events::Event::Text(t) = xml_reader.next()? {
-          #field_ident = Some(t.decode()?.into_owned());
+        let mut value = None;
+        loop {
+          match xml_reader.next()? {
+            quick_xml::events::Event::Text(t) => {
+              crate::common::push_xml_text(&mut value, t)?;
+            }
+            quick_xml::events::Event::GeneralRef(t) => {
+              crate::common::push_xml_general_ref(
+                &mut value,
+                t,
+                #q_name,
+                #field_name_lit,
+              )?;
+            }
+            quick_xml::events::Event::End(_) => break,
+            quick_xml::events::Event::Eof => {
+              return Err(crate::common::unexpected_eof(#q_name));
+            }
+            _ => {}
+          }
         }
-        xml_reader.next()?;
+        #field_ident = value;
       }
     }
   })?)

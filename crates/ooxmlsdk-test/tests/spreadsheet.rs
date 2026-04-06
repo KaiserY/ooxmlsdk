@@ -4,11 +4,10 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 fn assert_cell_value_xml(serialized: &str, expected_value: &str) {
-  let serialized = trim_xml_declaration(serialized);
-
-  assert!(serialized.starts_with("<x:v"));
-  assert!(serialized.ends_with("</x:v>"));
-  assert!(serialized.contains(expected_value));
+  assert_eq!(
+    trim_xml_declaration(serialized),
+    format!("<x:v>{expected_value}</x:v>")
+  );
 }
 
 fn shared_string_items(

@@ -92,6 +92,79 @@
       }
     },
     {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "TableJustification",
+      "Field": "w:val",
+      "Action": {
+        "MapAttributeValue": {
+          "Mappings": [
+            {
+              "From": "start",
+              "To": "left"
+            },
+            {
+              "From": "end",
+              "To": "right"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "TabStop",
+      "Field": "w:val",
+      "Action": {
+        "MapAttributeValue": {
+          "Mappings": [
+            {
+              "From": "start",
+              "To": "left"
+            },
+            {
+              "From": "end",
+              "To": "right"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "TextDirection",
+      "Field": "w:val",
+      "Action": {
+        "MapAttributeValue": {
+          "Mappings": [
+            {
+              "From": "lr",
+              "To": "btLr"
+            },
+            {
+              "From": "tb",
+              "To": "lrTb"
+            },
+            {
+              "From": "tbV",
+              "To": "lrTbV"
+            },
+            {
+              "From": "lrV",
+              "To": "tbLrV"
+            },
+            {
+              "From": "rl",
+              "To": "tbRl"
+            },
+            {
+              "From": "rlV",
+              "To": "tbRlV"
+            }
+          ]
+        }
+      }
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
       "Type": "TextCharacterPropertiesType",
       "Field": "Baseline",

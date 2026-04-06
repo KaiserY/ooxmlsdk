@@ -1,6 +1,9 @@
+#[cfg(feature = "microsoft365")]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChildChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChildChoice,
-  Paragraph, ParagraphChoice, Run, RunChoice, SdtBlock, SdtPropertiesChildChoice, Text,
+  Justification, Paragraph, ParagraphChoice, Run, RunChoice, SdtBlock, SdtPropertiesChildChoice,
+  TabStop, TableJustification, Text, TextDirection,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -203,6 +206,82 @@ fn body_paragraph_count(body: &Body) -> usize {
     .iter()
     .filter(|child| matches!(child, BodyChildChoice::WP(_)))
     .count()
+}
+
+#[test]
+fn document_attribute_translation_test() {
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" conformance="strict" />"#;
+  let document = xml.parse::<Document>().unwrap();
+
+  assert!(document.w_conformance.is_none());
+}
+
+#[test]
+fn justification_attribute_translation_test() {
+  const NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  for (value, expected) in [("start", "left"), ("end", "right")] {
+    let xml = format!(r#"<w:jc xmlns:w="{NAMESPACE}" w:val="{value}" />"#);
+    let element = xml.parse::<Justification>().unwrap();
+
+    assert_eq!(element.val.to_string(), expected);
+  }
+}
+
+#[test]
+fn table_justification_attribute_translation_test() {
+  const NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  for (value, expected) in [("start", "left"), ("end", "right")] {
+    let xml = format!(r#"<w:jc xmlns:w="{NAMESPACE}" w:val="{value}" />"#);
+    let element = xml.parse::<TableJustification>().unwrap();
+
+    assert_eq!(element.val.to_string(), expected);
+  }
+}
+
+#[test]
+fn tab_stop_attribute_translation_test() {
+  const NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  for (value, expected) in [("start", "left"), ("end", "right")] {
+    let xml = format!(r#"<w:tab xmlns:w="{NAMESPACE}" w:val="{value}" w:pos="12" />"#);
+    let element = xml.parse::<TabStop>().unwrap();
+
+    assert_eq!(element.val.to_string(), expected);
+  }
+}
+
+#[test]
+fn text_direction_attribute_translation_test() {
+  const NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  for (value, expected) in [
+    ("lr", "btLr"),
+    ("tb", "lrTb"),
+    ("tbV", "lrTbV"),
+    ("lrV", "tbLrV"),
+    ("rl", "tbRl"),
+    ("rlV", "tbRlV"),
+  ] {
+    let xml = format!(r#"<w:textDirection xmlns:w="{NAMESPACE}" w:val="{value}" />"#);
+    let element = xml.parse::<TextDirection>().unwrap();
+
+    assert_eq!(element.val.to_string(), expected);
+  }
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn level_justification_attribute_translation_test() {
+  const NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  for (value, expected) in [("start", "left"), ("end", "right")] {
+    let xml = format!(r#"<w:lvlJc xmlns:w="{NAMESPACE}" w:val="{value}" />"#);
+    let element = xml.parse::<LevelJustification>().unwrap();
+
+    assert_eq!(element.w_val.to_string(), expected);
+  }
 }
 
 #[test]

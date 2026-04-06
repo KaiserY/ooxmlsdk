@@ -27,6 +27,7 @@ pub struct CodegenContext<'a> {
   enum_type_map: HashMap<&'a str, &'a SchemaEnum>,
   enum_type_module_map: HashMap<&'a str, &'a str>,
   type_map: HashMap<&'a str, &'a SchemaType>,
+  type_class_name_map: HashMap<&'a str, &'a SchemaType>,
   type_module_map: HashMap<&'a str, &'a str>,
   type_prefix_map: HashMap<&'a str, &'a str>,
   enum_module_by_typed_namespace_and_name: HashMap<(&'a str, &'a str), &'a str>,
@@ -116,6 +117,7 @@ impl<'a> CodegenContext<'a> {
     let mut enum_type_map = HashMap::new();
     let mut enum_type_module_map = HashMap::new();
     let mut type_map = HashMap::new();
+    let mut type_class_name_map = HashMap::new();
     let mut type_module_map = HashMap::new();
     let mut type_prefix_map = HashMap::new();
     let mut enum_module_by_typed_namespace_and_name = HashMap::new();
@@ -123,6 +125,7 @@ impl<'a> CodegenContext<'a> {
     for schema in schemas {
       for schema_type in &schema.types {
         type_map.insert(schema_type.name.as_str(), schema_type);
+        type_class_name_map.insert(schema_type.class_name.as_str(), schema_type);
         type_module_map.insert(schema_type.name.as_str(), schema.module_name.as_str());
         type_prefix_map.insert(schema_type.name.as_str(), schema.prefix.as_str());
       }
@@ -141,6 +144,7 @@ impl<'a> CodegenContext<'a> {
       enum_type_map,
       enum_type_module_map,
       type_map,
+      type_class_name_map,
       type_module_map,
       type_prefix_map,
       enum_module_by_typed_namespace_and_name,
@@ -157,6 +161,10 @@ impl<'a> CodegenContext<'a> {
 
   pub fn type_by_name(&self, name: &str) -> Option<&'a SchemaType> {
     self.type_map.get(name).copied()
+  }
+
+  pub fn type_by_class_name(&self, class_name: &str) -> Option<&'a SchemaType> {
+    self.type_class_name_map.get(class_name).copied()
   }
 
   pub fn derived_base_type(&self, schema_type: &SchemaType) -> Option<&'a SchemaType> {
@@ -839,7 +847,7 @@ fn gen_schema_enum(
   for rule in compatibility_rules {
     if let CompatibilityAction::MapAttributeValue { mappings } = &rule.action {
       let is_relevant = if let Some(attr_type) = context
-        .type_by_name(&rule.type_name)
+        .type_by_class_name(&rule.type_name)
         .or_else(|| context.type_by_name(&format!("{}/{}", rule.schema, rule.type_name)))
         .and_then(|ty| {
           ty.attributes
@@ -902,8 +910,9 @@ fn gen_schema_enum_variants(
       let value = &facet.value;
       let aliases = alias_map.get(value);
       if let Some(aliases) = aliases {
+        let alias_attrs = aliases.iter().map(|alias| quote! { alias = #alias });
         quote! {
-          #[sdk(rename = #value, alias = [#(#aliases),*])]
+          #[sdk(rename = #value, #(#alias_attrs),*)]
         }
       } else {
         quote! {

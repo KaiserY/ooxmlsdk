@@ -64,7 +64,8 @@ fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::T
   if std::fs::create_dir_all(&kind_dir).is_err() {
     return;
   }
-  let file_path = format!("{kind_dir}/{}.rs", input.ident);
+  let snapshot_name = snapshot_file_stem(input);
+  let file_path = format!("{kind_dir}/{snapshot_name}.rs");
   let mut file = match std::fs::File::create(&file_path) {
     Ok(file) => file,
     Err(_) => return,
@@ -181,6 +182,30 @@ fn expand_sdk_enum(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
   })
 }
 
+fn snapshot_file_stem(input: &DeriveInput) -> String {
+  let raw_name = parse_sdk_qname(&input.attrs)
+    .ok()
+    .flatten()
+    .unwrap_or_else(|| input.ident.to_string());
+  sanitize_snapshot_component(&raw_name)
+}
+
+fn sanitize_snapshot_component(value: &str) -> String {
+  let mut out = String::with_capacity(value.len());
+  for ch in value.chars() {
+    if ch.is_ascii_alphanumeric() {
+      out.push(ch);
+    } else {
+      out.push('_');
+    }
+  }
+  if out.is_empty() {
+    "unknown".to_string()
+  } else {
+    out
+  }
+}
+
 fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -209,387 +234,6 @@ fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
       impl crate::sdk::SdkType for #ident {}
     }),
   }
-}
-
-#[allow(dead_code)]
-fn expand_helper_struct_old(
-  input: &DeriveInput,
-  fields: &syn::FieldsNamed,
-) -> syn::Result<proc_macro2::TokenStream> {
-  let ident = &input.ident;
-
-  let mut child_fields = Vec::new();
-  let mut choice_fields = Vec::new();
-  for field in &fields.named {
-    let field_ident = field
-      .ident
-      .as_ref()
-      .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
-    match parse_sdk_type_field_kind(&field.attrs)? {
-      Some(SdkTypeFieldKind::Child { qname }) => child_fields.push(SdkChildField {
-        ident: field_ident.clone(),
-        qname,
-        ty: field.ty.clone(),
-        optional: is_option_type(&field.ty),
-        repeated: contains_vec_type(&field.ty),
-      }),
-      Some(SdkTypeFieldKind::Choice) => choice_fields.push(SdkChoiceField {
-        ident: field_ident.clone(),
-        ty: field.ty.clone(),
-        optional: is_option_type(&field.ty),
-        repeated: contains_vec_type(&field.ty),
-      }),
-      Some(SdkTypeFieldKind::Text) => {
-        return Err(syn::Error::new_spanned(
-          field,
-          "helper structs do not support #[sdk(text)]",
-        ));
-      }
-      Some(SdkTypeFieldKind::Attr { .. }) | None => {
-        return Err(syn::Error::new_spanned(
-          field,
-          "helper structs require #[sdk(child(...))] or #[sdk(choice)] fields",
-        ));
-      }
-    }
-  }
-
-  let mut child_decl_tokens = Vec::new();
-  let mut child_parse_tokens = Vec::new();
-  let mut child_visit_parse_tokens = Vec::new();
-  let mut child_write_tokens = Vec::new();
-  let mut child_init_tokens = Vec::new();
-  let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-  let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
-  for field in &child_fields {
-    let field_ident = &field.ident;
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(&field.qname);
-    let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-    let payload_ty = unwrap_option_vec_type(&field.ty);
-    let child_ty = if let Some(inner_ty) = box_inner_type(&payload_ty) {
-      inner_ty
-    } else {
-      payload_ty.clone()
-    };
-    let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
-      quote! { std::boxed::Box::new(parsed_child) }
-    } else {
-      quote! { parsed_child }
-    };
-    let build_arm = |reader_ident: &Ident| {
-      let match_target = if tag_prefix.is_empty() {
-        quote! { #local_name_lit }
-      } else {
-        let tag_qname_lit = LitByteStr::new(
-          format!("{tag_prefix}:{local_name}").as_bytes(),
-          Span::call_site(),
-        );
-        quote! { #tag_qname_lit | #local_name_lit }
-      };
-      if field.repeated {
-        quote! {
-          #match_target => {
-            match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-              Ok(parsed_child) => {
-                #field_ident.push(#parsed_child_expr);
-                true
-              },
-              Err(crate::common::SdkError::MissingField { .. }) => true,
-              Err(err) => Err(err),
-            }
-          },
-        }
-      } else {
-        quote! {
-          #match_target => {
-            match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-              Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                true
-              },
-              Err(crate::common::SdkError::MissingField { .. }) => true,
-              Err(err) => Err(err),
-            }
-          },
-        }
-      }
-    };
-
-    if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
-      child_write_tokens.push(quote! {
-        for child in &self.#field_ident {
-          child.write_xml(writer, xmlns_prefix)?;
-        }
-      });
-      child_parse_tokens.push(build_arm(&xml_reader_ident));
-      child_visit_parse_tokens.push(build_arm(&xml_reader_ident));
-    } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-      if field.optional {
-        child_write_tokens.push(quote! {
-          if let Some(child) = &self.#field_ident {
-            child.write_xml(writer, xmlns_prefix)?;
-          }
-        });
-      } else {
-        child_write_tokens.push(quote! {
-          self.#field_ident.write_xml(writer, xmlns_prefix)?;
-        });
-      }
-      child_parse_tokens.push(build_arm(&xml_reader_ident));
-      child_visit_parse_tokens.push(build_arm(&xml_reader_ident));
-    }
-  }
-
-  let mut choice_decl_tokens = Vec::new();
-  let mut choice_write_tokens = Vec::new();
-  let mut choice_parse_tokens = Vec::new();
-  let mut choice_visit_parse_tokens = Vec::new();
-  let mut choice_init_tokens = Vec::new();
-  for field in &choice_fields {
-    let field_ident = &field.ident;
-    let choice_ty = unwrap_option_vec_type(&field.ty);
-    let choice_value_expr = if box_inner_type(&choice_ty).is_some() {
-      quote! { std::boxed::Box::new(parsed_choice) }
-    } else {
-      quote! { parsed_choice }
-    };
-    let build_arm = |reader_ident: &Ident| {
-      if field.repeated {
-        quote! {
-          #field_ident.push(match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-            Ok(parsed_choice) => #choice_value_expr,
-            Err(crate::common::SdkError::MissingField { .. }) => return true,
-            Err(crate::common::SdkError::UnexpectedTag { .. }) => return false,
-            Err(err) => return Err(err),
-          });
-          true,
-        }
-      } else {
-        quote! {
-          #field_ident = Some(match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-            Ok(parsed_choice) => #choice_value_expr,
-            Err(crate::common::SdkError::MissingField { .. }) => return true,
-            Err(crate::common::SdkError::UnexpectedTag { .. }) => return false,
-            Err(err) => return Err(err),
-          });
-          true,
-        }
-      }
-    };
-    if field.repeated {
-      choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      choice_init_tokens.push(quote! { #field_ident });
-      choice_write_tokens.push(quote! {
-        for choice in &self.#field_ident {
-          choice.write_xml(writer, xmlns_prefix)?;
-        }
-      });
-      choice_parse_tokens.push(build_arm(&xml_reader_ident));
-      choice_visit_parse_tokens.push(build_arm(&visitor_reader_ident));
-    } else {
-      choice_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        choice_init_tokens.push(quote! { #field_ident });
-      } else {
-        choice_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-      if field.optional {
-        choice_write_tokens.push(quote! {
-          if let Some(choice) = &self.#field_ident {
-            choice.write_xml(writer, xmlns_prefix)?;
-          }
-        });
-      } else {
-        choice_write_tokens.push(quote! {
-          self.#field_ident.write_xml(writer, xmlns_prefix)?;
-        });
-      }
-      choice_parse_tokens.push(build_arm(&xml_reader_ident));
-      choice_visit_parse_tokens.push(build_arm(&visitor_reader_ident));
-    }
-  }
-
-  let use_runtime_strict_dispatch = matches!(
-    ident.to_string().as_str(),
-    "Body" | "Paragraph" | "ParagraphProperties" | "PlotArea" | "ChartSpace"
-  );
-
-  let visit_foreign_child_tokens = if child_fields.is_empty() && choice_fields.is_empty() {
-    quote! {
-      let mut visit_foreign_child = |
-        _xml_reader: &mut R,
-        _e: quick_xml::events::BytesStart<'de>,
-        _next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        Ok(false)
-      };
-    }
-  } else if use_runtime_strict_dispatch {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let matched: bool = match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => Ok::<bool, crate::common::SdkError>(false),
-        }?;
-        if matched {
-          return Ok(true);
-        }
-        Ok(false)
-      };
-    }
-  } else {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let matched: bool = match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => Ok::<bool, crate::common::SdkError>(false),
-        }?;
-        Ok(matched)
-      }
-    }
-  };
-
-  Ok(quote! {
-    impl crate::sdk::SdkType for #ident {}
-
-    impl std::str::FromStr for #ident {
-      type Err = crate::common::SdkError;
-
-      fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-    }
-
-    impl #ident {
-      pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-
-      pub fn from_reader<R: std::io::BufRead>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-
-      pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
-        xml_reader: &mut R,
-        xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut pending_event = xml_event;
-
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-
-        loop {
-          let (e, next_empty) = if let Some((e, next_empty)) = pending_event.take() {
-            (e, next_empty)
-          } else {
-            match xml_reader.next()? {
-              quick_xml::events::Event::Start(e) => (e, false),
-              quick_xml::events::Event::Empty(e) => (e, true),
-              quick_xml::events::Event::End(e) => {
-                break;
-              }
-              quick_xml::events::Event::Eof => {
-                return Err(crate::common::unexpected_eof(stringify!(#ident)));
-              }
-              _ => continue,
-            }
-          };
-
-          {
-            #visit_foreign_child_tokens
-            let matched = match e.name().as_ref() {
-              #( #child_parse_tokens )*
-              _ => false,
-            };
-            if matched {
-              continue;
-            }
-
-            match e.name().as_ref() {
-              b"mc:AlternateContent" | b"AlternateContent" => {
-                crate::common::process_markup_compatibility_children(
-                  xml_reader,
-                  next_empty,
-                  &mut visit_foreign_child,
-                )?;
-                continue;
-              }
-              _ => {
-                if crate::common::is_foreign_prefixed_child(e.name().as_ref(), "") {
-                  crate::common::process_foreign_element_children(
-                    xml_reader,
-                    next_empty,
-                    &mut visit_foreign_child,
-                  )?;
-                  continue;
-                }
-              }
-            }
-
-            return Err(crate::common::unexpected_tag(
-              stringify!(#ident),
-              "known child",
-              e.name().as_ref(),
-            ));
-          }
-        }
-
-        Ok(Self {
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-        })
-      }
-      pub(crate) fn write_xml<W: std::fmt::Write>(
-        &self,
-        writer: &mut W,
-        xmlns_prefix: &str,
-      ) -> Result<(), std::fmt::Error> {
-        #( #child_write_tokens )*
-        #( #choice_write_tokens )*
-        Ok(())
-      }
-    }
-
-    impl ::std::fmt::Display for #ident {
-      fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "{}", self.to_xml()?)
-      }
-    }
-  })
 }
 
 fn expand_sequence_helper_struct(
@@ -702,28 +346,7 @@ fn expand_sequence_helper_struct(
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}
 
-    impl std::str::FromStr for #ident {
-      type Err = crate::common::SdkError;
-
-      fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-    }
-
     impl #ident {
-      pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-
-      pub fn from_reader<R: std::io::BufRead>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-
       pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
@@ -770,12 +393,6 @@ fn expand_sequence_helper_struct(
         })
       }
 
-      pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-        let mut writer = String::with_capacity(32);
-        self.write_xml(&mut writer, "")?;
-        Ok(writer)
-      }
-
       pub(crate) fn write_xml<W: std::fmt::Write>(
         &self,
         writer: &mut W,
@@ -783,12 +400,6 @@ fn expand_sequence_helper_struct(
       ) -> Result<(), std::fmt::Error> {
         #( #child_write_tokens )*
         Ok(())
-      }
-    }
-
-    impl ::std::fmt::Display for #ident {
-      fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "{}", self.to_xml()?)
       }
     }
   })
@@ -1221,28 +832,6 @@ fn expand_helper_struct(
           #( #choice_init_tokens, )*
         })
       }
-
-      pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-        let mut writer = String::with_capacity(32);
-        self.write_xml(&mut writer, "")?;
-        Ok(writer)
-      }
-
-      pub(crate) fn write_xml<W: std::fmt::Write>(
-        &self,
-        writer: &mut W,
-        xmlns_prefix: &str,
-      ) -> Result<(), std::fmt::Error> {
-        #( #child_write_tokens )*
-        #( #choice_write_tokens )*
-        Ok(())
-      }
-    }
-
-    impl ::std::fmt::Display for #ident {
-      fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "{}", self.to_xml()?)
-      }
     }
   })
 }
@@ -1257,6 +846,11 @@ fn expand_text_wrapper(
     tag_prefix,
     local_name,
   } = parse_qname_info(schema_qname);
+  if local_name.is_empty() {
+    return Ok(quote! {
+      impl crate::sdk::SdkType for #ident {}
+    });
+  }
   let tag_qname = if tag_prefix.is_empty() {
     local_name.clone()
   } else {
@@ -1409,6 +1003,7 @@ fn expand_text_wrapper(
           }
         }
         #deserialize_tokens
+
       }
 
       pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
@@ -1449,6 +1044,11 @@ fn expand_named_struct(
     tag_prefix,
     local_name,
   } = parse_qname_info(schema_qname);
+  if local_name.is_empty() {
+    return Ok(quote! {
+      impl crate::sdk::SdkType for #ident {}
+    });
+  }
   let tag_qname = if tag_prefix.is_empty() {
     local_name.clone()
   } else {
@@ -2273,28 +1873,7 @@ fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStrea
   Ok(quote! {
     impl crate::sdk::SdkChoice for #ident {}
 
-    impl std::str::FromStr for #ident {
-      type Err = crate::common::SdkError;
-
-      fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-    }
-
     impl #ident {
-      pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-
-      pub fn from_reader<R: std::io::BufRead>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::deserialize_inner(&mut xml_reader, None)
-      }
-
       pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
@@ -2324,7 +1903,7 @@ fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStrea
         }
       }
 
-      pub fn write_xml<W: std::fmt::Write>(
+      pub(crate) fn write_xml<W: std::fmt::Write>(
         &self,
         writer: &mut W,
         xmlns_prefix: &str,
@@ -2332,12 +1911,6 @@ fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStrea
         match self {
           #( #write_arms )*
         }
-      }
-
-      pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-        let mut writer = String::with_capacity(32);
-        self.write_xml(&mut writer, "")?;
-        Ok(writer)
       }
     }
   })
@@ -2400,10 +1973,12 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
     }
     let metas =
       attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    if let Some(Meta::NameValue(meta)) = metas.into_iter().next()
-      && meta.path.is_ident("qname")
-    {
-      return Ok(Some(parse_string_expr(meta.value)?));
+    for meta in metas {
+      if let Meta::NameValue(meta) = meta
+        && meta.path.is_ident("qname")
+      {
+        return Ok(Some(parse_string_expr(meta.value)?));
+      }
     }
   }
   Ok(None)
@@ -2521,7 +2096,7 @@ fn parse_sdk_enum_variant_attrs(
     }
     let metas =
       attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    if let Some(meta) = metas.into_iter().next() {
+    for meta in metas {
       match meta {
         Meta::NameValue(meta) if meta.path.is_ident("rename") => {
           rename = Some(parse_string_expr(meta.value)?);
@@ -2547,31 +2122,7 @@ fn parse_sdk_enum_variant_attrs(
 }
 
 fn parse_alias_expr(expr: syn::Expr) -> syn::Result<Vec<String>> {
-  match expr {
-    syn::Expr::Array(array) => {
-      let rendered = quote!(#array).to_string();
-      let trimmed = rendered
-        .strip_prefix('[')
-        .and_then(|value| value.strip_suffix(']'))
-        .unwrap_or(rendered.as_str());
-      let mut aliases = Vec::new();
-      for part in trimmed.split(',') {
-        let part = part.trim();
-        if part.is_empty() {
-          continue;
-        }
-        let value: LitStr = syn::parse_str(part).map_err(|err| {
-          syn::Error::new_spanned(
-            &array,
-            format!("expected string literal for sdk enum alias: {err}"),
-          )
-        })?;
-        aliases.push(value.value());
-      }
-      Ok(aliases)
-    }
-    other => Ok(vec![parse_string_expr(other)?]),
-  }
+  Ok(vec![parse_string_expr(expr)?])
 }
 
 fn parse_string_expr(expr: syn::Expr) -> syn::Result<String> {

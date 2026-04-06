@@ -2,7 +2,8 @@ use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-  Arm, Expr, Ident, ImplItemFn, ItemImpl, ItemStruct, LitByteStr, Stmt, Type, parse_str, parse2,
+  Arm, Expr, Ident, ImplItemFn, ItemImpl, ItemStruct, LitByteStr, LitStr, Stmt, Type, parse_str,
+  parse2,
 };
 
 use crate::Result;
@@ -20,7 +21,7 @@ pub fn gen_package_schema(schema: &PackageSchema) -> Result<TokenStream> {
   }
 
   for package_type in &schema.types {
-    if let Some(choice_enum) = gen_choice_enum(package_type)? {
+    if let Some(choice_enum) = gen_choice_enum(schema, package_type)? {
       token_stream_list.push(choice_enum);
     }
 
@@ -35,66 +36,38 @@ pub fn gen_package_schema(schema: &PackageSchema) -> Result<TokenStream> {
 fn gen_package_enum(package_enum: &PackageEnum) -> Result<TokenStream> {
   let enum_ident: Ident = parse_str(&package_enum.name.to_upper_camel_case())?;
   let mut variants: Vec<TokenStream> = vec![];
-  let mut from_str_arms: Vec<Arm> = vec![];
-  let mut as_str_arms: Vec<Arm> = vec![];
 
   for variant in &package_enum.variants {
     let variant_ident: Ident = parse_str(&variant.name.to_upper_camel_case())?;
     let variant_value = variant.value.as_str();
+    let variant_value_lit = LitStr::new(variant_value, proc_macro2::Span::call_site());
 
     if variant.is_default {
       variants.push(quote! {
+        #[sdk(rename = #variant_value_lit)]
         #[default]
         #variant_ident
       });
     } else {
       variants.push(quote! {
+        #[sdk(rename = #variant_value_lit)]
         #variant_ident
       });
     }
-
-    from_str_arms.push(parse2(quote! {
-      #variant_value => Ok(Self::#variant_ident),
-    })?);
-    as_str_arms.push(parse2(quote! {
-      Self::#variant_ident => #variant_value,
-    })?);
   }
 
   Ok(quote! {
-    #[derive(Clone, Debug, Default)]
+    #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
     pub enum #enum_ident {
       #( #variants, )*
-    }
-
-    impl std::str::FromStr for #enum_ident {
-      type Err = crate::common::SdkError;
-
-      fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-          #( #from_str_arms )*
-          _ => Err(crate::common::SdkError::CommonError(s.to_string())),
-        }
-      }
-    }
-
-    impl #enum_ident {
-      pub fn as_xml_str(&self) -> &'static str {
-        match self {
-          #( #as_str_arms )*
-        }
-      }
-    }
-
-    impl std::fmt::Display for #enum_ident {
-      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_xml_str())
-      }
     }
   })
 }
 
-fn gen_choice_enum(package_type: &PackageType) -> Result<Option<TokenStream>> {
+fn gen_choice_enum(
+  schema: &PackageSchema,
+  package_type: &PackageType,
+) -> Result<Option<TokenStream>> {
   let Some(choice_field) = package_type
     .child_fields
     .iter()
@@ -109,13 +82,17 @@ fn gen_choice_enum(package_type: &PackageType) -> Result<Option<TokenStream>> {
   for variant in &choice_field.variants {
     let variant_ident: Ident = parse_str(&variant.name.to_upper_camel_case())?;
     let variant_type: Type = parse_str(&variant.r#type.to_upper_camel_case())?;
+    let variant_schema_type = find_package_type(schema, &variant.r#type)?;
+    let q_name = package_prefixed_tag(&variant_schema_type.prefix, &variant_schema_type.tag);
+    let q_name_lit = LitStr::new(&q_name, proc_macro2::Span::call_site());
     variants.push(quote! {
+      #[sdk(child(qname = #q_name_lit))]
       #variant_ident(std::boxed::Box<#variant_type>),
     });
   }
 
   Ok(Some(quote! {
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
     pub enum #enum_ident {
       #( #variants )*
     }
@@ -124,9 +101,7 @@ fn gen_choice_enum(package_type: &PackageType) -> Result<Option<TokenStream>> {
 
 fn gen_package_type(schema: &PackageSchema, package_type: &PackageType) -> Result<TokenStream> {
   let struct_ident: Ident = parse_str(&package_type.name.to_upper_camel_case())?;
-  let prefixed_tag = prefixed_tag(&package_type.prefix, &package_type.tag);
   let local_tag = package_type.tag.as_str();
-  let prefixed_tag_literal: LitByteStr = parse_str(&format!("b\"{prefixed_tag}\""))?;
   let local_tag_literal: LitByteStr = parse_str(&format!("b\"{local_tag}\""))?;
 
   let fields = gen_type_fields(package_type)?;
@@ -157,12 +132,7 @@ fn gen_package_type(schema: &PackageSchema, package_type: &PackageType) -> Resul
     }
   })?;
 
-  let deserialize_inner_fn = gen_deserialize_inner_fn(
-    schema,
-    package_type,
-    &prefixed_tag_literal,
-    &local_tag_literal,
-  )?;
+  let deserialize_inner_fn = gen_deserialize_inner_fn(schema, package_type, &local_tag_literal)?;
   let serializer_impl = gen_package_type_serializer(schema, package_type)?;
 
   let impl_block: ItemImpl = parse2(quote! {
@@ -228,13 +198,14 @@ fn gen_type_fields(package_type: &PackageType) -> Result<Vec<TokenStream>> {
 fn gen_deserialize_inner_fn(
   schema: &PackageSchema,
   package_type: &PackageType,
-  prefixed_tag_literal: &LitByteStr,
   local_tag_literal: &LitByteStr,
 ) -> Result<ImplItemFn> {
   let mut declarations = vec![];
   let mut attr_arms: Vec<Arm> = vec![];
   let mut build_fields = vec![];
   let mut child_arms: Vec<Arm> = vec![];
+  let prefixed_tag = package_prefixed_tag(&package_type.prefix, &package_type.tag);
+  let prefixed_tag_literal: LitByteStr = parse_str(&format!("b\"{prefixed_tag}\""))?;
 
   if package_type.has_xmlns_fields {
     declarations.push(quote! { let mut xmlns = None; });
@@ -277,7 +248,7 @@ fn gen_deserialize_inner_fn(
         let child_type: Type = parse_str(&child_field.item_type.to_upper_camel_case())?;
         let child_schema_type = find_package_type(schema, &child_field.item_type)?;
         let child_type_name = child_schema_type.tag.as_str();
-        let child_prefixed = prefixed_tag(&child_schema_type.prefix, child_type_name);
+        let child_prefixed = package_prefixed_tag(&child_schema_type.prefix, child_type_name);
         let child_prefixed_literal: LitByteStr = parse_str(&format!("b\"{child_prefixed}\""))?;
         let child_local_literal: LitByteStr = parse_str(&format!("b\"{child_type_name}\""))?;
 
@@ -290,18 +261,14 @@ fn gen_deserialize_inner_fn(
       PackageChildFieldKind::ChoiceVec => {
         let enum_ident: Ident = parse_str(&child_field.enum_name)?;
         for variant in &child_field.variants {
-          let variant_ident: Ident = parse_str(&variant.name.to_upper_camel_case())?;
-          let variant_type: Type = parse_str(&variant.r#type.to_upper_camel_case())?;
           let variant_schema_type = find_package_type(schema, &variant.r#type)?;
           let tag = variant_schema_type.tag.as_str();
-          let prefixed_tag = prefixed_tag(&variant_schema_type.prefix, tag);
+          let prefixed_tag = package_prefixed_tag(&variant_schema_type.prefix, tag);
           let prefixed_tag_literal: LitByteStr = parse_str(&format!("b\"{prefixed_tag}\""))?;
           let local_tag_literal: LitByteStr = parse_str(&format!("b\"{tag}\""))?;
           child_arms.push(parse2(quote! {
             #prefixed_tag_literal | #local_tag_literal => {
-              #field_ident.push(#enum_ident::#variant_ident(std::boxed::Box::new(
-                #variant_type::deserialize_inner(xml_reader, Some((e, e_empty)))?,
-              )));
+              #field_ident.push(#enum_ident::deserialize_inner(xml_reader, Some((e, e_empty)))?);
             }
           })?);
         }
@@ -426,32 +393,9 @@ fn gen_package_type_serializer(
   package_type: &PackageType,
 ) -> Result<TokenStream> {
   let struct_ident: Ident = parse_str(&package_type.name.to_upper_camel_case())?;
-  let root_with_xmlns = if package_type.name == schema.root {
-    let xmlns_uri = schema.xmlns_uri.as_str();
-    quote! {
-      if let Some(xmlns) = &self.xmlns {
-        xmlns != #xmlns_uri
-      } else {
-        true
-      }
-    }
-  } else {
-    quote! { false }
-  };
-  let header = if package_type.name == schema.root {
-    match schema.xml_header {
-      PackageXmlHeader::None => quote! {},
-      PackageXmlHeader::Plain => quote! {
-        writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
-      },
-      PackageXmlHeader::Standalone => quote! {
-        writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
-      },
-    }
-  } else {
-    quote! {}
-  };
-  let prefixed_tag = prefixed_tag(&package_type.prefix, &package_type.tag);
+  let root_default_namespace_prefix = gen_root_default_namespace_prefix(schema, package_type);
+  let header = gen_root_xml_header(schema, package_type);
+  let tag_prefix = package_type.prefix.as_str();
   let local_tag = package_type.tag.as_str();
   let is_leaf = package_type.kind == PackageTypeKind::Leaf;
 
@@ -468,13 +412,7 @@ fn gen_package_type_serializer(
 
       #( #child_writers )*
 
-      writer.write_str("</")?;
-      if with_xmlns {
-        writer.write_str(#prefixed_tag)?;
-      } else {
-        writer.write_str(#local_tag)?;
-      }
-      writer.write_char('>')?;
+      crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_tag)?;
       Ok(())
     }
   };
@@ -482,7 +420,7 @@ fn gen_package_type_serializer(
     quote! {
       pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
         let mut writer = String::with_capacity(32);
-        self.write_xml(&mut writer, #root_with_xmlns)?;
+        self.write_xml(&mut writer, #root_default_namespace_prefix)?;
         Ok(writer)
       }
     }
@@ -490,7 +428,7 @@ fn gen_package_type_serializer(
     quote! {
       pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
         let mut writer = String::with_capacity(32);
-        self.write_xml(&mut writer, false)?;
+        self.write_xml(&mut writer, #tag_prefix)?;
         Ok(writer)
       }
     }
@@ -503,16 +441,11 @@ fn gen_package_type_serializer(
       pub(crate) fn write_xml<W: std::fmt::Write>(
         &self,
         writer: &mut W,
-        with_xmlns: bool,
+        xmlns_prefix: &str,
       ) -> Result<(), std::fmt::Error> {
         #header
 
-        writer.write_char('<')?;
-        if with_xmlns {
-          writer.write_str(#prefixed_tag)?;
-        } else {
-          writer.write_str(#local_tag)?;
-        }
+        crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_tag)?;
 
         #( #attr_writers )*
 
@@ -524,6 +457,46 @@ fn gen_package_type_serializer(
   Ok(quote! {
     #serializer_impl
   })
+}
+
+fn gen_root_default_namespace_prefix(
+  schema: &PackageSchema,
+  package_type: &PackageType,
+) -> TokenStream {
+  let prefix_lit = LitStr::new(&package_type.prefix, proc_macro2::Span::call_site());
+  if package_type.name == schema.root {
+    let xmlns_uri = schema.xmlns_uri.as_str();
+    let xmlns_uri_lit = LitStr::new(xmlns_uri, proc_macro2::Span::call_site());
+    quote! {
+      if let Some(xmlns) = &self.xmlns {
+        if xmlns != #xmlns_uri_lit {
+          ""
+        } else {
+          #prefix_lit
+        }
+      } else {
+        ""
+      }
+    }
+  } else {
+    quote! { #prefix_lit }
+  }
+}
+
+fn gen_root_xml_header(schema: &PackageSchema, package_type: &PackageType) -> TokenStream {
+  if package_type.name == schema.root {
+    match schema.xml_header {
+      PackageXmlHeader::None => quote! {},
+      PackageXmlHeader::Plain => quote! {
+        writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
+      },
+      PackageXmlHeader::Standalone => quote! {
+        writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
+      },
+    }
+  } else {
+    quote! {}
+  }
 }
 
 fn attr_type(attr: &PackageAttribute) -> Result<Type> {
@@ -666,7 +639,7 @@ fn gen_child_writers(package_type: &PackageType) -> Result<Vec<TokenStream>> {
       PackageChildFieldKind::Vec => {
         writers.push(quote! {
           for child in &self.#field_ident {
-            child.write_xml(writer, with_xmlns)?;
+            child.write_xml(writer, xmlns_prefix)?;
           }
         });
       }
@@ -676,7 +649,7 @@ fn gen_child_writers(package_type: &PackageType) -> Result<Vec<TokenStream>> {
           let variant_ident: Ident = parse_str(&variant.name.to_upper_camel_case())?;
           let enum_ident: Ident = parse_str(&child_field.enum_name)?;
           variant_arms.push(quote! {
-            #enum_ident::#variant_ident(value) => value.write_xml(writer, with_xmlns)?,
+            #enum_ident::#variant_ident(value) => value.write_xml(writer, xmlns_prefix)?,
           });
         }
         writers.push(quote! {
@@ -710,7 +683,7 @@ fn gen_fixed_attr_writers(attrs: &[PackageFixedAttribute]) -> Vec<TokenStream> {
     .collect()
 }
 
-fn prefixed_tag(prefix: &str, tag: &str) -> String {
+fn package_prefixed_tag(prefix: &str, tag: &str) -> String {
   if prefix.is_empty() {
     tag.to_string()
   } else {

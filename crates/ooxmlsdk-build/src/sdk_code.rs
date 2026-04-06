@@ -8,11 +8,9 @@ use std::path::Path;
 use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
-use crate::sdk_code::deserializer::gen_schema_deserializer;
 use crate::sdk_code::package_schemas::gen_package_schema;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{CodegenContext, gen_schema};
-use crate::sdk_code::serializer::gen_schema_serializer;
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::compatibility::{apply_compatibility, read_compatibility};
 use crate::sdk_data::sdk_data_model::{
@@ -20,12 +18,10 @@ use crate::sdk_data::sdk_data_model::{
   PackageSchema as SdkDataPackageSchema, Part as SdkDataPart, Schema as SdkDataSchema,
 };
 
-pub mod deserializer;
 pub mod helpers;
 pub mod package_schemas;
 pub mod parts;
 pub mod schemas;
-pub mod serializer;
 pub mod versioning;
 
 const FILE_HEADER: &str = r#"//
@@ -37,11 +33,10 @@ const FILE_HEADER: &str = r#"//
 
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
-  let sdk_data_package_schemas_dir_path = sdk_data_dir.as_ref().join("package_schemas");
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let sdk_data_compatibility_path = sdk_data_dir.as_ref().join("compatibility.json");
   let mut sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
-  let sdk_data_package_schemas = read_package_schemas(&sdk_data_package_schemas_dir_path)?;
+  let sdk_data_package_schemas = read_package_schemas(&sdk_data_schemas_dir_path)?;
   let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let sdk_data_compatibility = read_compatibility(&sdk_data_compatibility_path)?;
@@ -52,18 +47,6 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   write_schemas(
     &sdk_data_schemas,
     &sdk_data_package_schemas,
-    &sdk_data_compatibility.rules,
-    &context,
-    out_dir_path,
-  )?;
-  write_deserializers(
-    &sdk_data_schemas,
-    &sdk_data_compatibility.rules,
-    &context,
-    out_dir_path,
-  )?;
-  write_serializers(
-    &sdk_data_schemas,
     &sdk_data_compatibility.rules,
     &context,
     out_dir_path,
@@ -85,8 +68,14 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<SdkDataSchema>> 
       continue;
     }
 
-    let file = File::open(path)?;
+    let file = File::open(&path)?;
     let reader = BufReader::new(file);
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+      continue;
+    };
+    if file_name.starts_with("package_") {
+      continue;
+    }
     let sdk_data_schema: SdkDataSchema = serde_json::from_reader(reader)?;
     sdk_data_schemas.push(sdk_data_schema);
   }
@@ -111,7 +100,7 @@ fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<SdkDataPart>> {
       continue;
     }
 
-    let file = File::open(path)?;
+    let file = File::open(&path)?;
     let reader = BufReader::new(file);
     let sdk_data_part: SdkDataPart = serde_json::from_reader(reader)?;
     sdk_data_parts.push(sdk_data_part);
@@ -135,6 +124,13 @@ fn read_package_schemas(
     let path = entry.path();
 
     if !path.is_file() || path.extension() != Some(OsStr::new("json")) {
+      continue;
+    }
+
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+      continue;
+    };
+    if !file_name.starts_with("package_") {
       continue;
     }
 
@@ -227,53 +223,6 @@ fn write_schemas(
   Ok(())
 }
 
-fn write_deserializers(
-  sdk_data_schemas: &[SdkDataSchema],
-  compatibility_rules: &[SdkDataCompatibilityRule],
-  context: &CodegenContext<'_>,
-  out_dir_path: &Path,
-) -> Result<()> {
-  let out_deserializers_dir_path = out_dir_path.join("deserializers");
-  fs::create_dir_all(&out_deserializers_dir_path)?;
-  clear_generated_rs_files(&out_deserializers_dir_path)?;
-
-  let mut deserializers_mod_list: Vec<ItemMod> = vec![];
-
-  for sdk_data_schema in sdk_data_schemas {
-    let deserializer_path =
-      out_deserializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
-    write_generated_module(
-      &deserializer_path,
-      gen_schema_deserializer(
-        sdk_data_schema,
-        compatibility_rules,
-        context,
-        schema_module_is_microsoft365_only(sdk_data_schema),
-      )
-      .map_err(|err| {
-        format!(
-          "failed to generate deserializer {}: {err}",
-          sdk_data_schema.module_name
-        )
-      })?,
-    )?;
-
-    push_module_decl(
-      &mut deserializers_mod_list,
-      &sdk_data_schema.module_name,
-      schema_module_cfg_attrs(sdk_data_schema),
-    )?;
-  }
-
-  let token_stream: TokenStream = quote! {
-    #( #deserializers_mod_list )*
-  };
-  let deserializers_mod_path = out_dir_path.join("deserializers.rs");
-  write_generated_module(&deserializers_mod_path, token_stream)?;
-
-  Ok(())
-}
-
 fn write_parts(sdk_data_parts: &[SdkDataPart], out_dir_path: &Path) -> Result<()> {
   let out_parts_dir_path = out_dir_path.join("parts");
   fs::create_dir_all(&out_parts_dir_path)?;
@@ -326,53 +275,6 @@ fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Pat
 
   let namespaces_path = out_dir_path.join("namespaces.rs");
   write_generated_module(&namespaces_path, token_stream)?;
-
-  Ok(())
-}
-
-fn write_serializers(
-  sdk_data_schemas: &[SdkDataSchema],
-  compatibility_rules: &[SdkDataCompatibilityRule],
-  context: &CodegenContext<'_>,
-  out_dir_path: &Path,
-) -> Result<()> {
-  let out_serializers_dir_path = out_dir_path.join("serializers");
-  fs::create_dir_all(&out_serializers_dir_path)?;
-  clear_generated_rs_files(&out_serializers_dir_path)?;
-
-  let mut serializers_mod_list: Vec<ItemMod> = vec![];
-
-  for sdk_data_schema in sdk_data_schemas {
-    let serializer_path =
-      out_serializers_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
-    write_generated_module(
-      &serializer_path,
-      gen_schema_serializer(
-        sdk_data_schema,
-        compatibility_rules,
-        context,
-        schema_module_is_microsoft365_only(sdk_data_schema),
-      )
-      .map_err(|err| {
-        format!(
-          "failed to generate serializer {}: {err}",
-          sdk_data_schema.module_name
-        )
-      })?,
-    )?;
-
-    push_module_decl(
-      &mut serializers_mod_list,
-      &sdk_data_schema.module_name,
-      schema_module_cfg_attrs(sdk_data_schema),
-    )?;
-  }
-
-  let token_stream: TokenStream = quote! {
-    #( #serializers_mod_list )*
-  };
-  let serializers_mod_path = out_dir_path.join("serializers.rs");
-  write_generated_module(&serializers_mod_path, token_stream)?;
 
   Ok(())
 }

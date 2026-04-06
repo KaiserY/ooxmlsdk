@@ -22,14 +22,11 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
 ) -> Result<()> {
   let gen_context = Context::new(data_dir.as_ref())?;
   let out_dir = out_dir.as_ref();
-  let out_package_schemas_dir_path = out_dir.join("package_schemas");
   let out_parts_dir_path = out_dir.join("parts");
   let out_schemas_dir_path = out_dir.join("schemas");
 
-  fs::create_dir_all(&out_package_schemas_dir_path)?;
   fs::create_dir_all(&out_parts_dir_path)?;
   fs::create_dir_all(&out_schemas_dir_path)?;
-  clear_generated_json_files(&out_package_schemas_dir_path)?;
   clear_generated_json_files(&out_parts_dir_path)?;
   clear_generated_json_files(&out_schemas_dir_path)?;
 
@@ -47,7 +44,7 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
 
   for package_schema in read_package_schemas(package_schemas_dir.as_ref())? {
     write_json(
-      out_package_schemas_dir_path.join(format!("{}.json", package_schema.module_name)),
+      out_schemas_dir_path.join(format!("package_{}.json", package_schema.module_name)),
       &package_schema,
     )?;
   }

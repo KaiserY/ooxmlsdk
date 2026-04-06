@@ -12,8 +12,8 @@ pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   XmlReader, decode_attr_value, expect_event_start, from_reader_inner, from_str_inner,
-  read_outer_xml, write_attr_value, write_attr_value_str, write_end_tag, write_escaped_text,
-  write_escaped_text_str, write_start_tag_open, write_xmlns_attr,
+  read_outer_xml, write_attr_value, write_end_tag, write_escaped_text, write_start_tag_open,
+  write_xmlns_attr,
 };
 
 #[inline(always)]
@@ -71,44 +71,6 @@ pub fn parse_bool_str(
 #[inline(always)]
 pub fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
   xml::parse_bool_bytes(b)
-}
-
-pub(crate) fn merge_strict_bitmask_attr(
-  current: Option<&str>,
-  raw_value: &str,
-  bit: u32,
-  radix: u32,
-  width: usize,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<String, SdkError> {
-  let is_true = parse_bool_str(raw_value, ty, field)?;
-  let current_value = current
-    .and_then(|value| u32::from_str_radix(value, radix).ok())
-    .unwrap_or(0);
-  let combined = if is_true {
-    current_value | bit
-  } else {
-    current_value & !bit
-  };
-
-  match radix {
-    2 => Ok(format!("{combined:0width$b}")),
-    16 => Ok(format!("{combined:0width$x}")),
-    _ => Err(SdkError::CommonError(format!(
-      "unsupported strict bitmask radix: {radix}"
-    ))),
-  }
-}
-
-pub(crate) fn map_compat_attr_value(raw_value: String, mappings: &[(&str, &str)]) -> String {
-  for (from, to) in mappings {
-    if raw_value == *from {
-      return (*to).to_string();
-    }
-  }
-
-  raw_value
 }
 
 #[inline(always)]

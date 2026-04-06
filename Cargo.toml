@@ -4,7 +4,7 @@ members = [
   "crates/ooxmlsdk",
   "crates/ooxmlsdk-build",
   "crates/ooxmlsdk-derive",
-  "crates/ooxmlsdk-test",
+  "crates/ooxmlsdk-test"
 ]
 
 [workspace.package]

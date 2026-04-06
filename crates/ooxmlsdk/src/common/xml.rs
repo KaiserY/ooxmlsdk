@@ -400,6 +400,7 @@ pub(crate) fn write_escaped_text<W: std::fmt::Write, T: std::fmt::Display + ?Siz
   writer.write_str(&quick_xml::escape::escape(value.to_string()))
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) fn write_escaped_text_str<W: std::fmt::Write>(
   writer: &mut W,
@@ -421,6 +422,7 @@ pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized
   writer.write_char('"')
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) fn write_attr_value_str<W: std::fmt::Write>(
   writer: &mut W,

@@ -44,3 +44,4 @@ sdk_data/namespaces.json
 sdk_data/package_schemas
 
 .codex
+tmp/

@@ -10,13 +10,14 @@ use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredChoice, StructuredChoiceVariant,
   StructuredParticleKind, classify_attr_type, flatten_one_sequence_particles, is_composite_type,
   is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
-  is_one_sequence_flatten, is_one_sequence_structurable, structure_one_sequence_particles,
-  supports_compat_xmlns_fields,
+  is_one_sequence_flatten, is_one_sequence_structurable, needs_xml_header,
+  structure_one_sequence_particles, supports_compat_xmlns_fields,
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
 use crate::sdk_data::compatibility::treat_as_string_rule_for_field;
 use crate::sdk_data::sdk_data_model::{
-  CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeParticle,
+  CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
+  SchemaTypeParticle,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -499,7 +500,13 @@ pub fn gen_schema(
   let mut token_stream_list: Vec<TokenStream> = vec![];
 
   for schema_enum in &schema.enums {
-    token_stream_list.push(gen_schema_enum(schema_enum, version_cfg)?);
+    token_stream_list.push(gen_schema_enum(
+      schema_enum,
+      &schema.module_name,
+      compatibility_rules,
+      context,
+      version_cfg,
+    )?);
   }
 
   for schema_type in &schema.types {
@@ -517,6 +524,13 @@ pub fn gen_schema(
       quote! {
         #[sdk(qname = #qname)]
       }
+    };
+    let sdk_xml_header_attrs = if needs_xml_header(schema_type) {
+      quote! {
+        #[sdk(xml_header)]
+      }
+    } else {
+      quote! {}
     };
     let sdk_text_attrs = quote! {
       #[sdk(text)]
@@ -548,6 +562,7 @@ pub fn gen_schema(
         #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
         #sdk_text_attrs
         #sdk_type_attrs
+        #sdk_xml_header_attrs
         pub struct #struct_name_ident(pub Option<#xml_content_type>);
 
         #( #type_attrs )*
@@ -764,6 +779,7 @@ pub fn gen_schema(
       #[doc = #qualified_doc]
       #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
       #sdk_type_attrs
+      #sdk_xml_header_attrs
       pub struct #struct_name_ident {
         #( #fields )*
       }
@@ -792,6 +808,9 @@ fn common_choice_version<'a>(container_version: &'a str, variant_versions: &[&st
 
 fn gen_schema_enum(
   schema_enum: &SchemaEnum,
+  _module_name: &str,
+  compatibility_rules: &[CompatibilityRule],
+  context: &CodegenContext<'_>,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
   let enum_name_ident: Ident = parse_str(&schema_enum.name.to_upper_camel_case())?;
@@ -815,9 +834,40 @@ fn gen_schema_enum(
     .first()
     .copied()
     .unwrap_or_else(|| schema_enum.facets.first().expect("schema enum facet"));
+
+  let mut alias_map: HashMap<String, Vec<String>> = HashMap::new();
+  for rule in compatibility_rules {
+    if let CompatibilityAction::MapAttributeValue { mappings } = &rule.action {
+      let is_relevant = if let Some(attr_type) = context
+        .type_by_name(&rule.type_name)
+        .or_else(|| context.type_by_name(&format!("{}/{}", rule.schema, rule.type_name)))
+        .and_then(|ty| {
+          ty.attributes
+            .iter()
+            .find(|a| a.property_name == rule.field || a.q_name == rule.field)
+        })
+        .map(|a| a.r#type.as_str())
+      {
+        attr_type.contains(&schema_enum.name)
+      } else {
+        false
+      };
+
+      if is_relevant {
+        for mapping in mappings {
+          alias_map
+            .entry(mapping.to.clone())
+            .or_default()
+            .push(mapping.from.clone());
+        }
+      }
+    }
+  }
+
   let variants = gen_schema_enum_variants(
     &schema_enum.facets.iter().collect::<Vec<_>>(),
     default_facet,
+    &alias_map,
     nested_version_cfg,
   )?;
 
@@ -834,6 +884,7 @@ fn gen_schema_enum(
 fn gen_schema_enum_variants(
   facets: &[&crate::sdk_data::sdk_data_model::SchemaEnumFacet],
   default_facet: &crate::sdk_data::sdk_data_model::SchemaEnumFacet,
+  alias_map: &HashMap<String, Vec<String>>,
   version_cfg: VersionCfgContext,
 ) -> Result<Vec<Variant>> {
   let mut variants = Vec::with_capacity(facets.len());
@@ -849,8 +900,15 @@ fn gen_schema_enum_variants(
       quote! {}
     } else {
       let value = &facet.value;
-      quote! {
-        #[sdk(rename = #value)]
+      let aliases = alias_map.get(value);
+      if let Some(aliases) = aliases {
+        quote! {
+          #[sdk(rename = #value, alias = [#(#aliases),*])]
+        }
+      } else {
+        quote! {
+          #[sdk(rename = #value)]
+        }
       }
     };
     let default_attr = if std::ptr::eq(*facet, default_facet) {
@@ -946,6 +1004,31 @@ fn gen_attr(
     }
   };
 
+  let mut strict_bitmask_attrs = quote! {};
+  for rule in compatibility_rules {
+    if let CompatibilityAction::StrictBitmaskAttributes {
+      radix,
+      width,
+      attributes,
+    } = &rule.action
+      && rule.schema == schema.module_name
+      && (rule.type_name == owner_class_name || rule.type_name == owner_type_name)
+    {
+      if rule.field == attr.property_name || rule.field == attr.q_name {
+        strict_bitmask_attrs = quote! {
+          #[cfg(feature = "strict")]
+          #[sdk(strict_bitmask(radix = #radix, width = #width))]
+        };
+      } else if let Some(bit_attr) = attributes.iter().find(|a| a.q_name == attr.q_name) {
+        let bit = bit_attr.bit;
+        strict_bitmask_attrs = quote! {
+          #[cfg(feature = "strict")]
+          #[sdk(bit = #bit)]
+        };
+      }
+    }
+  }
+
   let required = attr
     .validators
     .iter()
@@ -969,6 +1052,7 @@ fn gen_attr(
     quote! {
       #( #attr_attrs )*
       #sdk_attr_attrs
+      #strict_bitmask_attrs
       #[doc = #property_comments_doc]
       #[doc = ""]
       #[doc = #version_doc]
@@ -980,6 +1064,7 @@ fn gen_attr(
     quote! {
       #( #attr_attrs )*
       #sdk_attr_attrs
+      #strict_bitmask_attrs
       #[doc = #property_comments_doc]
       #[doc = ""]
       #[doc = #version_doc]
@@ -1723,9 +1808,15 @@ mod tests {
       ..Default::default()
     };
 
-    let tokens = gen_schema_enum(&schema_enum, VersionCfgContext::default())
-      .expect("schema enum tokens")
-      .to_string();
+    let tokens = gen_schema_enum(
+      &schema_enum,
+      "",
+      &[],
+      &CodegenContext::new(&[]),
+      VersionCfgContext::default(),
+    )
+    .expect("schema enum tokens")
+    .to_string();
 
     assert!(tokens.contains("qname"));
     assert!(tokens.contains("mso:ST_Size"));
@@ -1761,9 +1852,15 @@ mod tests {
       ..Default::default()
     };
 
-    let tokens = gen_schema_enum(&schema_enum, VersionCfgContext::default())
-      .expect("schema enum tokens")
-      .to_string();
+    let tokens = gen_schema_enum(
+      &schema_enum,
+      "",
+      &[],
+      &CodegenContext::new(&[]),
+      VersionCfgContext::default(),
+    )
+    .expect("schema enum tokens")
+    .to_string();
 
     assert_eq!(tokens.matches("pub enum TriggerEventValues").count(), 1);
     assert!(tokens.contains("OnMediaBookmark"));

@@ -32,6 +32,7 @@ pub enum CompatibilityAction {
   TreatAsString,
   FallbackToRawXml,
   PreserveNamespaceDecls,
+  CollectionSequenceRoot,
   ExtraChild,
   MapAttributeValue {
     #[serde(rename = "Mappings")]
@@ -259,6 +260,7 @@ pub struct SchemaType {
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
   pub particle: SchemaTypeParticle,
+  pub collection_sequence_root: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]

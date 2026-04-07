@@ -112,6 +112,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             })
             .collect(),
           particle: gen_particle(&ty.particle),
+          collection_sequence_root: false,
         })
         .collect(),
       enums: schema

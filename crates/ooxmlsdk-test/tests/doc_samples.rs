@@ -402,7 +402,17 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
         }
       }
       Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {}
-      Event::GeneralRef(_) => {}
+      Event::GeneralRef(event) => {
+        let raw = event.decode().unwrap_or_else(|err| {
+          panic!("failed to decode xml general ref for {file_name}:{entry_name}: {err}");
+        });
+        let text = unescape(&format!("&{raw};"))
+          .unwrap_or_else(|err| {
+            panic!("failed to decode xml general ref for {file_name}:{entry_name}: {err}");
+          })
+          .into_owned();
+        push_xml_node(&mut roots, &mut stack, XmlNode::Text(text));
+      }
       Event::Eof => break,
     }
 
@@ -574,15 +584,17 @@ fn normalize_bool_lexeme(value: &str) -> String {
   match value {
     "1" | "true" => "true".to_string(),
     "0" | "false" => "false".to_string(),
+    "t" | "T" => "true".to_string(),
+    "f" | "F" => "false".to_string(),
     _ => value.to_string(),
   }
 }
 
 fn normalize_numeric_lexeme(value: &str) -> String {
-  if value.contains('.') || value.contains('e') || value.contains('E') {
-    if let Ok(parsed) = value.parse::<f64>() {
-      return parsed.to_string();
-    }
+  if (value.contains('.') || value.contains('e') || value.contains('E'))
+    && let Ok(parsed) = value.parse::<f64>()
+  {
+    return parsed.to_string();
   }
 
   value.to_string()

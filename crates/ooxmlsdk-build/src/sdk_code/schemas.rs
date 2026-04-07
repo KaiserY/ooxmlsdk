@@ -1025,13 +1025,11 @@ fn gen_attr(
     {
       if rule.field == attr.property_name || rule.field == attr.q_name {
         strict_bitmask_attrs = quote! {
-          #[cfg(feature = "strict")]
           #[sdk(strict_bitmask(radix = #radix, width = #width))]
         };
       } else if let Some(bit_attr) = attributes.iter().find(|a| a.q_name == attr.q_name) {
         let bit = bit_attr.bit;
         strict_bitmask_attrs = quote! {
-          #[cfg(feature = "strict")]
           #[sdk(bit = #bit)]
         };
       }

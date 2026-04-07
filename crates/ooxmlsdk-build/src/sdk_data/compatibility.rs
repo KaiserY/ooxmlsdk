@@ -50,6 +50,7 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
           );
         }
       }
+      CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
       CompatibilityAction::MapAttributeValue { mappings } => {
         if mappings.is_empty() {
@@ -349,6 +350,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       }
     }
     CompatibilityAction::FallbackToRawXml => {}
+    CompatibilityAction::CollectionSequenceRoot => {
+      let schema = &mut sdk_data_schemas[schema_index];
+      schema.types[schema_type_index].collection_sequence_root = true;
+    }
     CompatibilityAction::MapAttributeValue { .. } => {
       if attribute_index.is_none() {
         return Err(
@@ -642,5 +647,30 @@ mod tests {
       schemas[0].types[0].particle.items[0].name,
       "w14:CT_Ligatures/w14:ligatures"
     );
+  }
+
+  #[test]
+  fn collection_sequence_root_marks_schema_type() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+      types: vec![SchemaType {
+        class_name: "Footnotes".to_string(),
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        type_name: "Footnotes".to_string(),
+        field: "collection_sequence_root".to_string(),
+        action: CompatibilityAction::CollectionSequenceRoot,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert!(schemas[0].types[0].collection_sequence_root);
   }
 }

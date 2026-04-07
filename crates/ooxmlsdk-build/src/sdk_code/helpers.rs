@@ -73,6 +73,10 @@ pub fn supports_compat_xmlns_fields(
     .is_some()
 }
 
+pub fn is_collection_sequence_root(schema_type: &SchemaType) -> bool {
+  schema_type.collection_sequence_root
+}
+
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
   if schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
     || schema_type.particle.kind == "Sequence"
@@ -143,9 +147,10 @@ pub enum StructuredChoiceVariant<'a> {
 
 pub fn flatten_one_sequence_particles(schema_type: &SchemaType) -> Vec<FlatParticle<'_>> {
   let mut flat_particles = Vec::new();
+  let parent_repeated = is_collection_sequence_root(schema_type);
 
   for particle in &schema_type.particle.items {
-    flatten_one_sequence_particle(particle, false, false, "", &mut flat_particles);
+    flatten_one_sequence_particle(particle, false, parent_repeated, "", &mut flat_particles);
   }
 
   flat_particles
@@ -167,9 +172,10 @@ pub fn is_one_sequence_structurable(schema_type: &SchemaType) -> bool {
 
 pub fn structure_one_sequence_particles(schema_type: &SchemaType) -> Vec<StructuredParticle<'_>> {
   let mut particles = Vec::new();
+  let parent_repeated = is_collection_sequence_root(schema_type);
 
   for particle in &schema_type.particle.items {
-    structure_one_sequence_particle(particle, false, false, "", &mut particles);
+    structure_one_sequence_particle(particle, false, parent_repeated, "", &mut particles);
   }
 
   particles

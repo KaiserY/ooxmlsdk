@@ -165,6 +165,18 @@
       }
     },
     {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "Footnotes",
+      "Field": "collection_sequence_root",
+      "Action": "CollectionSequenceRoot"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "Endnotes",
+      "Field": "collection_sequence_root",
+      "Action": "CollectionSequenceRoot"
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
       "Type": "TextCharacterPropertiesType",
       "Field": "Baseline",

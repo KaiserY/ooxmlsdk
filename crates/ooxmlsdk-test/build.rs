@@ -32,10 +32,16 @@ fn main() {
     }
 
     if !is_round_trip_supported(&file_name) {
+      generated.push_str(&format!(
+        "#[test]\nfn open_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
+      ));
       continue;
     }
 
     if file_name == "Strict01.docx" {
+      generated.push_str("#[cfg(feature = \"strict\")]\n");
+    }
+    if file_name == "AnnotationRef.docx" {
       generated.push_str("#[cfg(feature = \"strict\")]\n");
     }
     if file_name == "HelloWorld.docx" || file_name == "Youtube.xlsx" {
@@ -54,6 +60,7 @@ fn is_open_failure(file_name: &str) -> bool {
   matches!(
     file_name,
     "5Errors.docx"
+      | "basicspreadsheet.xlsx"
       | "Of16-09-UnknownElement.docx"
       | "UnknownElement.docx"
       | "complex0.docx"
@@ -67,6 +74,7 @@ fn is_round_trip_supported(file_name: &str) -> bool {
     "BadDocProps.docx"
       | "AnnotationRef.docx"
       | "Comments.docx"
+      | "Comments.xlsx"
       | "Data-Bound-Content-Controls.docx"
       | "Hyperlink.docx"
       | "Presentation.pptx"

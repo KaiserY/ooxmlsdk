@@ -199,17 +199,34 @@ fn find_attribute_index_in_type_or_base(
   None
 }
 
-fn find_child_type_index_by_qname(schema: &Schema, field: &str) -> Option<usize> {
+fn find_child_type_index_by_qname(
+  sdk_data_schemas: &[Schema],
+  field: &str,
+) -> Option<(usize, usize)> {
   let field_suffix = field.rsplit(':').next().unwrap_or(field);
   let field_tail = format!("/{field}");
   let field_suffix_tail = format!("/{field_suffix}");
 
-  schema.types.iter().position(|item| {
-    item.name == field
-      || item.name.ends_with(&field_tail)
-      || item.name.ends_with(&field_suffix_tail)
-      || item.class_name == field_suffix
-  })
+  sdk_data_schemas
+    .iter()
+    .enumerate()
+    .find_map(|(schema_index, schema)| {
+      schema
+        .types
+        .iter()
+        .enumerate()
+        .find_map(|(type_index, item)| {
+          if item.name == field
+            || item.name.ends_with(&field_tail)
+            || item.name.ends_with(&field_suffix_tail)
+            || item.class_name == field_suffix
+          {
+            Some((schema_index, type_index))
+          } else {
+            None
+          }
+        })
+    })
 }
 
 pub fn strict_bitmask_rule_for_field<'a>(
@@ -285,41 +302,50 @@ pub fn fallback_to_raw_xml_rule_for_field<'a>(
 }
 
 fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Result<()> {
-  let schema = sdk_data_schemas
-    .iter_mut()
-    .find(|schema| schema.module_name == rule.schema)
+  let schema_index = sdk_data_schemas
+    .iter()
+    .position(|schema| schema.module_name == rule.schema)
     .ok_or_else(|| format!("compatibility schema {} not found", rule.schema))?;
 
-  let schema_type_index = find_schema_type_index(schema, &rule.type_name).ok_or_else(|| {
-    format!(
-      "compatibility type {}.{} not found",
-      rule.schema, rule.type_name
-    )
-  })?;
+  let schema_type_index = {
+    let schema = &sdk_data_schemas[schema_index];
+    find_schema_type_index(schema, &rule.type_name).ok_or_else(|| {
+      format!(
+        "compatibility type {}.{} not found",
+        rule.schema, rule.type_name
+      )
+    })?
+  };
 
-  let attribute_index =
-    find_attribute_index_in_type_or_base(schema, schema_type_index, &rule.field);
+  let attribute_index = {
+    let schema = &sdk_data_schemas[schema_index];
+    find_attribute_index_in_type_or_base(schema, schema_type_index, &rule.field)
+  };
 
   match &rule.action {
     CompatibilityAction::TreatAsString => {
       if let Some((attribute_type_index, attribute_index)) = attribute_index {
         if attribute_type_index == schema_type_index {
+          let schema = &mut sdk_data_schemas[schema_index];
           let attribute = &mut schema.types[attribute_type_index].attributes[attribute_index];
           attribute.r#type = "StringValue".to_string();
         }
-      } else if rule.field == "xml_content"
-        && (schema.types[schema_type_index].api_kind == SchemaTypeApiKind::LeafTextWrapper
-          || schema.types[schema_type_index].kind == SchemaTypeKind::LeafText)
-      {
-        // Leaf text wrappers derive their xml_content type during codegen.
       } else {
-        return Err(
-          format!(
-            "compatibility field {}.{}.{} not found",
-            rule.schema, rule.type_name, rule.field
-          )
-          .into(),
-        );
+        let schema = &sdk_data_schemas[schema_index];
+        if rule.field == "xml_content"
+          && (schema.types[schema_type_index].api_kind == SchemaTypeApiKind::LeafTextWrapper
+            || schema.types[schema_type_index].kind == SchemaTypeKind::LeafText)
+        {
+          // Leaf text wrappers derive their xml_content type during codegen.
+        } else {
+          return Err(
+            format!(
+              "compatibility field {}.{}.{} not found",
+              rule.schema, rule.type_name, rule.field
+            )
+            .into(),
+          );
+        }
       }
     }
     CompatibilityAction::FallbackToRawXml => {}
@@ -336,19 +362,21 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
     }
     CompatibilityAction::PreserveNamespaceDecls => {}
     CompatibilityAction::ExtraChild => {
-      let child_type_index =
-        find_child_type_index_by_qname(schema, &rule.field).ok_or_else(|| {
+      let (child_schema_index, child_type_index) =
+        find_child_type_index_by_qname(sdk_data_schemas, &rule.field).ok_or_else(|| {
           format!(
             "compatibility child {}.{}.{} not found",
             rule.schema, rule.type_name, rule.field
           )
         })?;
-      let child_name = schema.types[child_type_index].name.clone();
-      let child_property_comments = schema.types[child_type_index].summary.clone();
-      let child_version = schema.types[child_type_index].version.clone();
+      let child_schema = &sdk_data_schemas[child_schema_index];
+      let child_name = child_schema.types[child_type_index].name.clone();
+      let child_property_comments = child_schema.types[child_type_index].summary.clone();
+      let child_version = child_schema.types[child_type_index].version.clone();
       let child_name_for_particle = child_name.clone();
+      let target_schema = &mut sdk_data_schemas[schema_index];
 
-      if schema.types[schema_type_index]
+      if target_schema.types[schema_type_index]
         .children
         .iter()
         .any(|child| child.name == child_name)
@@ -356,7 +384,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         return Ok(());
       }
 
-      schema.types[schema_type_index].children.push(
+      target_schema.types[schema_type_index].children.push(
         crate::sdk_data::sdk_data_model::SchemaTypeChild {
           name: child_name,
           property_name: String::new(),
@@ -364,10 +392,11 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         },
       );
 
-      if schema.types[schema_type_index].particle.kind == "Sequence"
-        || schema.types[schema_type_index].composite_kind == SchemaTypeCompositeKind::OneSequence
+      if target_schema.types[schema_type_index].particle.kind == "Sequence"
+        || target_schema.types[schema_type_index].composite_kind
+          == SchemaTypeCompositeKind::OneSequence
       {
-        schema.types[schema_type_index]
+        target_schema.types[schema_type_index]
           .particle
           .items
           .push(SchemaTypeParticle {
@@ -561,5 +590,57 @@ mod tests {
       "w:CT_CompatSetting/w:compatSetting"
     );
     assert_eq!(schemas[0].types[1].children[0].property_name, "");
+  }
+
+  #[test]
+  fn extra_child_can_refer_to_child_type_in_another_schema() {
+    let mut schemas = vec![
+      Schema {
+        module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        types: vec![SchemaType {
+          name: "w:CT_RPrBaseStyleable/w:rPr".to_string(),
+          class_name: "RunPropertiesBaseStyle".to_string(),
+          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
+            kind: "Sequence".to_string(),
+            ..Default::default()
+          },
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+      Schema {
+        module_name: "schemas_microsoft_com_office_word_2010_wordml".to_string(),
+        types: vec![SchemaType {
+          name: "w14:CT_Ligatures/w14:ligatures".to_string(),
+          class_name: "Ligatures".to_string(),
+          summary: "Ligatures".to_string(),
+          version: "Office2010".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    ];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        type_name: "RunPropertiesBaseStyle".to_string(),
+        field: "w14:ligatures".to_string(),
+        action: CompatibilityAction::ExtraChild,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert_eq!(schemas[0].types[0].children.len(), 1);
+    assert_eq!(
+      schemas[0].types[0].children[0].name,
+      "w14:CT_Ligatures/w14:ligatures"
+    );
+    assert_eq!(schemas[0].types[0].particle.items.len(), 1);
+    assert_eq!(
+      schemas[0].types[0].particle.items[0].name,
+      "w14:CT_Ligatures/w14:ligatures"
+    );
   }
 }

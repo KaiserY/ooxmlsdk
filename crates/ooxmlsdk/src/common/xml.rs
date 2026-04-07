@@ -126,14 +126,14 @@ pub fn resolve_relationship_target_path(parent_path: &str, target: &str) -> Stri
 
 #[inline(always)]
 pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> Result<IoReader<R>, SdkError> {
-  let mut xml_reader = quick_xml::Reader::from_reader(reader);
+  let mut xml_reader = Reader::from_reader(reader);
   xml_reader.config_mut().check_end_names = false;
   Ok(IoReader::new(xml_reader))
 }
 
 #[inline(always)]
 pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
-  let mut xml_reader = quick_xml::Reader::from_str(s);
+  let mut xml_reader = Reader::from_str(s);
   xml_reader.config_mut().check_end_names = false;
   Ok(SliceReader::new(xml_reader))
 }

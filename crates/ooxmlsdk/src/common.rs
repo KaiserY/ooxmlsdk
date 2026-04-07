@@ -1,6 +1,5 @@
 use quick_xml::Decoder;
 use quick_xml::events::attributes::Attribute;
-use std::collections::HashMap;
 
 mod error;
 mod xml;
@@ -220,7 +219,6 @@ fn markup_compatibility_choice_supported<'a>(
   decoder: Decoder,
 ) -> Result<bool, SdkError> {
   let mut requires = None;
-  let namespaces = collect_namespace_declarations(choice_start, decoder)?;
 
   for attr in choice_start.attributes().with_checks(false) {
     let attr = attr?;
@@ -235,38 +233,12 @@ fn markup_compatibility_choice_supported<'a>(
   };
 
   for prefix in requires.split_ascii_whitespace() {
-    let Some(namespace_uri) = namespaces.get(prefix) else {
-      return Ok(false);
-    };
-
-    if crate::namespaces::prefix_by_uri(namespace_uri).is_none() {
+    if crate::namespaces::uri_by_prefix(prefix).is_none() {
       return Ok(false);
     }
   }
 
   Ok(true)
-}
-
-fn collect_namespace_declarations<'a>(
-  start: &quick_xml::events::BytesStart<'a>,
-  decoder: Decoder,
-) -> Result<HashMap<String, String>, SdkError> {
-  let mut namespaces = HashMap::new();
-
-  for attr in start.attributes().with_checks(false) {
-    let attr = attr?;
-    let key = attr.key.as_ref();
-    if key == b"xmlns" {
-      namespaces.insert(String::new(), decode_attr_value(&attr, decoder)?);
-    } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
-      namespaces.insert(
-        String::from_utf8_lossy(prefix).into_owned(),
-        decode_attr_value(&attr, decoder)?,
-      );
-    }
-  }
-
-  Ok(namespaces)
 }
 
 fn skip_foreign_element_children<'de, R: XmlReader<'de>>(

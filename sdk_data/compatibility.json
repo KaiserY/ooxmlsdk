@@ -442,6 +442,78 @@
       "Action": "ExtraChild"
     },
     {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:glow",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:shadow",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:reflection",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:textOutline",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:textFill",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:scene3d",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:props3d",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:ligatures",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:numForm",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:numSpacing",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:stylisticSets",
+      "Action": "ExtraChild"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "RunPropertiesBaseStyle",
+      "Field": "w14:cntxtAlts",
+      "Action": "ExtraChild"
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
       "Type": "GraphicData",
       "Field": "we:webextension",

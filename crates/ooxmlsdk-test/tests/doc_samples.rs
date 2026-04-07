@@ -34,8 +34,8 @@ fn assert_doc_sample_round_trip(file_name: &str) {
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
       let reopened = WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+      assert_wordprocessing_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
-      assert_eq!(reopened.main_document_part.inner_path, "word/document.xml");
     }
     DocSampleKind::Spreadsheet => {
       let original = SpreadsheetDocument::new_from_file(&path).unwrap();
@@ -43,8 +43,8 @@ fn assert_doc_sample_round_trip(file_name: &str) {
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
       let reopened = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+      assert_spreadsheet_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
-      assert_eq!(reopened.workbook_part.inner_path, "xl/workbook.xml");
     }
     DocSampleKind::Presentation => {
       let original = PresentationDocument::new_from_file(&path).unwrap();
@@ -52,11 +52,8 @@ fn assert_doc_sample_round_trip(file_name: &str) {
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
       let reopened = PresentationDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+      assert_presentation_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
-      assert_eq!(
-        reopened.presentation_part.inner_path,
-        "ppt/presentation.xml"
-      );
     }
   }
 }
@@ -74,6 +71,137 @@ fn assert_doc_sample_open_failure(file_name: &str) {
   assert!(
     result.is_err(),
     "expected {file_name} to fail opening so we can keep it out of round-trip coverage"
+  );
+}
+
+fn assert_doc_sample_opens(file_name: &str) {
+  let kind = doc_sample_kind(file_name);
+  let path = test_file_path(file_name);
+
+  match kind {
+    DocSampleKind::Wordprocessing => {
+      let package = WordprocessingDocument::new_from_file(&path).unwrap();
+      assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+    }
+    DocSampleKind::Spreadsheet => {
+      let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+      assert_eq!(package.workbook_part.inner_path, "xl/workbook.xml");
+    }
+    DocSampleKind::Presentation => {
+      let package = PresentationDocument::new_from_file(&path).unwrap();
+      assert_eq!(package.presentation_part.inner_path, "ppt/presentation.xml");
+    }
+  }
+}
+
+fn assert_wordprocessing_document_round_trip(
+  original: &WordprocessingDocument,
+  roundtripped: &WordprocessingDocument,
+) {
+  assert_eq!(original.inner_path, roundtripped.inner_path);
+  assert_eq!(
+    original.main_document_part.inner_path,
+    roundtripped.main_document_part.inner_path
+  );
+  assert_eq!(
+    original
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(
+    original
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .main_document_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+}
+
+fn assert_spreadsheet_document_round_trip(
+  original: &SpreadsheetDocument,
+  roundtripped: &SpreadsheetDocument,
+) {
+  assert_eq!(original.inner_path, roundtripped.inner_path);
+  assert_eq!(
+    original.workbook_part.inner_path,
+    roundtripped.workbook_part.inner_path
+  );
+  assert_eq!(
+    original
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(
+    original
+      .workbook_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .workbook_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(
+    original.workbook_part.worksheet_parts.len(),
+    roundtripped.workbook_part.worksheet_parts.len()
+  );
+}
+
+fn assert_presentation_document_round_trip(
+  original: &PresentationDocument,
+  roundtripped: &PresentationDocument,
+) {
+  assert_eq!(original.inner_path, roundtripped.inner_path);
+  assert_eq!(
+    original.presentation_part.inner_path,
+    roundtripped.presentation_part.inner_path
+  );
+  assert_eq!(
+    original
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(
+    original
+      .presentation_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len()),
+    roundtripped
+      .presentation_part
+      .relationships
+      .as_ref()
+      .map(|relationships| relationships.relationship.len())
+  );
+  assert_eq!(
+    original.presentation_part.slide_parts.len(),
+    roundtripped.presentation_part.slide_parts.len()
+  );
+  assert_eq!(
+    original.presentation_part.slide_master_parts.len(),
+    roundtripped.presentation_part.slide_master_parts.len()
   );
 }
 

@@ -12,7 +12,7 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk_test::fixtures::doc_sample_path;
-use quick_xml::{Reader, escape::escape, events::Event};
+use quick_xml::{Reader, escape::unescape, events::Event};
 use zip::ZipArchive;
 
 #[derive(Clone, Copy, Debug)]
@@ -378,7 +378,11 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
         push_xml_node(&mut roots, &mut stack, node);
       }
       Event::Text(event) => {
-        let raw = String::from_utf8_lossy(event.as_ref()).into_owned();
+        let raw = unescape(&String::from_utf8_lossy(event.as_ref()))
+          .unwrap_or_else(|err| {
+            panic!("failed to decode xml text for {file_name}:{entry_name}: {err}");
+          })
+          .into_owned();
         if raw.chars().all(|ch| ch.is_whitespace()) {
           // Skip formatting-only whitespace.
         } else {
@@ -387,7 +391,11 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
         }
       }
       Event::CData(event) => {
-        let raw = String::from_utf8_lossy(event.as_ref()).into_owned();
+        let raw = unescape(&String::from_utf8_lossy(event.as_ref()))
+          .unwrap_or_else(|err| {
+            panic!("failed to decode xml cdata for {file_name}:{entry_name}: {err}");
+          })
+          .into_owned();
         if !raw.chars().all(|ch| ch.is_whitespace()) {
           let text = normalize_xml_text(&raw, relaxed_bool);
           push_xml_node(&mut roots, &mut stack, XmlNode::Text(text));
@@ -451,6 +459,11 @@ fn parse_xml_node(
     } else {
       value
     };
+    let value = if relaxed_bool {
+      normalize_numeric_lexeme(&value)
+    } else {
+      value
+    };
     if key == "xmlns" || key.starts_with("xmlns:") || key == "mc:Ignorable" {
       continue;
     }
@@ -511,7 +524,7 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
         out.push(' ');
         out.push_str(key);
         out.push_str("=\"");
-        out.push_str(escape(value).as_ref());
+        out.push_str(&escape_xml_text(value));
         out.push('"');
       }
 
@@ -519,14 +532,20 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
         out.push_str("/>");
       } else {
         out.push('>');
-        let mut children = element
-          .children
-          .iter()
-          .map(|child| render_xml_node_to_string(child, relaxed_bool, entry_name))
-          .collect::<Vec<_>>();
-        children.sort();
-        for child in children {
-          out.push_str(&child);
+        if entry_name == "docProps/core.xml" {
+          let mut children = element
+            .children
+            .iter()
+            .map(|child| render_xml_node_to_string(child, relaxed_bool, entry_name))
+            .collect::<Vec<_>>();
+          children.sort();
+          for child in children {
+            out.push_str(&child);
+          }
+        } else {
+          for child in &element.children {
+            out.push_str(&render_xml_node_to_string(child, relaxed_bool, entry_name));
+          }
         }
         out.push_str("</");
         out.push_str(&element.name);
@@ -538,12 +557,35 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
   out
 }
 
+fn escape_xml_text(value: &str) -> String {
+  let mut out = String::with_capacity(value.len());
+  for ch in value.chars() {
+    match ch {
+      '&' => out.push_str("&amp;"),
+      '<' => out.push_str("&lt;"),
+      '>' => out.push_str("&gt;"),
+      _ => out.push(ch),
+    }
+  }
+  out
+}
+
 fn normalize_bool_lexeme(value: &str) -> String {
   match value {
     "1" | "true" => "true".to_string(),
     "0" | "false" => "false".to_string(),
     _ => value.to_string(),
   }
+}
+
+fn normalize_numeric_lexeme(value: &str) -> String {
+  if value.contains('.') || value.contains('e') || value.contains('E') {
+    if let Ok(parsed) = value.parse::<f64>() {
+      return parsed.to_string();
+    }
+  }
+
+  value.to_string()
 }
 
 fn normalize_xml_text(value: &str, relaxed_bool: bool) -> String {

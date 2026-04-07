@@ -31,6 +31,13 @@ fn main() {
       continue;
     }
 
+    if is_valid_open_only(&file_name) {
+      generated.push_str(&format!(
+        "#[test]\nfn open_valid_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
+      ));
+      continue;
+    }
+
     if !is_round_trip_supported(&file_name) {
       generated.push_str(&format!(
         "#[test]\nfn open_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
@@ -60,7 +67,6 @@ fn is_open_failure(file_name: &str) -> bool {
   matches!(
     file_name,
     "5Errors.docx"
-      | "basicspreadsheet.xlsx"
       | "Of16-09-UnknownElement.docx"
       | "UnknownElement.docx"
       | "complex0.docx"
@@ -76,20 +82,69 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "Comments.docx"
       | "Comments.xlsx"
       | "Data-Bound-Content-Controls.docx"
+      | "HelloWorld.docx"
       | "Hyperlink.docx"
       | "Presentation.pptx"
       | "Presentation.potx"
       | "autosave.pptx"
+      | "Document.dotx"
       | "Spreadsheet.xltx"
       | "vmldrawingroot.xlsx"
       | "DocProps.docx"
       | "EmptyRelationshipElement.docx"
       | "InvalidDocPropsct.docx"
-      | "Document.dotx"
       | "MoreDocProps.docx"
       | "NoDocProps.docx"
       | "Plain.docx"
       | "Revision_NameCommentChange.xlsx"
+  )
+}
+
+fn is_valid_open_only(file_name: &str) -> bool {
+  matches!(
+    file_name,
+    "Algn_tab_TabAlignment.pptx"
+      | "MCExecl.xlsx"
+      | "Of16-10-SymEx.docx"
+      | "3dtestdash.pptx"
+      | "3dtestdot.pptx"
+      | "Complex01.docx"
+      | "Complex01.xlsx"
+      | "Document.docx"
+      | "Dickinson_Sample_Slides.pptx"
+      | "demo.docx"
+      | "Notes.docx"
+      | "animation.pptx"
+      | "basicspreadsheet.xlsx"
+      | "excel14.xlsx"
+      | "extlst.xlsx"
+      | "HelloO14.docx"
+      | "mailmerge.docx"
+      | "malformed_uri.xlsx"
+      | "malformed_uri_long.xlsx"
+      | "May_12_04.docx"
+      | "mcdoc.docx"
+      | "mcinleaf.docx"
+      | "mcppt.pptx"
+      | "mediareference.pptx"
+      | "missingcalcchainpart.xlsx"
+      | "o09_Performance_typical.pptx"
+      | "Products.xlsx"
+      | "simpleSdt.docx"
+      | "Spreadsheet.xlsx"
+      | "svg.docx"
+      | "Youtube.xlsx"
+      | "Of16-01.docx"
+      | "Of16-02.docx"
+      | "Of16-03.docx"
+      | "Of16-04.docx"
+      | "Of16-05.docx"
+      | "Of16-06.docx"
+      | "Of16-07.docx"
+      | "Of16-08.docx"
+      | "Of16-01.pptx"
+      | "Of16-02.pptx"
+      | "Of16-03.pptx"
   )
 }
 

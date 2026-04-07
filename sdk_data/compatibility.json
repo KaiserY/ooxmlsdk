@@ -518,6 +518,24 @@
       "Type": "GraphicData",
       "Field": "we:webextension",
       "Action": "FallbackToRawXml"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "Graphic",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "GraphicFrameLocks",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_picture",
+      "Type": "Picture",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
     }
   ]
 }

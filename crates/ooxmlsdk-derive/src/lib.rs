@@ -275,6 +275,7 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
     let relationship_type = quote! { crate::parts::#child_module_ident::RELATIONSHIP_TYPE };
     let child_field_ident = &child.field_ident;
     let child_item_ident = child.item_ident()?;
+    let child_load_ident: Ident = parse_str(&format!("loaded_{}", child_item_ident))?;
 
     match child.kind {
       PartChildKind::Repeated => {
@@ -289,17 +290,21 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
                 &relationship.target,
               ),
             );
-            if !visited.contains(&target_path) && #file_path_set_ident.contains(&target_path) {
-              visited.insert(target_path.clone());
-              let #child_item_ident = #child_type::new_from_archive(
-                &child_parent_path,
-                &target_path,
-                &relationship.id,
-                #file_path_set_ident,
-                #archive_ident,
-                visited,
-              )?;
-              #child_field_ident.push(#child_item_ident);
+            if #file_path_set_ident.contains(&target_path) {
+              let inserted = visited.insert(target_path.clone());
+              if inserted {
+                let #child_load_ident = #child_type::new_from_archive(
+                  &child_parent_path,
+                  &target_path,
+                  &relationship.id,
+                  #file_path_set_ident,
+                  #archive_ident,
+                  visited,
+                );
+                visited.remove(&target_path);
+                let #child_load_ident = #child_load_ident?;
+                #child_field_ident.push(#child_load_ident);
+              }
             }
           }
         });
@@ -322,16 +327,21 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
                 &relationship.target,
               ),
             );
-            if !visited.contains(&target_path) && #file_path_set_ident.contains(&target_path) {
-              visited.insert(target_path.clone());
-              #child_field_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                &target_path,
-                &relationship.id,
-                #file_path_set_ident,
-                #archive_ident,
-                visited,
-              )?));
+            if #file_path_set_ident.contains(&target_path) {
+              let inserted = visited.insert(target_path.clone());
+              if inserted {
+                let #child_load_ident = #child_type::new_from_archive(
+                  &child_parent_path,
+                  &target_path,
+                  &relationship.id,
+                  #file_path_set_ident,
+                  #archive_ident,
+                  visited,
+                );
+                visited.remove(&target_path);
+                let #child_load_ident = #child_load_ident?;
+                #child_field_ident = Some(std::boxed::Box::new(#child_load_ident));
+              }
             }
           }
         });
@@ -359,16 +369,21 @@ fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream>
                 &relationship.target,
               ),
             );
-            if !visited.contains(&target_path) && #file_path_set_ident.contains(&target_path) {
-              visited.insert(target_path.clone());
-              #child_field_ident = Some(std::boxed::Box::new(#child_type::new_from_archive(
-                &child_parent_path,
-                &target_path,
-                &relationship.id,
-                #file_path_set_ident,
-                #archive_ident,
-                visited,
-              )?));
+            if #file_path_set_ident.contains(&target_path) {
+              let inserted = visited.insert(target_path.clone());
+              if inserted {
+                let #child_load_ident = #child_type::new_from_archive(
+                  &child_parent_path,
+                  &target_path,
+                  &relationship.id,
+                  #file_path_set_ident,
+                  #archive_ident,
+                  visited,
+                );
+                visited.remove(&target_path);
+                let #child_load_ident = #child_load_ident?;
+                #child_field_ident = Some(std::boxed::Box::new(#child_load_ident));
+              }
             }
           }
         });
@@ -2207,6 +2222,25 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let mut body_write_tokens = Vec::new();
+  let mut child_write_idx = 0usize;
+  let mut choice_write_idx = 0usize;
+  for field in &fields.named {
+    match parse_sdk_type_field_kind(&field.attrs)? {
+      Some(SdkTypeFieldKind::Child { .. }) => {
+        body_write_tokens.push(child_write_tokens[child_write_idx].clone());
+        child_write_idx += 1;
+      }
+      Some(SdkTypeFieldKind::Choice) => {
+        body_write_tokens.push(choice_write_tokens[choice_write_idx].clone());
+        choice_write_idx += 1;
+      }
+      Some(SdkTypeFieldKind::Text) => {
+        body_write_tokens.push(text_write_tokens.clone());
+      }
+      Some(SdkTypeFieldKind::Attr { .. }) | None => {}
+    }
+  }
   let text_finish_tokens = if let Some(text_field) = &text_field {
     let field_ident = &text_field.ident;
     let inner_ty = unwrap_wrapped_type(&text_field.ty);
@@ -2445,9 +2479,7 @@ fn expand_named_struct(
         #( #attr_write_tokens )*
         if #has_body {
           writer.write_char('>')?;
-          #text_write_tokens
-          #( #child_write_tokens )*
-          #( #choice_write_tokens )*
+          #( #body_write_tokens )*
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {
           writer.write_str("/>")?;

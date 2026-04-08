@@ -257,6 +257,8 @@ pub struct SchemaType {
   pub kind: SchemaTypeKind,
   pub composite_kind: SchemaTypeCompositeKind,
   pub is_abstract: bool,
+  pub has_xmlns_fields: bool,
+  pub has_mc_ignorable_field: bool,
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,

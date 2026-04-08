@@ -4,6 +4,7 @@ use std::{ffi::OsStr, fs, fs::File, io::BufWriter, path::Path};
 
 pub mod compatibility;
 pub mod context;
+pub mod mce;
 pub mod open_xml;
 pub mod package_schemas;
 pub mod parts;
@@ -12,7 +13,8 @@ pub mod sdk_data_model;
 
 use crate::Result;
 use crate::sdk_data::{
-  context::Context, package_schemas::read_package_schemas, parts::gen_parts, schemas::gen_schemas,
+  context::Context, mce::gen_mc_schema, package_schemas::read_package_schemas, parts::gen_parts,
+  schemas::gen_schemas,
 };
 
 pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
@@ -20,7 +22,11 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   out_dir: P,
   package_schemas_dir: Q,
 ) -> Result<()> {
-  let gen_context = Context::new(data_dir.as_ref())?;
+  let mut gen_context = Context::new(data_dir.as_ref())?;
+  gen_context.schemas.push(gen_mc_schema());
+  gen_context
+    .schemas
+    .sort_by(|left, right| left.module_name.cmp(&right.module_name));
   let out_dir = out_dir.as_ref();
   let out_parts_dir_path = out_dir.join("parts");
   let out_schemas_dir_path = out_dir.join("schemas");

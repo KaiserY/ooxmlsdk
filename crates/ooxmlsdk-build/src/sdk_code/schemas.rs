@@ -617,6 +617,9 @@ pub fn gen_schema(
       fields.push(quote! {
         pub xmlns_map: std::collections::HashMap<String, String>,
       });
+    }
+
+    if schema_type.has_mc_ignorable_field {
       fields.push(quote! {
         pub mc_ignorable: Option<String>,
       });

@@ -51,16 +51,13 @@ pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
   !schema_type.part.is_empty() || schema_type.base_class == "OpenXmlPartRootElement"
 }
 
-pub fn supports_xmlns_fields(schema_type: &SchemaType) -> bool {
-  needs_xml_header(schema_type)
-}
-
 pub fn supports_compat_xmlns_fields(
   schema_type: &SchemaType,
   schema: &Schema,
   compatibility_rules: &[CompatibilityRule],
 ) -> bool {
-  supports_xmlns_fields(schema_type)
+  schema_type.has_xmlns_fields
+    || needs_xml_header(schema_type)
     || preserve_namespace_decls_rule_for_schema(compatibility_rules, &schema.module_name).is_some()
     || preserve_namespace_decls_rule_for_type(
       compatibility_rules,

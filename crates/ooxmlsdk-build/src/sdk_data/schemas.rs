@@ -70,6 +70,10 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           kind: resolve_kind(ty, &type_map),
           composite_kind: resolve_composite_kind(ty),
           is_abstract: ty.is_abstract,
+          has_xmlns_fields: ty.has_xmlns_fields,
+          has_mc_ignorable_field: ty.has_mc_ignorable_field
+            || !ty.part.is_empty()
+            || ty.base_class == "OpenXmlPartRootElement",
           api_kind: resolve_api_kind(ty, &type_map),
           attributes: ty
             .attributes

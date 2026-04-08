@@ -331,6 +331,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
     .ok_or_else(|| format!("compatibility schema {} not found", rule.schema))?;
 
   if matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls) && rule.type_name == "*" {
+    let schema = &mut sdk_data_schemas[schema_index];
+    for schema_type in &mut schema.types {
+      schema_type.has_xmlns_fields = true;
+    }
     return Ok(());
   }
 
@@ -391,7 +395,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         );
       }
     }
-    CompatibilityAction::PreserveNamespaceDecls => {}
+    CompatibilityAction::PreserveNamespaceDecls => {
+      let schema = &mut sdk_data_schemas[schema_index];
+      schema.types[schema_type_index].has_xmlns_fields = true;
+    }
     CompatibilityAction::ExtraChild => {
       let (child_schema_index, child_type_index) =
         find_child_type_index_by_qname(sdk_data_schemas, &rule.field).ok_or_else(|| {

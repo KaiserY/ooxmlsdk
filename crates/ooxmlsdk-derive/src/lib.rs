@@ -1760,15 +1760,20 @@ fn expand_named_struct(
   let mut child_fields = Vec::new();
   let mut choice_fields = Vec::new();
   let mut text_field = None;
-  let mut special_namespace_fields = Vec::new();
+  let mut xmlns_fields = Vec::new();
+  let mut mc_ignorable_field = None;
 
   for field in &fields.named {
     let field_ident = field
       .ident
       .as_ref()
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
-    if is_namespace_field(field_ident) {
-      special_namespace_fields.push(field_ident.clone());
+    if is_xmlns_field(field_ident) {
+      xmlns_fields.push(field_ident.clone());
+      continue;
+    }
+    if is_mc_ignorable_field(field_ident) {
+      mc_ignorable_field = Some(field_ident.clone());
       continue;
     }
 
@@ -1808,7 +1813,8 @@ fn expand_named_struct(
     }
   }
 
-  let has_namespace_fields = !special_namespace_fields.is_empty();
+  let has_xmlns_fields = !xmlns_fields.is_empty();
+  let has_mc_ignorable_field = mc_ignorable_field.is_some();
 
   let mut attr_decl_tokens = Vec::new();
   let mut attr_parse_tokens = Vec::new();
@@ -1818,6 +1824,7 @@ fn expand_named_struct(
   for field in &attr_fields {
     let field_ident = &field.ident;
     let name_lit = LitStr::new(&field.name, Span::call_site());
+    let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
     let parse_ty = unwrap_wrapped_type(&field.ty);
     let parser = if is_bool_type(&parse_ty) {
       quote! { crate::common::parse_bool_attr(&attr, xml_reader.decoder(), stringify!(#ident), #name_lit)? }
@@ -1829,7 +1836,7 @@ fn expand_named_struct(
     if field.optional {
       attr_decl_tokens.push(quote! { let mut #field_ident = None; });
       attr_parse_tokens.push(quote! {
-        if attr.key.as_ref() == #name_lit.as_bytes() {
+        #name_bytes_lit => {
           #field_ident = Some(#parser);
         }
       });
@@ -1837,7 +1844,7 @@ fn expand_named_struct(
     } else {
       attr_decl_tokens.push(quote! { let mut #field_ident = None; });
       attr_parse_tokens.push(quote! {
-        if attr.key.as_ref() == #name_lit.as_bytes() {
+        #name_bytes_lit => {
           #field_ident = Some(#parser);
         }
       });
@@ -1861,36 +1868,80 @@ fn expand_named_struct(
     }
   }
 
-  let special_namespace_parse_tokens = if has_namespace_fields {
+  let xmlns_parse_tokens = if has_xmlns_fields {
     quote! {
+      b"xmlns" => {
+        xmlns = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+      }
+      key if key.starts_with(b"xmlns:") => {
+        let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
+        let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
+        if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
+          xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
+        } else {
+          xmlns_map.insert(prefix, uri);
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let mc_ignorable_parse_tokens = if has_mc_ignorable_field {
+    quote! {
+      b"mc:Ignorable" => {
+        mc_ignorable = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let namespace_attr_parse_tokens = match (has_xmlns_fields, has_mc_ignorable_field) {
+    (true, true) => quote! {
       let mut xmlns = None;
       let mut xmlns_map = std::collections::HashMap::<String, String>::new();
       let mut mc_ignorable = None;
       for attr in e.attributes().with_checks(false) {
         let attr = attr?;
         match attr.key.as_ref() {
-          b"xmlns" => {
-            xmlns = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-          }
-          b"mc:Ignorable" => {
-            mc_ignorable = Some(crate::common::decode_attr_value(&attr, xml_reader.decoder())?);
-          }
-          key => {
-            if key.starts_with(b"xmlns:") {
-              let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
-              let uri = crate::common::decode_attr_value(&attr, xml_reader.decoder())?;
-              if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
-                xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
-              } else {
-                xmlns_map.insert(prefix, uri);
-              }
-            }
-          }
+          #xmlns_parse_tokens
+          #mc_ignorable_parse_tokens
+          #( #attr_parse_tokens )*
+          _ => {}
         }
       }
-    }
-  } else {
-    quote! {}
+    },
+    (true, false) => quote! {
+      let mut xmlns = None;
+      let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+      for attr in e.attributes().with_checks(false) {
+        let attr = attr?;
+        match attr.key.as_ref() {
+          #xmlns_parse_tokens
+          #( #attr_parse_tokens )*
+          _ => {}
+        }
+      }
+    },
+    (false, true) => quote! {
+      let mut mc_ignorable = None;
+      for attr in e.attributes().with_checks(false) {
+        let attr = attr?;
+        match attr.key.as_ref() {
+          #mc_ignorable_parse_tokens
+          #( #attr_parse_tokens )*
+          _ => {}
+        }
+      }
+    },
+    (false, false) => quote! {
+      for attr in e.attributes().with_checks(false) {
+        let attr = attr?;
+        match attr.key.as_ref() {
+          #( #attr_parse_tokens )*
+          _ => {}
+        }
+      }
+    },
   };
 
   let mut child_decl_tokens = Vec::new();
@@ -2271,7 +2322,7 @@ fn expand_named_struct(
     quote! {}
   };
 
-  let special_namespace_write_tokens = if has_namespace_fields {
+  let special_namespace_write_tokens = if has_xmlns_fields {
     quote! {
       if let Some(xmlns) = &self.xmlns {
         crate::common::write_xmlns_attr(writer, None, xmlns)?;
@@ -2283,6 +2334,12 @@ fn expand_named_struct(
           crate::common::write_xmlns_attr(writer, Some(k), v)?;
         }
       }
+    }
+  } else {
+    quote! {}
+  };
+  let mc_ignorable_write_tokens = if has_mc_ignorable_field {
+    quote! {
       if let Some(mc_ignorable) = &self.mc_ignorable {
         crate::common::write_attr_value(writer, "mc:Ignorable", mc_ignorable)?;
       }
@@ -2290,10 +2347,16 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let special_namespace_init_tokens = if has_namespace_fields {
+  let special_namespace_init_tokens = if has_xmlns_fields {
     quote! {
       xmlns,
       xmlns_map,
+    }
+  } else {
+    quote! {}
+  };
+  let mc_ignorable_init_tokens = if has_mc_ignorable_field {
+    quote! {
       mc_ignorable,
     }
   } else {
@@ -2306,7 +2369,7 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let to_xml_prefix_tokens = if has_namespace_fields {
+  let to_xml_prefix_tokens = if has_xmlns_fields {
     quote! {
       if self.xmlns.is_some() {
         #tag_prefix
@@ -2375,15 +2438,10 @@ fn expand_named_struct(
         }
 
         #( #attr_decl_tokens )*
-        #special_namespace_parse_tokens
+        #namespace_attr_parse_tokens
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
         #text_decl_tokens
-
-        for attr in e.attributes().with_checks(false) {
-          let attr = attr?;
-          #( #attr_parse_tokens )*
-        }
 
         if !empty_tag {
           loop {
@@ -2459,6 +2517,7 @@ fn expand_named_struct(
           #text_finish_tokens
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
+          #mc_ignorable_init_tokens
         })
       }
 
@@ -2476,6 +2535,7 @@ fn expand_named_struct(
         #xml_header_tokens
         crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         #special_namespace_write_tokens
+        #mc_ignorable_write_tokens
         #( #attr_write_tokens )*
         if #has_body {
           writer.write_char('>')?;
@@ -2908,11 +2968,12 @@ fn has_struct_xml_header_attr(attrs: &[Attribute]) -> bool {
   false
 }
 
-fn is_namespace_field(ident: &Ident) -> bool {
-  matches!(
-    ident.to_string().as_str(),
-    "xmlns" | "xmlns_map" | "mc_ignorable"
-  )
+fn is_xmlns_field(ident: &Ident) -> bool {
+  matches!(ident.to_string().as_str(), "xmlns" | "xmlns_map")
+}
+
+fn is_mc_ignorable_field(ident: &Ident) -> bool {
+  ident == "mc_ignorable"
 }
 
 fn is_option_type(ty: &Type) -> bool {

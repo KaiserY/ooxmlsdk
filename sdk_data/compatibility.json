@@ -544,10 +544,34 @@
       "Action": "PreserveNamespaceDecls"
     },
     {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart_drawing",
+      "Type": "*",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart_drawing",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_diagram",
       "Type": "RelationshipIds",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_diagram",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
     },
     {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
@@ -556,10 +580,52 @@
       "Action": "PreserveNamespaceDecls"
     },
     {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_picture",
       "Type": "*",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_office_document_2006_math",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2012_chart",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_drawing_2014_chart",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
+      "Schema": "schemas_microsoft_com_ink_2010_main",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
+    },
+    {
+      "Schema": "schemas_microsoft_com_office_2006_01_customui",
+      "Type": "*",
+      "Field": "preserved_xml_nodes",
+      "Action": "PreserveAlternateContent"
     }
   ]
 }

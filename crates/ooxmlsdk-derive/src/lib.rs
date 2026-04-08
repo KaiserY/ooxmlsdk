@@ -700,6 +700,10 @@ fn is_system_part_field(field: &syn::Field) -> bool {
     .unwrap_or(false)
 }
 
+fn is_system_preserved_xml_nodes_field(ident: &syn::Ident) -> bool {
+  ident == "preserved_xml_nodes"
+}
+
 fn is_field_named(field: &syn::Field, expected: &str) -> bool {
   field
     .ident
@@ -948,12 +952,14 @@ fn expand_sequence_helper_struct(
   let mut child_init_tokens = Vec::new();
 
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-
   for field in &fields.named {
     let field_ident = field
       .ident
       .as_ref()
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
+    if is_system_preserved_xml_nodes_field(field_ident) {
+      continue;
+    }
     let Some(SdkTypeFieldKind::Child { qname }) = parse_sdk_type_field_kind(&field.attrs)? else {
       return Err(syn::Error::new_spanned(
         field,
@@ -1000,8 +1006,9 @@ fn expand_sequence_helper_struct(
           match #child_ty::deserialize_inner(#xml_reader_ident, Some((e.clone(), next_empty))) {
             Ok(parsed_child) => {
               #field_ident.push(#parsed_child_expr);
+              true
             }
-            Err(crate::common::SdkError::MissingField { .. }) => {}
+            Err(crate::common::SdkError::MissingField { .. }) => true,
             Err(err) => return Err(err),
           }
         }
@@ -1034,8 +1041,9 @@ fn expand_sequence_helper_struct(
           match #child_ty::deserialize_inner(#xml_reader_ident, Some((e.clone(), next_empty))) {
             Ok(parsed_child) => {
               #field_ident = Some(#parsed_child_expr);
+              true
             }
-            Err(crate::common::SdkError::MissingField { .. }) => {}
+            Err(crate::common::SdkError::MissingField { .. }) => true,
             Err(err) => return Err(err),
           }
         }
@@ -1056,17 +1064,19 @@ fn expand_sequence_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            match e.name().as_ref() {
+            let matched = match e.name().as_ref() {
               #( #child_parse_tokens )*
-              _ => {
-                xml_reader.unread(if next_empty {
-                  quick_xml::events::Event::Empty(e)
-                } else {
-                  quick_xml::events::Event::Start(e)
-                })?;
-                break;
-              }
+              _ => false,
+            };
+            if matched {
+              continue;
             }
+            xml_reader.unread(if next_empty {
+              quick_xml::events::Event::Empty(e)
+            } else {
+              quick_xml::events::Event::Start(e)
+            })?;
+            break;
           }
 
           match xml_reader.next()? {
@@ -1113,6 +1123,9 @@ fn expand_helper_struct(
   let mut child_fields = Vec::new();
   let mut choice_fields = Vec::new();
   for field in &fields.named {
+    if is_system_preserved_xml_nodes_field(field.ident.as_ref().unwrap()) {
+      continue;
+    }
     let field_ident = field
       .ident
       .as_ref()
@@ -1148,11 +1161,9 @@ fn expand_helper_struct(
 
   let mut child_decl_tokens = Vec::new();
   let mut child_parse_tokens = Vec::new();
-  let mut child_visit_parse_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-  let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
     let QNameInfo {
@@ -1171,7 +1182,7 @@ fn expand_helper_struct(
     } else {
       quote! { parsed_child }
     };
-    let build_arm = |reader_ident: &Ident, as_result: bool| {
+    let build_arm = |reader_ident: &Ident| {
       let target = if tag_prefix.is_empty() {
         quote! { #local_name_lit }
       } else {
@@ -1182,60 +1193,30 @@ fn expand_helper_struct(
         quote! { #tag_qname_lit | #local_name_lit }
       };
       if field.repeated {
-        if as_result {
-          quote! {
-              #target => {
-                match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                  Ok(parsed_child) => {
-                    #field_ident.push(#parsed_child_expr);
-                    Ok(true)
-                  },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              }
-            },
-          }
-        } else {
-          quote! {
-              #target => {
-                match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                  Ok(parsed_child) => {
-                    #field_ident.push(#parsed_child_expr);
-                    true
-                  },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
-                Err(err) => return Err(err),
-              }
-            },
-          }
+        quote! {
+          #target => {
+            match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+              Ok(parsed_child) => {
+                #field_ident.push(#parsed_child_expr);
+                true
+              },
+              Err(crate::common::SdkError::MissingField { .. }) => true,
+              Err(err) => return Err(err),
+            }
+          },
         }
       } else {
-        if as_result {
-          quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  Ok(true)
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              }
-            },
-          }
-        } else {
-          quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  true
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
-                Err(err) => return Err(err),
-              }
-            },
-          }
+        quote! {
+          #target => {
+            match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+              Ok(parsed_child) => {
+                #field_ident = Some(#parsed_child_expr);
+                true
+              },
+              Err(crate::common::SdkError::MissingField { .. }) => true,
+              Err(err) => return Err(err),
+            }
+          },
         }
       }
     };
@@ -1248,8 +1229,7 @@ fn expand_helper_struct(
           child.write_xml(writer, xmlns_prefix)?;
         }
       });
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&xml_reader_ident, true));
+      child_parse_tokens.push(build_arm(&xml_reader_ident));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -1273,56 +1253,17 @@ fn expand_helper_struct(
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
         });
       }
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&xml_reader_ident, true));
+      child_parse_tokens.push(build_arm(&xml_reader_ident));
     }
   }
 
   let mut choice_decl_tokens = Vec::new();
   let mut choice_parse_tokens = Vec::new();
-  let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
   for field in &choice_fields {
     let field_ident = &field.ident;
     let choice_ty = unwrap_option_vec_type(&field.ty);
-    let build_visit_arm = |reader_ident: &Ident| {
-      if field.repeated {
-        quote! {
-          if !matched {
-            match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-              Ok(parsed_choice) => {
-                #field_ident.push(parsed_choice);
-                matched = true;
-              }
-              Err(crate::common::SdkError::MissingField { .. }) => {
-                matched = true;
-              }
-              Err(crate::common::SdkError::UnexpectedTag { expected, .. })
-                if expected == "choice" => {}
-              Err(err) => return Err(err),
-            }
-          }
-        }
-      } else {
-        quote! {
-          if !matched {
-            match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-              Ok(parsed_choice) => {
-                #field_ident = Some(parsed_choice);
-                matched = true;
-              }
-              Err(crate::common::SdkError::MissingField { .. }) => {
-                matched = true;
-              }
-              Err(crate::common::SdkError::UnexpectedTag { expected, .. })
-                if expected == "choice" => {}
-              Err(err) => return Err(err),
-            }
-          }
-        }
-      }
-    };
     let build_parse_arm = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
@@ -1369,7 +1310,6 @@ fn expand_helper_struct(
         }
       });
       choice_parse_tokens.push(build_parse_arm(&xml_reader_ident));
-      choice_visit_parse_tokens.push(build_visit_arm(&visitor_reader_ident));
     } else {
       choice_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -1394,43 +1334,89 @@ fn expand_helper_struct(
         });
       }
       choice_parse_tokens.push(build_parse_arm(&xml_reader_ident));
-      choice_visit_parse_tokens.push(build_visit_arm(&visitor_reader_ident));
     }
   }
 
-  if child_fields.len() == fields.named.len() {
+  let has_preserved_xml_nodes = fields
+    .named
+    .iter()
+    .any(|field| is_system_preserved_xml_nodes_field(field.ident.as_ref().unwrap()));
+  let non_system_field_count = fields
+    .named
+    .iter()
+    .filter(|field| !is_system_preserved_xml_nodes_field(field.ident.as_ref().unwrap()))
+    .count();
+
+  if child_fields.len() == non_system_field_count && !has_preserved_xml_nodes {
     return expand_sequence_helper_struct(input, fields);
   }
 
-  let visit_foreign_child_tokens = if child_fields.is_empty() && choice_fields.is_empty() {
+  let preserved_xml_parse_tokens = if has_preserved_xml_nodes {
     quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        _e: quick_xml::events::BytesStart<'de>,
-        _next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        Ok(false)
-      };
+      let mut preserved_xml_nodes = Vec::<(usize, String)>::new();
+      let mut preserved_xml_node_index = 0usize;
     }
   } else {
+    quote! {}
+  };
+  let preserved_xml_write_tokens = if has_preserved_xml_nodes {
     quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let matched: bool = match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => false,
-        };
-        if matched {
-          return Ok(true);
+      let mut preserved_xml_node_index = 0usize;
+      let mut emit_preserved_xml_nodes = |writer: &mut W, position: usize| -> Result<(), std::fmt::Error> {
+        while let Some((node_position, xml)) = self.preserved_xml_nodes.get(preserved_xml_node_index) {
+          if *node_position != position {
+            break;
+          }
+          writer.write_str(xml)?;
+          preserved_xml_node_index += 1;
         }
-        let mut matched = false;
-        #( #choice_visit_parse_tokens )*
-        Ok(matched)
+        Ok(())
       };
+      let mut current_node_index = 0usize;
     }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_node_increment_tokens = if has_preserved_xml_nodes {
+    quote! {
+      preserved_xml_node_index += 1;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_child_write_tokens = if has_preserved_xml_nodes {
+    quote! {
+      emit_preserved_xml_nodes(writer, current_node_index)?;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_child_advance_tokens = if has_preserved_xml_nodes {
+    quote! {
+      current_node_index += 1;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_alternate_content_tokens = if has_preserved_xml_nodes {
+    quote! {
+      match e.name().as_ref() {
+        b"mc:AlternateContent" | b"AlternateContent" => {
+          let raw_xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+          preserved_xml_nodes.push((preserved_xml_node_index, raw_xml));
+          continue;
+        }
+        _ => {
+          if crate::common::is_foreign_prefixed_child(e.name().as_ref(), "") {
+            let raw_xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+            preserved_xml_nodes.push((preserved_xml_node_index, raw_xml));
+            continue;
+          }
+        }
+      }
+    }
+  } else {
+    quote! {}
   };
 
   Ok(quote! {
@@ -1464,6 +1450,7 @@ fn expand_helper_struct(
       ) -> Result<Self, crate::common::SdkError> {
         let mut pending_event = xml_event;
 
+        #preserved_xml_parse_tokens
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
 
@@ -1485,39 +1472,21 @@ fn expand_helper_struct(
           };
 
           {
-            #visit_foreign_child_tokens
             let matched = match e.name().as_ref() {
               #( #child_parse_tokens )*
               _ => false,
             };
             if matched {
+              #preserved_xml_node_increment_tokens
               continue;
             }
             let mut matched = false;
             #( #choice_parse_tokens )*
             if matched {
+              #preserved_xml_node_increment_tokens
               continue;
             }
-            match e.name().as_ref() {
-              b"mc:AlternateContent" | b"AlternateContent" => {
-                crate::common::process_markup_compatibility_children(
-                  xml_reader,
-                  next_empty,
-                  &mut visit_foreign_child,
-                )?;
-                continue;
-              }
-              _ => {
-                if crate::common::is_foreign_prefixed_child(e.name().as_ref(), "") {
-                  crate::common::process_foreign_element_children(
-                    xml_reader,
-                    next_empty,
-                    &mut visit_foreign_child,
-                  )?;
-                  continue;
-                }
-              }
-            }
+            #preserved_xml_alternate_content_tokens
             return Err(crate::common::unexpected_tag(
               stringify!(#ident),
               "known child",
@@ -1767,6 +1736,9 @@ fn expand_named_struct(
       .ident
       .as_ref()
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
+    if is_system_preserved_xml_nodes_field(field_ident) {
+      continue;
+    }
     if is_namespace_field(field_ident) {
       special_namespace_fields.push(field_ident.clone());
       continue;
@@ -1809,6 +1781,10 @@ fn expand_named_struct(
   }
 
   let has_namespace_fields = !special_namespace_fields.is_empty();
+  let has_preserved_xml_nodes = fields
+    .named
+    .iter()
+    .any(|field| is_system_preserved_xml_nodes_field(field.ident.as_ref().unwrap()));
 
   let mut attr_decl_tokens = Vec::new();
   let mut attr_parse_tokens = Vec::new();
@@ -1892,14 +1868,93 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let preserved_xml_parse_tokens = if has_preserved_xml_nodes {
+    quote! {
+      let mut preserved_xml_nodes = Vec::<(usize, String)>::new();
+      let mut preserved_xml_node_index = 0usize;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_write_tokens = if has_preserved_xml_nodes {
+    quote! {
+      let mut preserved_xml_node_index = 0usize;
+      let mut emit_preserved_xml_nodes = |writer: &mut W, position: usize| -> Result<(), std::fmt::Error> {
+        while let Some((node_position, xml)) = self.preserved_xml_nodes.get(preserved_xml_node_index) {
+          if *node_position != position {
+            break;
+          }
+          writer.write_str(xml)?;
+          preserved_xml_node_index += 1;
+        }
+        Ok(())
+      };
+      let mut current_node_index = 0usize;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_node_increment_tokens = if has_preserved_xml_nodes {
+    quote! {
+      preserved_xml_node_index += 1;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_child_write_tokens = if has_preserved_xml_nodes {
+    quote! {
+      emit_preserved_xml_nodes(writer, current_node_index)?;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_child_advance_tokens = if has_preserved_xml_nodes {
+    quote! {
+      current_node_index += 1;
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_alternate_content_tokens = if has_preserved_xml_nodes {
+    quote! {
+      match e.name().as_ref() {
+        b"mc:AlternateContent" | b"AlternateContent" => {
+          let raw_xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+          preserved_xml_nodes.push((preserved_xml_node_index, raw_xml));
+          continue;
+        }
+        _ => {
+          if crate::common::is_foreign_prefixed_child(e.name().as_ref(), #tag_prefix) {
+            let raw_xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+            preserved_xml_nodes.push((preserved_xml_node_index, raw_xml));
+            continue;
+          }
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_init_tokens = if has_preserved_xml_nodes {
+    quote! {
+      preserved_xml_nodes,
+    }
+  } else {
+    quote! {}
+  };
+  let preserved_xml_trailing_emit_tokens = if has_preserved_xml_nodes {
+    quote! {
+      emit_preserved_xml_nodes(writer, current_node_index)?;
+    }
+  } else {
+    quote! {}
+  };
 
   let mut child_decl_tokens = Vec::new();
   let mut child_parse_tokens = Vec::new();
-  let mut child_visit_parse_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-  let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
     let QNameInfo {
@@ -1918,7 +1973,7 @@ fn expand_named_struct(
     } else {
       quote! { parsed_child }
     };
-    let build_arm = |reader_ident: &Ident, as_result: bool| {
+    let build_arm = |reader_ident: &Ident| {
       let target = if tag_prefix.is_empty() {
         quote! { #local_name_lit }
       } else {
@@ -1929,60 +1984,30 @@ fn expand_named_struct(
         quote! { #tag_qname_lit | #local_name_lit }
       };
       if field.repeated {
-        if as_result {
-          quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  Ok(true)
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              }
-            },
-          }
-        } else {
-          quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  true
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
-                Err(err) => return Err(err),
-              }
-            },
-          }
+        quote! {
+          #target => {
+            match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+              Ok(parsed_child) => {
+                #field_ident.push(#parsed_child_expr);
+                true
+              },
+              Err(crate::common::SdkError::MissingField { .. }) => true,
+              Err(err) => return Err(err),
+            }
+          },
         }
       } else {
-        if as_result {
-          quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  Ok(true)
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              }
-            },
-          }
-        } else {
-          quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  true
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
-                Err(err) => return Err(err),
-              }
-            },
-          }
+        quote! {
+          #target => {
+            match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+              Ok(parsed_child) => {
+                #field_ident = Some(#parsed_child_expr);
+                true
+              },
+              Err(crate::common::SdkError::MissingField { .. }) => true,
+              Err(err) => return Err(err),
+            }
+          },
         }
       }
     };
@@ -1992,11 +2017,12 @@ fn expand_named_struct(
       child_init_tokens.push(quote! { #field_ident });
       child_write_tokens.push(quote! {
         for child in &self.#field_ident {
+          #preserved_xml_child_write_tokens
           child.write_xml(writer, xmlns_prefix)?;
+          #preserved_xml_child_advance_tokens
         }
       });
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&xml_reader_ident, true));
+      child_parse_tokens.push(build_arm(&xml_reader_ident));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -2012,22 +2038,24 @@ fn expand_named_struct(
       if field.optional {
         child_write_tokens.push(quote! {
           if let Some(child) = &self.#field_ident {
+            #preserved_xml_child_write_tokens
             child.write_xml(writer, xmlns_prefix)?;
+            #preserved_xml_child_advance_tokens
           }
         });
       } else {
         child_write_tokens.push(quote! {
+          #preserved_xml_child_write_tokens
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
+          #preserved_xml_child_advance_tokens
         });
       }
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&xml_reader_ident, true));
+      child_parse_tokens.push(build_arm(&xml_reader_ident));
     }
   }
 
   let mut choice_decl_tokens = Vec::new();
   let mut choice_parse_tokens = Vec::new();
-  let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
   for field in &choice_fields {
@@ -2037,43 +2065,6 @@ fn expand_named_struct(
       quote! { std::boxed::Box::new(parsed_choice) }
     } else {
       quote! { parsed_choice }
-    };
-    let build_visit_block = |reader_ident: &Ident| {
-      if field.repeated {
-        quote! {
-          if !matched {
-            match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-              Ok(parsed_choice) => {
-                #field_ident.push(#parsed_choice_expr);
-                matched = true;
-              }
-              Err(crate::common::SdkError::MissingField { .. }) => {
-                matched = true;
-              }
-              Err(crate::common::SdkError::UnexpectedTag { expected, .. })
-                if expected == "choice" => {}
-              Err(err) => return Err(err),
-            }
-          }
-        }
-      } else {
-        quote! {
-          if !matched {
-            match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
-              Ok(parsed_choice) => {
-                #field_ident = Some(#parsed_choice_expr);
-                matched = true;
-              }
-              Err(crate::common::SdkError::MissingField { .. }) => {
-                matched = true;
-              }
-              Err(crate::common::SdkError::UnexpectedTag { expected, .. })
-                if expected == "choice" => {}
-              Err(err) => return Err(err),
-            }
-          }
-        }
-      }
     };
     let build_parse_block = |reader_ident: &Ident| {
       if field.repeated {
@@ -2117,11 +2108,12 @@ fn expand_named_struct(
       choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(quote! {
         for choice in &self.#field_ident {
+          #preserved_xml_child_write_tokens
           choice.write_xml(writer, xmlns_prefix)?;
+          #preserved_xml_child_advance_tokens
         }
       });
       choice_parse_tokens.push(build_parse_block(&xml_reader_ident));
-      choice_visit_parse_tokens.push(build_visit_block(&visitor_reader_ident));
     } else {
       choice_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -2137,49 +2129,21 @@ fn expand_named_struct(
       if field.optional {
         choice_write_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
+            #preserved_xml_child_write_tokens
             choice.write_xml(writer, xmlns_prefix)?;
+            #preserved_xml_child_advance_tokens
           }
         });
       } else {
         choice_write_tokens.push(quote! {
+          #preserved_xml_child_write_tokens
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
+          #preserved_xml_child_advance_tokens
         });
       }
       choice_parse_tokens.push(build_parse_block(&xml_reader_ident));
-      choice_visit_parse_tokens.push(build_visit_block(&visitor_reader_ident));
     }
   }
-
-  let visit_foreign_child_tokens = if child_fields.is_empty() && choice_fields.is_empty() {
-    quote! {
-      let mut visit_foreign_child = |
-        _xml_reader: &mut R,
-        _e: quick_xml::events::BytesStart<'de>,
-        _next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        Ok(false)
-      };
-    }
-  } else {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let matched: bool = match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => Ok::<bool, crate::common::SdkError>(false),
-        }?;
-        if matched {
-          return Ok(true);
-        }
-        let mut matched = false;
-        #( #choice_visit_parse_tokens )*
-        Ok(matched)
-      };
-    }
-  };
 
   let text_decl_tokens = if let Some(text_field) = &text_field {
     let field_ident = &text_field.ident;
@@ -2318,7 +2282,10 @@ fn expand_named_struct(
     quote! { "" }
   };
 
-  let has_body = !child_fields.is_empty() || !choice_fields.is_empty() || text_field.is_some();
+  let has_body = !child_fields.is_empty()
+    || !choice_fields.is_empty()
+    || text_field.is_some()
+    || has_preserved_xml_nodes;
 
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}
@@ -2376,6 +2343,7 @@ fn expand_named_struct(
 
         #( #attr_decl_tokens )*
         #special_namespace_parse_tokens
+        #preserved_xml_parse_tokens
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
         #text_decl_tokens
@@ -2418,36 +2386,15 @@ fn expand_named_struct(
                 #( #choice_parse_tokens )*
               }
               if matched {
+                #preserved_xml_node_increment_tokens
                 continue;
               }
-              #visit_foreign_child_tokens
-              match e.name().as_ref() {
-                b"mc:AlternateContent" | b"AlternateContent" => {
-                  crate::common::process_markup_compatibility_children(
-                    xml_reader,
-                    next_empty,
-                    &mut visit_foreign_child,
-                  )?;
-                }
-                _ => {
-                  if crate::common::is_foreign_prefixed_child(
-                    e.name().as_ref(),
-                    #tag_prefix,
-                  ) {
-                    crate::common::process_foreign_element_children(
-                      xml_reader,
-                      next_empty,
-                      &mut visit_foreign_child,
-                    )?;
-                  } else {
-                    Err(crate::common::unexpected_tag(
-                      stringify!(#ident),
-                      "known child",
-                      e.name().as_ref(),
-                    ))?;
-                  }
-                }
-              }
+              #preserved_xml_alternate_content_tokens
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                e.name().as_ref(),
+              ));
             }
           }
         }
@@ -2458,6 +2405,7 @@ fn expand_named_struct(
           #( #choice_init_tokens, )*
           #text_finish_tokens
           #( #attr_finish_tokens, )*
+          #preserved_xml_init_tokens
           #special_namespace_init_tokens
         })
       }
@@ -2479,7 +2427,9 @@ fn expand_named_struct(
         #( #attr_write_tokens )*
         if #has_body {
           writer.write_char('>')?;
+          #preserved_xml_write_tokens
           #( #body_write_tokens )*
+          #preserved_xml_trailing_emit_tokens
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {
           writer.write_str("/>")?;

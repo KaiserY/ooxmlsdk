@@ -12,6 +12,7 @@ use crate::sdk_code::helpers::{
   is_derived_type, is_leaf_element_type, is_leaf_text_type, is_leaf_text_wrapper,
   is_one_sequence_flatten, is_one_sequence_structurable, needs_xml_header,
   structure_one_sequence_particles, supports_compat_xmlns_fields,
+  supports_preserved_xml_nodes_fields,
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
 use crate::sdk_data::compatibility::treat_as_string_rule_for_field;
@@ -609,6 +610,8 @@ pub fn gen_schema(
 
     let mut fields: Vec<TokenStream> = vec![];
     let mut child_choice_enums: Vec<TokenStream> = vec![];
+    let has_preserved_xml_nodes =
+      supports_preserved_xml_nodes_fields(schema_type, schema, compatibility_rules);
 
     if supports_compat_xmlns_fields(schema_type, schema, compatibility_rules) {
       fields.push(quote! {
@@ -668,7 +671,13 @@ pub fn gen_schema(
 
       if is_one_sequence_flatten(schema_type) {
         let (one_sequence_fields, one_sequence_enums) =
-          gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
+          gen_one_sequence_fields(
+            schema_type,
+            schema,
+            context,
+            field_version_cfg,
+            version_cfg,
+          )?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_enums);
       } else if is_one_sequence_structurable(schema_type) {
@@ -676,6 +685,7 @@ pub fn gen_schema(
           schema_type,
           schema,
           context,
+          has_preserved_xml_nodes,
           field_version_cfg,
           version_cfg,
         )?;
@@ -727,7 +737,13 @@ pub fn gen_schema(
 
       if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         let (one_sequence_fields, one_sequence_enums) =
-          gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
+          gen_one_sequence_fields(
+            schema_type,
+            schema,
+            context,
+            field_version_cfg,
+            version_cfg,
+          )?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_enums);
       } else if is_one_sequence_structurable(schema_type)
@@ -737,6 +753,7 @@ pub fn gen_schema(
           schema_type,
           schema,
           context,
+          has_preserved_xml_nodes,
           field_version_cfg,
           version_cfg,
         )?;
@@ -768,6 +785,13 @@ pub fn gen_schema(
       }
     } else {
       return Err(format!("{schema_type:?}").into());
+    }
+
+    if has_preserved_xml_nodes {
+      fields.push(quote! {
+        #[doc(hidden)]
+        pub preserved_xml_nodes: Vec<(usize, String)>,
+      });
     }
 
     let child_choice_tokens = if !child_choice_enums.is_empty() {
@@ -1433,6 +1457,7 @@ fn gen_structured_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  has_preserved_xml_nodes: bool,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
@@ -1603,8 +1628,13 @@ fn gen_structured_one_sequence_fields(
               } else {
                 VersionCfgContext::new(true)
               };
-              let sequence_fields =
-                gen_sequence_variant_fields(sequence_variant, schema, context, sequence_field_cfg)?;
+              let sequence_fields = gen_sequence_variant_fields(
+                sequence_variant,
+                schema,
+                context,
+                has_preserved_xml_nodes,
+                sequence_field_cfg,
+              )?;
               if default_variant.is_none()
                 && (choice_version == sequence_version
                   || (choice_version.is_empty() && !is_microsoft365_version(sequence_version)))
@@ -1694,6 +1724,7 @@ fn gen_sequence_variant_fields(
   sequence_variant: &ResolvedOneSequenceSequenceVariant<'_>,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  has_preserved_xml_nodes: bool,
   version_cfg: VersionCfgContext,
 ) -> Result<Vec<TokenStream>> {
   let mut fields = Vec::new();
@@ -1756,6 +1787,13 @@ fn gen_sequence_variant_fields(
         pub #child_name_ident: std::boxed::Box<#child_variant_type>,
       });
     }
+  }
+
+  if has_preserved_xml_nodes {
+    fields.push(quote! {
+      #[doc(hidden)]
+      pub preserved_xml_nodes: Vec<(usize, String)>,
+    });
   }
 
   Ok(fields)

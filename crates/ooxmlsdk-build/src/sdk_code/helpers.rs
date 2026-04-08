@@ -1,5 +1,6 @@
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::compatibility::{
+  preserve_alternate_content_rule_for_schema, preserve_alternate_content_rule_for_type,
   preserve_namespace_decls_rule_for_schema, preserve_namespace_decls_rule_for_type,
 };
 use crate::sdk_data::sdk_data_model::{
@@ -69,6 +70,26 @@ pub fn supports_compat_xmlns_fields(
     )
     .is_some()
     || preserve_namespace_decls_rule_for_type(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.name,
+    )
+    .is_some()
+}
+
+pub fn supports_preserved_xml_nodes_fields(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  compatibility_rules: &[CompatibilityRule],
+) -> bool {
+  preserve_alternate_content_rule_for_schema(compatibility_rules, &schema.module_name).is_some()
+    || preserve_alternate_content_rule_for_type(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.class_name,
+    )
+    .is_some()
+    || preserve_alternate_content_rule_for_type(
       compatibility_rules,
       &schema.module_name,
       &schema_type.name,

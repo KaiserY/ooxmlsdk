@@ -1,5 +1,7 @@
 use crate::sdk_code::versioning::effective_version;
-use crate::sdk_data::compatibility::preserve_namespace_decls_rule_for_type;
+use crate::sdk_data::compatibility::{
+  preserve_namespace_decls_rule_for_schema, preserve_namespace_decls_rule_for_type,
+};
 use crate::sdk_data::sdk_data_model::{
   CompatibilityRule, Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind,
   SchemaTypeKind, SchemaTypeParticle,
@@ -59,6 +61,7 @@ pub fn supports_compat_xmlns_fields(
   compatibility_rules: &[CompatibilityRule],
 ) -> bool {
   supports_xmlns_fields(schema_type)
+    || preserve_namespace_decls_rule_for_schema(compatibility_rules, &schema.module_name).is_some()
     || preserve_namespace_decls_rule_for_type(
       compatibility_rules,
       &schema.module_name,

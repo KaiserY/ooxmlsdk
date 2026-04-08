@@ -9,6 +9,8 @@ This repository is a Rust workspace with three crates under `crates/`:
 
 Treat the checked-in `sdk_data/` directory and `schemas/OpenPackagingConventions-XMLSchema/` directory as committed generator inputs. The checked-in files under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, `crates/ooxmlsdk/src/schemas.rs`, `crates/ooxmlsdk/src/deserializers.rs`, `crates/ooxmlsdk/src/serializers.rs`, and `crates/ooxmlsdk/src/namespaces.rs` are generated artifacts.
 
+`crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is part of the generator input model, not a generated artifact. Keep it in sync with `sdk_data/` when adding new schema or package-level knobs such as compatibility flags.
+
 The repository also keeps checked-in `sdk_data/`, but the current ignored generator test still reads upstream data from `../Open-XML-SDK/data` before regenerating `sdk_data/` and runtime code. Do not assume that external checkout is available unless you have explicitly prepared it.
 
 The runtime crate currently exports `common`, `deserializers`, `namespaces`, `parts` behind the `parts` feature, `schemas`, `serializers`, and `simple_type`. The public feature surface in this repository is currently `microsoft365`, `parts`, and `strict`. The `strict` feature gates strict OOXML compatibility coverage and the corresponding feature-gated integration tests. There is no shipped `validators` module.
@@ -33,6 +35,8 @@ Run commands from the repository root. For normal validation, use this order and
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo fmt --all`
+
+For fast iteration on runtime or doc-sample work, treat `cargo test -p ooxmlsdk-test` as the primary gate first. Defer workspace-wide, `strict`, and clippy runs unless the change touches generator code, shared runtime code, or feature-gated behavior.
 
 Execute Cargo commands in the repository's default `target/` directory. Do not switch `target/` directories or introduce `CARGO_TARGET_DIR`. Run generation, test, clippy, and format commands sequentially, never in parallel. If Cargo reports a lock on the artifact directory, wait for the lock to clear and then continue.
 
@@ -60,6 +64,8 @@ Runtime behavior is currently covered by focused round-trip tests in `crates/oox
 Additional integration coverage also lives in `crates/ooxmlsdk-test/tests/spreadsheet.rs`, `crates/ooxmlsdk-test/tests/properties.rs`, and `crates/ooxmlsdk-test/tests/packages.rs`. Add new tests close to the behavior they protect.
 
 Feature-gated strict OOXML coverage lives in `crates/ooxmlsdk-test/tests/packages.rs` behind `#[cfg(feature = "strict")]`. Keep strict-only fixtures and assertions under the `strict` feature instead of expanding the default test surface.
+
+`crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` fixtures into `open_failure`, `open_valid`, and `round_trip`. Only promote a fixture to `round_trip` when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid` so they do not get revisited as false positives.
 
 When validating work, do not overlap `cargo fmt`, `cargo test`, `cargo clippy`, or generation commands. Finish one command, capture its result, and only then start the next one. Do not switch target directories to avoid locks. If you encounter a target directory lock, wait for the existing lock to release.
 

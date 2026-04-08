@@ -156,6 +156,7 @@ pub struct PackageType {
   pub prefix: String,
   pub kind: PackageTypeKind,
   pub has_xmlns_fields: bool,
+  pub preserve_empty_text_children: bool,
   pub attributes: Vec<PackageAttribute>,
   pub text_children: Vec<PackageTextChild>,
   pub child_fields: Vec<PackageChildField>,

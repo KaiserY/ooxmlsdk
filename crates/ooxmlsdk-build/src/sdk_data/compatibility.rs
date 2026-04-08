@@ -49,6 +49,16 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
             .into(),
           );
         }
+
+        if rule.type_name.is_empty() {
+          return Err(
+            format!(
+              "compatibility rule {}.{}.{} PreserveNamespaceDecls type cannot be empty",
+              rule.schema, rule.type_name, rule.field
+            )
+            .into(),
+          );
+        }
       }
       CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
@@ -274,6 +284,18 @@ pub fn preserve_namespace_decls_rule_for_type<'a>(
   })
 }
 
+pub fn preserve_namespace_decls_rule_for_schema<'a>(
+  compatibility_rules: &'a [CompatibilityRule],
+  schema: &str,
+) -> Option<&'a CompatibilityRule> {
+  compatibility_rules.iter().find(|rule| {
+    rule.schema == schema
+      && rule.type_name == "*"
+      && rule.field == "xmlns_map"
+      && matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls)
+  })
+}
+
 pub fn treat_as_string_rule_for_field<'a>(
   compatibility_rules: &'a [CompatibilityRule],
   schema: &str,
@@ -307,6 +329,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
     .iter()
     .position(|schema| schema.module_name == rule.schema)
     .ok_or_else(|| format!("compatibility schema {} not found", rule.schema))?;
+
+  if matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls) && rule.type_name == "*" {
+    return Ok(());
+  }
 
   let schema_type_index = {
     let schema = &sdk_data_schemas[schema_index];
@@ -548,6 +574,37 @@ mod tests {
       rules: vec![CompatibilityRule {
         schema: "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
         type_name: "WorkbookExtension".to_string(),
+        field: "xmlns_map".to_string(),
+        action: CompatibilityAction::PreserveNamespaceDecls,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
+  }
+
+  #[test]
+  fn preserve_namespace_decls_allows_schema_wildcard() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_drawingml_2006_main".to_string(),
+      types: vec![SchemaType {
+        class_name: "Graphic".to_string(),
+        attributes: vec![SchemaTypeAttribute {
+          property_name: "Uri".to_string(),
+          q_name: "uri".to_string(),
+          r#type: "StringValue".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_drawingml_2006_main".to_string(),
+        type_name: "*".to_string(),
         field: "xmlns_map".to_string(),
         action: CompatibilityAction::PreserveNamespaceDecls,
       }],

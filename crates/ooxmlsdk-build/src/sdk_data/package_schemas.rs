@@ -193,6 +193,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<PackageSchema> {
       prefix: "cp".to_string(),
       kind: PackageTypeKind::Composite,
       has_xmlns_fields: true,
+      preserve_empty_text_children: true,
       text_children: core_properties
         .children
         .iter()

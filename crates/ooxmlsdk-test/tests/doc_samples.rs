@@ -294,9 +294,56 @@ fn assert_xml_equivalent(original: &[u8], roundtripped: &[u8], file_name: &str, 
   let relaxed_roundtripped = canonicalize_xml(roundtripped, true, file_name, entry_name);
 
   assert_eq!(
-    relaxed_original, relaxed_roundtripped,
-    "xml mismatch for {file_name}:{entry_name}"
+    relaxed_original,
+    relaxed_roundtripped,
+    "xml mismatch for {file_name}:{entry_name}\n{}",
+    xml_diff_context(&relaxed_original, &relaxed_roundtripped)
   );
+}
+
+fn xml_diff_context(left: &str, right: &str) -> String {
+  if left == right {
+    return String::new();
+  }
+
+  let mut left_iter = left.char_indices();
+  let mut right_iter = right.char_indices();
+
+  loop {
+    match (left_iter.next(), right_iter.next()) {
+      (Some((li, lc)), Some((ri, rc))) if lc == rc => {
+        let _ = (li, ri);
+      }
+      (Some((li, _)), Some((ri, _))) => {
+        let start = li.saturating_sub(160).min(ri.saturating_sub(160));
+        let end = (li + 160).max(ri + 160).min(left.len().max(right.len()));
+        return format!(
+          "first diff around byte {li}/{ri}\nleft:  {:?}\nright: {:?}",
+          &left[start..left.len().min(end)],
+          &right[start..right.len().min(end)]
+        );
+      }
+      (Some((li, _)), None) => {
+        let start = li.saturating_sub(160);
+        let end = (li + 160).min(left.len());
+        return format!(
+          "right shorter around byte {li}\nleft:  {:?}\nright: {:?}",
+          &left[start..end],
+          &right[right.len().saturating_sub(160)..]
+        );
+      }
+      (None, Some((ri, _))) => {
+        let start = ri.saturating_sub(160);
+        let end = (ri + 160).min(right.len());
+        return format!(
+          "left shorter around byte {ri}\nleft:  {:?}\nright: {:?}",
+          &left[left.len().saturating_sub(160)..],
+          &right[start..end]
+        );
+      }
+      (None, None) => return String::from("xml contents differ but no diff point found"),
+    }
+  }
 }
 
 #[derive(Debug)]

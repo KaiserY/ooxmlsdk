@@ -235,7 +235,10 @@ fn gen_deserialize_inner_fn(
     let field_ident: Ident = parse_str(&escape_snake_case(child.field.clone()))?;
     declarations.push(quote! { let mut #field_ident = None; });
     build_fields.push(quote! { #field_ident });
-    child_arms.push(gen_text_child_arm(child)?);
+    child_arms.push(gen_text_child_arm(
+      child,
+      package_type.preserve_empty_text_children,
+    )?);
   }
 
   for child_field in &package_type.child_fields {
@@ -550,7 +553,7 @@ fn attr_build_expr(attr: &PackageAttribute) -> Result<TokenStream> {
   }
 }
 
-fn gen_text_child_arm(child: &PackageTextChild) -> Result<Arm> {
+fn gen_text_child_arm(child: &PackageTextChild, preserve_empty_text_children: bool) -> Result<Arm> {
   let field_ident: Ident = parse_str(&escape_snake_case(child.field.clone()))?;
   let q_name = child.q_name.as_str();
   let q_name_literal: LitByteStr = parse_str(&format!("b\"{q_name}\""))?;
@@ -558,9 +561,17 @@ fn gen_text_child_arm(child: &PackageTextChild) -> Result<Arm> {
   Ok(parse2(quote! {
     #q_name_literal => {
       if e_empty {
-        #field_ident = Some(String::new());
+        if #preserve_empty_text_children {
+          #field_ident = Some(String::new());
+        } else {
+          #field_ident = None;
+        }
       } else {
-        let mut value = None;
+        let mut value = if #preserve_empty_text_children {
+          Some(String::new())
+        } else {
+          None
+        };
         loop {
           match xml_reader.next()? {
             quick_xml::events::Event::Text(t) => {

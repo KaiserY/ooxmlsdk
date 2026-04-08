@@ -19,8 +19,8 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
 
   assert_eq!(serialized, serialized_twice);
 
-  assert_eq!(parsed.title.as_deref(), None);
-  assert_eq!(parsed.subject.as_deref(), None);
+  assert_eq!(parsed.title.as_deref(), Some(""));
+  assert_eq!(parsed.subject.as_deref(), Some(""));
   assert_eq!(parsed.creator.as_deref(), Some("Thomas Barnekow"));
   assert_eq!(parsed.last_modified_by.as_deref(), Some("Thomas Barnekow"));
   assert_eq!(parsed.revision.as_deref(), Some("1"));

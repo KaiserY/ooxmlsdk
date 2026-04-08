@@ -538,20 +538,26 @@
       "Action": "FallbackToRawXml"
     },
     {
-      "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
-      "Type": "Graphic",
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
+      "Type": "ChartReference",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_diagram",
+      "Type": "RelationshipIds",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
     },
     {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
-      "Type": "GraphicFrameLocks",
+      "Type": "*",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
     },
     {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_picture",
-      "Type": "Picture",
+      "Type": "*",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
     }

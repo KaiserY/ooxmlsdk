@@ -1626,7 +1626,6 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
     .push(BodyChildChoice::WAltChunk(Box::new(AltChunk {
       id: Some(ALT_CHUNK_ID.to_string()),
       alt_chunk_properties: None,
-      preserved_xml_nodes: Vec::new(),
     })));
 
   let alt_chunk_part = AlternativeFormatImportPart {

@@ -60,17 +60,6 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
           );
         }
       }
-      CompatibilityAction::PreserveAlternateContent => {
-        if rule.field != "preserved_xml_nodes" {
-          return Err(
-            format!(
-              "compatibility rule {}.{}.{} PreserveAlternateContent field must be preserved_xml_nodes",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-      }
       CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
       CompatibilityAction::MapAttributeValue { mappings } => {
@@ -307,31 +296,6 @@ pub fn preserve_namespace_decls_rule_for_schema<'a>(
   })
 }
 
-pub fn preserve_alternate_content_rule_for_type<'a>(
-  compatibility_rules: &'a [CompatibilityRule],
-  schema: &str,
-  type_name: &str,
-) -> Option<&'a CompatibilityRule> {
-  compatibility_rules.iter().find(|rule| {
-    rule.schema == schema
-      && rule.type_name == type_name
-      && rule.field == "preserved_xml_nodes"
-      && matches!(rule.action, CompatibilityAction::PreserveAlternateContent)
-  })
-}
-
-pub fn preserve_alternate_content_rule_for_schema<'a>(
-  compatibility_rules: &'a [CompatibilityRule],
-  schema: &str,
-) -> Option<&'a CompatibilityRule> {
-  compatibility_rules.iter().find(|rule| {
-    rule.schema == schema
-      && rule.type_name == "*"
-      && rule.field == "preserved_xml_nodes"
-      && matches!(rule.action, CompatibilityAction::PreserveAlternateContent)
-  })
-}
-
 pub fn treat_as_string_rule_for_field<'a>(
   compatibility_rules: &'a [CompatibilityRule],
   schema: &str,
@@ -366,10 +330,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
     .position(|schema| schema.module_name == rule.schema)
     .ok_or_else(|| format!("compatibility schema {} not found", rule.schema))?;
 
-  if (matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls)
-    || matches!(rule.action, CompatibilityAction::PreserveAlternateContent))
-    && rule.type_name == "*"
-  {
+  if matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls) && rule.type_name == "*" {
     return Ok(());
   }
 
@@ -431,7 +392,6 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       }
     }
     CompatibilityAction::PreserveNamespaceDecls => {}
-    CompatibilityAction::PreserveAlternateContent => {}
     CompatibilityAction::ExtraChild => {
       let (child_schema_index, child_type_index) =
         find_child_type_index_by_qname(sdk_data_schemas, &rule.field).ok_or_else(|| {

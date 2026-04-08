@@ -32,7 +32,6 @@ pub enum CompatibilityAction {
   TreatAsString,
   FallbackToRawXml,
   PreserveNamespaceDecls,
-  PreserveAlternateContent,
   CollectionSequenceRoot,
   ExtraChild,
   MapAttributeValue {

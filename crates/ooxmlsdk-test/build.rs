@@ -23,12 +23,8 @@ fn main() {
   for file_name in samples {
     let slug = slugify(&file_name);
     let test_name = format!("doc_sample_{slug}");
-    let strict_only = matches!(file_name.as_str(), "Strict01.docx" | "AnnotationRef.docx");
 
     if is_open_failure(&file_name) {
-      if strict_only {
-        generated.push_str("#[cfg(feature = \"strict\")]\n");
-      }
       generated.push_str(&format!(
         "#[test]\nfn open_failure_{test_name}() {{\n  assert_doc_sample_open_failure({file_name:?});\n}}\n\n"
       ));
@@ -36,9 +32,6 @@ fn main() {
     }
 
     if is_valid_open_only(&file_name) {
-      if strict_only {
-        generated.push_str("#[cfg(feature = \"strict\")]\n");
-      }
       generated.push_str(&format!(
         "#[test]\nfn open_valid_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
       ));
@@ -46,16 +39,16 @@ fn main() {
     }
 
     if !is_round_trip_supported(&file_name) {
-      if strict_only {
-        generated.push_str("#[cfg(feature = \"strict\")]\n");
-      }
       generated.push_str(&format!(
         "#[test]\nfn open_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
       ));
       continue;
     }
 
-    if strict_only {
+    if file_name == "Strict01.docx" {
+      generated.push_str("#[cfg(feature = \"strict\")]\n");
+    }
+    if file_name == "AnnotationRef.docx" {
       generated.push_str("#[cfg(feature = \"strict\")]\n");
     }
     if file_name == "HelloWorld.docx" || file_name == "Youtube.xlsx" {
@@ -94,6 +87,7 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "demo.docx"
       | "Notes.docx"
       | "Of16-01.pptx"
+      | "basicspreadsheet.xlsx"
       | "Presentation.pptx"
       | "Presentation.potx"
       | "autosave.pptx"
@@ -121,7 +115,6 @@ fn is_valid_open_only(file_name: &str) -> bool {
       | "3dtestdash.pptx"
       | "Complex01.docx"
       | "3dtestdot.pptx"
-      | "basicspreadsheet.xlsx"
       | "Complex01.xlsx"
       | "Dickinson_Sample_Slides.pptx"
       | "HelloO14.docx"

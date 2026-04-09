@@ -22,14 +22,8 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
   assert_eq!(parsed.creator.as_deref(), Some("Thomas Barnekow"));
   assert_eq!(parsed.last_modified_by.as_deref(), Some("Thomas Barnekow"));
   assert_eq!(parsed.revision.as_deref(), Some("1"));
-  assert_eq!(
-    parsed.created.as_deref().and_then(|v| v.0.as_deref()),
-    Some("2024-10-26T22:14:00Z")
-  );
-  assert_eq!(
-    parsed.modified.as_deref().and_then(|v| v.0.as_deref()),
-    Some("2024-10-26T22:15:00Z")
-  );
+  assert_eq!(parsed.created.as_deref(), Some("2024-10-26T22:14:00Z"));
+  assert_eq!(parsed.modified.as_deref(), Some("2024-10-26T22:15:00Z"));
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<cp:coreProperties"));
   assert!(serialized.contains("<dc:creator>Thomas Barnekow</dc:creator>"));
@@ -51,14 +45,8 @@ fn core_properties_round_trip_from_more_doc_props_test() {
   assert_eq!(parsed.creator.as_deref(), Some("Eric White"));
   assert_eq!(parsed.last_modified_by.as_deref(), Some("Eric White"));
   assert_eq!(parsed.revision.as_deref(), Some("6"));
-  assert_eq!(
-    parsed.created.as_deref().and_then(|v| v.0.as_deref()),
-    Some("2014-10-28T11:34:00Z")
-  );
-  assert_eq!(
-    parsed.modified.as_deref().and_then(|v| v.0.as_deref()),
-    Some("2015-06-20T07:40:00Z")
-  );
+  assert_eq!(parsed.created.as_deref(), Some("2014-10-28T11:34:00Z"));
+  assert_eq!(parsed.modified.as_deref(), Some("2015-06-20T07:40:00Z"));
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<cp:coreProperties"));
   assert!(serialized.contains("<dc:creator>Eric White</dc:creator>"));
@@ -71,9 +59,21 @@ fn extended_properties_round_trip_from_more_doc_props_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<ExtendedProperties>(fixtures::EXTENDED_PROPERTIES_MORE_DOC_PROPS_XML);
 
-  assert_eq!(parsed.template.as_deref(), Some("Normal.dotm"));
-  assert_eq!(parsed.application.as_deref(), Some("Microsoft Office Word"));
-  assert_eq!(parsed.application_version.as_deref(), Some("15.0000"));
+  assert_eq!(
+    parsed.template.as_deref().and_then(|v| v.0.as_deref()),
+    Some("Normal.dotm")
+  );
+  assert_eq!(
+    parsed.application.as_deref().and_then(|v| v.0.as_deref()),
+    Some("Microsoft Office Word")
+  );
+  assert_eq!(
+    parsed
+      .application_version
+      .as_deref()
+      .and_then(|v| v.0.as_deref()),
+    Some("15.0000")
+  );
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<Properties"));
   assert!(serialized.contains("extended-properties"));
@@ -130,7 +130,7 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
   let Some(CustomDocumentPropertyChildChoice::VtBool(value)) = property.children.first() else {
     panic!("expected vt:bool");
   };
-  assert!(*value);
+  assert_eq!(value.0, Some(true));
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<op:Properties"));
   assert!(serialized.contains("fmtid=\"{D5CDD505-2E9C-101B-9397-08002B2CF9AE}\""));

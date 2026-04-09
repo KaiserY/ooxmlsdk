@@ -8,16 +8,18 @@ use std::path::Path;
 use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
+use crate::sdk_code::package_schemas::gen_package_schema;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{CodegenContext, gen_schema};
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::compatibility::{apply_compatibility, read_compatibility};
 use crate::sdk_data::sdk_data_model::{
   CompatibilityRule as SdkDataCompatibilityRule, Namespace as SdkDataNamespace,
-  Part as SdkDataPart, Schema as SdkDataSchema,
+  PackageSchema as SdkDataPackageSchema, Part as SdkDataPart, Schema as SdkDataSchema,
 };
 
 pub mod helpers;
+pub mod package_schemas;
 pub mod parts;
 pub mod schemas;
 pub mod versioning;
@@ -34,6 +36,7 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let sdk_data_compatibility_path = sdk_data_dir.as_ref().join("compatibility.json");
   let mut sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
+  let sdk_data_package_schemas = read_package_schemas(&sdk_data_schemas_dir_path)?;
   let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let sdk_data_compatibility = read_compatibility(&sdk_data_compatibility_path)?;
@@ -43,6 +46,7 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
 
   write_schemas(
     &sdk_data_schemas,
+    &sdk_data_package_schemas,
     &sdk_data_compatibility.rules,
     &context,
     out_dir_path,
@@ -106,6 +110,40 @@ fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<SdkDataPart>> {
   Ok(sdk_data_parts)
 }
 
+fn read_package_schemas(
+  sdk_data_package_schemas_dir_path: &Path,
+) -> Result<Vec<SdkDataPackageSchema>> {
+  let mut sdk_data_package_schemas = vec![];
+
+  if !sdk_data_package_schemas_dir_path.exists() {
+    return Ok(sdk_data_package_schemas);
+  }
+
+  for entry in fs::read_dir(sdk_data_package_schemas_dir_path)? {
+    let entry = entry?;
+    let path = entry.path();
+
+    if !path.is_file() || path.extension() != Some(OsStr::new("json")) {
+      continue;
+    }
+
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+      continue;
+    };
+    if !file_name.starts_with("package_") {
+      continue;
+    }
+
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let package_schema: SdkDataPackageSchema = serde_json::from_reader(reader)?;
+    sdk_data_package_schemas.push(package_schema);
+  }
+
+  sdk_data_package_schemas.sort_by(|a, b| a.module_name.cmp(&b.module_name));
+  Ok(sdk_data_package_schemas)
+}
+
 fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
   let file = File::open(path)?;
   let reader = BufReader::new(file);
@@ -121,6 +159,7 @@ fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
 
 fn write_schemas(
   sdk_data_schemas: &[SdkDataSchema],
+  sdk_data_package_schemas: &[SdkDataPackageSchema],
   compatibility_rules: &[SdkDataCompatibilityRule],
   context: &CodegenContext<'_>,
   out_dir_path: &Path,
@@ -153,6 +192,25 @@ fn write_schemas(
       &mut schemas_mod_list,
       &sdk_data_schema.module_name,
       schema_module_cfg_attrs(sdk_data_schema),
+    )?;
+  }
+
+  for package_schema in sdk_data_package_schemas {
+    let schema_path = out_schemas_dir_path.join(format!("{}.rs", package_schema.module_name));
+    write_generated_module(
+      &schema_path,
+      gen_package_schema(package_schema).map_err(|err| {
+        format!(
+          "failed to generate package schema {}: {err}",
+          package_schema.module_name
+        )
+      })?,
+    )?;
+
+    push_module_decl(
+      &mut schemas_mod_list,
+      &package_schema.module_name,
+      Vec::new(),
     )?;
   }
 

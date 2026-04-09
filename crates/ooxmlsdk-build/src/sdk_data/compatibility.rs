@@ -39,7 +39,6 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
     match &rule.action {
       CompatibilityAction::TreatAsString => {}
       CompatibilityAction::FallbackToRawXml => {}
-      CompatibilityAction::MixedContent => {}
       CompatibilityAction::PreserveNamespaceDecls => {
         if rule.field != "xmlns_map" {
           return Err(
@@ -381,10 +380,6 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       }
     }
     CompatibilityAction::FallbackToRawXml => {}
-    CompatibilityAction::MixedContent => {
-      let schema = &mut sdk_data_schemas[schema_index];
-      schema.types[schema_type_index].mixed_content = true;
-    }
     CompatibilityAction::CollectionSequenceRoot => {
       let schema = &mut sdk_data_schemas[schema_index];
       schema.types[schema_type_index].collection_sequence_root = true;

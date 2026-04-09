@@ -5,7 +5,6 @@ use std::{ffi::OsStr, fs, fs::File, io::BufWriter, path::Path};
 pub mod compatibility;
 pub mod context;
 pub mod mce;
-pub mod opc_schemas;
 pub mod open_xml;
 pub mod package_schemas;
 pub mod parts;
@@ -14,7 +13,7 @@ pub mod sdk_data_model;
 
 use crate::Result;
 use crate::sdk_data::{
-  context::Context, mce::gen_mc_schema, opc_schemas::read_opc_schemas, parts::gen_parts,
+  context::Context, mce::gen_mc_schema, package_schemas::read_package_schemas, parts::gen_parts,
   schemas::gen_schemas,
 };
 
@@ -49,10 +48,10 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
     )?;
   }
 
-  for schema in read_opc_schemas(package_schemas_dir.as_ref())? {
+  for package_schema in read_package_schemas(package_schemas_dir.as_ref())? {
     write_json(
-      out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
-      &schema,
+      out_schemas_dir_path.join(format!("package_{}.json", package_schema.module_name)),
+      &package_schema,
     )?;
   }
 

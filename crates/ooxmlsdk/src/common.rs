@@ -10,8 +10,9 @@ pub use error::{
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  XmlReader, decode_attr_value, from_reader_inner, from_str_inner, read_outer_xml,
-  write_attr_value, write_end_tag, write_escaped_text, write_start_tag_open, write_xmlns_attr,
+  XmlReader, decode_attr_value, expect_event_start, from_reader_inner, from_str_inner,
+  read_outer_xml, write_attr_value, write_end_tag, write_escaped_text, write_start_tag_open,
+  write_xmlns_attr,
 };
 
 #[inline(always)]
@@ -249,7 +250,6 @@ fn skip_foreign_element_children<'de, R: XmlReader<'de>>(
   })
 }
 
-#[allow(dead_code)]
 pub(crate) fn normalize_relationship_type(value: &str) -> &str {
   match value {
     "http://purl.oclc.org/ooxml/officeDocument/relationships/aFChunk" => {

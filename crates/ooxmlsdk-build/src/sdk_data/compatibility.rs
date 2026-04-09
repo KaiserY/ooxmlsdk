@@ -431,8 +431,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       );
 
       if target_schema.types[schema_type_index].particle.kind == "Sequence"
-        || target_schema.types[schema_type_index].composite_kind
-          == SchemaTypeCompositeKind::OneSequence
+        || matches!(
+          target_schema.types[schema_type_index].composite_kind,
+          SchemaTypeCompositeKind::OneSequence | SchemaTypeCompositeKind::SdkSequence
+        )
       {
         target_schema.types[schema_type_index]
           .particle

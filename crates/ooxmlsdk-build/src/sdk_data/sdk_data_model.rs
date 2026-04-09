@@ -283,6 +283,9 @@ pub enum SchemaTypeCompositeKind {
   #[default]
   None,
   OneSequence,
+  OneChoice,
+  OneAll,
+  SdkSequence,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]

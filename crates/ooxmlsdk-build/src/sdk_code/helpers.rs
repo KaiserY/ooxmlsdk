@@ -77,10 +77,15 @@ pub fn is_collection_sequence_root(schema_type: &SchemaType) -> bool {
   schema_type.collection_sequence_root
 }
 
+fn supports_extended_sequence_strategy(schema_type: &SchemaType) -> bool {
+  matches!(
+    schema_type.composite_kind,
+    SchemaTypeCompositeKind::OneSequence | SchemaTypeCompositeKind::SdkSequence
+  )
+}
+
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
-  if schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
-    || schema_type.particle.kind == "Sequence"
-  {
+  if supports_extended_sequence_strategy(schema_type) {
     schema_type
       .particle
       .items
@@ -157,9 +162,7 @@ pub fn flatten_one_sequence_particles(schema_type: &SchemaType) -> Vec<FlatParti
 }
 
 pub fn is_one_sequence_structurable(schema_type: &SchemaType) -> bool {
-  if schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
-    || schema_type.particle.kind == "Sequence"
-  {
+  if supports_extended_sequence_strategy(schema_type) {
     schema_type
       .particle
       .items
@@ -526,6 +529,26 @@ mod tests {
     }
   }
 
+  fn composite_schema(
+    composite_kind: SchemaTypeCompositeKind,
+    particle_kind: &str,
+    items: Vec<SchemaTypeParticle>,
+  ) -> SchemaType {
+    SchemaType {
+      composite_kind,
+      particle: SchemaTypeParticle {
+        kind: particle_kind.to_string(),
+        name: String::new(),
+        occurs: vec![],
+        items,
+        initial_version: String::new(),
+        require_filter: false,
+        namespace: String::new(),
+      },
+      ..SchemaType::default()
+    }
+  }
+
   #[test]
   fn flattens_group_sequence_wrappers() {
     let schema_type = one_sequence_schema(vec![node(
@@ -735,6 +758,33 @@ mod tests {
       "",
     )]);
 
+    assert!(!is_one_sequence_structurable(&schema_type));
+  }
+
+  #[test]
+  fn one_choice_composite_kind_is_source_metadata_only() {
+    let schema_type = composite_schema(
+      SchemaTypeCompositeKind::OneChoice,
+      "Choice",
+      vec![leaf("a:CT_Test/a:first", 1, 1, "")],
+    );
+
+    assert!(!is_one_sequence_flatten(&schema_type));
+    assert!(!is_one_sequence_structurable(&schema_type));
+  }
+
+  #[test]
+  fn one_all_composite_kind_is_source_metadata_only() {
+    let schema_type = composite_schema(
+      SchemaTypeCompositeKind::OneAll,
+      "All",
+      vec![
+        leaf("a:CT_Test/a:first", 0, 1, ""),
+        leaf("a:CT_Test/a:second", 1, 1, ""),
+      ],
+    );
+
+    assert!(!is_one_sequence_flatten(&schema_type));
     assert!(!is_one_sequence_structurable(&schema_type));
   }
 }

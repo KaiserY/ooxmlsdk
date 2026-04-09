@@ -17,7 +17,7 @@ use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, ve
 use crate::sdk_data::compatibility::treat_as_string_rule_for_field;
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
-  SchemaTypeParticle,
+  SchemaTypeCompositeKind, SchemaTypeParticle,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -465,14 +465,15 @@ fn one_sequence_choice_enum_name(
   choice_slot_count: usize,
   field_name: &str,
 ) -> String {
+  let stem = one_sequence_choice_type_stem(schema_type, field_name);
   if choice_slot_count <= 1 {
-    format!("{}Choice", schema_type.class_name.to_upper_camel_case())
+    if stem.ends_with("Choice") {
+      stem
+    } else {
+      format!("{stem}Choice")
+    }
   } else {
-    format!(
-      "{}{}Choice",
-      schema_type.class_name.to_upper_camel_case(),
-      field_name.to_upper_camel_case()
-    )
+    stem
   }
 }
 
@@ -482,18 +483,31 @@ fn one_sequence_choice_sequence_struct_name(
   field_name: &str,
   variant_index: usize,
 ) -> String {
+  let stem = one_sequence_choice_type_stem(schema_type, field_name);
   if choice_slot_count <= 1 {
+    if stem.ends_with("Choice") {
+      format!("{stem}Sequence{}", variant_index + 1)
+    } else {
+      format!("{stem}ChoiceSequence{}", variant_index + 1)
+    }
+  } else {
+    format!("{stem}Sequence{}", variant_index + 1)
+  }
+}
+
+fn one_sequence_choice_type_stem(schema_type: &SchemaType, field_name: &str) -> String {
+  let owner_prefix = format!("{}_", schema_type.class_name.to_snake_case());
+  if let Some(stripped) = field_name.strip_prefix(&owner_prefix) {
     format!(
-      "{}ChoiceSequence{}",
+      "{}{}",
       schema_type.class_name.to_upper_camel_case(),
-      variant_index + 1
+      stripped.to_upper_camel_case()
     )
   } else {
     format!(
-      "{}{}Sequence{}",
+      "{}{}",
       schema_type.class_name.to_upper_camel_case(),
-      field_name.to_upper_camel_case(),
-      variant_index + 1
+      field_name.to_upper_camel_case()
     )
   }
 }
@@ -635,7 +649,16 @@ pub fn gen_schema(
         )?);
       }
 
-      if is_one_sequence_flatten(schema_type) {
+      if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+        && schema_type.particle.kind == "All"
+      {
+        fields.extend(gen_root_all_fields(
+          schema_type,
+          schema,
+          context,
+          field_version_cfg,
+        )?);
+      } else if is_one_sequence_flatten(schema_type) {
         let (one_sequence_fields, one_sequence_enums) =
           gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
         fields.extend(one_sequence_fields);
@@ -694,7 +717,16 @@ pub fn gen_schema(
         )?);
       }
 
-      if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
+      if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+        && schema_type.particle.kind == "All"
+      {
+        fields.extend(gen_root_all_fields(
+          schema_type,
+          schema,
+          context,
+          field_version_cfg,
+        )?);
+      } else if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         let (one_sequence_fields, one_sequence_enums) =
           gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
         fields.extend(one_sequence_fields);
@@ -1027,25 +1059,25 @@ fn gen_attr(
   Ok(if required {
     quote! {
       #( #attr_attrs )*
-      #sdk_attr_attrs
-      #strict_bitmask_attrs
       #[doc = #property_comments_doc]
       #[doc = ""]
       #[doc = #version_doc]
       #[doc = ""]
       #[doc = #qualified_doc]
+      #sdk_attr_attrs
+      #strict_bitmask_attrs
       pub #attr_name_ident: #type_ident,
     }
   } else {
     quote! {
       #( #attr_attrs )*
-      #sdk_attr_attrs
-      #strict_bitmask_attrs
       #[doc = #property_comments_doc]
       #[doc = ""]
       #[doc = #version_doc]
       #[doc = ""]
       #[doc = #qualified_doc]
+      #sdk_attr_attrs
+      #strict_bitmask_attrs
       pub #attr_name_ident: Option<#type_ident>,
     }
   })
@@ -1263,22 +1295,22 @@ fn gen_one_sequence_fields(
         if flat_particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_field_attrs
             #[doc = #property_comments]
+            #sdk_field_attrs
             pub #child_name_ident: Vec<#child_variant_type>,
           });
         } else if flat_particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_field_attrs
             #[doc = #property_comments]
+            #sdk_field_attrs
             pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_field_attrs
             #[doc = #property_comments]
+            #sdk_field_attrs
             pub #child_name_ident: std::boxed::Box<#child_variant_type>,
           });
         }
@@ -1372,22 +1404,22 @@ fn gen_one_sequence_fields(
         if flat_particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_choice_attrs
             #[doc = #property_comments]
+            #sdk_choice_attrs
             pub #choice_field_ident: Vec<#choice_enum_ident>,
           });
         } else if flat_particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_choice_attrs
             #[doc = #property_comments]
+            #sdk_choice_attrs
             pub #choice_field_ident: Option<#choice_enum_ident>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_choice_attrs
             #[doc = #property_comments]
+            #sdk_choice_attrs
             pub #choice_field_ident: #choice_enum_ident,
           });
         }
@@ -1458,22 +1490,22 @@ fn gen_structured_one_sequence_fields(
         if particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_field_attrs
             #[doc = #property_comments]
+            #sdk_field_attrs
             pub #child_name_ident: Vec<#child_variant_type>,
           });
         } else if particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_field_attrs
             #[doc = #property_comments]
+            #sdk_field_attrs
             pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_field_attrs
             #[doc = #property_comments]
+            #sdk_field_attrs
             pub #child_name_ident: std::boxed::Box<#child_variant_type>,
           });
         }
@@ -1633,22 +1665,22 @@ fn gen_structured_one_sequence_fields(
         if particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_choice_attrs
             #[doc = #property_comments]
+            #sdk_choice_attrs
             pub #choice_field_ident: Vec<#choice_enum_ident>,
           });
         } else if particle.optional {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_choice_attrs
             #[doc = #property_comments]
+            #sdk_choice_attrs
             pub #choice_field_ident: Option<#choice_enum_ident>,
           });
         } else {
           fields.push(quote! {
             #( #field_attrs )*
-            #sdk_choice_attrs
             #[doc = #property_comments]
+            #sdk_choice_attrs
             pub #choice_field_ident: #choice_enum_ident,
           });
         }
@@ -1706,22 +1738,96 @@ fn gen_sequence_variant_fields(
     if field.repeated {
       fields.push(quote! {
         #( #field_attrs )*
-        #sdk_field_attrs
         #[doc = #property_comments]
+        #sdk_field_attrs
         pub #child_name_ident: Vec<#child_variant_type>,
       });
     } else if field.optional {
       fields.push(quote! {
         #( #field_attrs )*
-        #sdk_field_attrs
         #[doc = #property_comments]
+        #sdk_field_attrs
         pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
       });
     } else {
       fields.push(quote! {
         #( #field_attrs )*
-        #sdk_field_attrs
         #[doc = #property_comments]
+        #sdk_field_attrs
+        pub #child_name_ident: std::boxed::Box<#child_variant_type>,
+      });
+    }
+  }
+
+  Ok(fields)
+}
+
+fn gen_root_all_fields(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  version_cfg: VersionCfgContext,
+) -> Result<Vec<TokenStream>> {
+  let mut fields = Vec::new();
+
+  for particle in &schema_type.particle.items {
+    let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+    let child_type = context
+      .type_map
+      .get(child.name)
+      .ok_or_else(|| format!("{:?}", child.name))?;
+    let child_prefix = context
+      .type_prefix_map
+      .get(child.name)
+      .ok_or_else(|| format!("{:?}", child.name))?;
+
+    let child_variant_type: Type = if *child_prefix != schema.prefix {
+      let child_module_name = context
+        .type_module(child.name)
+        .ok_or_else(|| format!("{:?}", child.name))?;
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        child_module_name,
+        child_type.class_name.to_upper_camel_case()
+      ))?
+    } else {
+      parse_str(&child_type.class_name.to_upper_camel_case())?
+    };
+
+    let child_name_ident: Ident = parse_str(&child.field_name)?;
+    let child_qname = child.name;
+    let property_comments = child.property_comments.as_ref();
+    let field_attrs = module_version_cfg_attrs(
+      effective_version(child.version, particle.initial_version.as_str()),
+      version_cfg,
+    );
+    let sdk_field_attrs = quote! {
+      #[sdk(child(qname = #child_qname))]
+    };
+
+    let repeated = particle.occurs.first().is_some_and(|occur| occur.max != 1);
+    let optional = particle.occurs.first().is_some_and(|occur| occur.min == 0);
+
+    if repeated {
+      fields.push(quote! {
+        #( #field_attrs )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        pub #child_name_ident: Vec<#child_variant_type>,
+      });
+    } else if optional {
+      fields.push(quote! {
+        #( #field_attrs )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        pub #child_name_ident: Option<std::boxed::Box<#child_variant_type>>,
+      });
+    } else {
+      fields.push(quote! {
+        #( #field_attrs )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
         pub #child_name_ident: std::boxed::Box<#child_variant_type>,
       });
     }
@@ -1762,7 +1868,10 @@ pub fn one_sequence_child_variant_type(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_data::sdk_data_model::SchemaEnumFacet;
+  use crate::sdk_data::sdk_data_model::{
+    Schema, SchemaEnumFacet, SchemaType, SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeKind,
+    SchemaTypeParticle, SchemaTypeParticleOccur,
+  };
 
   #[test]
   fn gen_schema_enum_emits_sdk_enum_attributes() {
@@ -1842,5 +1951,87 @@ mod tests {
     assert!(tokens.contains("OnMediaBookmark"));
     assert!(tokens.contains("cfg"));
     assert!(tokens.contains("microsoft365"));
+  }
+
+  #[test]
+  fn gen_schema_flattens_one_all_root_into_named_children() {
+    let schema_type = SchemaType {
+      name: "w:CT_OdsoFieldMapData/w:fieldMapData".to_string(),
+      class_name: "FieldMapData".to_string(),
+      kind: SchemaTypeKind::Composite,
+      composite_kind: SchemaTypeCompositeKind::OneAll,
+      particle: SchemaTypeParticle {
+        kind: "All".to_string(),
+        items: vec![
+          SchemaTypeParticle {
+            name: "w:CT_String/w:name".to_string(),
+            occurs: vec![SchemaTypeParticleOccur {
+              min: 0,
+              max: 1,
+              ..Default::default()
+            }],
+            ..Default::default()
+          },
+          SchemaTypeParticle {
+            name: "w:CT_String/w:mappedName".to_string(),
+            occurs: vec![SchemaTypeParticleOccur {
+              min: 0,
+              max: 1,
+              ..Default::default()
+            }],
+            ..Default::default()
+          },
+        ],
+        ..Default::default()
+      },
+      children: vec![
+        SchemaTypeChild {
+          name: "w:CT_String/w:name".to_string(),
+          property_name: "Name".to_string(),
+          property_comments: "Name".to_string(),
+        },
+        SchemaTypeChild {
+          name: "w:CT_String/w:mappedName".to_string(),
+          property_name: "MappedName".to_string(),
+          property_comments: "Mapped Name".to_string(),
+        },
+      ],
+      ..Default::default()
+    };
+    let schema = Schema {
+      prefix: "w".to_string(),
+      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+      types: vec![
+        schema_type.clone(),
+        SchemaType {
+          name: "w:CT_String/w:name".to_string(),
+          class_name: "Name".to_string(),
+          kind: SchemaTypeKind::Composite,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_String/w:mappedName".to_string(),
+          class_name: "MappedName".to_string(),
+          kind: SchemaTypeKind::Composite,
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let tokens = gen_schema(
+      &schema,
+      &[],
+      &CodegenContext::new(std::slice::from_ref(&schema)),
+      false,
+    )
+    .expect("schema tokens")
+    .to_string();
+    let compact: String = tokens.chars().filter(|ch| !ch.is_whitespace()).collect();
+
+    assert!(compact.contains("pubname:Option<std::boxed::Box<Name>>"));
+    assert!(compact.contains("pubmapped_name:Option<std::boxed::Box<MappedName>>"));
+    assert!(!compact.contains("FieldMapDataChildChoice"));
+    assert!(!compact.contains("pubchildren:Vec<"));
   }
 }

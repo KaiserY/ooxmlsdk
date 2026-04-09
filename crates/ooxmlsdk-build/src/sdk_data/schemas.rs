@@ -189,6 +189,12 @@ fn resolve_composite_kind(
 ) -> SchemaTypeCompositeKind {
   if schema_type.composite_type == "OneSequence" {
     SchemaTypeCompositeKind::OneSequence
+  } else if schema_type.composite_type == "OneChoice" {
+    SchemaTypeCompositeKind::OneChoice
+  } else if schema_type.composite_type == "OneAll" {
+    SchemaTypeCompositeKind::OneAll
+  } else if schema_type.particle.kind == "Sequence" {
+    SchemaTypeCompositeKind::SdkSequence
   } else {
     SchemaTypeCompositeKind::None
   }

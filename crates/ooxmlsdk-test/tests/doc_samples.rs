@@ -589,7 +589,9 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
         out.push_str("/>");
       } else {
         out.push('>');
-        if entry_name == "docProps/core.xml" {
+        if entry_name == "docProps/core.xml"
+          || (entry_name == "docProps/app.xml" && is_extended_properties_root(&element.name))
+        {
           let mut children = element
             .children
             .iter()
@@ -612,6 +614,11 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
   }
 
   out
+}
+
+fn is_extended_properties_root(name: &str) -> bool {
+  name == "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Properties"
+    || name == "{http://purl.oclc.org/ooxml/officeDocument/extendedProperties}Properties"
 }
 
 fn escape_xml_text(value: &str) -> String {

@@ -3,9 +3,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_custom_pr
   CustomDocumentPropertyChildChoice, Properties as CustomProperties,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VectorBaseValues;
-use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::{
-  Properties as ExtendedProperties, PropertiesChildChoice,
-};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties as ExtendedProperties;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 #[test]
@@ -61,14 +59,33 @@ fn extended_properties_round_trip_from_more_doc_props_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<ExtendedProperties>(fixtures::EXTENDED_PROPERTIES_MORE_DOC_PROPS_XML);
 
-  assert!(!parsed.children.is_empty());
+  assert_eq!(
+    parsed.template.as_deref().and_then(|v| v.0.as_deref()),
+    Some("Normal.dotm")
+  );
+  assert_eq!(
+    parsed.application.as_deref().and_then(|v| v.0.as_deref()),
+    Some("Microsoft Office Word")
+  );
+  assert_eq!(
+    parsed
+      .application_version
+      .as_deref()
+      .and_then(|v| v.0.as_deref()),
+    Some("15.0000")
+  );
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<Properties"));
   assert!(serialized.contains("extended-properties"));
   assert!(serialized.contains("<Template>Normal.dotm</Template>"));
   assert!(serialized.contains("<Application>Microsoft Office Word</Application>"));
   assert!(serialized.contains("<AppVersion>15.0000</AppVersion>"));
-  assert_eq!(parsed.children.len(), reparsed.children.len());
+  assert_eq!(parsed.template.is_some(), reparsed.template.is_some());
+  assert_eq!(parsed.application.is_some(), reparsed.application.is_some());
+  assert_eq!(
+    parsed.application_version.is_some(),
+    reparsed.application_version.is_some()
+  );
 }
 
 #[test]
@@ -77,10 +94,10 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
     fixtures::EXTENDED_PROPERTIES_TITLES_OF_PARTS_XML,
   );
 
-  assert_eq!(parsed.children.len(), 1);
-  let Some(PropertiesChildChoice::ApTitlesOfParts(titles)) = parsed.children.first() else {
-    panic!("expected ap:TitlesOfParts");
-  };
+  let titles = parsed
+    .titles_of_parts
+    .as_deref()
+    .expect("expected ap:TitlesOfParts");
 
   assert_eq!(titles.vt_vector.size, 1);
   assert!(matches!(
@@ -93,7 +110,7 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
   assert!(serialized.contains("<ap:TitlesOfParts>"));
   assert!(serialized.contains("<vt:vector baseType=\"lpstr\" size=\"1\">"));
   assert!(serialized.contains("<vt:lpstr"));
-  assert_eq!(reparsed.children.len(), 1);
+  assert!(reparsed.titles_of_parts.is_some());
 }
 
 #[test]

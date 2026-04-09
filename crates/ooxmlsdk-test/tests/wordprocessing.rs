@@ -2,8 +2,8 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChildChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChildChoice,
-  Justification, Paragraph, ParagraphChoice, Run, RunChoice, SdtBlock, SdtPropertiesChildChoice,
-  TabStop, TableJustification, Text, TextDirection,
+  Justification, Paragraph, ParagraphChoice, Run, RunChildChoice, SdtBlock,
+  SdtPropertiesChildChoice, TabStop, TableJustification, Text, TextDirection,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -68,10 +68,10 @@ fn first_sdt_block(body: &Body) -> &SdtBlock {
 
 fn first_text(run: &Run) -> &Text {
   run
-    .run_choice
+    .children
     .iter()
     .find_map(|child| match child {
-      RunChoice::WT(text) => Some(text.as_ref()),
+      RunChildChoice::WT(text) => Some(text.as_ref()),
       _ => None,
     })
     .expect("expected run text")
@@ -79,10 +79,10 @@ fn first_text(run: &Run) -> &Text {
 
 fn run_texts(run: &Run) -> Vec<&Text> {
   run
-    .run_choice
+    .children
     .iter()
     .filter_map(|child| match child {
-      RunChoice::WT(text) => Some(text.as_ref()),
+      RunChildChoice::WT(text) => Some(text.as_ref()),
       _ => None,
     })
     .collect()
@@ -174,9 +174,9 @@ fn paragraph_comment_reference_count(paragraph: &Paragraph) -> usize {
     })
     .map(|run| {
       run
-        .run_choice
+        .children
         .iter()
-        .filter(|run_child| matches!(run_child, RunChoice::WCommentReference(_)))
+        .filter(|run_child| matches!(run_child, RunChildChoice::WCommentReference(_)))
         .count()
     })
     .sum()

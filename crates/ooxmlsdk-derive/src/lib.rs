@@ -103,6 +103,15 @@ struct SdkChildField {
 }
 
 #[derive(Clone)]
+struct SdkTextChildField {
+  ident: Ident,
+  qname: String,
+  ty: Type,
+  optional: bool,
+  repeated: bool,
+}
+
+#[derive(Clone)]
 struct SdkChoiceField {
   ident: Ident,
   ty: Type,
@@ -117,16 +126,25 @@ struct SdkTextField {
   optional: bool,
 }
 
+#[derive(Clone)]
+struct SdkFixedAttribute {
+  q_name: String,
+  value: String,
+}
+
 enum SdkTypeFieldKind {
   Attr { name: String },
   Child { qname: String },
+  TextChild { qname: String },
   Choice,
   Text,
 }
 
 enum SdkChoiceVariantKind {
   Child { qnames: Vec<String> },
+  TextChild { qnames: Vec<String> },
   Any,
+  Text,
 }
 
 #[derive(Clone)]
@@ -381,6 +399,21 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
             qname: qname.unwrap_or_default(),
           }));
         }
+        Meta::List(meta) if meta.path.is_ident("text_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk text_child attribute"))
+            }
+          })?;
+          return Ok(Some(SdkTypeFieldKind::TextChild {
+            qname: qname.unwrap_or_default(),
+          }));
+        }
         Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkTypeFieldKind::Text)),
         Meta::Path(path) if path.is_ident("choice") => return Ok(Some(SdkTypeFieldKind::Choice)),
         Meta::Path(path) if path.is_ident("any") => {
@@ -402,6 +435,7 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
 
 fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {
   let mut child_qnames = Vec::new();
+  let mut text_child_qnames = Vec::new();
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -423,7 +457,21 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
           })?;
           child_qnames.push(qname.unwrap_or_default());
         }
+        Meta::List(meta) if meta.path.is_ident("text_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk choice text_child attribute"))
+            }
+          })?;
+          text_child_qnames.push(qname.unwrap_or_default());
+        }
         Meta::Path(path) if path.is_ident("any") => return Ok(Some(SdkChoiceVariantKind::Any)),
+        Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkChoiceVariantKind::Text)),
         other => {
           let _ = other;
         }
@@ -433,6 +481,11 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
   if !child_qnames.is_empty() {
     return Ok(Some(SdkChoiceVariantKind::Child {
       qnames: child_qnames,
+    }));
+  }
+  if !text_child_qnames.is_empty() {
+    return Ok(Some(SdkChoiceVariantKind::TextChild {
+      qnames: text_child_qnames,
     }));
   }
   Ok(None)
@@ -534,6 +587,79 @@ fn has_struct_xml_header_attr(attrs: &[Attribute]) -> bool {
     }
   }
   false
+}
+
+fn has_struct_xml_header_plain_attr(attrs: &[Attribute]) -> bool {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    if let Ok(metas) =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)
+    {
+      for meta in metas {
+        if matches!(meta, Meta::Path(path) if path.is_ident("xml_header_plain")) {
+          return true;
+        }
+      }
+    }
+  }
+  false
+}
+
+fn has_struct_xml_header_standalone_attr(attrs: &[Attribute]) -> bool {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    if let Ok(metas) =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)
+    {
+      for meta in metas {
+        if matches!(meta, Meta::Path(path) if path.is_ident("xml_header_standalone")) {
+          return true;
+        }
+      }
+    }
+  }
+  false
+}
+
+fn parse_struct_fixed_attributes(attrs: &[Attribute]) -> syn::Result<Vec<SdkFixedAttribute>> {
+  let mut fixed_attrs = Vec::new();
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::List(meta) = meta
+        && meta.path.is_ident("fixed_attr")
+      {
+        let mut q_name = None;
+        let mut value = None;
+        meta.parse_nested_meta(|nested| {
+          if nested.path.is_ident("qname") {
+            let lit: LitStr = nested.value()?.parse()?;
+            q_name = Some(lit.value());
+            Ok(())
+          } else if nested.path.is_ident("value") {
+            let lit: LitStr = nested.value()?.parse()?;
+            value = Some(lit.value());
+            Ok(())
+          } else {
+            Err(nested.error("unsupported sdk fixed_attr attribute"))
+          }
+        })?;
+        fixed_attrs.push(SdkFixedAttribute {
+          q_name: q_name.unwrap_or_default(),
+          value: value.unwrap_or_default(),
+        });
+      }
+    }
+  }
+  Ok(fixed_attrs)
 }
 
 fn is_xmlns_field(ident: &Ident) -> bool {

@@ -560,6 +560,12 @@
       "Type": "*",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "Run",
+      "Field": "children",
+      "Action": "MixedContent"
     }
   ]
 }

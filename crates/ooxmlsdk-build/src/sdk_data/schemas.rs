@@ -3,8 +3,8 @@ use crate::sdk_data::{
   sdk_data_model::{
     Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind,
     SchemaTypeAttribute, SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument,
-    SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeKind, SchemaTypeParticle,
-    SchemaTypeParticleOccur,
+    SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeFixedAttribute, SchemaTypeKind,
+    SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
   },
 };
 
@@ -69,11 +69,15 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           base_class: ty.base_class.clone(),
           kind: resolve_kind(ty, &type_map),
           composite_kind: resolve_composite_kind(ty),
+          xml_header: SchemaTypeXmlHeader::None,
           is_abstract: ty.is_abstract,
           has_xmlns_fields: ty.has_xmlns_fields,
           has_mc_ignorable_field: ty.has_mc_ignorable_field
             || !ty.part.is_empty()
             || ty.base_class == "OpenXmlPartRootElement",
+          mixed_content: false,
+          text_value_type: String::new(),
+          fixed_attributes: Vec::<SchemaTypeFixedAttribute>::new(),
           api_kind: resolve_api_kind(ty, &type_map),
           attributes: ty
             .attributes

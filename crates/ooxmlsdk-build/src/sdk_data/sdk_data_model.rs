@@ -31,6 +31,7 @@ pub enum CompatibilityAction {
   None,
   TreatAsString,
   FallbackToRawXml,
+  MixedContent,
   PreserveNamespaceDecls,
   CollectionSequenceRoot,
   ExtraChild,
@@ -256,9 +257,13 @@ pub struct SchemaType {
   pub base_class: String,
   pub kind: SchemaTypeKind,
   pub composite_kind: SchemaTypeCompositeKind,
+  pub xml_header: SchemaTypeXmlHeader,
   pub is_abstract: bool,
   pub has_xmlns_fields: bool,
   pub has_mc_ignorable_field: bool,
+  pub mixed_content: bool,
+  pub text_value_type: String,
+  pub fixed_attributes: Vec<SchemaTypeFixedAttribute>,
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
@@ -286,6 +291,22 @@ pub enum SchemaTypeCompositeKind {
   OneChoice,
   OneAll,
   SdkSequence,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SchemaTypeXmlHeader {
+  #[default]
+  None,
+  Plain,
+  Standalone,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeFixedAttribute {
+  pub q_name: String,
+  pub value: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]

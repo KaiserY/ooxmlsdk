@@ -39,6 +39,7 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
     match &rule.action {
       CompatibilityAction::TreatAsString => {}
       CompatibilityAction::FallbackToRawXml => {}
+      CompatibilityAction::TextChoice => {}
       CompatibilityAction::PreserveNamespaceDecls => {
         if rule.field != "xmlns_map" {
           return Err(
@@ -324,6 +325,20 @@ pub fn fallback_to_raw_xml_rule_for_field<'a>(
   })
 }
 
+pub fn text_choice_rule_for_field<'a>(
+  compatibility_rules: &'a [CompatibilityRule],
+  schema: &str,
+  type_name: &str,
+  field: &str,
+) -> Option<&'a CompatibilityRule> {
+  compatibility_rules.iter().find(|rule| {
+    rule.schema == schema
+      && rule.type_name == type_name
+      && rule.field == field
+      && matches!(rule.action, CompatibilityAction::TextChoice)
+  })
+}
+
 fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Result<()> {
   let schema_index = sdk_data_schemas
     .iter()
@@ -380,6 +395,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       }
     }
     CompatibilityAction::FallbackToRawXml => {}
+    CompatibilityAction::TextChoice => {}
     CompatibilityAction::CollectionSequenceRoot => {
       let schema = &mut sdk_data_schemas[schema_index];
       schema.types[schema_type_index].collection_sequence_root = true;

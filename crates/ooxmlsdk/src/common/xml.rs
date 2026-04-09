@@ -400,15 +400,6 @@ pub(crate) fn write_escaped_text<W: std::fmt::Write, T: std::fmt::Display + ?Siz
   writer.write_str(&quick_xml::escape::escape(value.to_string()))
 }
 
-#[allow(dead_code)]
-#[inline(always)]
-pub(crate) fn write_escaped_text_str<W: std::fmt::Write>(
-  writer: &mut W,
-  value: &str,
-) -> Result<(), std::fmt::Error> {
-  writer.write_str(&quick_xml::escape::escape(value))
-}
-
 #[inline(always)]
 pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
@@ -419,20 +410,6 @@ pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized
   writer.write_str(attr_name)?;
   writer.write_str("=\"")?;
   write_escaped_text(writer, value)?;
-  writer.write_char('"')
-}
-
-#[allow(dead_code)]
-#[inline(always)]
-pub(crate) fn write_attr_value_str<W: std::fmt::Write>(
-  writer: &mut W,
-  attr_name: &str,
-  value: &str,
-) -> Result<(), std::fmt::Error> {
-  writer.write_char(' ')?;
-  writer.write_str(attr_name)?;
-  writer.write_str("=\"")?;
-  write_escaped_text_str(writer, value)?;
   writer.write_char('"')
 }
 
@@ -453,57 +430,3 @@ pub(crate) fn write_xmlns_attr<W: std::fmt::Write>(
   writer.write_str(uri)?;
   writer.write_char('"')
 }
-
-macro_rules! expect_event_start {
-  ($xml_reader:expr, $xml_event:expr, $tag_prefix:expr, $tag:expr) => {{
-    let (e, empty_tag) = if let Some((e, empty_tag)) = $xml_event {
-      (e, empty_tag)
-    } else {
-      loop {
-        match $xml_reader.next()? {
-          quick_xml::events::Event::Start(b) => break (b, false),
-          quick_xml::events::Event::Empty(b) => break (b, true),
-          quick_xml::events::Event::Eof => {
-            return Err(crate::common::unexpected_eof("xml"));
-          }
-          _ => continue,
-        }
-      }
-    };
-    match e.name().as_ref() {
-      $tag_prefix | $tag => (),
-      found => {
-        return Err(crate::common::unexpected_tag("xml", "xml", found));
-      }
-    }
-    (e, empty_tag)
-  }};
-  (
-        $xml_reader:expr, $xml_event:expr, $context:expr, $expected:expr,
-        $tag_prefix:expr, $tag:expr
-    ) => {{
-    let (e, empty_tag) = if let Some((e, empty_tag)) = $xml_event {
-      (e, empty_tag)
-    } else {
-      loop {
-        match $xml_reader.next()? {
-          quick_xml::events::Event::Start(b) => break (b, false),
-          quick_xml::events::Event::Empty(b) => break (b, true),
-          quick_xml::events::Event::Eof => {
-            return Err(crate::common::unexpected_eof($context));
-          }
-          _ => continue,
-        }
-      }
-    };
-    match e.name().as_ref() {
-      $tag_prefix | $tag => (),
-      found => {
-        return Err(crate::common::unexpected_tag($context, $expected, found));
-      }
-    }
-    (e, empty_tag)
-  }};
-}
-
-pub(crate) use expect_event_start;

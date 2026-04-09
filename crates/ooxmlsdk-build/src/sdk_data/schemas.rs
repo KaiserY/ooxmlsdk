@@ -69,11 +69,18 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           base_class: ty.base_class.clone(),
           kind: resolve_kind(ty, &type_map),
           composite_kind: resolve_composite_kind(ty),
+          xml_header_standalone: if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement"
+          {
+            Some(true)
+          } else {
+            None
+          },
           is_abstract: ty.is_abstract,
           has_xmlns_fields: ty.has_xmlns_fields,
           has_mc_ignorable_field: ty.has_mc_ignorable_field
             || !ty.part.is_empty()
             || ty.base_class == "OpenXmlPartRootElement",
+          text_value_type: String::new(),
           api_kind: resolve_api_kind(ty, &type_map),
           attributes: ty
             .attributes

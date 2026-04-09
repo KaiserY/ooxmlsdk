@@ -31,6 +31,7 @@ pub enum CompatibilityAction {
   None,
   TreatAsString,
   FallbackToRawXml,
+  TextChoice,
   PreserveNamespaceDecls,
   CollectionSequenceRoot,
   ExtraChild,
@@ -130,112 +131,6 @@ pub struct PartChild {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
-pub struct PackageSchema {
-  pub module_name: String,
-  pub root: String,
-  pub xmlns_uri: String,
-  pub xml_header: PackageXmlHeader,
-  pub types: Vec<PackageType>,
-  pub enums: Vec<PackageEnum>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum PackageXmlHeader {
-  #[default]
-  None,
-  Plain,
-  Standalone,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageType {
-  pub name: String,
-  pub tag: String,
-  pub prefix: String,
-  pub kind: PackageTypeKind,
-  pub has_xmlns_fields: bool,
-  pub preserve_empty_text_children: bool,
-  pub attributes: Vec<PackageAttribute>,
-  pub text_children: Vec<PackageTextChild>,
-  pub child_fields: Vec<PackageChildField>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum PackageTypeKind {
-  #[default]
-  Composite,
-  Leaf,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageAttribute {
-  pub field: String,
-  pub q_name: String,
-  pub r#type: String,
-  pub required: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageTextChild {
-  pub field: String,
-  pub q_name: String,
-  pub fixed_attributes: Vec<PackageFixedAttribute>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageFixedAttribute {
-  pub q_name: String,
-  pub value: String,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageChildField {
-  pub field: String,
-  pub kind: PackageChildFieldKind,
-  pub item_type: String,
-  pub enum_name: String,
-  pub variants: Vec<PackageChildVariant>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum PackageChildFieldKind {
-  #[default]
-  Vec,
-  ChoiceVec,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageChildVariant {
-  pub name: String,
-  pub r#type: String,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageEnum {
-  pub name: String,
-  pub variants: Vec<PackageEnumVariant>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct PackageEnumVariant {
-  pub name: String,
-  pub value: String,
-  pub is_default: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
 pub struct Schema {
   pub target_namespace: String,
   pub prefix: String,
@@ -256,9 +151,11 @@ pub struct SchemaType {
   pub base_class: String,
   pub kind: SchemaTypeKind,
   pub composite_kind: SchemaTypeCompositeKind,
+  pub xml_header_standalone: Option<bool>,
   pub is_abstract: bool,
   pub has_xmlns_fields: bool,
   pub has_mc_ignorable_field: bool,
+  pub text_value_type: String,
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,

@@ -8,6 +8,7 @@ use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
+use ooxmlsdk::schemas::opc_core_properties::KeywordsChildChoice;
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   AltChunk, Body, BodyChildChoice, CommentChoice, Document, Hyperlink, HyperlinkChildChoice,
@@ -18,6 +19,16 @@ use ooxmlsdk_test::fixtures;
 const ALT_CHUNK_ID: &str = "XmlAltChunkId-1";
 const ALT_CHUNK_TARGET: &str = "afchunk.xml";
 const ALT_CHUNK_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><root><element>Some text</element></root>";
+
+fn keywords_text(value: Option<&ooxmlsdk::schemas::opc_core_properties::Keywords>) -> Option<&str> {
+  value.and_then(|keywords| {
+    keywords.xml_content.as_deref().or_else(|| {
+      keywords.children.iter().find_map(|child| match child {
+        KeywordsChildChoice::CpValue(value) => value.xml_content.as_deref(),
+      })
+    })
+  })
+}
 
 fn test_file_path(file_name: &str) -> std::path::PathBuf {
   let path = fixtures::doc_sample_path(file_name);
@@ -1065,7 +1076,7 @@ fn open_doc_props_docx_asset_from_openxml_sdk() {
     package
       .core_file_properties_part
       .as_ref()
-      .map(|part| part.root_element.keywords.as_deref()),
+      .map(|part| keywords_text(part.root_element.keywords.as_deref())),
     Some(Some("Test-Keywords"))
   );
   assert_eq!(
@@ -2327,14 +2338,16 @@ fn round_trip_doc_props_docx_asset_from_openxml_sdk() {
     Some("Eric White")
   );
   assert_eq!(
-    original_core_properties.root_element.keywords.as_deref(),
+    keywords_text(original_core_properties.root_element.keywords.as_deref()),
     Some("Test-Keywords")
   );
   assert_eq!(
-    roundtripped_core_properties
-      .root_element
-      .keywords
-      .as_deref(),
+    keywords_text(
+      roundtripped_core_properties
+        .root_element
+        .keywords
+        .as_deref()
+    ),
     Some("Test-Keywords")
   );
   assert_eq!(

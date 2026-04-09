@@ -10,7 +10,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   };
 
   let mut write_arms = Vec::with_capacity(variants.len());
-  let mut read_arms = Vec::with_capacity(variants.len());
+  let mut child_dispatch_tokens = Vec::with_capacity(variants.len());
+  let mut any_dispatch_tokens = Vec::new();
 
   for variant in variants {
     if variant.fields.len() != 1 {
@@ -56,12 +57,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         }
         let read_arm = quote! {
-          #( #qname_patterns )|* => {
-            let parsed_child = #inner_ty::deserialize_inner(xml_reader, Some((e.clone(), empty_tag)))?;
-            Ok(#constructor)
+          if matches!(e.name().as_ref(), #( #qname_patterns )|*) {
+            let parsed_child = #inner_ty::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
+            return Ok(#constructor);
           }
         };
-        read_arms.push(quote! { #(#cfg_attrs)* #read_arm });
+        child_dispatch_tokens.push(quote! { #(#cfg_attrs)* #read_arm });
 
         let write_arm = quote! {
           #(#cfg_attrs)*
@@ -75,16 +76,35 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(value) => writer.write_str(value.as_ref()),
         };
         write_arms.push(write_arm);
-        read_arms.push(quote! {
+        any_dispatch_tokens.push(quote! {
           #(#cfg_attrs)*
-          _ => {
+          {
             let xml = crate::common::read_outer_xml(xml_reader, e, empty_tag)?;
-            Ok(Self::#variant_ident(std::boxed::Box::new(xml)))
+            return Ok(Self::#variant_ident(std::boxed::Box::new(xml)));
           }
         });
       }
     }
   }
+
+  let read_tokens = if any_dispatch_tokens.is_empty() {
+    quote! {
+      #( #child_dispatch_tokens )*
+      {
+        let found = e.name();
+        Err(crate::common::unexpected_tag(
+          stringify!(#ident),
+          "choice",
+          found.as_ref(),
+        ))
+      }
+    }
+  } else {
+    quote! {
+      #( #child_dispatch_tokens )*
+      #( #any_dispatch_tokens )*
+    }
+  };
 
   Ok(quote! {
     impl crate::sdk::SdkChoice for #ident {}
@@ -108,15 +128,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             }
           }
         };
-
-        match e.name().as_ref() {
-          #( #read_arms )*
-          _ => Err(crate::common::unexpected_tag(
-            stringify!(#ident),
-            "choice",
-            e.name().as_ref(),
-          )),
-        }
+        #read_tokens
       }
 
       pub(crate) fn write_xml<W: std::fmt::Write>(

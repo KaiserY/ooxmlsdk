@@ -540,9 +540,6 @@ pub fn gen_schema(
     } else {
       quote! {}
     };
-    let sdk_text_attrs = quote! {
-      #[sdk(text)]
-    };
     let summary_doc = format!(" {}", schema_type.summary);
     let version_doc = if schema_type.version.is_empty() {
       " Available in Office2007 and above.".to_string()
@@ -568,40 +565,9 @@ pub fn gen_schema(
         #[doc = ""]
         #[doc = #qualified_doc]
         #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
-        #sdk_text_attrs
         #sdk_type_attrs
         #sdk_xml_header_attrs
         pub struct #struct_name_ident(pub Option<#xml_content_type>);
-
-        #( #type_attrs )*
-        impl From<#xml_content_type> for #struct_name_ident {
-          fn from(value: #xml_content_type) -> Self {
-            Self(Some(value))
-          }
-        }
-
-        #( #type_attrs )*
-        impl From<Option<#xml_content_type>> for #struct_name_ident {
-          fn from(value: Option<#xml_content_type>) -> Self {
-            Self(value)
-          }
-        }
-
-        #( #type_attrs )*
-        impl std::ops::Deref for #struct_name_ident {
-          type Target = Option<#xml_content_type>;
-
-          fn deref(&self) -> &Self::Target {
-            &self.0
-          }
-        }
-
-        #( #type_attrs )*
-        impl std::ops::DerefMut for #struct_name_ident {
-          fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-          }
-        }
       });
 
       continue;

@@ -390,6 +390,20 @@ pub fn alternate_content_choice_rule_for_field<'a>(
   })
 }
 
+pub fn alternate_content_choice_rule_for_child<'a>(
+  compatibility_rules: &'a [CompatibilityRule],
+  schema: &str,
+  type_name: &str,
+  child_qname: &str,
+) -> Option<&'a CompatibilityRule> {
+  compatibility_rules.iter().find(|rule| {
+    rule.schema == schema
+      && rule.type_name == type_name
+      && rule.field == child_qname
+      && matches!(rule.action, CompatibilityAction::AlternateContentChoice)
+  })
+}
+
 fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Result<()> {
   let schema_index = sdk_data_schemas
     .iter()

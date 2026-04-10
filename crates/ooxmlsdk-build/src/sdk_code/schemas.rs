@@ -15,8 +15,8 @@ use crate::sdk_code::helpers::{
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
 use crate::sdk_data::compatibility::{
-  alternate_content_choice_rule_for_field, text_choice_rule_for_field,
-  treat_as_string_rule_for_field,
+  alternate_content_choice_rule_for_child, alternate_content_choice_rule_for_field,
+  text_choice_rule_for_field, treat_as_string_rule_for_field,
 };
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
@@ -1232,6 +1232,15 @@ fn gen_children(
   });
 
   let mut variants: Vec<TokenStream> = vec![];
+  let has_alternate_content_choice = resolved_children.iter().any(|child| {
+    alternate_content_choice_rule_for_child(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.class_name,
+      child.name,
+    )
+    .is_some()
+  });
 
   for child in &resolved_children {
     let child_variant_name_ident: Ident = parse_str(&child.variant_name.to_upper_camel_case())?;
@@ -1292,6 +1301,18 @@ fn gen_children(
         #child_variant_name_ident(#child_variant_type),
       });
     }
+  }
+
+  if has_alternate_content_choice {
+    variants.push(quote! {
+      #[doc = " Preserves the mc:AlternateContent wrapper for this child."]
+      #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+      McAlternateContent(
+        std::boxed::Box<
+          crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+      ),
+    });
   }
 
   let choice_field_name = "children";
@@ -1390,27 +1411,21 @@ fn can_alias_leaf_text_wrapper(schema_type: &SchemaType) -> bool {
     && !needs_xml_header(schema_type)
 }
 
-fn chart_space_mc_alternate_content_choice(
+fn choice_particle_has_alternate_content_choice_wrapper(
   compatibility_rules: &[CompatibilityRule],
   schema: &Schema,
   schema_type: &SchemaType,
-  choice_field_name: &str,
   choice_particle: &SchemaTypeParticle,
 ) -> bool {
-  alternate_content_choice_rule_for_field(
-    compatibility_rules,
-    &schema.module_name,
-    &schema_type.class_name,
-    choice_field_name,
-  )
-  .is_some()
-    && schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
-    && choice_particle.kind == "Choice"
-    && choice_particle
-      .occurs
-      .first()
-      .is_some_and(|occur| occur.max == 1)
-    && choice_particle.items.len() == 2
+  choice_particle.items.iter().any(|item| {
+    alternate_content_choice_rule_for_child(
+      compatibility_rules,
+      &schema.module_name,
+      &schema_type.class_name,
+      item.name.as_str(),
+    )
+    .is_some()
+  })
 }
 
 fn can_inline_text_child(schema_type: &SchemaType) -> bool {
@@ -1518,6 +1533,21 @@ fn choice_child_variant_shape(
   ))
 }
 
+fn child_has_alternate_content_choice_wrapper(
+  compatibility_rules: &[CompatibilityRule],
+  schema: &Schema,
+  schema_type: &SchemaType,
+  child_qname: &str,
+) -> bool {
+  alternate_content_choice_rule_for_child(
+    compatibility_rules,
+    &schema.module_name,
+    &schema_type.class_name,
+    child_qname,
+  )
+  .is_some()
+}
+
 fn gen_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
@@ -1552,6 +1582,20 @@ fn gen_one_sequence_fields(
           effective_version(child.version, flat_particle.initial_version),
           field_cfg,
         );
+        let has_alternate_content_wrapper = child_has_alternate_content_choice_wrapper(
+          compatibility_rules,
+          schema,
+          schema_type,
+          child.name,
+        );
+        if has_alternate_content_wrapper {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = " Preserves the mc:AlternateContent wrapper for this child."]
+            #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+            pub mc_alternate_content: Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>>,
+          });
+        }
 
         if flat_particle.repeated {
           fields.push(quote! {
@@ -1618,16 +1662,23 @@ fn gen_one_sequence_fields(
             .collect::<Vec<_>>(),
         );
         let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
-        if chart_space_mc_alternate_content_choice(
+        let has_alternate_content_wrapper = alternate_content_choice_rule_for_field(
           compatibility_rules,
-          schema,
-          schema_type,
+          &schema.module_name,
+          &schema_type.class_name,
           &choice.field_name,
-          choice_particle,
-        ) {
+        )
+        .is_some()
+          || choice_particle_has_alternate_content_choice_wrapper(
+            compatibility_rules,
+            schema,
+            schema_type,
+            choice_particle,
+          );
+        if has_alternate_content_wrapper {
           fields.push(quote! {
             #( #field_attrs )*
-            #[doc = " Preserves the mc:AlternateContent wrapper for the chartSpace alternate style choice."]
+            #[doc = " Preserves the mc:AlternateContent wrapper for this choice."]
             #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
             pub mc_alternate_content: Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>>,
           });
@@ -1771,6 +1822,20 @@ fn gen_structured_one_sequence_fields(
           effective_version(child.version, particle.initial_version),
           field_cfg,
         );
+        let has_alternate_content_wrapper = child_has_alternate_content_choice_wrapper(
+          compatibility_rules,
+          schema,
+          schema_type,
+          child.name,
+        );
+        if has_alternate_content_wrapper {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = " Preserves the mc:AlternateContent wrapper for this child."]
+            #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+            pub mc_alternate_content: Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>>,
+          });
+        }
         if particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
@@ -1857,6 +1922,43 @@ fn gen_structured_one_sequence_fields(
         } else {
           VersionCfgContext::new(true)
         };
+        let has_alternate_content_wrapper = alternate_content_choice_rule_for_field(
+          compatibility_rules,
+          &schema.module_name,
+          &schema_type.class_name,
+          &choice.field_name,
+        )
+        .is_some()
+          || choice.variants.iter().any(|variant| match variant {
+            ResolvedOneSequenceChoiceVariant::Leaf(child) => {
+              alternate_content_choice_rule_for_child(
+                compatibility_rules,
+                &schema.module_name,
+                &schema_type.class_name,
+                child.name,
+              )
+              .is_some()
+            }
+            ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => {
+              sequence_variant.fields.iter().any(|field| {
+                alternate_content_choice_rule_for_child(
+                  compatibility_rules,
+                  &schema.module_name,
+                  &schema_type.class_name,
+                  field.child.name,
+                )
+                .is_some()
+              })
+            }
+          });
+        if has_alternate_content_wrapper {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = " Preserves the mc:AlternateContent wrapper for this choice."]
+            #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+            pub mc_alternate_content: Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>>,
+          });
+        }
         let mut variants = Vec::new();
         let mut default_variant = None;
 

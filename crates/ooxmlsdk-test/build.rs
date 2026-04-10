@@ -74,8 +74,8 @@ fn is_open_failure(file_name: &str) -> bool {
   matches!(
     file_name,
     "5Errors.docx"
-      | "Of16-09-UnknownElement.docx"
       | "UnknownElement.docx"
+      | "Of16-09-UnknownElement.docx"
       | "complex0.docx"
       | "complex2010.docx"
   )
@@ -88,6 +88,14 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "AnnotationRef.docx"
       | "Comments.docx"
       | "Comments.xlsx"
+      | "Of16-01.docx"
+      | "Of16-03.docx"
+      | "Of16-04.docx"
+      | "Of16-05.docx"
+      | "Of16-06.docx"
+      | "Of16-07.docx"
+      | "Of16-02.pptx"
+      | "Of16-03.pptx"
       | "Data-Bound-Content-Controls.docx"
       | "HelloWorld.docx"
       | "Hyperlink.docx"
@@ -109,41 +117,28 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "NoDocProps.docx"
       | "Revision_NameCommentChange.xlsx"
       | "Plain.docx"
+      | "Algn_tab_TabAlignment.pptx"
+      | "basicspreadsheet.xlsx"
+      | "simpleSdt.docx"
+      | "Spreadsheet.xlsx"
   )
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {
   matches!(
     file_name,
-    "Algn_tab_TabAlignment.pptx"
-      | "MCExecl.xlsx"
-      | "Of16-10-SymEx.docx"
+    "MCExecl.xlsx"
       | "3dtestdash.pptx"
       | "Complex01.docx"
       | "3dtestdot.pptx"
-      | "basicspreadsheet.xlsx"
       | "Complex01.xlsx"
       | "Dickinson_Sample_Slides.pptx"
-      | "HelloO14.docx"
-      | "malformed_uri.xlsx"
-      | "malformed_uri_long.xlsx"
-      | "mcdoc.docx"
-      | "missingcalcchainpart.xlsx"
+      | "Of16-08.docx"
       | "o09_Performance_typical.pptx"
       | "May_12_04.docx"
-      | "simpleSdt.docx"
-      | "Spreadsheet.xlsx"
-      | "Youtube.xlsx"
-      | "Of16-01.docx"
-      | "Of16-03.docx"
-      | "Of16-04.docx"
-      | "Of16-05.docx"
-      | "Of16-06.docx"
-      | "Of16-07.docx"
-      | "Of16-08.docx"
-      | "Of16-01.pptx"
-      | "Of16-02.pptx"
-      | "Of16-03.pptx"
+      | "malformed_uri.xlsx"
+      | "malformed_uri_long.xlsx"
+      | "missingcalcchainpart.xlsx"
   )
 }
 

@@ -550,23 +550,6 @@ pub fn gen_schema(
         #[sdk(qname = #qname)]
       }
     };
-    let sdk_xml_header_attrs = if needs_xml_header(schema_type) {
-      if schema_type.xml_header_standalone == Some(true) {
-        quote! {
-          #[sdk(xml_header_standalone)]
-        }
-      } else if schema_type.xml_header_standalone == Some(false) {
-        quote! {
-          #[sdk(xml_header_plain)]
-        }
-      } else {
-        quote! {
-          #[sdk(xml_header)]
-        }
-      }
-    } else {
-      quote! {}
-    };
     let summary_doc = format!(" {}", schema_type.summary);
     let version_doc = if schema_type.version.is_empty() {
       " Available in Office2007 and above.".to_string()
@@ -610,7 +593,7 @@ pub fn gen_schema(
       }
       if needs_xml_header(schema_type) {
         fields.push(quote! {
-          pub xml_header_standalone: Option<bool>,
+          pub xml_header: crate::common::XmlHeaderType,
         });
       }
       if schema_type.has_mc_ignorable_field {
@@ -653,7 +636,6 @@ pub fn gen_schema(
         #[doc = #qualified_doc]
         #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
         #sdk_type_attrs
-        #sdk_xml_header_attrs
         pub struct #struct_name_ident {
           #( #fields )*
         }
@@ -675,7 +657,7 @@ pub fn gen_schema(
     }
     if needs_xml_header(schema_type) {
       fields.push(quote! {
-        pub xml_header_standalone: Option<bool>,
+        pub xml_header: crate::common::XmlHeaderType,
       });
     }
     if schema_type.has_mc_ignorable_field {
@@ -912,11 +894,9 @@ pub fn gen_schema(
       #[doc = #qualified_doc]
       #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
       #sdk_type_attrs
-      #sdk_xml_header_attrs
       pub struct #struct_name_ident {
         #( #fields )*
       }
-
       #child_choice_tokens
     });
   }

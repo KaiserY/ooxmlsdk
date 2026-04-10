@@ -4,7 +4,7 @@ use crate::sdk_data::compatibility::{
 };
 use crate::sdk_data::sdk_data_model::{
   CompatibilityRule, Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind,
-  SchemaTypeKind, SchemaTypeParticle,
+  SchemaTypeKind, SchemaTypeParticle, SchemaTypeXmlHeader,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,9 +48,7 @@ pub fn is_derived_type(schema_type: &SchemaType) -> bool {
 }
 
 pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
-  schema_type.xml_header_standalone.is_some()
-    || !schema_type.part.is_empty()
-    || schema_type.base_class == "OpenXmlPartRootElement"
+  schema_type.xml_header != SchemaTypeXmlHeader::None
 }
 
 pub fn supports_compat_xmlns_fields(

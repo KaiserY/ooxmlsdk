@@ -428,60 +428,6 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
   Ok(None)
 }
 
-fn has_struct_xml_header_attr(attrs: &[Attribute]) -> bool {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    if let Ok(metas) =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)
-    {
-      for meta in metas {
-        if matches!(meta, Meta::Path(path) if path.is_ident("xml_header")) {
-          return true;
-        }
-      }
-    }
-  }
-  false
-}
-
-fn has_struct_xml_header_plain_attr(attrs: &[Attribute]) -> bool {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    if let Ok(metas) =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)
-    {
-      for meta in metas {
-        if matches!(meta, Meta::Path(path) if path.is_ident("xml_header_plain")) {
-          return true;
-        }
-      }
-    }
-  }
-  false
-}
-
-fn has_struct_xml_header_standalone_attr(attrs: &[Attribute]) -> bool {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    if let Ok(metas) =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)
-    {
-      for meta in metas {
-        if matches!(meta, Meta::Path(path) if path.is_ident("xml_header_standalone")) {
-          return true;
-        }
-      }
-    }
-  }
-  false
-}
-
 fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {
   let mut child_qnames = Vec::new();
   let mut text_child_qnames = Vec::new();

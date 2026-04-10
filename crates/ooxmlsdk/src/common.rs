@@ -14,6 +14,14 @@ pub(crate) use xml::{
   write_attr_value, write_end_tag, write_escaped_text, write_start_tag_open, write_xmlns_attr,
 };
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum XmlHeaderType {
+  #[default]
+  Plain,
+  None,
+  Standalone,
+}
+
 #[inline(always)]
 pub fn parse_bool_attr(
   attr: &Attribute<'_>,

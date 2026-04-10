@@ -4,7 +4,7 @@ use crate::sdk_data::{
     Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind,
     SchemaTypeAttribute, SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument,
     SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeKind, SchemaTypeParticle,
-    SchemaTypeParticleOccur,
+    SchemaTypeParticleOccur, SchemaTypeXmlHeader,
   },
 };
 
@@ -69,11 +69,10 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           base_class: ty.base_class.clone(),
           kind: resolve_kind(ty, &type_map),
           composite_kind: resolve_composite_kind(ty),
-          xml_header_standalone: if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement"
-          {
-            Some(true)
+          xml_header: if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
+            SchemaTypeXmlHeader::Standalone
           } else {
-            None
+            SchemaTypeXmlHeader::None
           },
           is_abstract: ty.is_abstract,
           has_xmlns_fields: ty.has_xmlns_fields,

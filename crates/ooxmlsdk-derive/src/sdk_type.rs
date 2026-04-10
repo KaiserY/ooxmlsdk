@@ -936,9 +936,6 @@ fn expand_named_struct(
   fields: &syn::FieldsNamed,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
-  let has_xml_header = has_struct_xml_header_attr(&input.attrs);
-  let has_xml_header_plain = has_struct_xml_header_plain_attr(&input.attrs);
-  let has_xml_header_standalone = has_struct_xml_header_standalone_attr(&input.attrs);
   let QNameInfo {
     tag_prefix,
     local_name,
@@ -962,7 +959,7 @@ fn expand_named_struct(
   let mut choice_fields = Vec::new();
   let mut text_field = None;
   let mut xmlns_fields = Vec::new();
-  let mut xml_header_standalone_field = None;
+  let mut xml_header_field = None;
   let mut mc_ignorable_field = None;
 
   for field in &fields.named {
@@ -974,8 +971,8 @@ fn expand_named_struct(
       xmlns_fields.push(field_ident.clone());
       continue;
     }
-    if field_ident == "xml_header_standalone" {
-      xml_header_standalone_field = Some(field_ident.clone());
+    if field_ident == "xml_header" {
+      xml_header_field = Some(field_ident.clone());
       continue;
     }
     if is_mc_ignorable_field(field_ident) {
@@ -1027,7 +1024,7 @@ fn expand_named_struct(
   }
 
   let has_xmlns_fields = !xmlns_fields.is_empty();
-  let has_xml_header_field = xml_header_standalone_field.is_some();
+  let has_xml_header_field = xml_header_field.is_some();
   let has_mc_ignorable_field = mc_ignorable_field.is_some();
 
   let mut attr_decl_tokens = Vec::new();
@@ -1162,8 +1159,14 @@ fn expand_named_struct(
         },
       }
     };
-  let xml_header_decl_tokens = quote! {
-    let mut __sdk_xml_header_standalone = None;
+  let xml_header_decl_tokens = if has_xml_header_field {
+    quote! {
+      let mut xml_header_state = crate::common::XmlHeaderType::default();
+    }
+  } else {
+    quote! {
+      let mut xml_header_state = crate::common::XmlHeaderType::None;
+    }
   };
   let mut child_decl_tokens = Vec::new();
   let mut child_parse_tokens = Vec::new();
@@ -1728,37 +1731,22 @@ fn expand_named_struct(
   };
   let xml_header_init_tokens = if has_xml_header_field {
     quote! {
-      xml_header_standalone: __sdk_xml_header_standalone,
+      xml_header: xml_header_state,
     }
   } else {
     quote! {}
   };
   let xml_header_tokens = if has_xml_header_field {
-    let default_header_tokens = if has_xml_header_standalone {
-      quote! { Some(true) }
-    } else if has_xml_header_plain || has_xml_header {
-      quote! { Some(false) }
-    } else {
-      quote! { None }
-    };
     quote! {
-      match self.xml_header_standalone.or(#default_header_tokens) {
-        Some(true) => {
+      match self.xml_header {
+        crate::common::XmlHeaderType::Standalone => {
           writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
         }
-        Some(false) => {
+        crate::common::XmlHeaderType::Plain => {
           writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
         }
-        None => {}
+        crate::common::XmlHeaderType::None => {}
       }
-    }
-  } else if has_xml_header_standalone {
-    quote! {
-      writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
-    }
-  } else if has_xml_header_plain || has_xml_header {
-    quote! {
-      writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
     }
   } else {
     quote! {}
@@ -1816,10 +1804,14 @@ fn expand_named_struct(
             match xml_reader.next()? {
               quick_xml::events::Event::Decl(e) => {
                 if #has_xml_header_field {
-                  __sdk_xml_header_standalone = Some(matches!(
+                  xml_header_state = if matches!(
                     e.standalone(),
                     Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-                  ));
+                  ) {
+                    crate::common::XmlHeaderType::Standalone
+                  } else {
+                    crate::common::XmlHeaderType::Plain
+                  };
                 }
               }
               quick_xml::events::Event::Start(e) => break (e, false),
@@ -1855,10 +1847,14 @@ fn expand_named_struct(
             match xml_reader.next()? {
               quick_xml::events::Event::Decl(e) => {
                 if #has_xml_header_field {
-                  __sdk_xml_header_standalone = Some(matches!(
+                  xml_header_state = if matches!(
                     e.standalone(),
                     Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-                  ));
+                  ) {
+                    crate::common::XmlHeaderType::Standalone
+                  } else {
+                    crate::common::XmlHeaderType::Plain
+                  };
                 }
               }
               quick_xml::events::Event::Start(e) => {

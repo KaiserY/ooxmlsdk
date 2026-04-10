@@ -63,6 +63,43 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
       }
       CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
+      CompatibilityAction::AlternateContentChoice => {}
+      CompatibilityAction::AddAttribute {
+        q_name,
+        r#type,
+        property_comments,
+        ..
+      } => {
+        if q_name.is_empty() {
+          return Err(
+            format!(
+              "compatibility rule {}.{}.{} AddAttribute QName cannot be empty",
+              rule.schema, rule.type_name, rule.field
+            )
+            .into(),
+          );
+        }
+
+        if r#type.is_empty() {
+          return Err(
+            format!(
+              "compatibility rule {}.{}.{} AddAttribute type cannot be empty",
+              rule.schema, rule.type_name, rule.field
+            )
+            .into(),
+          );
+        }
+
+        if property_comments.is_empty() {
+          return Err(
+            format!(
+              "compatibility rule {}.{}.{} AddAttribute property comments cannot be empty",
+              rule.schema, rule.type_name, rule.field
+            )
+            .into(),
+          );
+        }
+      }
       CompatibilityAction::MapAttributeValue { mappings } => {
         if mappings.is_empty() {
           return Err(
@@ -339,6 +376,20 @@ pub fn text_choice_rule_for_field<'a>(
   })
 }
 
+pub fn alternate_content_choice_rule_for_field<'a>(
+  compatibility_rules: &'a [CompatibilityRule],
+  schema: &str,
+  type_name: &str,
+  field: &str,
+) -> Option<&'a CompatibilityRule> {
+  compatibility_rules.iter().find(|rule| {
+    rule.schema == schema
+      && rule.type_name == type_name
+      && rule.field == field
+      && matches!(rule.action, CompatibilityAction::AlternateContentChoice)
+  })
+}
+
 fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Result<()> {
   let schema_index = sdk_data_schemas
     .iter()
@@ -400,6 +451,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       let schema = &mut sdk_data_schemas[schema_index];
       schema.types[schema_type_index].collection_sequence_root = true;
     }
+    CompatibilityAction::AlternateContentChoice => {}
     CompatibilityAction::MapAttributeValue { .. } => {
       if attribute_index.is_none() {
         return Err(
@@ -410,6 +462,47 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
           .into(),
         );
       }
+    }
+    CompatibilityAction::AddAttribute {
+      q_name,
+      r#type,
+      property_comments,
+      required,
+    } => {
+      let schema = &mut sdk_data_schemas[schema_index];
+      let schema_type = &mut schema.types[schema_type_index];
+
+      if schema_type
+        .attributes
+        .iter()
+        .any(|attr| attr.q_name == *q_name || attr.property_name == rule.field)
+      {
+        return Ok(());
+      }
+
+      schema_type
+        .attributes
+        .push(crate::sdk_data::sdk_data_model::SchemaTypeAttribute {
+          q_name: q_name.clone(),
+          property_name: rule.field.clone(),
+          r#type: r#type.clone(),
+          property_comments: property_comments.clone(),
+          version: "Office2007".to_string(),
+          validators: if *required {
+            vec![
+              crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidator {
+                name: "RequiredValidator".to_string(),
+                is_list: false,
+                r#type: String::new(),
+                union_id: 0,
+                is_initial_version: false,
+                arguments: Vec::new(),
+              },
+            ]
+          } else {
+            Vec::new()
+          },
+        });
     }
     CompatibilityAction::PreserveNamespaceDecls => {
       let schema = &mut sdk_data_schemas[schema_index];

@@ -1618,37 +1618,75 @@ fn expand_named_struct(
       }
     }
   };
-  let text_write_tokens = if let Some(text_field) = &text_field {
-    let field_ident = &text_field.ident;
-    if text_field.optional {
-      quote! {
-        if let Some(value) = &self.#field_ident {
-          crate::common::write_escaped_text(writer, value)?;
+  let mut ordered_write_tokens = Vec::new();
+  for field in &fields.named {
+    let field_ident = field
+      .ident
+      .as_ref()
+      .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
+    match parse_sdk_type_field_kind(&field.attrs)? {
+      Some(SdkTypeFieldKind::Child { .. }) => {
+        let repeated = contains_vec_type(&field.ty);
+        let optional = is_option_type(&field.ty);
+        if repeated {
+          ordered_write_tokens.push(quote! {
+            for child in &self.#field_ident {
+              child.write_xml(writer, xmlns_prefix)?;
+            }
+          });
+        } else if optional {
+          ordered_write_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              child.write_xml(writer, xmlns_prefix)?;
+            }
+          });
+        } else {
+          ordered_write_tokens.push(quote! {
+            self.#field_ident.write_xml(writer, xmlns_prefix)?;
+          });
         }
       }
-    } else {
-      quote! {
-        crate::common::write_escaped_text(writer, &self.#field_ident)?;
-      }
-    }
-  } else {
-    quote! {}
-  };
-  let mut body_write_tokens = Vec::new();
-  let mut child_write_idx = 0usize;
-  let mut choice_write_idx = 0usize;
-  for field in &fields.named {
-    match parse_sdk_type_field_kind(&field.attrs)? {
-      Some(SdkTypeFieldKind::Child { .. }) | Some(SdkTypeFieldKind::TextChild { .. }) => {
-        body_write_tokens.push(child_write_tokens[child_write_idx].clone());
-        child_write_idx += 1;
+      Some(SdkTypeFieldKind::TextChild { qname }) => {
+        ordered_write_tokens.push(build_text_child_write_tokens(
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          is_option_type(&field.ty),
+        ));
       }
       Some(SdkTypeFieldKind::Choice) => {
-        body_write_tokens.push(choice_write_tokens[choice_write_idx].clone());
-        choice_write_idx += 1;
+        let repeated = contains_vec_type(&field.ty);
+        let optional = is_option_type(&field.ty);
+        if repeated {
+          ordered_write_tokens.push(quote! {
+            for choice in &self.#field_ident {
+              choice.write_xml(writer, xmlns_prefix)?;
+            }
+          });
+        } else if optional {
+          ordered_write_tokens.push(quote! {
+            if let Some(choice) = &self.#field_ident {
+              choice.write_xml(writer, xmlns_prefix)?;
+            }
+          });
+        } else {
+          ordered_write_tokens.push(quote! {
+            self.#field_ident.write_xml(writer, xmlns_prefix)?;
+          });
+        }
       }
       Some(SdkTypeFieldKind::Text) => {
-        body_write_tokens.push(text_write_tokens.clone());
+        if is_option_type(&field.ty) {
+          ordered_write_tokens.push(quote! {
+            if let Some(value) = &self.#field_ident {
+              crate::common::write_escaped_text(writer, value)?;
+            }
+          });
+        } else {
+          ordered_write_tokens.push(quote! {
+            crate::common::write_escaped_text(writer, &self.#field_ident)?;
+          });
+        }
       }
       Some(SdkTypeFieldKind::Attr { .. }) | None => {}
     }
@@ -1940,7 +1978,7 @@ fn expand_named_struct(
         #( #attr_write_tokens )*
         if #has_body {
           writer.write_char('>')?;
-          #( #body_write_tokens )*
+          #( #ordered_write_tokens )*
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {
           writer.write_str("/>")?;

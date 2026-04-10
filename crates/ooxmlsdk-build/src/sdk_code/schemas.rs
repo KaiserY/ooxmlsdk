@@ -14,7 +14,10 @@ use crate::sdk_code::helpers::{
   structure_one_sequence_particles, supports_compat_xmlns_fields,
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
-use crate::sdk_data::compatibility::{text_choice_rule_for_field, treat_as_string_rule_for_field};
+use crate::sdk_data::compatibility::{
+  alternate_content_choice_rule_for_field, text_choice_rule_for_field,
+  treat_as_string_rule_for_field,
+};
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
   SchemaTypeCompositeKind, SchemaTypeParticle,
@@ -1387,6 +1390,29 @@ fn can_alias_leaf_text_wrapper(schema_type: &SchemaType) -> bool {
     && !needs_xml_header(schema_type)
 }
 
+fn chart_space_mc_alternate_content_choice(
+  compatibility_rules: &[CompatibilityRule],
+  schema: &Schema,
+  schema_type: &SchemaType,
+  choice_field_name: &str,
+  choice_particle: &SchemaTypeParticle,
+) -> bool {
+  alternate_content_choice_rule_for_field(
+    compatibility_rules,
+    &schema.module_name,
+    &schema_type.class_name,
+    choice_field_name,
+  )
+  .is_some()
+    && schema_type.composite_kind == SchemaTypeCompositeKind::OneSequence
+    && choice_particle.kind == "Choice"
+    && choice_particle
+      .occurs
+      .first()
+      .is_some_and(|occur| occur.max == 1)
+    && choice_particle.items.len() == 2
+}
+
 fn can_inline_text_child(schema_type: &SchemaType) -> bool {
   can_alias_leaf_text_wrapper(schema_type)
 }
@@ -1592,6 +1618,20 @@ fn gen_one_sequence_fields(
             .collect::<Vec<_>>(),
         );
         let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+        if chart_space_mc_alternate_content_choice(
+          compatibility_rules,
+          schema,
+          schema_type,
+          &choice.field_name,
+          choice_particle,
+        ) {
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[doc = " Preserves the mc:AlternateContent wrapper for the chartSpace alternate style choice."]
+            #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+            pub mc_alternate_content: Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>>,
+          });
+        }
         let sdk_choice_attrs = quote! {
           #[sdk(choice)]
         };

@@ -183,6 +183,30 @@
       "Action": "TextChoice"
     },
     {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "ParagraphProperties",
+      "Field": "mc_preserve_attributes",
+      "Action": {
+        "AddAttribute": {
+          "QName": "mc:PreserveAttributes",
+          "Type": "StringValue",
+          "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors."
+        }
+      }
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
+      "Type": "Run",
+      "Field": "mc_preserve_attributes",
+      "Action": {
+        "AddAttribute": {
+          "QName": "mc:PreserveAttributes",
+          "Type": "StringValue",
+          "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors."
+        }
+      }
+    },
+    {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_main",
       "Type": "TextCharacterPropertiesType",
       "Field": "Baseline",
@@ -356,6 +380,30 @@
       "Type": "StylesheetExtension",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "PivotCacheDefinitionExtension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "PivotTableDefinitionExtension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
+      "Type": "ChartSpaceExtension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
+      "Type": "ChartSpace",
+      "Field": "chart_space_choice",
+      "Action": "AlternateContentChoice"
     },
     {
       "Schema": "schemas_microsoft_com_office_powerpoint_2010_main",

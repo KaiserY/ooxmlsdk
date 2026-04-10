@@ -100,6 +100,7 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "Document.dotx"
       | "Spreadsheet.xltx"
       | "Products.xlsx"
+      | "extlst.xlsx"
       | "vmldrawingroot.xlsx"
       | "DocProps.docx"
       | "EmptyRelationshipElement.docx"
@@ -116,7 +117,6 @@ fn is_valid_open_only(file_name: &str) -> bool {
     file_name,
     "Algn_tab_TabAlignment.pptx"
       | "MCExecl.xlsx"
-      | "extlst.xlsx"
       | "Of16-10-SymEx.docx"
       | "3dtestdash.pptx"
       | "Complex01.docx"

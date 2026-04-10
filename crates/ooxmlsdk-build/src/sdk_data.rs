@@ -10,10 +10,11 @@ pub mod open_xml;
 pub mod parts;
 pub mod schemas;
 pub mod sdk_data_model;
+pub mod xsd;
 
 use crate::Result;
 use crate::sdk_data::{
-  context::Context, mce::gen_mc_schema, opc_schemas::read_opc_schemas, parts::gen_parts,
+  context::Context, mce::gen_mc_schema_from_xsd, opc_schemas::read_opc_schemas, parts::gen_parts,
   schemas::gen_schemas,
 };
 
@@ -23,7 +24,14 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   package_schemas_dir: Q,
 ) -> Result<()> {
   let mut gen_context = Context::new(data_dir.as_ref())?;
-  gen_context.schemas.push(gen_mc_schema());
+  let mc_schema_dir = package_schemas_dir
+    .as_ref()
+    .parent()
+    .map(|path| path.join("mce"))
+    .ok_or_else(|| "failed to resolve schemas/mce directory".to_string())?;
+  if let Some(mc_schema) = gen_mc_schema_from_xsd(&mc_schema_dir)? {
+    gen_context.schemas.push(mc_schema);
+  }
   gen_context
     .schemas
     .sort_by(|left, right| left.module_name.cmp(&right.module_name));

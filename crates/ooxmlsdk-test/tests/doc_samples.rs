@@ -58,7 +58,7 @@ fn assert_doc_sample_round_trip(file_name: &str) {
   }
 }
 
-fn assert_doc_sample_open_failure(file_name: &str) {
+fn assert_doc_sample_invalid(file_name: &str) {
   let kind = doc_sample_kind(file_name);
   let path = test_file_path(file_name);
 
@@ -70,7 +70,7 @@ fn assert_doc_sample_open_failure(file_name: &str) {
 
   assert!(
     result.is_err(),
-    "expected {file_name} to fail opening so we can keep it out of round-trip coverage"
+    "expected {file_name} to be invalid so we can keep it out of round-trip coverage"
   );
 }
 

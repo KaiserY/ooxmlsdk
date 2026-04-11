@@ -455,6 +455,48 @@
     },
     {
       "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "Table",
+      "Field": "xr:uid",
+      "Action": {
+        "AddAttribute": {
+          "QName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID."
+        }
+      }
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "AutoFilter",
+      "Field": "xr:uid",
+      "Action": {
+        "AddAttribute": {
+          "QName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID."
+        }
+      }
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "TableColumn",
+      "Field": "xr3:uid",
+      "Action": {
+        "AddAttribute": {
+          "QName": "xr3:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID."
+        }
+      }
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
+      "Type": "TableExtension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",
       "Type": "Workbook",
       "Field": "x15ac:CT_AbsolutePath/x15ac:absPath",
       "Action": "AlternateContentChoice"
@@ -568,6 +610,12 @@
       "Action": "PreserveNamespaceDecls"
     },
     {
+      "Schema": "schemas_microsoft_com_office_drawing_2014_chart",
+      "Type": "*",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
       "Schema": "schemas_microsoft_com_office_spreadsheetml_2010_11_ac",
       "Type": "AbsolutePath",
       "Field": "xmlns_map",
@@ -576,6 +624,12 @@
     {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
       "Type": "Extension",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
+      "Type": "RadarSerExtension",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
     },
@@ -672,6 +726,12 @@
     {
       "Schema": "schemas_openxmlformats_org_drawingml_2006_chart",
       "Type": "ChartReference",
+      "Field": "xmlns_map",
+      "Action": "PreserveNamespaceDecls"
+    },
+    {
+      "Schema": "schemas_openxmlformats_org_drawingml_2006_chart_drawing",
+      "Type": "*",
       "Field": "xmlns_map",
       "Action": "PreserveNamespaceDecls"
     },

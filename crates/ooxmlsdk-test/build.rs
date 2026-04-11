@@ -25,12 +25,12 @@ fn main() {
     let test_name = format!("doc_sample_{slug}");
     let strict_only = matches!(file_name.as_str(), "Strict01.docx" | "AnnotationRef.docx");
 
-    if is_open_failure(&file_name) {
+    if is_invalid(&file_name) {
       if strict_only {
         generated.push_str("#[cfg(feature = \"strict\")]\n");
       }
       generated.push_str(&format!(
-        "#[test]\nfn open_failure_{test_name}() {{\n  assert_doc_sample_open_failure({file_name:?});\n}}\n\n"
+        "#[test]\nfn invalid_{test_name}() {{\n  assert_doc_sample_invalid({file_name:?});\n}}\n\n"
       ));
       continue;
     }
@@ -70,7 +70,7 @@ fn main() {
   fs::write(out_file, generated).expect("write generated doc sample tests");
 }
 
-fn is_open_failure(file_name: &str) -> bool {
+fn is_invalid(file_name: &str) -> bool {
   matches!(
     file_name,
     "5Errors.docx"
@@ -110,6 +110,9 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "Products.xlsx"
       | "extlst.xlsx"
       | "vmldrawingroot.xlsx"
+      | "malformed_uri.xlsx"
+      | "3dtestdash.pptx"
+      | "3dtestdot.pptx"
       | "DocProps.docx"
       | "EmptyRelationshipElement.docx"
       | "InvalidDocPropsct.docx"
@@ -118,6 +121,8 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "Revision_NameCommentChange.xlsx"
       | "Plain.docx"
       | "Algn_tab_TabAlignment.pptx"
+      | "Of16-08.docx"
+      | "Dickinson_Sample_Slides.pptx"
       | "basicspreadsheet.xlsx"
       | "simpleSdt.docx"
       | "Spreadsheet.xlsx"
@@ -127,17 +132,13 @@ fn is_round_trip_supported(file_name: &str) -> bool {
 fn is_valid_open_only(file_name: &str) -> bool {
   matches!(
     file_name,
-    "MCExecl.xlsx"
-      | "3dtestdash.pptx"
-      | "Complex01.docx"
-      | "3dtestdot.pptx"
+    "Complex01.docx"
       | "Complex01.xlsx"
-      | "Dickinson_Sample_Slides.pptx"
-      | "Of16-08.docx"
       | "o09_Performance_typical.pptx"
       | "May_12_04.docx"
-      | "malformed_uri.xlsx"
       | "malformed_uri_long.xlsx"
+      | "MCExecl.xlsx"
+      | "mcdoc.docx"
       | "missingcalcchainpart.xlsx"
   )
 }

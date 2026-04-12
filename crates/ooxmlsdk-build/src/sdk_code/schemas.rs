@@ -14,7 +14,6 @@ use crate::sdk_code::helpers::{
   structure_one_sequence_particles,
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
-use crate::sdk_data::compatibility::text_choice_rule_for_field;
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
   SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
@@ -259,7 +258,17 @@ impl<'a> CodegenContext<'a> {
     let mut variants = Vec::new();
 
     for child in &choice_child.children {
-      variants.push(self.resolve_one_sequence_child(schema_type, child.name.as_str())?);
+      if child.kind == SchemaTypeChildKind::TextChild && child.name.is_empty() {
+        variants.push(ResolvedOneSequenceChild {
+          name: "",
+          field_name: Cow::Borrowed("Text"),
+          property_comments: Cow::Borrowed(" _"),
+          version: child.initial_version.as_str(),
+          kind: child.kind,
+        });
+      } else {
+        variants.push(self.resolve_one_sequence_child(schema_type, child.name.as_str())?);
+      }
     }
 
     let field_name = one_sequence_choice_field_name(schema_type, choice_slot_count, slot_index);
@@ -268,7 +277,7 @@ impl<'a> CodegenContext<'a> {
       "Choice of {}",
       variants
         .iter()
-        .map(|child| child.name.split('/').nth(1).unwrap_or(child.name))
+        .map(choice_child_display_name)
         .collect::<Vec<_>>()
         .join(", ")
     );
@@ -450,6 +459,24 @@ impl<'a> CodegenContext<'a> {
     resolved: &mut Vec<ResolvedCompositeChild<'a>>,
     resolved_names: &mut std::collections::HashSet<String>,
   ) -> Result<()> {
+    if child.kind == SchemaTypeChildKind::TextChild && child.name.is_empty() {
+      resolved.push(ResolvedCompositeChild {
+        name: "",
+        variant_name: Cow::Borrowed(if child.property_name.is_empty() {
+          "Text"
+        } else {
+          child.property_name.as_str()
+        }),
+        version: child.initial_version.as_str(),
+        is_any: false,
+        kind: child.kind,
+        repeated: child.repeated,
+        children: Vec::new(),
+      });
+
+      return Ok(());
+    }
+
     if !child.name.is_empty() && !resolved_names.insert(child.name.clone()) {
       return Ok(());
     }
@@ -1543,20 +1570,6 @@ fn gen_children(
     });
   }
 
-  if text_choice_rule_for_field(
-    compatibility_rules,
-    &schema.module_name,
-    &schema_type.class_name,
-    &choice_field_name,
-  )
-  .is_some()
-  {
-    variants.push(quote! {
-      #[sdk(text)]
-      Text(crate::simple_type::StringValue),
-    });
-  }
-
   let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
   let enum_tokens = quote! {
     #( #enum_attrs )*
@@ -1723,6 +1736,22 @@ fn child_field_name(child: &SchemaTypeChild, _child_type: &SchemaType) -> String
   escape_snake_case(raw_name.to_snake_case())
 }
 
+fn choice_child_display_name<'a>(child: &'a ResolvedOneSequenceChild<'a>) -> &'a str {
+  if child.name.is_empty() {
+    child.field_name.as_ref()
+  } else {
+    child.name.split('/').nth(1).unwrap_or(child.name)
+  }
+}
+
+fn composite_choice_display_name<'a>(child: &'a ResolvedCompositeChild<'a>) -> &'a str {
+  if child.name.is_empty() {
+    child.variant_name.as_ref()
+  } else {
+    child.name.split('/').nth(1).unwrap_or(child.name)
+  }
+}
+
 fn leaf_text_wrapper_alias_type(
   child_name: &str,
   schema: &Schema,
@@ -1841,6 +1870,14 @@ fn choice_child_variant_shape(
 ) -> Result<(TokenStream, Type, bool)> {
   let child_qname = child.name;
 
+  if child.kind == SchemaTypeChildKind::TextChild && child.name.is_empty() {
+    return Ok((
+      quote! { #[sdk(text)] },
+      parse_str("crate::simple_type::StringValue")?,
+      false,
+    ));
+  }
+
   if child.kind == SchemaTypeChildKind::Any {
     return Ok((quote! { #[sdk(any)] }, parse_str("String")?, true));
   }
@@ -1877,7 +1914,7 @@ fn choice_child_variant_shape(
 fn gen_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
+  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -2003,9 +2040,9 @@ fn gen_one_sequence_fields(
         let mut default_variant = None;
 
         for variant in &choice.variants {
-          let variant_type = one_sequence_child_variant_type(variant, schema, context)?;
+          let (sdk_variant_attrs, variant_type, wrap_box) =
+            choice_child_variant_shape(variant, schema, context)?;
           let variant_ident: Ident = parse_str(&variant.field_name.to_upper_camel_case())?;
-          let child_qname = variant.name;
           let variant_attrs = module_version_cfg_attrs(variant.version, variant_cfg);
           if default_variant.is_none()
             && (choice_version == variant.version
@@ -2013,35 +2050,27 @@ fn gen_one_sequence_fields(
           {
             default_variant = Some((variant_ident.clone(), variant_type.clone()));
           }
-          let sdk_variant_attrs = quote! {
-            #[sdk(child(qname = #child_qname))]
+          let variant_tokens = if wrap_box {
+            quote! {
+              #( #variant_attrs )*
+              #sdk_variant_attrs
+              #variant_ident(std::boxed::Box<#variant_type>),
+            }
+          } else {
+            quote! {
+              #( #variant_attrs )*
+              #sdk_variant_attrs
+              #variant_ident(#variant_type),
+            }
           };
-
-          variants.push(quote! {
-            #( #variant_attrs )*
-            #sdk_variant_attrs
-            #variant_ident(std::boxed::Box<#variant_type>),
-          });
-        }
-
-        if text_choice_rule_for_field(
-          compatibility_rules,
-          &schema.module_name,
-          &schema_type.class_name,
-          &choice.field_name,
-        )
-        .is_some()
-        {
-          variants.push(quote! {
-            #[sdk(text)]
-            Text(crate::simple_type::StringValue),
-          });
+          variants.push(variant_tokens);
         }
 
         let default_variant_ident = default_variant
           .or_else(|| {
             choice.variants.first().and_then(|variant| {
-              let variant_type = one_sequence_child_variant_type(variant, schema, context).ok()?;
+              let (_, variant_type, _) =
+                choice_child_variant_shape(variant, schema, context).ok()?;
               let variant_ident =
                 parse_str::<Ident>(&variant.field_name.to_upper_camel_case()).ok()?;
               Some((variant_ident, variant_type))
@@ -2093,7 +2122,7 @@ fn gen_one_sequence_fields(
 fn gen_structured_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
+  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -2304,20 +2333,6 @@ fn gen_structured_one_sequence_fields(
               });
             }
           }
-        }
-
-        if text_choice_rule_for_field(
-          compatibility_rules,
-          &schema.module_name,
-          &schema_type.class_name,
-          &choice.field_name,
-        )
-        .is_some()
-        {
-          variants.push(quote! {
-            #[sdk(text)]
-            Text(crate::simple_type::StringValue),
-          });
         }
 
         let (default_variant_ident, _default_variant_type) = default_variant
@@ -2628,7 +2643,7 @@ fn build_direct_child_field_token(
 fn gen_mixed_choice_children_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
+  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -2805,20 +2820,6 @@ fn gen_mixed_choice_children_fields(
     }
   }
 
-  if text_choice_rule_for_field(
-    compatibility_rules,
-    &schema.module_name,
-    &schema_type.class_name,
-    &choice_field_name,
-  )
-  .is_some()
-  {
-    variants.push(quote! {
-      #[sdk(text)]
-      Text(crate::simple_type::StringValue),
-    });
-  }
-
   let default_variant_ident = default_variant
     .or_else(|| {
       choice_variants.first().and_then(|child| match child.kind {
@@ -2864,12 +2865,7 @@ fn gen_mixed_choice_children_fields(
               .join(", ")
           )
         }
-        _ => child
-          .name
-          .split('/')
-          .nth(1)
-          .unwrap_or(child.name)
-          .to_string(),
+        _ => composite_choice_display_name(child).to_string(),
       })
       .collect::<Vec<_>>()
       .join(", ");
@@ -3063,8 +3059,14 @@ fn gen_root_all_fields(
       version_cfg,
     );
 
-    let repeated = particle.occurs.first().is_some_and(|occur| occur.max != 1);
-    let optional = particle.occurs.first().is_some_and(|occur| occur.min == 0);
+    let repeated = particle
+      .occurs
+      .first()
+      .is_some_and(|occur| occur.max.is_none() || occur.max.is_some_and(|max| max > 1));
+    let optional = particle
+      .occurs
+      .first()
+      .is_some_and(|occur| occur.min.is_none() || occur.min == Some(0));
 
     if repeated {
       fields.push(quote! {
@@ -3241,8 +3243,8 @@ mod tests {
           SchemaTypeParticle {
             name: "w:CT_String/w:name".to_string(),
             occurs: vec![SchemaTypeParticleOccur {
-              min: 0,
-              max: 1,
+              min: Some(0),
+              max: Some(1),
               ..Default::default()
             }],
             ..Default::default()
@@ -3250,8 +3252,8 @@ mod tests {
           SchemaTypeParticle {
             name: "w:CT_String/w:mappedName".to_string(),
             occurs: vec![SchemaTypeParticleOccur {
-              min: 0,
-              max: 1,
+              min: Some(0),
+              max: Some(1),
               ..Default::default()
             }],
             ..Default::default()

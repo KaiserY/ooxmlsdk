@@ -131,6 +131,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               false,
             );
           }
+          mark_sequence_collection_children_repeated(ty, &mut children);
           mark_mixed_sequence_direct_children_optional(&mut children);
 
           let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
@@ -173,7 +174,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               .collect(),
             children,
             particle: gen_particle(&ty.particle),
-            collection_sequence_root: false,
           }
         })
         .collect(),
@@ -406,14 +406,25 @@ fn schema_child_from_particle(
         });
       (fallback_name, String::new())
     });
+  let is_collection_wrapper = kind == SchemaTypeChildKind::Child
+    && property_name.is_empty()
+    && particle.kind == "Sequence"
+    && particle.items.len() == 1;
 
   Some(SchemaTypeChild {
     name: particle.name.clone(),
     property_name,
     property_comments,
     kind,
-    optional: particle.occurs.first().is_some_and(|occur| occur.min == 0),
-    repeated: particle.occurs.first().is_some_and(|occur| occur.max != 1),
+    optional: particle
+      .occurs
+      .first()
+      .is_some_and(|occur| occur.min.is_none() || occur.min == Some(0)),
+    repeated: particle
+      .occurs
+      .first()
+      .is_some_and(|occur| occur.max.is_none() || occur.max.is_some_and(|max| max > 1))
+      || is_collection_wrapper,
     initial_version: particle.initial_version.clone(),
     children: Vec::new(),
   })
@@ -424,10 +435,29 @@ fn particle_cardinality(
 ) -> (bool, bool, String) {
   let occurs = particle.occurs.first();
   (
-    occurs.is_some_and(|occur| occur.min == 0),
-    occurs.is_some_and(|occur| occur.max != 1),
+    occurs.is_some_and(|occur| occur.min.is_none() || occur.min == Some(0)),
+    occurs.is_some_and(|occur| occur.max.is_none() || occur.max.is_some_and(|max| max > 1)),
     particle.initial_version.clone(),
   )
+}
+
+fn mark_sequence_collection_children_repeated(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  children: &mut [SchemaTypeChild],
+) {
+  if schema_type.composite_type != "SdkSequence"
+    || schema_type.children.len() != 1
+    || children.len() != 1
+    || !children[0].property_name.is_empty()
+    || !matches!(
+      children[0].kind,
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+    )
+  {
+    return;
+  }
+
+  children[0].repeated = true;
 }
 
 fn mark_mixed_sequence_direct_children_optional(children: &mut [SchemaTypeChild]) {

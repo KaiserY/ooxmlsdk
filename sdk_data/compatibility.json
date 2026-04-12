@@ -94,24 +94,6 @@
     },
     {
       "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
-      "Type": "Footnotes",
-      "Field": "collection_sequence_root",
-      "Action": "CollectionSequenceRoot"
-    },
-    {
-      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
-      "Type": "Endnotes",
-      "Field": "collection_sequence_root",
-      "Action": "CollectionSequenceRoot"
-    },
-    {
-      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
-      "Type": "Run",
-      "Field": "run_choice",
-      "Action": "TextChoice"
-    },
-    {
-      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
       "Type": "ConditionalFormatStyle",
       "Field": "Val",
       "Action": {
@@ -194,12 +176,6 @@
       "Type": "Run",
       "Field": "w:CT_Drawing/w:drawing",
       "Action": "AlternateContentChoice"
-    },
-    {
-      "Schema": "schemas_openxmlformats_org_wordprocessingml_2006_main",
-      "Type": "Run",
-      "Field": "w16se:CT_SymEx/w16se:symEx",
-      "Action": "ExtraChild"
     },
     {
       "Schema": "schemas_openxmlformats_org_spreadsheetml_2006_main",

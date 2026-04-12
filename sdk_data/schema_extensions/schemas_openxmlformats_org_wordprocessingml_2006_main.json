@@ -14,6 +14,22 @@
     },
     {
       "ClassName": "Run",
+      "Children": [
+        {
+          "PropertyName": "run_choice",
+          "Kind": "Choice",
+          "Children": [
+            {
+              "Kind": "TextChild"
+            }
+          ]
+        },
+        {
+          "Name": "w16se:CT_SymEx/w16se:symEx",
+          "Kind": "Child",
+          "Optional": true
+        }
+      ],
       "Attributes": [
         {
           "QName": "mc:PreserveAttributes",

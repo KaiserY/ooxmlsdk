@@ -56,10 +56,6 @@ pub fn has_mce_fields(schema_type: &SchemaType) -> bool {
   schema_type.has_mc_ignorable_field
 }
 
-pub fn is_collection_sequence_root(schema_type: &SchemaType) -> bool {
-  schema_type.collection_sequence_root
-}
-
 fn supports_extended_sequence_strategy(schema_type: &SchemaType) -> bool {
   matches!(
     schema_type.composite_kind,
@@ -139,10 +135,9 @@ pub enum StructuredChoiceVariant<'a> {
 
 pub fn flatten_one_sequence_particles(schema_type: &SchemaType) -> Vec<FlatParticle<'_>> {
   let mut flat_particles = Vec::new();
-  let parent_repeated = is_collection_sequence_root(schema_type);
 
   for child in &schema_type.children {
-    flatten_one_sequence_child(child, false, parent_repeated, "", &mut flat_particles);
+    flatten_one_sequence_child(child, false, false, "", &mut flat_particles);
   }
 
   flat_particles
@@ -164,10 +159,9 @@ pub fn is_one_sequence_structurable(schema_type: &SchemaType) -> bool {
 
 pub fn structure_one_sequence_particles(schema_type: &SchemaType) -> Vec<StructuredParticle<'_>> {
   let mut particles = Vec::new();
-  let parent_repeated = is_collection_sequence_root(schema_type);
 
   for child in &schema_type.children {
-    structure_one_sequence_child(child, false, parent_repeated, "", &mut particles);
+    structure_one_sequence_child(child, false, false, "", &mut particles);
   }
 
   particles

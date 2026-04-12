@@ -39,7 +39,6 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
     match &rule.action {
       CompatibilityAction::FallbackToRawXml => {}
       CompatibilityAction::TextChoice => {}
-      CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
       CompatibilityAction::AlternateContentChoice => {}
       CompatibilityAction::MapAttributeValue { mappings } => {
@@ -340,10 +339,6 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         child.property_name = rule.field.clone();
       }
     }
-    CompatibilityAction::CollectionSequenceRoot => {
-      let schema = &mut sdk_data_schemas[schema_index];
-      schema.types[schema_type_index].collection_sequence_root = true;
-    }
     CompatibilityAction::AlternateContentChoice => {
       let schema = &mut sdk_data_schemas[schema_index];
       let schema_type = &mut schema.types[schema_type_index];
@@ -409,8 +404,8 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
             kind: String::new(),
             name: child_name_for_particle,
             occurs: vec![SchemaTypeParticleOccur {
-              max: 1,
-              min: 0,
+              max: Some(1),
+              min: Some(0),
               version: String::new(),
             }],
             items: vec![],
@@ -563,31 +558,6 @@ mod tests {
       schemas[0].types[0].particle.items[0].name,
       "w14:CT_Ligatures/w14:ligatures"
     );
-  }
-
-  #[test]
-  fn collection_sequence_root_marks_schema_type() {
-    let mut schemas = vec![Schema {
-      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
-      types: vec![SchemaType {
-        class_name: "Footnotes".to_string(),
-        ..Default::default()
-      }],
-      ..Default::default()
-    }];
-
-    let compatibility = CompatibilityConfig {
-      rules: vec![CompatibilityRule {
-        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
-        type_name: "Footnotes".to_string(),
-        field: "collection_sequence_root".to_string(),
-        action: CompatibilityAction::CollectionSequenceRoot,
-      }],
-    };
-
-    apply_compatibility(&mut schemas, &compatibility).unwrap();
-
-    assert!(schemas[0].types[0].collection_sequence_root);
   }
 
   #[test]

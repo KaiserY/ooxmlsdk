@@ -104,8 +104,8 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
             kind: String::new(),
             name: "CT_Relationship/Relationship".to_string(),
             occurs: vec![SchemaTypeParticleOccur {
-              min: 0,
-              max: u64::MAX,
+              min: Some(0),
+              max: Some(u64::MAX),
               version: String::new(),
             }],
             items: Vec::new(),
@@ -113,7 +113,6 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           }],
           initial_version: String::new(),
         },
-        collection_sequence_root: false,
       },
       SchemaType {
         name: "CT_Relationship/Relationship".to_string(),
@@ -148,7 +147,6 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           .collect(),
         children: Vec::new(),
         particle: SchemaTypeParticle::default(),
-        collection_sequence_root: false,
       },
     ],
     enums: vec![SchemaEnum {
@@ -226,8 +224,8 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
           kind: "Choice".to_string(),
           name: String::new(),
           occurs: vec![SchemaTypeParticleOccur {
-            min: 0,
-            max: u64::MAX,
+            min: Some(0),
+            max: Some(u64::MAX),
             version: String::new(),
           }],
           items: types
@@ -237,8 +235,8 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
               kind: String::new(),
               name: content_types_child_type_name(child.q_name.as_str()),
               occurs: vec![SchemaTypeParticleOccur {
-                min: 1,
-                max: 1,
+                min: Some(1),
+                max: Some(1),
                 version: String::new(),
               }],
               items: Vec::new(),
@@ -247,7 +245,6 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
             .collect(),
           initial_version: String::new(),
         },
-        collection_sequence_root: false,
       },
       simple_leaf_type(
         "CT_Default/Default",
@@ -334,8 +331,8 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
           kind: String::new(),
           name: core_property_child_type_name(child),
           occurs: vec![SchemaTypeParticleOccur {
-            min: child.min_occurs,
-            max: child.max_occurs,
+            min: Some(child.min_occurs),
+            max: Some(child.max_occurs),
             version: String::new(),
           }],
           items: Vec::new(),
@@ -344,7 +341,6 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         .collect(),
       initial_version: String::new(),
     },
-    collection_sequence_root: false,
   }];
 
   for child in &core_properties.children {
@@ -395,8 +391,8 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
           kind: String::new(),
           name: "cp:CT_Keyword/cp:value".to_string(),
           occurs: vec![SchemaTypeParticleOccur {
-            min: child.min_occurs,
-            max: child.max_occurs,
+            min: Some(child.min_occurs),
+            max: Some(child.max_occurs),
             version: String::new(),
           }],
           items: Vec::new(),
@@ -405,7 +401,6 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         .collect(),
       initial_version: String::new(),
     },
-    collection_sequence_root: false,
   });
 
   types.push(SchemaType {
@@ -426,7 +421,6 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     attributes: keyword_attributes(&keyword.attributes),
     children: Vec::new(),
     particle: SchemaTypeParticle::default(),
-    collection_sequence_root: false,
   });
 
   Ok(Schema {
@@ -472,7 +466,6 @@ fn simple_leaf_type(
     attributes: attributes_to_schema(attributes),
     children: Vec::new(),
     particle: SchemaTypeParticle::default(),
-    collection_sequence_root: false,
   }
 }
 
@@ -511,7 +504,6 @@ fn core_property_text_type(child: &ParsedChildElement) -> SchemaType {
     attributes,
     children: Vec::new(),
     particle: SchemaTypeParticle::default(),
-    collection_sequence_root: false,
   }
 }
 

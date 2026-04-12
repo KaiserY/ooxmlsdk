@@ -126,8 +126,8 @@ pub struct OpenXmlSchemaTypeParticle {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct OpenXmlSchemaTypeParticleOccur {
-  pub max: u64,
-  pub min: u64,
+  pub max: Option<u64>,
+  pub min: Option<u64>,
   pub include_version: bool,
   pub version: String,
 }

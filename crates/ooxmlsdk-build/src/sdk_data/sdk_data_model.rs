@@ -31,7 +31,6 @@ pub enum CompatibilityAction {
   None,
   FallbackToRawXml,
   TextChoice,
-  CollectionSequenceRoot,
   ExtraChild,
   AlternateContentChoice,
   MapAttributeValue {
@@ -160,7 +159,6 @@ pub struct SchemaType {
   pub children: Vec<SchemaTypeChild>,
   #[serde(skip)]
   pub particle: SchemaTypeParticle,
-  pub collection_sequence_root: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -251,8 +249,8 @@ pub struct SchemaTypeParticle {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeParticleOccur {
-  pub max: u64,
-  pub min: u64,
+  pub max: Option<u64>,
+  pub min: Option<u64>,
   pub version: String,
 }
 

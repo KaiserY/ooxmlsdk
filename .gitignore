@@ -45,3 +45,9 @@ sdk_data/package_schemas
 
 .codex
 tmp/
+
+
+crates/ooxmlsdk/src/schemas copy
+sdk_data/schemas copy
+crates/ooxmlsdk-build/src copy
+crates/ooxmlsdk-derive/src copy

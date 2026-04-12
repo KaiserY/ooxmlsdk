@@ -416,6 +416,11 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
             qname: String::new(),
           }));
         }
+        Meta::Path(path)
+          if path.is_ident("xmlns") || path.is_ident("mce") || path.is_ident("xml_header") =>
+        {
+          continue;
+        }
         other => {
           return Err(syn::Error::new_spanned(
             other,

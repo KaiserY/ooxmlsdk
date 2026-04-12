@@ -4,8 +4,9 @@ use std::path::Path;
 
 use crate::Result;
 use crate::sdk_data::sdk_data_model::{
-  CompatibilityAction, CompatibilityConfig, CompatibilityRule, Schema, SchemaTypeApiKind,
-  SchemaTypeCompositeKind, SchemaTypeKind, SchemaTypeParticle, SchemaTypeParticleOccur,
+  CompatibilityAction, CompatibilityConfig, CompatibilityRule, Schema, SchemaType,
+  SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
+  SchemaTypeParticle, SchemaTypeParticleOccur,
 };
 
 pub fn read_compatibility(path: &Path) -> Result<CompatibilityConfig> {
@@ -45,16 +46,6 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
           return Err(
             format!(
               "compatibility rule {}.{}.{} PreserveNamespaceDecls field must be xmlns_map",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-
-        if rule.type_name.is_empty() {
-          return Err(
-            format!(
-              "compatibility rule {}.{}.{} PreserveNamespaceDecls type cannot be empty",
               rule.schema, rule.type_name, rule.field
             )
             .into(),
@@ -460,12 +451,25 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
       }
     }
     CompatibilityAction::FallbackToRawXml => {}
-    CompatibilityAction::TextChoice => {}
+    CompatibilityAction::TextChoice => {
+      let schema = &mut sdk_data_schemas[schema_index];
+      if let Some(child) = schema.types[schema_type_index]
+        .children
+        .iter_mut()
+        .find(|child| child.kind == SchemaTypeChildKind::Choice)
+      {
+        child.property_name = rule.field.clone();
+      }
+    }
     CompatibilityAction::CollectionSequenceRoot => {
       let schema = &mut sdk_data_schemas[schema_index];
       schema.types[schema_type_index].collection_sequence_root = true;
     }
-    CompatibilityAction::AlternateContentChoice => {}
+    CompatibilityAction::AlternateContentChoice => {
+      let schema = &mut sdk_data_schemas[schema_index];
+      let schema_type = &mut schema.types[schema_type_index];
+      ensure_alternate_content_child(schema_type, &rule.field);
+    }
     CompatibilityAction::MapAttributeValue { .. } => {
       if attribute_index.is_none() {
         return Err(
@@ -550,6 +554,11 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
           name: child_name,
           property_name: String::new(),
           property_comments: child_property_comments,
+          kind: SchemaTypeChildKind::Child,
+          optional: true,
+          repeated: false,
+          initial_version: String::new(),
+          children: Vec::new(),
         },
       );
 
@@ -585,10 +594,58 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
   Ok(())
 }
 
+fn ensure_alternate_content_child(schema_type: &mut SchemaType, child_qname: &str) {
+  if schema_type.children.iter().any(|child| {
+    child.name == "mc:CT_AlternateContent/mc:AlternateContent"
+      || child.property_name == "mc_alternate_content"
+  }) {
+    return;
+  }
+
+  let alternate_content_child = crate::sdk_data::sdk_data_model::SchemaTypeChild {
+    name: "mc:CT_AlternateContent/mc:AlternateContent".to_string(),
+    property_name: "mc_alternate_content".to_string(),
+    property_comments: "Preserves the mc:AlternateContent wrapper for this child.".to_string(),
+    kind: SchemaTypeChildKind::Child,
+    optional: true,
+    repeated: false,
+    initial_version: String::new(),
+    children: Vec::new(),
+  };
+
+  if let Some(index) = schema_type.children.iter().position(|child| {
+    child.name == child_qname
+      || child.name.ends_with(&format!("/{child_qname}"))
+      || child.property_name == child_qname
+  }) {
+    schema_type.children.insert(index, alternate_content_child);
+    return;
+  }
+
+  if let Some(index) = schema_type.children.iter().position(|child| {
+    child.kind == SchemaTypeChildKind::Choice && choice_child_contains_qname(child, child_qname)
+  }) {
+    schema_type.children.insert(index, alternate_content_child);
+  } else {
+    schema_type.children.push(alternate_content_child);
+  }
+}
+
+fn choice_child_contains_qname(child: &SchemaTypeChild, child_qname: &str) -> bool {
+  child.children.iter().any(|nested| {
+    nested.name == child_qname
+      || nested.name.ends_with(&format!("/{child_qname}"))
+      || nested.property_name == child_qname
+      || choice_child_contains_qname(nested, child_qname)
+  })
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_data::sdk_data_model::{SchemaType, SchemaTypeAttribute};
+  use crate::sdk_data::sdk_data_model::{
+    SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
+  };
 
   #[test]
   fn treat_validator_type_as_string_rewrites_attribute_type() {
@@ -861,5 +918,64 @@ mod tests {
     apply_compatibility(&mut schemas, &compatibility).unwrap();
 
     assert!(schemas[0].types[0].collection_sequence_root);
+  }
+
+  #[test]
+  fn text_choice_renames_choice_child() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+      types: vec![SchemaType {
+        class_name: "Run".to_string(),
+        children: vec![SchemaTypeChild {
+          kind: SchemaTypeChildKind::Choice,
+          property_name: "children".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        type_name: "Run".to_string(),
+        field: "run_choice".to_string(),
+        action: CompatibilityAction::TextChoice,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert_eq!(schemas[0].types[0].children[0].property_name, "run_choice");
+  }
+
+  #[test]
+  fn alternate_content_choice_adds_mc_alternate_content_child() {
+    let mut schemas = vec![Schema {
+      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+      types: vec![SchemaType {
+        class_name: "Run".to_string(),
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+
+    let compatibility = CompatibilityConfig {
+      rules: vec![CompatibilityRule {
+        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
+        type_name: "Run".to_string(),
+        field: "w:CT_Drawing/w:drawing".to_string(),
+        action: CompatibilityAction::AlternateContentChoice,
+      }],
+    };
+
+    apply_compatibility(&mut schemas, &compatibility).unwrap();
+
+    assert!(schemas[0].types[0].children.iter().any(|child| {
+      child.name == "mc:CT_AlternateContent/mc:AlternateContent"
+        && child.property_name == "mc_alternate_content"
+        && child.kind == SchemaTypeChildKind::Child
+    }));
   }
 }

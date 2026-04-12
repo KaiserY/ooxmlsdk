@@ -1,10 +1,7 @@
 use crate::sdk_code::versioning::effective_version;
-use crate::sdk_data::compatibility::{
-  preserve_namespace_decls_rule_for_schema, preserve_namespace_decls_rule_for_type,
-};
 use crate::sdk_data::sdk_data_model::{
-  CompatibilityRule, Schema, SchemaType, SchemaTypeApiKind, SchemaTypeCompositeKind,
-  SchemaTypeKind, SchemaTypeParticle, SchemaTypeXmlHeader,
+  SchemaType, SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
+  SchemaTypeKind, SchemaTypeXmlHeader,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -49,28 +46,26 @@ pub fn is_derived_type(schema_type: &SchemaType) -> bool {
 
 pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
   schema_type.xml_header != SchemaTypeXmlHeader::None
+    || schema_type
+      .children
+      .iter()
+      .any(|child| child.kind == SchemaTypeChildKind::XmlHeader)
 }
 
-pub fn supports_compat_xmlns_fields(
-  schema_type: &SchemaType,
-  schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
-) -> bool {
+pub fn has_xmlns_fields(schema_type: &SchemaType) -> bool {
   schema_type.has_xmlns_fields
-    || needs_xml_header(schema_type)
-    || preserve_namespace_decls_rule_for_schema(compatibility_rules, &schema.module_name).is_some()
-    || preserve_namespace_decls_rule_for_type(
-      compatibility_rules,
-      &schema.module_name,
-      &schema_type.class_name,
-    )
-    .is_some()
-    || preserve_namespace_decls_rule_for_type(
-      compatibility_rules,
-      &schema.module_name,
-      &schema_type.name,
-    )
-    .is_some()
+    || schema_type
+      .children
+      .iter()
+      .any(|child| child.kind == SchemaTypeChildKind::Xmlns)
+}
+
+pub fn has_mce_fields(schema_type: &SchemaType) -> bool {
+  schema_type.has_mc_ignorable_field
+    || schema_type
+      .children
+      .iter()
+      .any(|child| child.kind == SchemaTypeChildKind::Mce)
 }
 
 pub fn is_collection_sequence_root(schema_type: &SchemaType) -> bool {
@@ -86,35 +81,40 @@ fn supports_extended_sequence_strategy(schema_type: &SchemaType) -> bool {
 
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
   if supports_extended_sequence_strategy(schema_type) {
+    if schema_type.children.is_empty() {
+      return false;
+    }
     schema_type
-      .particle
-      .items
+      .children
       .iter()
-      .all(can_flatten_one_sequence_particle)
+      .all(can_flatten_one_sequence_child)
   } else {
     false
   }
 }
 
-fn can_flatten_one_sequence_particle(particle: &SchemaTypeParticle) -> bool {
-  match particle.kind.as_str() {
-    "" => particle.items.is_empty() && !particle.name.is_empty(),
-    "Choice" => {
-      !particle.items.is_empty()
-        && particle
-          .items
-          .iter()
-          .all(|item| item.kind.is_empty() && item.items.is_empty() && !item.name.is_empty())
+fn can_flatten_one_sequence_child(child: &SchemaTypeChild) -> bool {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
+    SchemaTypeChildKind::Any => false,
+    SchemaTypeChildKind::Choice => {
+      !child.children.is_empty()
+        && child.children.iter().all(|item| {
+          matches!(
+            item.kind,
+            SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any
+          ) && item.children.is_empty()
+        })
     }
-    "Group" | "Sequence" => particle.items.iter().all(can_flatten_one_sequence_particle),
-    _ => false,
+    SchemaTypeChildKind::Sequence => child.children.iter().all(can_flatten_one_sequence_child),
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
 #[derive(Clone, Debug)]
 pub enum FlatParticleKind<'a> {
-  Leaf(&'a SchemaTypeParticle),
-  Choice(&'a SchemaTypeParticle),
+  Leaf(&'a SchemaTypeChild),
+  Choice(&'a SchemaTypeChild),
 }
 
 #[derive(Clone, Debug)]
@@ -127,7 +127,7 @@ pub struct FlatParticle<'a> {
 
 #[derive(Clone, Debug)]
 pub enum StructuredParticleKind<'a> {
-  Leaf(&'a SchemaTypeParticle),
+  Leaf(&'a SchemaTypeChild),
   Choice(StructuredChoice<'a>),
 }
 
@@ -146,7 +146,7 @@ pub struct StructuredChoice<'a> {
 
 #[derive(Clone, Debug)]
 pub enum StructuredChoiceVariant<'a> {
-  Leaf(&'a SchemaTypeParticle),
+  Leaf(&'a SchemaTypeChild),
   Sequence(Vec<StructuredParticle<'a>>),
 }
 
@@ -154,8 +154,8 @@ pub fn flatten_one_sequence_particles(schema_type: &SchemaType) -> Vec<FlatParti
   let mut flat_particles = Vec::new();
   let parent_repeated = is_collection_sequence_root(schema_type);
 
-  for particle in &schema_type.particle.items {
-    flatten_one_sequence_particle(particle, false, parent_repeated, "", &mut flat_particles);
+  for child in &schema_type.children {
+    flatten_one_sequence_child(child, false, parent_repeated, "", &mut flat_particles);
   }
 
   flat_particles
@@ -163,11 +163,13 @@ pub fn flatten_one_sequence_particles(schema_type: &SchemaType) -> Vec<FlatParti
 
 pub fn is_one_sequence_structurable(schema_type: &SchemaType) -> bool {
   if supports_extended_sequence_strategy(schema_type) {
+    if schema_type.children.is_empty() {
+      return false;
+    }
     schema_type
-      .particle
-      .items
+      .children
       .iter()
-      .all(can_structure_one_sequence_particle)
+      .all(can_structure_one_sequence_child)
   } else {
     false
   }
@@ -177,169 +179,182 @@ pub fn structure_one_sequence_particles(schema_type: &SchemaType) -> Vec<Structu
   let mut particles = Vec::new();
   let parent_repeated = is_collection_sequence_root(schema_type);
 
-  for particle in &schema_type.particle.items {
-    structure_one_sequence_particle(particle, false, parent_repeated, "", &mut particles);
+  for child in &schema_type.children {
+    structure_one_sequence_child(child, false, parent_repeated, "", &mut particles);
   }
 
   particles
 }
 
-fn flatten_one_sequence_particle<'a>(
-  particle: &'a SchemaTypeParticle,
+fn flatten_one_sequence_child<'a>(
+  child: &'a SchemaTypeChild,
   parent_optional: bool,
   parent_repeated: bool,
   parent_initial_version: &'a str,
   out: &mut Vec<FlatParticle<'a>>,
 ) {
-  let occurs = particle.occurs.first();
-  let optional = parent_optional || occurs.is_some_and(|occur| occur.min == 0);
-  let repeated = parent_repeated || occurs.is_some_and(|occur| occur.max != 1);
-  let initial_version =
-    effective_version(parent_initial_version, particle.initial_version.as_str());
+  let optional = parent_optional || child.optional;
+  let repeated = parent_repeated || child.repeated;
+  let initial_version = effective_version(parent_initial_version, child.initial_version.as_str());
 
-  match particle.kind.as_str() {
-    "" => {
-      if !particle.name.is_empty() {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      if !child.name.is_empty() || matches!(child.kind, SchemaTypeChildKind::Any) {
         out.push(FlatParticle {
-          kind: FlatParticleKind::Leaf(particle),
+          kind: FlatParticleKind::Leaf(child),
           optional,
           repeated,
           initial_version,
         });
       }
     }
-    "Choice" => {
-      if !particle.items.is_empty() {
+    SchemaTypeChildKind::Choice => {
+      if !child.children.is_empty() {
         out.push(FlatParticle {
-          kind: FlatParticleKind::Choice(particle),
+          kind: FlatParticleKind::Choice(child),
           optional,
           repeated,
           initial_version,
         });
       }
     }
-    "Group" | "Sequence" => {
-      for child in &particle.items {
-        flatten_one_sequence_particle(child, optional, repeated, initial_version, out);
+    SchemaTypeChildKind::Sequence => {
+      for grand_child in &child.children {
+        flatten_one_sequence_child(grand_child, optional, repeated, initial_version, out);
       }
     }
-    _ => {}
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
   }
 }
 
-fn can_structure_one_sequence_particle(particle: &SchemaTypeParticle) -> bool {
-  match particle.kind.as_str() {
-    "" => particle.items.is_empty() && !particle.name.is_empty(),
-    "Choice" => {
+fn can_structure_one_sequence_child(child: &SchemaTypeChild) -> bool {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
+    SchemaTypeChildKind::Any => false,
+    SchemaTypeChildKind::Choice => {
       let mut leaf_name_set = std::collections::HashSet::new();
 
-      !particle.items.is_empty()
-        && particle
-          .items
+      !child.children.is_empty()
+        && child
+          .children
           .iter()
           .all(can_structure_one_sequence_choice_variant)
-        && particle
-          .items
+        && child
+          .children
           .iter()
           .all(|item| collect_structured_choice_leaf_names(item, &mut leaf_name_set))
     }
-    "Group" | "Sequence" => particle
-      .items
-      .iter()
-      .all(can_structure_one_sequence_particle),
-    _ => false,
+    SchemaTypeChildKind::Sequence => child.children.iter().all(can_structure_one_sequence_child),
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
-fn can_structure_one_sequence_choice_variant(particle: &SchemaTypeParticle) -> bool {
-  match particle.kind.as_str() {
-    "" => particle.items.is_empty() && !particle.name.is_empty(),
-    "Choice" => {
-      !particle.items.is_empty()
-        && particle
-          .items
+fn can_structure_one_sequence_choice_variant(child: &SchemaTypeChild) -> bool {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
+    SchemaTypeChildKind::Any => false,
+    SchemaTypeChildKind::Choice => {
+      !child.children.is_empty()
+        && child
+          .children
           .iter()
           .all(can_structure_one_sequence_choice_variant)
     }
-    "Group" | "Sequence" => {
-      can_structure_sequence_variant_particle(particle)
-        || (particle.items.len() == 1
-          && can_structure_one_sequence_choice_variant(&particle.items[0]))
+    SchemaTypeChildKind::Sequence => {
+      can_structure_sequence_variant_child(child)
+        || (child.children.len() == 1
+          && can_structure_one_sequence_choice_variant(&child.children[0]))
     }
-    _ => false,
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
-fn can_structure_sequence_variant_particle(particle: &SchemaTypeParticle) -> bool {
-  let occurs = particle.occurs.first();
-  if occurs.is_some_and(|occur| occur.max != 1) {
+fn can_structure_sequence_variant_child(child: &SchemaTypeChild) -> bool {
+  if child.repeated {
     return false;
   }
 
-  match particle.kind.as_str() {
-    "" => particle.items.is_empty() && !particle.name.is_empty(),
-    "Group" | "Sequence" => particle
-      .items
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
+    SchemaTypeChildKind::Any => false,
+    SchemaTypeChildKind::Sequence => child
+      .children
       .iter()
-      .all(can_structure_sequence_variant_particle),
-    _ => false,
+      .all(can_structure_sequence_variant_child),
+    SchemaTypeChildKind::Choice
+    | SchemaTypeChildKind::Xmlns
+    | SchemaTypeChildKind::XmlHeader
+    | SchemaTypeChildKind::Mce => false,
   }
 }
 
+pub fn is_any_only_composite_type(schema_type: &SchemaType) -> bool {
+  schema_type.composite_kind == SchemaTypeCompositeKind::SdkSequence
+    && schema_type.children.len() == 1
+    && schema_type.children[0].kind == SchemaTypeChildKind::Any
+}
+
+pub fn has_any_child(schema_type: &SchemaType) -> bool {
+  schema_type
+    .children
+    .iter()
+    .any(|child| child.kind == SchemaTypeChildKind::Any)
+}
+
 fn collect_structured_choice_leaf_names<'a>(
-  particle: &'a SchemaTypeParticle,
+  child: &'a SchemaTypeChild,
   out: &mut std::collections::HashSet<&'a str>,
 ) -> bool {
-  match particle.kind.as_str() {
-    "" => !particle.name.is_empty() && out.insert(particle.name.as_str()),
-    "Choice" => {
-      !particle.items.is_empty()
-        && particle
-          .items
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      !child.name.is_empty() && out.insert(child.name.as_str())
+    }
+    SchemaTypeChildKind::Choice => {
+      !child.children.is_empty()
+        && child
+          .children
           .iter()
           .all(|item| collect_structured_choice_leaf_names(item, out))
     }
-    "Group" | "Sequence" => {
-      if can_structure_sequence_variant_particle(particle) {
+    SchemaTypeChildKind::Sequence => {
+      if can_structure_sequence_variant_child(child) {
         true
-      } else if particle.items.len() == 1 {
-        collect_structured_choice_leaf_names(&particle.items[0], out)
+      } else if child.children.len() == 1 {
+        collect_structured_choice_leaf_names(&child.children[0], out)
       } else {
         false
       }
     }
-    _ => false,
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
-fn structure_one_sequence_particle<'a>(
-  particle: &'a SchemaTypeParticle,
+fn structure_one_sequence_child<'a>(
+  child: &'a SchemaTypeChild,
   parent_optional: bool,
   parent_repeated: bool,
   parent_initial_version: &'a str,
   out: &mut Vec<StructuredParticle<'a>>,
 ) {
-  let occurs = particle.occurs.first();
-  let optional = parent_optional || occurs.is_some_and(|occur| occur.min == 0);
-  let repeated = parent_repeated || occurs.is_some_and(|occur| occur.max != 1);
-  let initial_version =
-    effective_version(parent_initial_version, particle.initial_version.as_str());
+  let optional = parent_optional || child.optional;
+  let repeated = parent_repeated || child.repeated;
+  let initial_version = effective_version(parent_initial_version, child.initial_version.as_str());
 
-  match particle.kind.as_str() {
-    "" => {
-      if !particle.name.is_empty() {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      if !child.name.is_empty() || matches!(child.kind, SchemaTypeChildKind::Any) {
         out.push(StructuredParticle {
-          kind: StructuredParticleKind::Leaf(particle),
+          kind: StructuredParticleKind::Leaf(child),
           optional,
           repeated,
           initial_version,
         });
       }
     }
-    "Choice" => {
+    SchemaTypeChildKind::Choice => {
       let mut variants = Vec::new();
 
-      for item in &particle.items {
+      for item in &child.children {
         variants.extend(structure_one_sequence_choice_variant(item, initial_version));
       }
 
@@ -352,84 +367,94 @@ fn structure_one_sequence_particle<'a>(
         });
       }
     }
-    "Group" | "Sequence" => {
-      for child in &particle.items {
-        structure_one_sequence_particle(child, optional, repeated, initial_version, out);
+    SchemaTypeChildKind::Sequence => {
+      for grand_child in &child.children {
+        structure_one_sequence_child(grand_child, optional, repeated, initial_version, out);
       }
     }
-    _ => {}
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
   }
 }
 
 fn structure_one_sequence_choice_variant<'a>(
-  particle: &'a SchemaTypeParticle,
+  child: &'a SchemaTypeChild,
   parent_initial_version: &'a str,
 ) -> Vec<StructuredChoiceVariant<'a>> {
-  let initial_version =
-    effective_version(parent_initial_version, particle.initial_version.as_str());
+  let initial_version = effective_version(parent_initial_version, child.initial_version.as_str());
 
-  match particle.kind.as_str() {
-    "" => (!particle.name.is_empty())
-      .then_some(StructuredChoiceVariant::Leaf(particle))
-      .into_iter()
-      .collect(),
-    "Choice" => particle
-      .items
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      (!child.name.is_empty() || matches!(child.kind, SchemaTypeChildKind::Any))
+        .then_some(StructuredChoiceVariant::Leaf(child))
+        .into_iter()
+        .collect()
+    }
+    SchemaTypeChildKind::Choice => child
+      .children
       .iter()
       .flat_map(|child| structure_one_sequence_choice_variant(child, initial_version))
       .collect(),
-    "Group" | "Sequence" => {
-      if can_structure_sequence_variant_particle(particle) {
+    SchemaTypeChildKind::Sequence => {
+      if can_structure_sequence_variant_child(child) {
         let mut particles = Vec::new();
 
-        for child in &particle.items {
-          structure_sequence_variant_particle(child, false, false, initial_version, &mut particles);
+        for grand_child in &child.children {
+          structure_sequence_variant_child(
+            grand_child,
+            false,
+            false,
+            initial_version,
+            &mut particles,
+          );
         }
 
         (!particles.is_empty())
           .then_some(StructuredChoiceVariant::Sequence(particles))
           .into_iter()
           .collect()
-      } else if particle.items.len() == 1 {
-        structure_one_sequence_choice_variant(&particle.items[0], initial_version)
+      } else if child.children.len() == 1 {
+        structure_one_sequence_choice_variant(&child.children[0], initial_version)
       } else {
         Vec::new()
       }
     }
-    _ => Vec::new(),
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {
+      Vec::new()
+    }
   }
 }
 
-fn structure_sequence_variant_particle<'a>(
-  particle: &'a SchemaTypeParticle,
+fn structure_sequence_variant_child<'a>(
+  child: &'a SchemaTypeChild,
   parent_optional: bool,
   parent_repeated: bool,
   parent_initial_version: &'a str,
   out: &mut Vec<StructuredParticle<'a>>,
 ) {
-  let occurs = particle.occurs.first();
-  let optional = parent_optional || occurs.is_some_and(|occur| occur.min == 0);
-  let repeated = parent_repeated || occurs.is_some_and(|occur| occur.max != 1);
-  let initial_version =
-    effective_version(parent_initial_version, particle.initial_version.as_str());
+  let optional = parent_optional || child.optional;
+  let repeated = parent_repeated || child.repeated;
+  let initial_version = effective_version(parent_initial_version, child.initial_version.as_str());
 
-  match particle.kind.as_str() {
-    "" => {
-      if !particle.name.is_empty() {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      if !child.name.is_empty() || matches!(child.kind, SchemaTypeChildKind::Any) {
         out.push(StructuredParticle {
-          kind: StructuredParticleKind::Leaf(particle),
+          kind: StructuredParticleKind::Leaf(child),
           optional,
           repeated,
           initial_version,
         });
       }
     }
-    "Group" | "Sequence" => {
-      for child in &particle.items {
-        structure_sequence_variant_particle(child, optional, repeated, initial_version, out);
+    SchemaTypeChildKind::Sequence => {
+      for grand_child in &child.children {
+        structure_sequence_variant_child(grand_child, optional, repeated, initial_version, out);
       }
     }
-    _ => {}
+    SchemaTypeChildKind::Choice
+    | SchemaTypeChildKind::Xmlns
+    | SchemaTypeChildKind::XmlHeader
+    | SchemaTypeChildKind::Mce => {}
   }
 }
 
@@ -470,101 +495,86 @@ pub fn classify_attr_type(attr_type: &str) -> Option<AttrTypeKind<'_>> {
 mod tests {
   use super::*;
   use crate::sdk_data::sdk_data_model::{
-    SchemaType, SchemaTypeCompositeKind, SchemaTypeParticle, SchemaTypeParticleOccur,
+    SchemaType, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
   };
 
-  fn leaf(name: &str, min: u64, max: u64, version: &'static str) -> SchemaTypeParticle {
-    SchemaTypeParticle {
-      kind: String::new(),
+  fn child(name: &str, optional: bool, repeated: bool, version: &'static str) -> SchemaTypeChild {
+    SchemaTypeChild {
       name: name.to_string(),
-      occurs: vec![SchemaTypeParticleOccur {
-        max,
-        min,
-        include_version: false,
-        version: String::new(),
-      }],
-      items: vec![],
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Child,
+      optional,
+      repeated,
       initial_version: version.to_string(),
-      require_filter: false,
-      namespace: String::new(),
+      children: vec![],
     }
   }
 
-  fn node(
-    kind: &str,
-    items: Vec<SchemaTypeParticle>,
-    min: u64,
-    max: u64,
+  fn choice(
+    items: Vec<SchemaTypeChild>,
+    optional: bool,
+    repeated: bool,
     version: &'static str,
-  ) -> SchemaTypeParticle {
-    SchemaTypeParticle {
-      kind: kind.to_string(),
+  ) -> SchemaTypeChild {
+    SchemaTypeChild {
       name: String::new(),
-      occurs: vec![SchemaTypeParticleOccur {
-        max,
-        min,
-        include_version: false,
-        version: String::new(),
-      }],
-      items,
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional,
+      repeated,
       initial_version: version.to_string(),
-      require_filter: false,
-      namespace: String::new(),
+      children: items,
     }
   }
 
-  fn one_sequence_schema(items: Vec<SchemaTypeParticle>) -> SchemaType {
+  fn sequence(
+    items: Vec<SchemaTypeChild>,
+    optional: bool,
+    repeated: bool,
+    version: &'static str,
+  ) -> SchemaTypeChild {
+    SchemaTypeChild {
+      name: String::new(),
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Sequence,
+      optional,
+      repeated,
+      initial_version: version.to_string(),
+      children: items,
+    }
+  }
+
+  fn one_sequence_schema(items: Vec<SchemaTypeChild>) -> SchemaType {
     SchemaType {
       composite_kind: SchemaTypeCompositeKind::OneSequence,
-      particle: SchemaTypeParticle {
-        kind: "Sequence".to_string(),
-        name: String::new(),
-        occurs: vec![],
-        items,
-        initial_version: String::new(),
-        require_filter: false,
-        namespace: String::new(),
-      },
+      children: items,
       ..SchemaType::default()
     }
   }
 
   fn composite_schema(
     composite_kind: SchemaTypeCompositeKind,
-    particle_kind: &str,
-    items: Vec<SchemaTypeParticle>,
+    items: Vec<SchemaTypeChild>,
   ) -> SchemaType {
     SchemaType {
       composite_kind,
-      particle: SchemaTypeParticle {
-        kind: particle_kind.to_string(),
-        name: String::new(),
-        occurs: vec![],
-        items,
-        initial_version: String::new(),
-        require_filter: false,
-        namespace: String::new(),
-      },
+      children: items,
       ..SchemaType::default()
     }
   }
 
   #[test]
   fn flattens_group_sequence_wrappers() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Group",
-      vec![node(
-        "Sequence",
-        vec![
-          leaf("a:CT_Test/a:first", 1, 1, ""),
-          leaf("a:CT_Test/a:second", 0, 1, "Office2021"),
-        ],
-        1,
-        1,
-        "",
-      )],
-      1,
-      1,
+    let schema_type = one_sequence_schema(vec![sequence(
+      vec![
+        child("a:CT_Test/a:first", false, false, ""),
+        child("a:CT_Test/a:second", true, false, "Office2021"),
+      ],
+      false,
+      false,
       "",
     )]);
 
@@ -588,11 +598,10 @@ mod tests {
 
   #[test]
   fn propagates_wrapper_occurs_and_version() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Group",
-      vec![leaf("a:CT_Test/a:item", 1, 1, "")],
-      0,
-      2,
+    let schema_type = one_sequence_schema(vec![sequence(
+      vec![child("a:CT_Test/a:item", false, false, "")],
+      true,
+      true,
       "Office2021",
     )]);
 
@@ -605,14 +614,13 @@ mod tests {
 
   #[test]
   fn flattens_leaf_choice_particles() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Choice",
+    let schema_type = one_sequence_schema(vec![choice(
       vec![
-        leaf("a:CT_Test/a:first", 1, 1, ""),
-        leaf("a:CT_Test/a:second", 1, 1, ""),
+        child("a:CT_Test/a:first", false, false, ""),
+        child("a:CT_Test/a:second", false, false, ""),
       ],
-      1,
-      1,
+      true,
+      true,
       "",
     )]);
 
@@ -623,22 +631,20 @@ mod tests {
     let FlatParticleKind::Choice(choice) = flat[0].kind else {
       panic!("expected choice");
     };
-    assert_eq!(choice.items.len(), 2);
+    assert_eq!(choice.children.len(), 2);
   }
 
   #[test]
   fn does_not_flatten_nested_choice_particles() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Choice",
-      vec![node(
-        "Sequence",
-        vec![leaf("a:CT_Test/a:first", 1, 1, "")],
-        1,
-        1,
+    let schema_type = one_sequence_schema(vec![choice(
+      vec![sequence(
+        vec![child("a:CT_Test/a:first", false, false, "")],
+        false,
+        false,
         "",
       )],
-      1,
-      1,
+      true,
+      false,
       "",
     )]);
 
@@ -647,29 +653,21 @@ mod tests {
 
   #[test]
   fn structures_choice_with_sequence_variant() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Choice",
+    let schema_type = one_sequence_schema(vec![choice(
       vec![
-        leaf("c:CT_Test/c:delete", 1, 1, ""),
-        node(
-          "Group",
-          vec![node(
-            "Sequence",
-            vec![
-              leaf("c:CT_Test/c:layout", 0, 1, ""),
-              leaf("c:CT_Test/c:tx", 0, 1, ""),
-            ],
-            1,
-            1,
-            "",
-          )],
-          1,
-          1,
+        child("c:CT_Test/c:delete", false, false, ""),
+        sequence(
+          vec![
+            child("c:CT_Test/c:layout", true, false, ""),
+            child("c:CT_Test/c:tx", true, false, ""),
+          ],
+          false,
+          false,
           "",
         ),
       ],
-      1,
-      1,
+      true,
+      false,
       "",
     )]);
 
@@ -699,23 +697,20 @@ mod tests {
 
   #[test]
   fn structures_choice_with_nested_choice_wrapper_variant() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Choice",
-      vec![node(
-        "Group",
-        vec![node(
-          "Choice",
-          vec![leaf("a:CT_Test/a:first", 1, 1, "")],
-          1,
-          1,
+    let schema_type = one_sequence_schema(vec![choice(
+      vec![sequence(
+        vec![choice(
+          vec![child("a:CT_Test/a:first", false, false, "")],
+          true,
+          false,
           "",
         )],
-        1,
-        1,
+        false,
+        false,
         "",
       )],
-      1,
-      1,
+      true,
+      false,
       "",
     )]);
 
@@ -735,26 +730,23 @@ mod tests {
 
   #[test]
   fn does_not_structure_choice_with_mixed_choice_and_leaf_sequence_variant() {
-    let schema_type = one_sequence_schema(vec![node(
-      "Choice",
-      vec![node(
-        "Group",
+    let schema_type = one_sequence_schema(vec![choice(
+      vec![sequence(
         vec![
-          node(
-            "Choice",
-            vec![leaf("a:CT_Test/a:first", 1, 1, "")],
-            1,
-            1,
+          choice(
+            vec![child("a:CT_Test/a:first", false, false, "")],
+            true,
+            false,
             "",
           ),
-          leaf("a:CT_Test/a:second", 1, 1, ""),
+          child("a:CT_Test/a:second", false, false, ""),
         ],
-        1,
-        1,
+        false,
+        false,
         "",
       )],
-      1,
-      1,
+      true,
+      false,
       "",
     )]);
 
@@ -765,8 +757,12 @@ mod tests {
   fn one_choice_composite_kind_is_source_metadata_only() {
     let schema_type = composite_schema(
       SchemaTypeCompositeKind::OneChoice,
-      "Choice",
-      vec![leaf("a:CT_Test/a:first", 1, 1, "")],
+      vec![choice(
+        vec![child("a:CT_Test/a:first", false, false, "")],
+        true,
+        false,
+        "",
+      )],
     );
 
     assert!(!is_one_sequence_flatten(&schema_type));
@@ -777,10 +773,9 @@ mod tests {
   fn one_all_composite_kind_is_source_metadata_only() {
     let schema_type = composite_schema(
       SchemaTypeCompositeKind::OneAll,
-      "All",
       vec![
-        leaf("a:CT_Test/a:first", 0, 1, ""),
-        leaf("a:CT_Test/a:second", 1, 1, ""),
+        child("a:CT_Test/a:first", true, false, ""),
+        child("a:CT_Test/a:second", false, false, ""),
       ],
     );
 

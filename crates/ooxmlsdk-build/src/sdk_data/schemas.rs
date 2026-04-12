@@ -3,11 +3,12 @@ use crate::sdk_data::{
   sdk_data_model::{
     Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind,
     SchemaTypeAttribute, SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument,
-    SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeKind, SchemaTypeParticle,
-    SchemaTypeParticleOccur, SchemaTypeXmlHeader,
+    SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
+    SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
   },
 };
 
+use heck::ToUpperCamelCase;
 use std::collections::HashMap;
 
 pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
@@ -60,69 +61,185 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
       types: schema
         .types
         .iter()
-        .map(|ty| SchemaType {
-          name: ty.name.clone(),
-          class_name: ty.class_name.clone(),
-          summary: ty.summary.clone(),
-          version: ty.version.clone(),
-          part: ty.part.clone(),
-          base_class: ty.base_class.clone(),
-          kind: resolve_kind(ty, &type_map),
-          composite_kind: resolve_composite_kind(ty),
-          xml_header: if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
-            SchemaTypeXmlHeader::Standalone
-          } else {
-            SchemaTypeXmlHeader::None
-          },
-          is_abstract: ty.is_abstract,
-          has_xmlns_fields: ty.has_xmlns_fields,
-          has_mc_ignorable_field: ty.has_mc_ignorable_field
-            || !ty.part.is_empty()
-            || ty.base_class == "OpenXmlPartRootElement",
-          text_value_type: String::new(),
-          api_kind: resolve_api_kind(ty, &type_map),
-          attributes: ty
-            .attributes
-            .iter()
-            .map(|attr| SchemaTypeAttribute {
-              q_name: attr.q_name.clone(),
-              property_name: attr.property_name.clone(),
-              r#type: attr.r#type.clone(),
-              property_comments: attr.property_comments.clone(),
-              version: attr.version.clone(),
-              validators: attr
-                .validators
-                .iter()
-                .map(|validator| SchemaTypeAttributeValidator {
-                  name: validator.name.clone(),
-                  is_list: validator.is_list,
-                  r#type: validator.r#type.clone(),
-                  union_id: validator.union_id,
-                  is_initial_version: validator.is_initial_version,
-                  arguments: validator
-                    .arguments
-                    .iter()
-                    .map(|argument| SchemaTypeAttributeValidatorArgument {
-                      name: argument.name.clone(),
-                      r#type: argument.r#type.clone(),
-                      value: argument.value.clone(),
-                    })
-                    .collect(),
-                })
-                .collect(),
-            })
-            .collect(),
-          children: ty
+        .map(|ty| {
+          let has_xmlns_fields =
+            ty.has_xmlns_fields || !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement";
+          let raw_child_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild> = ty
             .children
             .iter()
-            .map(|child| SchemaTypeChild {
+            .map(|child| (child.name.as_str(), child))
+            .collect();
+          let mut children = Vec::new();
+          if ty.particle.kind == "All" {
+            children.extend(ty.children.iter().map(|child| SchemaTypeChild {
               name: child.name.clone(),
               property_name: child.property_name.clone(),
               property_comments: child.property_comments.clone(),
-            })
-            .collect(),
-          particle: gen_particle(&ty.particle),
-          collection_sequence_root: false,
+              kind: resolve_child_kind(child.name.as_str(), &type_map),
+              optional: false,
+              repeated: false,
+              initial_version: String::new(),
+              children: Vec::new(),
+            }));
+          } else if ty.particle.kind.is_empty() {
+            if !ty.additional_elements.is_empty() {
+              let variants: Vec<SchemaTypeChild> = ty
+                .children
+                .iter()
+                .map(|child| SchemaTypeChild {
+                  name: child.name.clone(),
+                  property_name: child.property_name.clone(),
+                  property_comments: child.property_comments.clone(),
+                  kind: resolve_child_kind(child.name.as_str(), &type_map),
+                  optional: false,
+                  repeated: false,
+                  initial_version: String::new(),
+                  children: Vec::new(),
+                })
+                .collect();
+
+              if !variants.is_empty() {
+                children.push(SchemaTypeChild {
+                  name: String::new(),
+                  property_name: "children".to_string(),
+                  property_comments: String::new(),
+                  kind: SchemaTypeChildKind::Choice,
+                  optional: false,
+                  repeated: true,
+                  initial_version: String::new(),
+                  children: variants,
+                });
+              }
+            } else {
+              children.extend(ty.children.iter().map(|child| SchemaTypeChild {
+                name: child.name.clone(),
+                property_name: child.property_name.clone(),
+                property_comments: child.property_comments.clone(),
+                kind: resolve_child_kind(child.name.as_str(), &type_map),
+                optional: false,
+                repeated: false,
+                initial_version: String::new(),
+                children: Vec::new(),
+              }));
+            }
+          } else {
+            collect_choice_children(
+              &ty.particle,
+              &raw_child_map,
+              &type_map,
+              &mut children,
+              false,
+              false,
+            );
+          }
+          mark_mixed_sequence_direct_children_optional(&mut children);
+
+          if has_xmlns_fields {
+            children.push(SchemaTypeChild {
+              name: String::new(),
+              property_name: "xmlns".to_string(),
+              property_comments: String::new(),
+              kind: SchemaTypeChildKind::Xmlns,
+              optional: false,
+              repeated: false,
+              initial_version: String::new(),
+              children: Vec::new(),
+            });
+            children.push(SchemaTypeChild {
+              name: String::new(),
+              property_name: "xmlns_map".to_string(),
+              property_comments: String::new(),
+              kind: SchemaTypeChildKind::Xmlns,
+              optional: false,
+              repeated: false,
+              initial_version: String::new(),
+              children: Vec::new(),
+            });
+          }
+
+          let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
+            SchemaTypeXmlHeader::Standalone
+          } else {
+            SchemaTypeXmlHeader::None
+          };
+          if xml_header != SchemaTypeXmlHeader::None {
+            children.push(SchemaTypeChild {
+              name: String::new(),
+              property_name: "xml_header".to_string(),
+              property_comments: String::new(),
+              kind: SchemaTypeChildKind::XmlHeader,
+              optional: false,
+              repeated: false,
+              initial_version: String::new(),
+              children: Vec::new(),
+            });
+          }
+
+          if ty.has_mc_ignorable_field {
+            children.push(SchemaTypeChild {
+              name: String::new(),
+              property_name: "mc_ignorable".to_string(),
+              property_comments: String::new(),
+              kind: SchemaTypeChildKind::Mce,
+              optional: false,
+              repeated: false,
+              initial_version: String::new(),
+              children: Vec::new(),
+            });
+          }
+
+          SchemaType {
+            name: ty.name.clone(),
+            class_name: ty.class_name.clone(),
+            summary: ty.summary.clone(),
+            version: ty.version.clone(),
+            part: ty.part.clone(),
+            base_class: ty.base_class.clone(),
+            kind: resolve_kind(ty, &type_map),
+            composite_kind: resolve_composite_kind(ty),
+            xml_header,
+            is_abstract: ty.is_abstract,
+            has_xmlns_fields,
+            has_mc_ignorable_field: ty.has_mc_ignorable_field
+              || !ty.part.is_empty()
+              || ty.base_class == "OpenXmlPartRootElement",
+            text_value_type: String::new(),
+            api_kind: resolve_api_kind(ty, &type_map),
+            attributes: ty
+              .attributes
+              .iter()
+              .map(|attr| SchemaTypeAttribute {
+                q_name: attr.q_name.clone(),
+                property_name: attr.property_name.clone(),
+                r#type: attr.r#type.clone(),
+                property_comments: attr.property_comments.clone(),
+                version: attr.version.clone(),
+                validators: attr
+                  .validators
+                  .iter()
+                  .map(|validator| SchemaTypeAttributeValidator {
+                    name: validator.name.clone(),
+                    is_list: validator.is_list,
+                    r#type: validator.r#type.clone(),
+                    union_id: validator.union_id,
+                    is_initial_version: validator.is_initial_version,
+                    arguments: validator
+                      .arguments
+                      .iter()
+                      .map(|argument| SchemaTypeAttributeValidatorArgument {
+                        name: argument.name.clone(),
+                        r#type: argument.r#type.clone(),
+                        value: argument.value.clone(),
+                      })
+                      .collect(),
+                  })
+                  .collect(),
+              })
+              .collect(),
+            children,
+            particle: gen_particle(&ty.particle),
+            collection_sequence_root: false,
+          }
         })
         .collect(),
       enums: schema
@@ -147,6 +264,344 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .collect();
 
   schemas
+}
+
+fn collect_choice_children(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  out: &mut Vec<SchemaTypeChild>,
+  inherited_optional: bool,
+  inherited_repeated: bool,
+) {
+  let (optional, repeated, initial_version) = particle_cardinality(particle);
+  let optional = inherited_optional || optional;
+  let repeated = inherited_repeated || repeated;
+
+  match particle.kind.as_str() {
+    "Any" => {
+      out.push(SchemaTypeChild {
+        name: String::new(),
+        property_name: "UnknownXml".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Any,
+        optional,
+        repeated,
+        initial_version,
+        children: Vec::new(),
+      });
+    }
+    "" => {
+      if let Some(child) = schema_child_from_particle(particle, raw_child_map, type_map) {
+        out.push(SchemaTypeChild {
+          optional: optional || child.optional,
+          repeated: repeated || child.repeated,
+          ..child
+        });
+      }
+    }
+    "Choice" => {
+      let mut variants = Vec::new();
+      for item in &particle.items {
+        collect_choice_variant_children(
+          item,
+          raw_child_map,
+          type_map,
+          &mut variants,
+          optional,
+          repeated,
+        );
+      }
+      if !variants.is_empty() {
+        out.push(SchemaTypeChild {
+          name: String::new(),
+          property_name: "children".to_string(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Choice,
+          optional,
+          repeated,
+          initial_version,
+          children: variants,
+        });
+      }
+    }
+    "Group" | "Sequence" => {
+      for item in &particle.items {
+        collect_choice_children(item, raw_child_map, type_map, out, optional, repeated);
+      }
+    }
+    _ => {}
+  }
+}
+
+fn collect_choice_variant_children(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  out: &mut Vec<SchemaTypeChild>,
+  inherited_optional: bool,
+  inherited_repeated: bool,
+) {
+  let (optional, repeated, initial_version) = particle_cardinality(particle);
+  let optional = inherited_optional || optional;
+  let repeated = inherited_repeated || repeated;
+
+  match particle.kind.as_str() {
+    "Any" => {
+      out.push(SchemaTypeChild {
+        name: String::new(),
+        property_name: "UnknownXml".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Any,
+        optional,
+        repeated,
+        initial_version,
+        children: Vec::new(),
+      });
+    }
+    "" => {
+      if let Some(child) = schema_child_from_particle(particle, raw_child_map, type_map) {
+        out.push(SchemaTypeChild {
+          optional: optional || child.optional,
+          repeated: repeated || child.repeated,
+          ..child
+        });
+      }
+    }
+    "Choice" => {
+      let mut variants = Vec::new();
+      for item in &particle.items {
+        collect_choice_variant_children(
+          item,
+          raw_child_map,
+          type_map,
+          &mut variants,
+          optional,
+          repeated,
+        );
+      }
+      if !variants.is_empty() {
+        out.push(SchemaTypeChild {
+          name: String::new(),
+          property_name: String::new(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Choice,
+          optional,
+          repeated,
+          initial_version,
+          children: variants,
+        });
+      }
+    }
+    "Group" | "Sequence" => {
+      let mut sequence_children = Vec::new();
+      for item in &particle.items {
+        collect_choice_variant_children(
+          item,
+          raw_child_map,
+          type_map,
+          &mut sequence_children,
+          optional,
+          repeated,
+        );
+      }
+      if !sequence_children.is_empty() {
+        if sequence_children.len() == 1 && sequence_children[0].kind == SchemaTypeChildKind::Choice
+        {
+          let mut child = sequence_children.remove(0);
+          child.optional |= optional;
+          child.repeated |= repeated;
+          child.initial_version = initial_version;
+          out.push(child);
+          return;
+        }
+        out.push(SchemaTypeChild {
+          name: String::new(),
+          property_name: String::new(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Sequence,
+          optional,
+          repeated,
+          initial_version,
+          children: sequence_children,
+        });
+      }
+    }
+    _ => {}
+  }
+}
+
+fn schema_child_from_particle(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> Option<SchemaTypeChild> {
+  if particle.name.is_empty() {
+    if particle.kind == "Any" {
+      return Some(SchemaTypeChild {
+        name: String::new(),
+        property_name: "UnknownXml".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Any,
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: Vec::new(),
+      });
+    }
+
+    return None;
+  }
+
+  let kind = resolve_child_kind(particle.name.as_str(), type_map);
+
+  let (property_name, property_comments) = raw_child_map
+    .get(particle.name.as_str())
+    .map(|child| (child.property_name.clone(), child.property_comments.clone()))
+    .unwrap_or_else(|| {
+      let fallback_name = resolve_schema_type(particle.name.as_str(), type_map)
+        .map(|child_type| child_type.class_name.clone())
+        .unwrap_or_else(|| {
+          particle
+            .name
+            .split('/')
+            .nth(1)
+            .unwrap_or(particle.name.as_str())
+            .to_string()
+        });
+      (fallback_name, String::new())
+    });
+
+  Some(SchemaTypeChild {
+    name: particle.name.clone(),
+    property_name,
+    property_comments,
+    kind,
+    optional: particle.occurs.first().is_some_and(|occur| occur.min == 0),
+    repeated: particle.occurs.first().is_some_and(|occur| occur.max != 1),
+    initial_version: particle.initial_version.clone(),
+    children: Vec::new(),
+  })
+}
+
+fn particle_cardinality(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+) -> (bool, bool, String) {
+  let occurs = particle.occurs.first();
+  (
+    occurs.is_some_and(|occur| occur.min == 0),
+    occurs.is_some_and(|occur| occur.max != 1),
+    particle.initial_version.clone(),
+  )
+}
+
+fn mark_mixed_sequence_direct_children_optional(children: &mut [SchemaTypeChild]) {
+  let Some(choice_child) = children
+    .iter()
+    .find(|child| child.kind == SchemaTypeChildKind::Choice)
+  else {
+    return;
+  };
+
+  let mut choice_leaf_names = std::collections::HashSet::new();
+  collect_choice_child_leaf_names(choice_child, &mut choice_leaf_names);
+
+  if choice_leaf_names.is_empty() {
+    return;
+  }
+
+  for child in children.iter_mut() {
+    if matches!(
+      child.kind,
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+    ) && !choice_leaf_names.contains(child.name.as_str())
+    {
+      child.optional = true;
+    }
+  }
+}
+
+fn collect_choice_child_leaf_names(
+  child: &SchemaTypeChild,
+  out: &mut std::collections::HashSet<String>,
+) {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      if !child.name.is_empty() {
+        out.insert(child.name.clone());
+      }
+    }
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      for item in &child.children {
+        collect_choice_child_leaf_names(item, out);
+      }
+    }
+    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
+  }
+}
+
+fn resolve_child_kind(
+  child_name: &str,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> SchemaTypeChildKind {
+  let Some(schema_type) = resolve_schema_type(child_name, type_map) else {
+    return SchemaTypeChildKind::Child;
+  };
+
+  if schema_type.base_class == "OpenXmlLeafTextElement"
+    && schema_type.attributes.is_empty()
+    && !schema_type.has_xmlns_fields
+  {
+    SchemaTypeChildKind::TextChild
+  } else {
+    SchemaTypeChildKind::Child
+  }
+}
+
+fn resolve_schema_type<'a>(
+  child_name: &str,
+  type_map: &HashMap<&'a str, &'a crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> Option<&'a crate::sdk_data::open_xml::OpenXmlSchemaType> {
+  let mut candidates = Vec::new();
+  candidates.push(child_name.to_string());
+
+  if let Some((left, right)) = child_name.split_once('/') {
+    candidates.push(left.to_string());
+    candidates.push(right.to_string());
+
+    if let Some((_, left_local)) = left.split_once(':') {
+      candidates.push(left_local.to_string());
+    }
+
+    if let Some((_, right_local)) = right.split_once(':') {
+      candidates.push(right_local.to_string());
+      candidates.push(right_local.to_upper_camel_case());
+    }
+  }
+
+  if let Some((_, local)) = child_name.split_once(':') {
+    candidates.push(local.to_string());
+    candidates.push(local.to_upper_camel_case());
+  }
+
+  for candidate in candidates {
+    if let Some(schema_type) = type_map.get(candidate.as_str()) {
+      return Some(*schema_type);
+    }
+  }
+
+  let local_name = child_name.split('/').nth(1).unwrap_or(child_name);
+  let local_name_without_prefix = local_name.split(':').nth(1).unwrap_or(local_name);
+  let class_name = local_name_without_prefix.to_upper_camel_case();
+
+  type_map.values().copied().find(|schema_type| {
+    schema_type.name == child_name
+      || schema_type.name.ends_with(&format!("/{local_name}"))
+      || schema_type
+        .name
+        .ends_with(&format!("/{local_name_without_prefix}"))
+      || schema_type.class_name == class_name
+  })
 }
 
 fn resolve_api_kind(

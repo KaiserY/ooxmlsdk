@@ -5,8 +5,8 @@ use std::path::Path;
 use crate::Result;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute,
-  SchemaTypeAttributeValidator, SchemaTypeChild, SchemaTypeCompositeKind, SchemaTypeKind,
-  SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
+  SchemaTypeAttributeValidator, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
+  SchemaTypeKind, SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
 };
 use crate::sdk_data::xsd::{ParsedAttribute, ParsedChildElement, parse_xsd};
 
@@ -90,6 +90,11 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           name: "CT_Relationship/Relationship".to_string(),
           property_name: "relationship".to_string(),
           property_comments: "Relationship".to_string(),
+          kind: SchemaTypeChildKind::Child,
+          optional: false,
+          repeated: true,
+          initial_version: String::new(),
+          children: Vec::new(),
         }],
         particle: SchemaTypeParticle {
           kind: "Sequence".to_string(),
@@ -226,6 +231,11 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
             name: content_types_child_type_name(child.q_name.as_str()),
             property_name: String::new(),
             property_comments: String::new(),
+            kind: SchemaTypeChildKind::Child,
+            optional: false,
+            repeated: false,
+            initial_version: String::new(),
+            children: Vec::new(),
           })
           .collect(),
         particle: SchemaTypeParticle {
@@ -328,6 +338,11 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         name: core_property_child_type_name(child),
         property_name: core_property_field_name(child.q_name.as_str()).to_string(),
         property_comments: child.q_name.clone(),
+        kind: core_property_child_kind(child.q_name.as_str()),
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: Vec::new(),
       })
       .collect(),
     particle: SchemaTypeParticle {
@@ -389,6 +404,11 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         name: "cp:CT_Keyword/cp:value".to_string(),
         property_name: "value".to_string(),
         property_comments: child.q_name.clone(),
+        kind: SchemaTypeChildKind::Child,
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: Vec::new(),
       })
       .collect(),
     particle: SchemaTypeParticle {
@@ -565,6 +585,16 @@ fn core_property_class_name(q_name: &str) -> &'static str {
     "dcterms:created" => "Created",
     "dcterms:modified" => "Modified",
     _ => "Value",
+  }
+}
+
+fn core_property_child_kind(q_name: &str) -> SchemaTypeChildKind {
+  match core_property_class_name(q_name) {
+    "Category" | "ContentStatus" | "Creator" | "Description" | "Identifier" | "Language"
+    | "LastModifiedBy" | "LastPrinted" | "Revision" | "Subject" | "Title" | "Version" => {
+      SchemaTypeChildKind::TextChild
+    }
+    _ => SchemaTypeChildKind::Child,
   }
 }
 

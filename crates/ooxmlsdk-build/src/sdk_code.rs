@@ -11,7 +11,7 @@ use crate::Result;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{CodegenContext, gen_schema};
 use crate::sdk_code::versioning::version_cfg_attrs;
-use crate::sdk_data::compatibility::{apply_compatibility, read_compatibility};
+use crate::sdk_data::compatibility::read_compatibility;
 use crate::sdk_data::sdk_data_model::{
   CompatibilityRule as SdkDataCompatibilityRule, Namespace as SdkDataNamespace,
   Part as SdkDataPart, Schema as SdkDataSchema,
@@ -33,12 +33,11 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let sdk_data_compatibility_path = sdk_data_dir.as_ref().join("compatibility.json");
-  let mut sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
+  let sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
   let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let sdk_data_compatibility = read_compatibility(&sdk_data_compatibility_path)?;
   let out_dir_path = out_dir.as_ref();
-  apply_compatibility(&mut sdk_data_schemas, &sdk_data_compatibility)?;
   let context = CodegenContext::new(&sdk_data_schemas);
 
   write_schemas(
@@ -143,7 +142,7 @@ fn write_schemas(
       )
       .map_err(|err| {
         format!(
-          "failed to generate schema {}: {err}",
+          "failed to generate schema {}: {err:?}",
           sdk_data_schema.module_name
         )
       })?,

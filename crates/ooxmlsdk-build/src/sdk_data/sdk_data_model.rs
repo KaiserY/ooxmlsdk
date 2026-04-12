@@ -170,6 +170,7 @@ pub struct SchemaType {
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
+  #[serde(skip)]
   pub particle: SchemaTypeParticle,
   pub collection_sequence_root: bool,
 }
@@ -249,6 +250,26 @@ pub struct SchemaTypeChild {
   pub name: String,
   pub property_name: String,
   pub property_comments: String,
+  pub kind: SchemaTypeChildKind,
+  pub optional: bool,
+  pub repeated: bool,
+  pub initial_version: String,
+  #[serde(default)]
+  pub children: Vec<SchemaTypeChild>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SchemaTypeChildKind {
+  #[default]
+  Child,
+  TextChild,
+  Choice,
+  Sequence,
+  Any,
+  Xmlns,
+  XmlHeader,
+  Mce,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

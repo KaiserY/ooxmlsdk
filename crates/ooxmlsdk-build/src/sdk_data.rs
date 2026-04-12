@@ -14,7 +14,11 @@ pub mod xsd;
 
 use crate::Result;
 use crate::sdk_data::{
-  context::Context, mce::gen_mc_schema_from_xsd, opc_schemas::read_opc_schemas, parts::gen_parts,
+  compatibility::{apply_compatibility, read_compatibility},
+  context::Context,
+  mce::gen_mc_schema_from_xsd,
+  opc_schemas::read_opc_schemas,
+  parts::gen_parts,
   schemas::gen_schemas,
 };
 
@@ -38,6 +42,7 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   let out_dir = out_dir.as_ref();
   let out_parts_dir_path = out_dir.join("parts");
   let out_schemas_dir_path = out_dir.join("schemas");
+  let compatibility = read_compatibility(&out_dir.join("compatibility.json"))?;
 
   fs::create_dir_all(&out_parts_dir_path)?;
   fs::create_dir_all(&out_schemas_dir_path)?;
@@ -49,14 +54,12 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
     &schemas::gen_namespaces(&gen_context),
   )?;
 
-  for schema in gen_schemas(&gen_context) {
-    write_json(
-      out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
-      &schema,
-    )?;
-  }
+  let mut schemas = gen_schemas(&gen_context);
+  schemas.extend(read_opc_schemas(package_schemas_dir.as_ref())?);
+  schemas.sort_by(|left, right| left.module_name.cmp(&right.module_name));
+  apply_compatibility(&mut schemas, &compatibility)?;
 
-  for schema in read_opc_schemas(package_schemas_dir.as_ref())? {
+  for schema in schemas {
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
       &schema,

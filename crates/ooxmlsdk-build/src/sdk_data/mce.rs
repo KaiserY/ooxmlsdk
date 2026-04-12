@@ -80,6 +80,7 @@ fn gen_alternate_content_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaTy
     is_abstract: false,
     has_xmlns_fields: true,
     has_mc_ignorable_field: true,
+    additional_elements: vec![],
     attributes: mc_attributes(attributes),
     children: vec![
       OpenXmlSchemaTypeChild {
@@ -113,6 +114,7 @@ fn gen_choice_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
     is_abstract: false,
     has_xmlns_fields: true,
     has_mc_ignorable_field: true,
+    additional_elements: vec![],
     attributes: mc_attributes(attributes),
     children: vec![],
     particle: any_particle(),
@@ -135,6 +137,7 @@ fn gen_fallback_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
     is_abstract: false,
     has_xmlns_fields: true,
     has_mc_ignorable_field: true,
+    additional_elements: vec![],
     attributes: mc_attributes(attributes),
     children: vec![],
     particle: any_particle(),

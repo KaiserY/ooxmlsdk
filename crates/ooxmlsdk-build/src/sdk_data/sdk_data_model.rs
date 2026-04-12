@@ -29,23 +29,11 @@ pub struct CompatibilityBitmaskAttribute {
 pub enum CompatibilityAction {
   #[default]
   None,
-  TreatAsString,
   FallbackToRawXml,
   TextChoice,
-  PreserveNamespaceDecls,
   CollectionSequenceRoot,
   ExtraChild,
   AlternateContentChoice,
-  AddAttribute {
-    #[serde(rename = "QName")]
-    q_name: String,
-    #[serde(rename = "Type")]
-    r#type: String,
-    #[serde(rename = "PropertyComments")]
-    property_comments: String,
-    #[serde(default)]
-    required: bool,
-  },
   MapAttributeValue {
     #[serde(rename = "Mappings")]
     mappings: Vec<CompatibilityValueMapping>,

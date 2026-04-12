@@ -4,9 +4,8 @@ use std::path::Path;
 
 use crate::Result;
 use crate::sdk_data::sdk_data_model::{
-  CompatibilityAction, CompatibilityConfig, CompatibilityRule, Schema, SchemaType,
-  SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
-  SchemaTypeParticle, SchemaTypeParticleOccur,
+  CompatibilityAction, CompatibilityConfig, CompatibilityRule, Schema, SchemaType, SchemaTypeChild,
+  SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeParticle, SchemaTypeParticleOccur,
 };
 
 pub fn read_compatibility(path: &Path) -> Result<CompatibilityConfig> {
@@ -38,49 +37,11 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
     }
 
     match &rule.action {
-      CompatibilityAction::TreatAsString => {}
       CompatibilityAction::FallbackToRawXml => {}
       CompatibilityAction::TextChoice => {}
-      CompatibilityAction::PreserveNamespaceDecls => {}
       CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
       CompatibilityAction::AlternateContentChoice => {}
-      CompatibilityAction::AddAttribute {
-        q_name,
-        r#type,
-        property_comments,
-        ..
-      } => {
-        if q_name.is_empty() {
-          return Err(
-            format!(
-              "compatibility rule {}.{}.{} AddAttribute QName cannot be empty",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-
-        if r#type.is_empty() {
-          return Err(
-            format!(
-              "compatibility rule {}.{}.{} AddAttribute type cannot be empty",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-
-        if property_comments.is_empty() {
-          return Err(
-            format!(
-              "compatibility rule {}.{}.{} AddAttribute property comments cannot be empty",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-      }
       CompatibilityAction::MapAttributeValue { mappings } => {
         if mappings.is_empty() {
           return Err(
@@ -290,45 +251,6 @@ pub fn map_attribute_value_rule_for_field<'a>(
   })
 }
 
-pub fn preserve_namespace_decls_rule_for_type<'a>(
-  compatibility_rules: &'a [CompatibilityRule],
-  schema: &str,
-  type_name: &str,
-) -> Option<&'a CompatibilityRule> {
-  compatibility_rules.iter().find(|rule| {
-    rule.schema == schema
-      && rule.type_name == type_name
-      && rule.field == "xmlns_map"
-      && matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls)
-  })
-}
-
-pub fn preserve_namespace_decls_rule_for_schema<'a>(
-  compatibility_rules: &'a [CompatibilityRule],
-  schema: &str,
-) -> Option<&'a CompatibilityRule> {
-  compatibility_rules.iter().find(|rule| {
-    rule.schema == schema
-      && rule.type_name == "*"
-      && rule.field == "xmlns_map"
-      && matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls)
-  })
-}
-
-pub fn treat_as_string_rule_for_field<'a>(
-  compatibility_rules: &'a [CompatibilityRule],
-  schema: &str,
-  type_name: &str,
-  field: &str,
-) -> Option<&'a CompatibilityRule> {
-  compatibility_rules.iter().find(|rule| {
-    rule.schema == schema
-      && rule.type_name == type_name
-      && rule.field == field
-      && matches!(rule.action, CompatibilityAction::TreatAsString)
-  })
-}
-
 pub fn fallback_to_raw_xml_rule_for_field<'a>(
   compatibility_rules: &'a [CompatibilityRule],
   schema: &str,
@@ -391,10 +313,6 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
     .position(|schema| schema.module_name == rule.schema)
     .ok_or_else(|| format!("compatibility schema {} not found", rule.schema))?;
 
-  if matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls) {
-    return Ok(());
-  }
-
   let schema_type_index = {
     let schema = &sdk_data_schemas[schema_index];
     find_schema_type_index(schema, &rule.type_name).ok_or_else(|| {
@@ -411,31 +329,6 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
   };
 
   match &rule.action {
-    CompatibilityAction::TreatAsString => {
-      if let Some((attribute_type_index, attribute_index)) = attribute_index {
-        if attribute_type_index == schema_type_index {
-          let schema = &mut sdk_data_schemas[schema_index];
-          let attribute = &mut schema.types[attribute_type_index].attributes[attribute_index];
-          attribute.r#type = "StringValue".to_string();
-        }
-      } else {
-        let schema = &sdk_data_schemas[schema_index];
-        if rule.field == "xml_content"
-          && (schema.types[schema_type_index].api_kind == SchemaTypeApiKind::LeafTextWrapper
-            || schema.types[schema_type_index].kind == SchemaTypeKind::LeafText)
-        {
-          // Leaf text wrappers derive their xml_content type during codegen.
-        } else {
-          return Err(
-            format!(
-              "compatibility field {}.{}.{} not found",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-      }
-    }
     CompatibilityAction::FallbackToRawXml => {}
     CompatibilityAction::TextChoice => {
       let schema = &mut sdk_data_schemas[schema_index];
@@ -467,35 +360,6 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
         );
       }
     }
-    CompatibilityAction::AddAttribute {
-      q_name,
-      r#type,
-      property_comments,
-      required,
-    } => {
-      let schema = &mut sdk_data_schemas[schema_index];
-      let schema_type = &mut schema.types[schema_type_index];
-
-      if schema_type
-        .attributes
-        .iter()
-        .any(|attr| attr.q_name == *q_name || attr.property_name == rule.field)
-      {
-        return Ok(());
-      }
-
-      schema_type
-        .attributes
-        .push(crate::sdk_data::sdk_data_model::SchemaTypeAttribute {
-          q_name: q_name.clone(),
-          property_name: rule.field.clone(),
-          r#type: r#type.clone(),
-          property_comments: property_comments.clone(),
-          version: "Office2007".to_string(),
-          required: *required,
-        });
-    }
-    CompatibilityAction::PreserveNamespaceDecls => {}
     CompatibilityAction::ExtraChild => {
       let (child_schema_index, child_type_index) =
         find_child_type_index_by_qname(sdk_data_schemas, &rule.field).ok_or_else(|| {
@@ -610,167 +474,6 @@ fn choice_child_contains_qname(child: &SchemaTypeChild, child_qname: &str) -> bo
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_data::sdk_data_model::{
-    SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
-  };
-
-  #[test]
-  fn treat_validator_type_as_string_rewrites_attribute_type() {
-    let mut schemas = vec![Schema {
-      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
-      types: vec![SchemaType {
-        class_name: "PageSize".to_string(),
-        attributes: vec![SchemaTypeAttribute {
-          property_name: "Width".to_string(),
-          q_name: "w:w".to_string(),
-          r#type: "UInt32Value".to_string(),
-          ..Default::default()
-        }],
-        ..Default::default()
-      }],
-      ..Default::default()
-    }];
-
-    let compatibility = CompatibilityConfig {
-      rules: vec![CompatibilityRule {
-        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
-        type_name: "PageSize".to_string(),
-        field: "Width".to_string(),
-        action: CompatibilityAction::TreatAsString,
-      }],
-    };
-
-    apply_compatibility(&mut schemas, &compatibility).unwrap();
-
-    assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
-  }
-
-  #[test]
-  fn treat_as_string_on_derived_attribute_does_not_rewrite_base_type() {
-    let mut schemas = vec![Schema {
-      module_name: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
-      types: vec![
-        SchemaType {
-          name: "w:CT_NonNegativeShort/".to_string(),
-          class_name: "NonNegativeShortType".to_string(),
-          attributes: vec![SchemaTypeAttribute {
-            property_name: "Val".to_string(),
-            q_name: "w:val".to_string(),
-            r#type: "Int16Value".to_string(),
-            ..Default::default()
-          }],
-          ..Default::default()
-        },
-        SchemaType {
-          name: "w:CT_NonNegativeShort/w:defaultTabStop".to_string(),
-          class_name: "DefaultTabStop".to_string(),
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    }];
-
-    let compatibility = CompatibilityConfig {
-      rules: vec![CompatibilityRule {
-        schema: "schemas_openxmlformats_org_wordprocessingml_2006_main".to_string(),
-        type_name: "DefaultTabStop".to_string(),
-        field: "Val".to_string(),
-        action: CompatibilityAction::TreatAsString,
-      }],
-    };
-
-    apply_compatibility(&mut schemas, &compatibility).unwrap();
-
-    assert_eq!(schemas[0].types[0].attributes[0].r#type, "Int16Value");
-  }
-
-  #[test]
-  fn treat_as_string_allows_leaf_text_xml_content_rule() {
-    let mut schemas = vec![Schema {
-      module_name: "schemas_microsoft_com_office_word_2010_wordprocessing_drawing".to_string(),
-      types: vec![SchemaType {
-        class_name: "PercentagePositionHeightOffset".to_string(),
-        kind: SchemaTypeKind::LeafText,
-        api_kind: SchemaTypeApiKind::LeafTextWrapper,
-        ..Default::default()
-      }],
-      ..Default::default()
-    }];
-
-    let compatibility = CompatibilityConfig {
-      rules: vec![CompatibilityRule {
-        schema: "schemas_microsoft_com_office_word_2010_wordprocessing_drawing".to_string(),
-        type_name: "PercentagePositionHeightOffset".to_string(),
-        field: "xml_content".to_string(),
-        action: CompatibilityAction::TreatAsString,
-      }],
-    };
-
-    apply_compatibility(&mut schemas, &compatibility).unwrap();
-  }
-
-  #[test]
-  fn preserve_namespace_decls_is_a_noop_for_schema_metadata() {
-    let mut schemas = vec![Schema {
-      module_name: "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
-      types: vec![SchemaType {
-        class_name: "WorkbookExtension".to_string(),
-        attributes: vec![SchemaTypeAttribute {
-          property_name: "Uri".to_string(),
-          q_name: "uri".to_string(),
-          r#type: "StringValue".to_string(),
-          ..Default::default()
-        }],
-        ..Default::default()
-      }],
-      ..Default::default()
-    }];
-
-    let compatibility = CompatibilityConfig {
-      rules: vec![CompatibilityRule {
-        schema: "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
-        type_name: "WorkbookExtension".to_string(),
-        field: "xmlns_map".to_string(),
-        action: CompatibilityAction::PreserveNamespaceDecls,
-      }],
-    };
-
-    apply_compatibility(&mut schemas, &compatibility).unwrap();
-
-    assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
-  }
-
-  #[test]
-  fn preserve_namespace_decls_allows_schema_wildcard() {
-    let mut schemas = vec![Schema {
-      module_name: "schemas_openxmlformats_org_drawingml_2006_main".to_string(),
-      types: vec![SchemaType {
-        class_name: "Graphic".to_string(),
-        attributes: vec![SchemaTypeAttribute {
-          property_name: "Uri".to_string(),
-          q_name: "uri".to_string(),
-          r#type: "StringValue".to_string(),
-          ..Default::default()
-        }],
-        ..Default::default()
-      }],
-      ..Default::default()
-    }];
-
-    let compatibility = CompatibilityConfig {
-      rules: vec![CompatibilityRule {
-        schema: "schemas_openxmlformats_org_drawingml_2006_main".to_string(),
-        type_name: "*".to_string(),
-        field: "xmlns_map".to_string(),
-        action: CompatibilityAction::PreserveNamespaceDecls,
-      }],
-    };
-
-    apply_compatibility(&mut schemas, &compatibility).unwrap();
-
-    assert_eq!(schemas[0].types[0].attributes[0].r#type, "StringValue");
-  }
-
   #[test]
   fn extra_child_appends_schema_child() {
     let mut schemas = vec![Schema {

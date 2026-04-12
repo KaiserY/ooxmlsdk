@@ -23,6 +23,42 @@
     {
       "ClassName": "TableExtension",
       "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Table",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "AutoFilter",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "TableColumn",
+      "Attributes": [
+        {
+          "QName": "xr3:uid",
+          "PropertyName": "xr3:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
     }
   ]
 }

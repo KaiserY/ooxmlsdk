@@ -1,0 +1,52 @@
+{
+  "Types": [
+    {
+      "ClassName": "ParagraphProperties",
+      "Attributes": [
+        {
+          "QName": "mc:PreserveAttributes",
+          "PropertyName": "mc_preserve_attributes",
+          "Type": "StringValue",
+          "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Run",
+      "Attributes": [
+        {
+          "QName": "mc:PreserveAttributes",
+          "PropertyName": "mc_preserve_attributes",
+          "Type": "StringValue",
+          "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlBlock",
+      "Attributes": [
+        {
+          "QName": "w:element",
+          "PropertyName": "element",
+          "Type": "StringValue",
+          "PropertyComments": "Custom XML element name.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlRun",
+      "Attributes": [
+        {
+          "QName": "w:element",
+          "PropertyName": "element",
+          "Type": "StringValue",
+          "PropertyComments": "Custom XML element name.",
+          "Version": "Office2007"
+        }
+      ]
+    }
+  ]
+}

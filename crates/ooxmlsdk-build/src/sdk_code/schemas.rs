@@ -14,7 +14,7 @@ use crate::sdk_code::helpers::{
   structure_one_sequence_particles,
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
-use crate::sdk_data::compatibility::{text_choice_rule_for_field, treat_as_string_rule_for_field};
+use crate::sdk_data::compatibility::text_choice_rule_for_field;
 use crate::sdk_data::sdk_data_model::{
   CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
   SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
@@ -625,8 +625,7 @@ pub fn gen_schema(
     };
 
     if is_leaf_text_wrapper(schema_type) {
-      let xml_content_type =
-        gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
+      let xml_content_type = gen_xml_content_type(schema_type, schema, context)?;
 
       if can_alias_leaf_text_wrapper(schema_type) {
         token_stream_list.push(quote! {
@@ -747,9 +746,8 @@ pub fn gen_schema(
         );
       }
 
-      let simple_type_name =
-        gen_xml_content_type(schema_type, schema, compatibility_rules, context)
-          .map_err(|err| format!("type {} xml content: {err}", schema_type.class_name))?;
+      let simple_type_name = gen_xml_content_type(schema_type, schema, context)
+        .map_err(|err| format!("type {} xml content: {err}", schema_type.class_name))?;
       fields.push(quote! {
         #[sdk(text)]
         pub xml_content: Option<#simple_type_name>,
@@ -780,9 +778,8 @@ pub fn gen_schema(
       }
 
       if !schema_type.text_value_type.is_empty() {
-        let simple_type_name =
-          gen_xml_content_type(schema_type, schema, compatibility_rules, context)
-            .map_err(|err| format!("type {} xml content: {err}", schema_type.class_name))?;
+        let simple_type_name = gen_xml_content_type(schema_type, schema, context)
+          .map_err(|err| format!("type {} xml content: {err}", schema_type.class_name))?;
         fields.push(quote! {
           #[sdk(text)]
           pub xml_content: Option<#simple_type_name>,
@@ -1042,8 +1039,7 @@ pub fn gen_schema(
       }
 
       if schema_type.children.is_empty() && is_leaf_text_type(base_class_type) {
-        let simple_type_name =
-          gen_xml_content_type(schema_type, schema, compatibility_rules, context)?;
+        let simple_type_name = gen_xml_content_type(schema_type, schema, context)?;
         fields.push(quote! {
           #[sdk(text)]
           pub xml_content: Option<#simple_type_name>,
@@ -1239,39 +1235,7 @@ fn gen_attr(
     parse_str(&escape_snake_case(attr.property_name.to_snake_case()))?
   };
 
-  let effective_attr_type = if treat_as_string_rule_for_field(
-    compatibility_rules,
-    &schema.module_name,
-    owner_class_name,
-    &attr.property_name,
-  )
-  .is_some()
-    || treat_as_string_rule_for_field(
-      compatibility_rules,
-      &schema.module_name,
-      owner_type_name,
-      &attr.property_name,
-    )
-    .is_some()
-    || treat_as_string_rule_for_field(
-      compatibility_rules,
-      &schema.module_name,
-      owner_class_name,
-      &attr.q_name,
-    )
-    .is_some()
-    || treat_as_string_rule_for_field(
-      compatibility_rules,
-      &schema.module_name,
-      owner_type_name,
-      &attr.q_name,
-    )
-    .is_some()
-  {
-    "StringValue"
-  } else {
-    attr.r#type.as_str()
-  };
+  let effective_attr_type = attr.r#type.as_str();
 
   let type_ident: Type = match classify_attr_type(effective_attr_type)
     .ok_or_else(|| effective_attr_type.to_string())?
@@ -1704,7 +1668,6 @@ fn collect_resolved_sequence_leafs<'a>(
 fn gen_xml_content_type(
   schema_type: &SchemaType,
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
 ) -> Result<Type> {
   if !schema_type.text_value_type.is_empty() {
@@ -1712,24 +1675,6 @@ fn gen_xml_content_type(
       "crate::simple_type::{}",
       schema_type.text_value_type
     ))?);
-  }
-
-  if treat_as_string_rule_for_field(
-    compatibility_rules,
-    &schema.module_name,
-    &schema_type.class_name,
-    "xml_content",
-  )
-  .is_some()
-    || treat_as_string_rule_for_field(
-      compatibility_rules,
-      &schema.module_name,
-      &schema_type.name,
-      "xml_content",
-    )
-    .is_some()
-  {
-    return Ok(parse_str("crate::simple_type::StringValue")?);
   }
 
   let first_name = &schema_type.name[0..schema_type.name.find('/').unwrap()];

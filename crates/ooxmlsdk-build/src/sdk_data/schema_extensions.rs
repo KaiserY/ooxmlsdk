@@ -5,7 +5,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
-use crate::sdk_data::sdk_data_model::Schema;
+use crate::sdk_data::sdk_data_model::{Schema, SchemaTypeAttribute};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
@@ -17,7 +17,10 @@ pub struct SchemaExtensions {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeExtension {
   pub class_name: String,
-  pub has_xmlns_fields: bool,
+  pub has_xmlns_fields: Option<bool>,
+  pub has_mc_ignorable_field: Option<bool>,
+  #[serde(default)]
+  pub attributes: Vec<SchemaTypeAttribute>,
 }
 
 pub fn read_schema_extensions(dir: &Path) -> Result<Vec<(String, SchemaExtensions)>> {
@@ -77,7 +80,25 @@ pub fn apply_schema_extensions(
         );
       };
 
-      schema_type.has_xmlns_fields = extension.has_xmlns_fields;
+      if let Some(has_xmlns_fields) = extension.has_xmlns_fields {
+        schema_type.has_xmlns_fields = has_xmlns_fields;
+      }
+
+      if let Some(has_mc_ignorable_field) = extension.has_mc_ignorable_field {
+        schema_type.has_mc_ignorable_field = has_mc_ignorable_field;
+      }
+
+      for attribute in &extension.attributes {
+        if schema_type.attributes.iter().any(|existing| {
+          existing.q_name == attribute.q_name
+            || (!attribute.property_name.is_empty()
+              && existing.property_name == attribute.property_name)
+        }) {
+          continue;
+        }
+
+        schema_type.attributes.push(attribute.clone());
+      }
     }
   }
 

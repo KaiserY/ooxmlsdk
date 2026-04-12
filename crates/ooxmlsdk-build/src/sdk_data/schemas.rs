@@ -170,6 +170,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                   .validators
                   .iter()
                   .any(|validator| validator.name == "RequiredValidator"),
+                ..Default::default()
               })
               .collect(),
             children,
@@ -191,6 +192,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               name: facet.name.clone(),
               value: facet.value.clone(),
               version: facet.version.clone(),
+              ..Default::default()
             })
             .collect(),
         })

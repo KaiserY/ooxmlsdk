@@ -143,6 +143,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
             property_comments: attribute.field.replace('_', " ").to_uppercase(),
             version: String::new(),
             required: attribute.required,
+            ..Default::default()
           })
           .collect(),
         children: Vec::new(),
@@ -158,6 +159,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           name: value.clone(),
           value: value.clone(),
           version: String::new(),
+          ..Default::default()
         })
         .collect(),
       version: String::new(),
@@ -436,6 +438,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         name: "DctermsW3cdtf".to_string(),
         value: "dcterms:W3CDTF".to_string(),
         version: String::new(),
+        ..Default::default()
       }],
       version: String::new(),
     }],
@@ -481,6 +484,7 @@ fn core_property_text_type(child: &ParsedChildElement) -> SchemaType {
       property_comments: "type".to_string(),
       version: String::new(),
       required: false,
+      ..Default::default()
     }]
   } else {
     Vec::new()
@@ -593,6 +597,7 @@ fn attributes_to_schema(attributes: &[ParsedAttribute]) -> Vec<SchemaTypeAttribu
       property_comments: attribute.field.clone(),
       version: String::new(),
       required: attribute.required,
+      ..Default::default()
     })
     .collect()
 }

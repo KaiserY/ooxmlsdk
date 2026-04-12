@@ -5,13 +5,15 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
-use crate::sdk_data::sdk_data_model::{Schema, SchemaTypeAttribute};
+use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaEnumFacet, SchemaTypeAttribute};
 use crate::sdk_data::sdk_data_model::{SchemaTypeChild, SchemaTypeChildKind};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaExtensions {
   pub types: Vec<SchemaTypeExtension>,
+  #[serde(default)]
+  pub enums: Vec<SchemaEnum>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -34,6 +36,7 @@ pub struct SchemaTypeChildExtension {
   pub property_name: String,
   #[serde(default)]
   pub optional: bool,
+  pub insert_before: Option<String>,
   #[serde(default)]
   pub children: Vec<SchemaTypeChildExtension>,
 }
@@ -106,6 +109,24 @@ pub fn apply_schema_extensions(
       merge_schema_type_attributes(&mut schema_type.attributes, &extension.attributes);
       merge_schema_type_children(&mut schema_type.children, &extension.children);
     }
+
+    for extension in &extensions.enums {
+      let Some(schema_enum) = schema
+        .enums
+        .iter_mut()
+        .find(|schema_enum| schema_enum.name == extension.name)
+      else {
+        return Err(
+          format!(
+            "schema extension enum {}.{} not found",
+            module_name, extension.name
+          )
+          .into(),
+        );
+      };
+
+      merge_schema_enum_facets(&mut schema_enum.facets, &extension.facets);
+    }
   }
 
   Ok(())
@@ -116,15 +137,69 @@ fn merge_schema_type_attributes(
   extensions: &[SchemaTypeAttribute],
 ) {
   for attribute in extensions {
-    if target.iter().any(|existing| {
+    if let Some(existing) = target.iter_mut().find(|existing| {
       existing.q_name == attribute.q_name
         || (!attribute.property_name.is_empty()
           && existing.property_name == attribute.property_name)
     }) {
-      continue;
+      merge_schema_type_attribute(existing, attribute);
+    } else {
+      target.push(attribute.clone());
     }
+  }
+}
 
-    target.push(attribute.clone());
+fn merge_schema_type_attribute(target: &mut SchemaTypeAttribute, extension: &SchemaTypeAttribute) {
+  if !extension.q_name.is_empty() {
+    target.q_name = extension.q_name.clone();
+  }
+  if !extension.property_name.is_empty() {
+    target.property_name = extension.property_name.clone();
+  }
+  if !extension.r#type.is_empty() {
+    target.r#type = extension.r#type.clone();
+  }
+  if !extension.property_comments.is_empty() {
+    target.property_comments = extension.property_comments.clone();
+  }
+  if !extension.version.is_empty() {
+    target.version = extension.version.clone();
+  }
+  if extension.required {
+    target.required = true;
+  }
+  if extension.bit.is_some() {
+    target.bit = extension.bit;
+  }
+}
+
+fn merge_schema_enum_facets(target: &mut Vec<SchemaEnumFacet>, extensions: &[SchemaEnumFacet]) {
+  for facet in extensions {
+    if let Some(existing) = target.iter_mut().find(|existing| {
+      (!facet.name.is_empty() && existing.name == facet.name)
+        || (!facet.value.is_empty() && existing.value == facet.value)
+    }) {
+      merge_schema_enum_facet(existing, facet);
+    } else {
+      target.push(facet.clone());
+    }
+  }
+}
+
+fn merge_schema_enum_facet(target: &mut SchemaEnumFacet, extension: &SchemaEnumFacet) {
+  if !extension.name.is_empty() {
+    target.name = extension.name.clone();
+  }
+  if !extension.value.is_empty() {
+    target.value = extension.value.clone();
+  }
+  if !extension.version.is_empty() {
+    target.version = extension.version.clone();
+  }
+  for alias in &extension.aliases {
+    if !target.aliases.contains(alias) {
+      target.aliases.push(alias.clone());
+    }
   }
 }
 
@@ -135,6 +210,12 @@ fn merge_schema_type_children(
   for extension in extensions {
     if let Some(target_child) = find_merge_target(target, extension) {
       merge_schema_type_child(target_child, extension);
+    } else if let Some(insert_before) = &extension.insert_before {
+      if let Some(index) = find_insert_before_index(target, insert_before) {
+        target.insert(index, runtime_schema_type_child(extension));
+      } else {
+        target.push(runtime_schema_type_child(extension));
+      }
     } else {
       target.push(runtime_schema_type_child(extension));
     }
@@ -185,6 +266,25 @@ fn find_merge_target<'a>(
   }
 
   None
+}
+
+fn find_insert_before_index(target: &[SchemaTypeChild], insert_before: &str) -> Option<usize> {
+  target.iter().position(|child| {
+    child.name == insert_before
+      || child.name.ends_with(&format!("/{insert_before}"))
+      || child.property_name == insert_before
+      || (child.kind == SchemaTypeChildKind::Choice
+        && choice_child_contains_qname(child, insert_before))
+  })
+}
+
+fn choice_child_contains_qname(child: &SchemaTypeChild, child_qname: &str) -> bool {
+  child.children.iter().any(|nested| {
+    nested.name == child_qname
+      || nested.name.ends_with(&format!("/{child_qname}"))
+      || nested.property_name == child_qname
+      || choice_child_contains_qname(nested, child_qname)
+  })
 }
 
 fn runtime_schema_type_child(extension: &SchemaTypeChildExtension) -> SchemaTypeChild {

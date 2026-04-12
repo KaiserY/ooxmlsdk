@@ -15,8 +15,8 @@ use crate::sdk_code::helpers::{
 };
 use crate::sdk_code::versioning::{effective_version, is_microsoft365_version, version_cfg_attrs};
 use crate::sdk_data::sdk_data_model::{
-  CompatibilityAction, CompatibilityRule, Schema, SchemaEnum, SchemaType, SchemaTypeAttribute,
-  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
+  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
+  SchemaTypeCompositeKind,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -602,7 +602,6 @@ fn one_sequence_choice_type_stem(schema_type: &SchemaType, field_name: &str) -> 
 
 pub fn gen_schema(
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   suppress_version_cfg_attrs: bool,
 ) -> Result<TokenStream> {
@@ -611,14 +610,8 @@ pub fn gen_schema(
 
   for schema_enum in &schema.enums {
     token_stream_list.push(
-      gen_schema_enum(
-        schema_enum,
-        &schema.module_name,
-        compatibility_rules,
-        context,
-        version_cfg,
-      )
-      .map_err(|err| format!("enum {}: {err}", schema_enum.name))?,
+      gen_schema_enum(schema_enum, &schema.module_name, context, version_cfg)
+        .map_err(|err| format!("enum {}: {err}", schema_enum.name))?,
     );
   }
 
@@ -695,7 +688,6 @@ pub fn gen_schema(
             &schema_type.class_name,
             &schema_type.name,
             schema,
-            compatibility_rules,
             context,
             field_version_cfg,
           )
@@ -760,7 +752,6 @@ pub fn gen_schema(
             &schema_type.class_name,
             &schema_type.name,
             schema,
-            compatibility_rules,
             context,
             field_version_cfg,
           )
@@ -786,7 +777,6 @@ pub fn gen_schema(
           &schema_type.class_name,
           &schema_type.name,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
         )?);
@@ -798,7 +788,6 @@ pub fn gen_schema(
           &schema_type.class_name,
           &schema_type.name,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
         )?);
@@ -843,7 +832,6 @@ pub fn gen_schema(
         let (mixed_fields, mixed_enums, mixed_items) = gen_mixed_choice_children_fields(
           schema_type,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
           version_cfg,
@@ -888,7 +876,6 @@ pub fn gen_schema(
         let (mixed_fields, mixed_enums, mixed_items) = gen_mixed_choice_children_fields(
           schema_type,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
           version_cfg,
@@ -905,13 +892,8 @@ pub fn gen_schema(
           SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
         )
       {
-        let single_child_fields = gen_single_sequence_child_fields(
-          schema_type,
-          schema,
-          compatibility_rules,
-          context,
-          field_version_cfg,
-        )?;
+        let single_child_fields =
+          gen_single_sequence_child_fields(schema_type, schema, context, field_version_cfg)?;
         fields.extend(single_child_fields);
       } else if matches!(
         schema_type.composite_kind,
@@ -930,21 +912,14 @@ pub fn gen_schema(
           None,
         )?);
       } else if is_one_sequence_flatten(schema_type) {
-        let (one_sequence_fields, one_sequence_enums) = gen_one_sequence_fields(
-          schema_type,
-          schema,
-          compatibility_rules,
-          context,
-          field_version_cfg,
-          version_cfg,
-        )?;
+        let (one_sequence_fields, one_sequence_enums) =
+          gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_enums);
       } else if is_one_sequence_structurable(schema_type) {
         let (one_sequence_fields, one_sequence_items) = gen_structured_one_sequence_fields(
           schema_type,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
           version_cfg,
@@ -952,14 +927,8 @@ pub fn gen_schema(
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_items);
       } else {
-        let (field_option, enum_option, child_items) = gen_children(
-          schema_type,
-          schema,
-          compatibility_rules,
-          context,
-          field_version_cfg,
-          version_cfg,
-        )?;
+        let (field_option, enum_option, child_items) =
+          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
 
         if let Some(field) = field_option {
           fields.push(field);
@@ -984,7 +953,6 @@ pub fn gen_schema(
           &schema_type.class_name,
           &schema_type.name,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
         )?);
@@ -996,7 +964,6 @@ pub fn gen_schema(
           &schema_type.class_name,
           &schema_type.name,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
         )?);
@@ -1019,14 +986,8 @@ pub fn gen_schema(
           field_version_cfg,
         )?);
       } else if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
-        let (one_sequence_fields, one_sequence_enums) = gen_one_sequence_fields(
-          schema_type,
-          schema,
-          compatibility_rules,
-          context,
-          field_version_cfg,
-          version_cfg,
-        )?;
+        let (one_sequence_fields, one_sequence_enums) =
+          gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_enums);
       } else if is_one_sequence_structurable(schema_type)
@@ -1035,7 +996,6 @@ pub fn gen_schema(
         let (one_sequence_fields, one_sequence_items) = gen_structured_one_sequence_fields(
           schema_type,
           schema,
-          compatibility_rules,
           context,
           field_version_cfg,
           version_cfg,
@@ -1043,14 +1003,8 @@ pub fn gen_schema(
         fields.extend(one_sequence_fields);
         child_choice_enums.extend(one_sequence_items);
       } else {
-        let (field_option, enum_option, child_items) = gen_children(
-          schema_type,
-          schema,
-          compatibility_rules,
-          context,
-          field_version_cfg,
-          version_cfg,
-        )?;
+        let (field_option, enum_option, child_items) =
+          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
 
         if let Some(field) = field_option {
           fields.push(field);
@@ -1122,8 +1076,7 @@ fn common_choice_version<'a>(container_version: &'a str, variant_versions: &[&st
 fn gen_schema_enum(
   schema_enum: &SchemaEnum,
   _module_name: &str,
-  compatibility_rules: &[CompatibilityRule],
-  context: &CodegenContext<'_>,
+  _context: &CodegenContext<'_>,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
   let enum_name_ident: Ident = parse_str(&schema_enum.name.to_upper_camel_case())?;
@@ -1149,31 +1102,12 @@ fn gen_schema_enum(
     .unwrap_or_else(|| schema_enum.facets.first().expect("schema enum facet"));
 
   let mut alias_map: HashMap<String, Vec<String>> = HashMap::new();
-  for rule in compatibility_rules {
-    if let CompatibilityAction::MapAttributeValue { mappings } = &rule.action {
-      let is_relevant = if let Some(attr_type) = context
-        .type_by_class_name(&rule.type_name)
-        .or_else(|| context.type_by_name(&format!("{}/{}", rule.schema, rule.type_name)))
-        .and_then(|ty| {
-          ty.attributes
-            .iter()
-            .find(|a| a.property_name == rule.field || a.q_name == rule.field)
-        })
-        .map(|a| a.r#type.as_str())
-      {
-        attr_type.contains(&schema_enum.name)
-      } else {
-        false
-      };
-
-      if is_relevant {
-        for mapping in mappings {
-          alias_map
-            .entry(mapping.to.clone())
-            .or_default()
-            .push(mapping.from.clone());
-        }
-      }
+  for facet in &schema_enum.facets {
+    for alias in &facet.aliases {
+      alias_map
+        .entry(facet.value.clone())
+        .or_default()
+        .push(alias.clone());
     }
   }
 
@@ -1248,10 +1182,9 @@ fn module_version_cfg_attrs(version: &str, version_cfg: VersionCfgContext) -> Ve
 
 fn gen_attr(
   attr: &SchemaTypeAttribute,
-  owner_class_name: &str,
-  owner_type_name: &str,
+  _owner_class_name: &str,
+  _owner_type_name: &str,
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
@@ -1286,28 +1219,13 @@ fn gen_attr(
     }
   };
 
-  let mut strict_bitmask_attrs = quote! {};
-  for rule in compatibility_rules {
-    if let CompatibilityAction::StrictBitmaskAttributes {
-      radix,
-      width,
-      attributes,
-    } = &rule.action
-      && rule.schema == schema.module_name
-      && (rule.type_name == owner_class_name || rule.type_name == owner_type_name)
-    {
-      if rule.field == attr.property_name || rule.field == attr.q_name {
-        strict_bitmask_attrs = quote! {
-          #[sdk(strict_bitmask(radix = #radix, width = #width))]
-        };
-      } else if let Some(bit_attr) = attributes.iter().find(|a| a.q_name == attr.q_name) {
-        let bit = bit_attr.bit;
-        strict_bitmask_attrs = quote! {
-          #[sdk(bit = #bit)]
-        };
-      }
+  let bit_attrs = if let Some(bit) = attr.bit {
+    quote! {
+      #[sdk(bit = #bit)]
     }
-  }
+  } else {
+    quote! {}
+  };
 
   let required = attr.required;
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
@@ -1334,7 +1252,7 @@ fn gen_attr(
       #[doc = ""]
       #[doc = #qualified_doc]
       #sdk_attr_attrs
-      #strict_bitmask_attrs
+      #bit_attrs
       pub #attr_name_ident: #type_ident,
     }
   } else {
@@ -1346,7 +1264,7 @@ fn gen_attr(
       #[doc = ""]
       #[doc = #qualified_doc]
       #sdk_attr_attrs
-      #strict_bitmask_attrs
+      #bit_attrs
       pub #attr_name_ident: Option<#type_ident>,
     }
   })
@@ -1355,7 +1273,6 @@ fn gen_attr(
 fn gen_children(
   schema_type: &SchemaType,
   schema: &Schema,
-  compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -1396,19 +1313,6 @@ fn gen_children(
   let mut items: Vec<TokenStream> = vec![];
   let mut variants: Vec<TokenStream> = vec![];
   let mut default_variant: Option<(Ident, Type)> = None;
-  let has_mc_alternate_content_child = resolved_children.iter().any(|child| {
-    child.name == "mc:CT_AlternateContent/mc:AlternateContent"
-      || child.variant_name == "mc_alternate_content"
-  });
-  let has_alternate_content_choice = resolved_children.iter().any(|child| {
-    crate::sdk_data::compatibility::alternate_content_choice_rule_for_child(
-      compatibility_rules,
-      &schema.module_name,
-      &schema_type.class_name,
-      child.name,
-    )
-    .is_some()
-  });
 
   for (variant_index, child) in resolved_children.iter().enumerate() {
     match child.kind {
@@ -1556,18 +1460,6 @@ fn gen_children(
         }
       }
     }
-  }
-
-  if has_alternate_content_choice && !has_mc_alternate_content_child {
-    variants.push(quote! {
-      #[doc = " Preserves the mc:AlternateContent wrapper for this child."]
-      #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-      McAlternateContent(
-        std::boxed::Box<
-          crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-      ),
-    });
   }
 
   let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
@@ -1914,7 +1806,6 @@ fn choice_child_variant_shape(
 fn gen_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -2122,7 +2013,6 @@ fn gen_one_sequence_fields(
 fn gen_structured_one_sequence_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -2393,7 +2283,6 @@ fn gen_structured_one_sequence_fields(
 fn gen_single_sequence_child_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
 ) -> Result<Vec<TokenStream>> {
@@ -2643,7 +2532,6 @@ fn build_direct_child_field_token(
 fn gen_mixed_choice_children_fields(
   schema_type: &SchemaType,
   schema: &Schema,
-  _compatibility_rules: &[CompatibilityRule],
   context: &CodegenContext<'_>,
   field_cfg: VersionCfgContext,
   item_cfg: VersionCfgContext,
@@ -3160,11 +3048,13 @@ mod tests {
           name: String::new(),
           value: "normal".to_string(),
           version: String::new(),
+          ..Default::default()
         },
         SchemaEnumFacet {
           name: String::new(),
           value: "large".to_string(),
           version: String::new(),
+          ..Default::default()
         },
       ],
       ..Default::default()
@@ -3173,7 +3063,6 @@ mod tests {
     let tokens = gen_schema_enum(
       &schema_enum,
       "",
-      &[],
       &CodegenContext::new(&[]),
       VersionCfgContext::default(),
     )
@@ -3199,16 +3088,19 @@ mod tests {
           name: String::new(),
           value: "none".to_string(),
           version: String::new(),
+          ..Default::default()
         },
         SchemaEnumFacet {
           name: String::new(),
           value: "onBegin".to_string(),
           version: String::new(),
+          ..Default::default()
         },
         SchemaEnumFacet {
           name: String::new(),
           value: "onMediaBookmark".to_string(),
           version: "Office2010".to_string(),
+          ..Default::default()
         },
       ],
       ..Default::default()
@@ -3217,7 +3109,6 @@ mod tests {
     let tokens = gen_schema_enum(
       &schema_enum,
       "",
-      &[],
       &CodegenContext::new(&[]),
       VersionCfgContext::default(),
     )
@@ -3308,7 +3199,6 @@ mod tests {
 
     let tokens = gen_schema(
       &schema,
-      &[],
       &CodegenContext::new(std::slice::from_ref(&schema)),
       false,
     )

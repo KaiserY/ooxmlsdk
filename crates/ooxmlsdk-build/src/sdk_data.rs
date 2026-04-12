@@ -2,7 +2,6 @@ use serde::Serialize;
 use serde_json::to_writer_pretty;
 use std::{ffi::OsStr, fs, fs::File, io::BufWriter, path::Path};
 
-pub mod compatibility;
 pub mod context;
 pub mod mce;
 pub mod opc_schemas;
@@ -15,7 +14,6 @@ pub mod xsd;
 
 use crate::Result;
 use crate::sdk_data::{
-  compatibility::{apply_compatibility, read_compatibility},
   context::Context,
   mce::gen_mc_schema_from_xsd,
   opc_schemas::read_opc_schemas,
@@ -44,7 +42,6 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   let out_dir = out_dir.as_ref();
   let out_parts_dir_path = out_dir.join("parts");
   let out_schemas_dir_path = out_dir.join("schemas");
-  let compatibility = read_compatibility(&out_dir.join("compatibility.json"))?;
 
   fs::create_dir_all(&out_parts_dir_path)?;
   fs::create_dir_all(&out_schemas_dir_path)?;
@@ -61,7 +58,6 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   schemas.sort_by(|left, right| left.module_name.cmp(&right.module_name));
   let schema_extensions = read_schema_extensions(&out_dir.join("schema_extensions"))?;
   apply_schema_extensions(&mut schemas, &schema_extensions)?;
-  apply_compatibility(&mut schemas, &compatibility)?;
 
   for schema in schemas {
     write_json(

@@ -15,6 +15,18 @@
     {
       "ClassName": "ChartReference",
       "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ChartSpace",
+      "Children": [
+        {
+          "Name": "mc:CT_AlternateContent/mc:AlternateContent",
+          "PropertyName": "mc_alternate_content",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "c:CT_Style/c:style"
+        }
+      ]
     }
   ]
 }

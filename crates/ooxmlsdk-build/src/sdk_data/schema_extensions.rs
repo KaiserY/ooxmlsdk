@@ -22,6 +22,7 @@ pub struct SchemaTypeExtension {
   pub class_name: String,
   pub has_xmlns_fields: Option<bool>,
   pub has_mc_ignorable_field: Option<bool>,
+  pub text_value_type: Option<String>,
   #[serde(default)]
   pub attributes: Vec<SchemaTypeAttribute>,
   #[serde(default)]
@@ -104,6 +105,10 @@ pub fn apply_schema_extensions(
 
       if let Some(has_mc_ignorable_field) = extension.has_mc_ignorable_field {
         schema_type.has_mc_ignorable_field = has_mc_ignorable_field;
+      }
+
+      if let Some(text_value_type) = &extension.text_value_type {
+        schema_type.text_value_type = text_value_type.clone();
       }
 
       merge_schema_type_attributes(&mut schema_type.attributes, &extension.attributes);

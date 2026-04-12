@@ -947,6 +947,19 @@ pub fn gen_schema(
         .derived_base_type(schema_type)
         .ok_or_else(|| format!("{:?}", schema_type.name))?;
 
+      let mut seen_attrs: Vec<&str> = schema_type
+        .attributes
+        .iter()
+        .flat_map(|attr| {
+          [
+            (!attr.q_name.is_empty()).then_some(attr.q_name.as_str()),
+            (!attr.property_name.is_empty()).then_some(attr.property_name.as_str()),
+          ]
+          .into_iter()
+          .flatten()
+        })
+        .collect();
+
       for attr in &schema_type.attributes {
         fields.push(gen_attr(
           attr,
@@ -959,6 +972,12 @@ pub fn gen_schema(
       }
 
       for attr in &base_class_type.attributes {
+        if (!attr.q_name.is_empty() && seen_attrs.contains(&attr.q_name.as_str()))
+          || (!attr.property_name.is_empty() && seen_attrs.contains(&attr.property_name.as_str()))
+        {
+          continue;
+        }
+
         fields.push(gen_attr(
           attr,
           &schema_type.class_name,
@@ -967,6 +986,13 @@ pub fn gen_schema(
           context,
           field_version_cfg,
         )?);
+
+        if !attr.q_name.is_empty() {
+          seen_attrs.push(attr.q_name.as_str());
+        }
+        if !attr.property_name.is_empty() {
+          seen_attrs.push(attr.property_name.as_str());
+        }
       }
 
       if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll

@@ -16,7 +16,6 @@ readme.workspace = true
 default = ["microsoft365", "parts"]
 parts = ["dep:zip"]
 microsoft365 = []
-strict = []
 
 [dependencies]
 ooxmlsdk-derive = { workspace = true }

@@ -5,6 +5,42 @@
       "HasXmlnsFields": true
     },
     {
+      "ClassName": "PercentageType",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "PositivePercentageType",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "PositiveFixedPercentageType",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "AlphaOffset",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
       "ClassName": "Graphic",
       "HasXmlnsFields": true
     },
@@ -70,7 +106,15 @@
     },
     {
       "ClassName": "TextParagraphPropertiesType",
-      "HasXmlnsFields": true
+      "HasXmlnsFields": true,
+      "Attributes": [
+        {
+          "QName": ":baseline",
+          "PropertyName": "Baseline",
+          "Type": "StringValue",
+          "PropertyComments": "baseline"
+        }
+      ]
     },
     {
       "ClassName": "ParagraphProperties",
@@ -90,7 +134,15 @@
     },
     {
       "ClassName": "DefaultRunProperties",
-      "HasXmlnsFields": true
+      "HasXmlnsFields": true,
+      "Attributes": [
+        {
+          "QName": ":baseline",
+          "PropertyName": "Baseline",
+          "Type": "StringValue",
+          "PropertyComments": "baseline"
+        }
+      ]
     },
     {
       "ClassName": "EndParagraphRunProperties",
@@ -98,7 +150,13 @@
     },
     {
       "ClassName": "TextCharacterPropertiesType",
-      "HasXmlnsFields": true
+      "HasXmlnsFields": true,
+      "Attributes": [
+        {
+          "QName": ":baseline",
+          "Type": "StringValue"
+        }
+      ]
     },
     {
       "ClassName": "LatinFont",
@@ -119,6 +177,51 @@
     {
       "ClassName": "TailEnd",
       "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "SpacingPercent",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "RgbColorModelPercentage",
+      "Attributes": [
+        {
+          "QName": ":r",
+          "Type": "StringValue"
+        },
+        {
+          "QName": ":g",
+          "Type": "StringValue"
+        },
+        {
+          "QName": ":b",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "Miter",
+      "Attributes": [
+        {
+          "QName": ":lim",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "GradientStop",
+      "Attributes": [
+        {
+          "QName": ":pos",
+          "PropertyName": "Position",
+          "Type": "StringValue"
+        }
+      ]
     }
   ]
 }

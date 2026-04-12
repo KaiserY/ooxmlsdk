@@ -64,6 +64,91 @@
       ]
     },
     {
+      "ClassName": "TableIndentation",
+      "Attributes": [
+        {
+          "QName": "w:w",
+          "PropertyName": "Width",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "TabStop",
+      "Attributes": [
+        {
+          "QName": "w:pos",
+          "PropertyName": "Position",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "DefaultTabStop",
+      "Attributes": [
+        {
+          "QName": "w:val",
+          "PropertyName": "Value",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "PageSize",
+      "Attributes": [
+        {
+          "QName": "w:w",
+          "PropertyName": "Width",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:h",
+          "PropertyName": "Height",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "PageMargin",
+      "Attributes": [
+        {
+          "QName": "w:top",
+          "PropertyName": "Top",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:right",
+          "PropertyName": "Right",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:bottom",
+          "PropertyName": "Bottom",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:left",
+          "PropertyName": "Left",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:header",
+          "PropertyName": "Header",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:footer",
+          "PropertyName": "Footer",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:gutter",
+          "PropertyName": "Gutter",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
       "ClassName": "Body",
       "Children": [
         {

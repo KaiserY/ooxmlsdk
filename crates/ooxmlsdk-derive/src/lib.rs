@@ -356,28 +356,25 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 }
 
 fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeFieldKind>> {
+  let mut attr_name = None;
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
     }
     let metas =
       attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    if let Some(meta) = metas.into_iter().next() {
+    for meta in metas {
       match meta {
         Meta::List(meta) if meta.path.is_ident("attr") => {
-          let mut name = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
-              name = Some(normalize_attr_qname(&value.value()));
+              attr_name = Some(normalize_attr_qname(&value.value()));
               Ok(())
             } else {
               Err(nested.error("unsupported sdk attr attribute"))
             }
           })?;
-          return Ok(Some(SdkTypeFieldKind::Attr {
-            name: name.unwrap_or_default(),
-          }));
         }
         Meta::List(meta) if meta.path.is_ident("child") => {
           let mut qname = None;
@@ -416,6 +413,7 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
             qname: String::new(),
           }));
         }
+        Meta::NameValue(meta) if meta.path.is_ident("bit") => {}
         Meta::Path(path)
           if path.is_ident("xmlns") || path.is_ident("mce") || path.is_ident("xml_header") =>
         {
@@ -429,6 +427,11 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
         }
       }
     }
+  }
+  if attr_name.is_some() {
+    return Ok(Some(SdkTypeFieldKind::Attr {
+      name: attr_name.unwrap_or_default(),
+    }));
   }
   Ok(None)
 }

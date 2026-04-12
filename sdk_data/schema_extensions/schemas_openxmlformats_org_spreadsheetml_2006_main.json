@@ -1,0 +1,28 @@
+{
+  "Types": [
+    {
+      "ClassName": "WorkbookExtensionList",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "WorkbookExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "StylesheetExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotCacheDefinitionExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotTableDefinitionExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TableExtension",
+      "HasXmlnsFields": true
+    }
+  ]
+}

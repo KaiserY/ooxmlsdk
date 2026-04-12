@@ -1370,7 +1370,6 @@ fn gen_children(
   item_cfg: VersionCfgContext,
 ) -> Result<(Option<TokenStream>, Option<ItemEnum>, Vec<TokenStream>)> {
   let resolved_children = context.resolve_children(schema_type)?;
-
   if resolved_children.is_empty() {
     return Ok((None, None, Vec::new()));
   }
@@ -2522,7 +2521,6 @@ fn gen_direct_children_fields(
       .type_map
       .get(child.name.as_str())
       .ok_or_else(|| format!("{:?}", child.name))?;
-
     let field_name = child_field_name(child, child_type);
     if !field_name_set.insert(field_name.clone()) {
       continue;
@@ -2612,7 +2610,6 @@ fn build_direct_child_field_token(
     .type_map
     .get(child.name.as_str())
     .ok_or_else(|| format!("{:?}", child.name))?;
-
   let field_name = child_field_name(child, child_type);
   if !field_name_set.insert(field_name.clone()) {
     return Ok(None);

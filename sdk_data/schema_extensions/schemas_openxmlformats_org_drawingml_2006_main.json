@@ -1,0 +1,124 @@
+{
+  "Types": [
+    {
+      "ClassName": "TableStyleId",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Graphic",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "GraphicData",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "GraphicFrameLocks",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Offset",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Extents",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Transform2D",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ShapeLocks",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Outline",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "PresetGeometry",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "AdjustValueList",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "NoFill",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "EffectList",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ShapeAutoFit",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "BodyProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TextBody",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ListStyle",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TextParagraphPropertiesType",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ParagraphProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Paragraph",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Run",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "RunProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "DefaultRunProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "EndParagraphRunProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TextCharacterPropertiesType",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "LatinFont",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "EastAsianFont",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ComplexScriptFont",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "HeadEnd",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TailEnd",
+      "HasXmlnsFields": true
+    }
+  ]
+}

@@ -41,17 +41,7 @@ fn validate_compatibility(compatibility: &CompatibilityConfig) -> Result<()> {
       CompatibilityAction::TreatAsString => {}
       CompatibilityAction::FallbackToRawXml => {}
       CompatibilityAction::TextChoice => {}
-      CompatibilityAction::PreserveNamespaceDecls => {
-        if rule.field != "xmlns_map" {
-          return Err(
-            format!(
-              "compatibility rule {}.{}.{} PreserveNamespaceDecls field must be xmlns_map",
-              rule.schema, rule.type_name, rule.field
-            )
-            .into(),
-          );
-        }
-      }
+      CompatibilityAction::PreserveNamespaceDecls => {}
       CompatibilityAction::CollectionSequenceRoot => {}
       CompatibilityAction::ExtraChild => {}
       CompatibilityAction::AlternateContentChoice => {}
@@ -401,11 +391,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
     .position(|schema| schema.module_name == rule.schema)
     .ok_or_else(|| format!("compatibility schema {} not found", rule.schema))?;
 
-  if matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls) && rule.type_name == "*" {
-    let schema = &mut sdk_data_schemas[schema_index];
-    for schema_type in &mut schema.types {
-      schema_type.has_xmlns_fields = true;
-    }
+  if matches!(rule.action, CompatibilityAction::PreserveNamespaceDecls) {
     return Ok(());
   }
 
@@ -509,10 +495,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
           required: *required,
         });
     }
-    CompatibilityAction::PreserveNamespaceDecls => {
-      let schema = &mut sdk_data_schemas[schema_index];
-      schema.types[schema_type_index].has_xmlns_fields = true;
-    }
+    CompatibilityAction::PreserveNamespaceDecls => {}
     CompatibilityAction::ExtraChild => {
       let (child_schema_index, child_type_index) =
         find_child_type_index_by_qname(sdk_data_schemas, &rule.field).ok_or_else(|| {

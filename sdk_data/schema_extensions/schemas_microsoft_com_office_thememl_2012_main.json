@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "ThemeFamily",
+      "HasXmlnsFields": true
+    }
+  ]
+}

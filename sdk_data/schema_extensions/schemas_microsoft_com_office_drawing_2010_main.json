@@ -1,0 +1,16 @@
+{
+  "Types": [
+    {
+      "ClassName": "UseLocalDpi",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "HiddenFillProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "HiddenLineProperties",
+      "HasXmlnsFields": true
+    }
+  ]
+}

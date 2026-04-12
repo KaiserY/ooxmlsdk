@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "CreationId",
+      "HasXmlnsFields": true
+    }
+  ]
+}

@@ -8,6 +8,7 @@ pub mod mce;
 pub mod opc_schemas;
 pub mod open_xml;
 pub mod parts;
+pub mod schema_extensions;
 pub mod schemas;
 pub mod sdk_data_model;
 pub mod xsd;
@@ -19,6 +20,7 @@ use crate::sdk_data::{
   mce::gen_mc_schema_from_xsd,
   opc_schemas::read_opc_schemas,
   parts::gen_parts,
+  schema_extensions::{apply_schema_extensions, read_schema_extensions},
   schemas::gen_schemas,
 };
 
@@ -57,6 +59,8 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   let mut schemas = gen_schemas(&gen_context);
   schemas.extend(read_opc_schemas(package_schemas_dir.as_ref())?);
   schemas.sort_by(|left, right| left.module_name.cmp(&right.module_name));
+  let schema_extensions = read_schema_extensions(&out_dir.join("schema_extensions"))?;
+  apply_schema_extensions(&mut schemas, &schema_extensions)?;
   apply_compatibility(&mut schemas, &compatibility)?;
 
   for schema in schemas {

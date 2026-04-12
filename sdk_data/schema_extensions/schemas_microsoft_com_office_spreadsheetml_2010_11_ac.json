@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "AbsolutePath",
+      "HasXmlnsFields": true
+    }
+  ]
+}

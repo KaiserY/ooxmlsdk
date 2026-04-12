@@ -293,7 +293,7 @@ fn document_round_trip_from_openxml_reader_test() {
     parsed.xmlns_map.get("w").map(String::as_str),
     Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
   );
-  assert!(serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"));
+  assert!(!serialized.starts_with("<?xml"));
   assert!(
     serialized.contains("xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"")
   );

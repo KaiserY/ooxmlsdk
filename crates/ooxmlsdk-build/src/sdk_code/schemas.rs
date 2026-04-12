@@ -438,7 +438,6 @@ impl<'a> CodegenContext<'a> {
             )?;
           }
         }
-        SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
       }
     }
 
@@ -896,11 +895,7 @@ pub fn gen_schema(
       ) && schema_type.children.iter().all(|child| {
         matches!(
           child.kind,
-          SchemaTypeChildKind::Child
-            | SchemaTypeChildKind::TextChild
-            | SchemaTypeChildKind::Xmlns
-            | SchemaTypeChildKind::XmlHeader
-            | SchemaTypeChildKind::Mce
+          SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
         )
       }) {
         fields.extend(gen_direct_children_fields(
@@ -1323,10 +1318,7 @@ fn gen_attr(
     }
   }
 
-  let required = attr
-    .validators
-    .iter()
-    .any(|validator| validator.name == "RequiredValidator");
+  let required = attr.required;
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
   let sdk_attr_attrs = quote! {
     #[sdk(attr(qname = #attr_qname))]
@@ -1706,7 +1698,6 @@ fn collect_resolved_sequence_leafs<'a>(
       SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
         collect_resolved_sequence_leafs(&child.children, out);
       }
-      SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
     }
   }
 }
@@ -1830,25 +1821,7 @@ fn child_kind_for_schema_type(schema_type: &SchemaType) -> SchemaTypeChildKind {
 
 fn gen_mce_fields(schema_type: &SchemaType) -> Vec<TokenStream> {
   let mut fields = Vec::new();
-  let has_mce_child = schema_type
-    .children
-    .iter()
-    .any(|child| child.kind == SchemaTypeChildKind::Mce);
-
-  for child in schema_type
-    .children
-    .iter()
-    .filter(|child| child.kind == SchemaTypeChildKind::Mce)
-  {
-    if child.property_name.as_str() == "mc_ignorable" {
-      fields.push(quote! {
-        #[sdk(mce)]
-        pub mc_ignorable: Option<String>,
-      });
-    }
-  }
-
-  if !has_mce_child && schema_type.has_mc_ignorable_field {
+  if schema_type.has_mc_ignorable_field {
     fields.push(quote! {
       #[sdk(mce)]
       pub mc_ignorable: Option<String>,
@@ -3045,7 +3018,6 @@ fn collect_choice_child_leaf_names(
         collect_choice_child_leaf_names(item, out);
       }
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
   }
 }
 

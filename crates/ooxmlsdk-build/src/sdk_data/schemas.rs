@@ -2,9 +2,8 @@ use crate::sdk_data::{
   context::Context,
   sdk_data_model::{
     Namespace, Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind,
-    SchemaTypeAttribute, SchemaTypeAttributeValidator, SchemaTypeAttributeValidatorArgument,
-    SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
-    SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
+    SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
+    SchemaTypeKind, SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
   },
 };
 
@@ -134,59 +133,11 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           }
           mark_mixed_sequence_direct_children_optional(&mut children);
 
-          if has_xmlns_fields {
-            children.push(SchemaTypeChild {
-              name: String::new(),
-              property_name: "xmlns".to_string(),
-              property_comments: String::new(),
-              kind: SchemaTypeChildKind::Xmlns,
-              optional: false,
-              repeated: false,
-              initial_version: String::new(),
-              children: Vec::new(),
-            });
-            children.push(SchemaTypeChild {
-              name: String::new(),
-              property_name: "xmlns_map".to_string(),
-              property_comments: String::new(),
-              kind: SchemaTypeChildKind::Xmlns,
-              optional: false,
-              repeated: false,
-              initial_version: String::new(),
-              children: Vec::new(),
-            });
-          }
-
           let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
             SchemaTypeXmlHeader::Standalone
           } else {
             SchemaTypeXmlHeader::None
           };
-          if xml_header != SchemaTypeXmlHeader::None {
-            children.push(SchemaTypeChild {
-              name: String::new(),
-              property_name: "xml_header".to_string(),
-              property_comments: String::new(),
-              kind: SchemaTypeChildKind::XmlHeader,
-              optional: false,
-              repeated: false,
-              initial_version: String::new(),
-              children: Vec::new(),
-            });
-          }
-
-          if ty.has_mc_ignorable_field {
-            children.push(SchemaTypeChild {
-              name: String::new(),
-              property_name: "mc_ignorable".to_string(),
-              property_comments: String::new(),
-              kind: SchemaTypeChildKind::Mce,
-              optional: false,
-              repeated: false,
-              initial_version: String::new(),
-              children: Vec::new(),
-            });
-          }
 
           SchemaType {
             name: ty.name.clone(),
@@ -214,26 +165,10 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                 r#type: attr.r#type.clone(),
                 property_comments: attr.property_comments.clone(),
                 version: attr.version.clone(),
-                validators: attr
+                required: attr
                   .validators
                   .iter()
-                  .map(|validator| SchemaTypeAttributeValidator {
-                    name: validator.name.clone(),
-                    is_list: validator.is_list,
-                    r#type: validator.r#type.clone(),
-                    union_id: validator.union_id,
-                    is_initial_version: validator.is_initial_version,
-                    arguments: validator
-                      .arguments
-                      .iter()
-                      .map(|argument| SchemaTypeAttributeValidatorArgument {
-                        name: argument.name.clone(),
-                        r#type: argument.r#type.clone(),
-                        value: argument.value.clone(),
-                      })
-                      .collect(),
-                  })
-                  .collect(),
+                  .any(|validator| validator.name == "RequiredValidator"),
               })
               .collect(),
             children,
@@ -536,7 +471,6 @@ fn collect_choice_child_leaf_names(
         collect_choice_child_leaf_names(item, out);
       }
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
   }
 }
 
@@ -684,15 +618,12 @@ fn gen_particle(
     kind: particle.kind.clone(),
     name: particle.name.clone(),
     initial_version: particle.initial_version.clone(),
-    require_filter: particle.require_filter,
-    namespace: particle.namespace.clone(),
     occurs: particle
       .occurs
       .iter()
       .map(|occur| SchemaTypeParticleOccur {
         max: occur.max,
         min: occur.min,
-        include_version: occur.include_version,
         version: occur.version.clone(),
       })
       .collect(),

@@ -17,8 +17,8 @@ pub(crate) use xml::{
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum XmlHeaderType {
   #[default]
-  Plain,
   None,
+  Plain,
   Standalone,
 }
 

@@ -46,26 +46,14 @@ pub fn is_derived_type(schema_type: &SchemaType) -> bool {
 
 pub fn needs_xml_header(schema_type: &SchemaType) -> bool {
   schema_type.xml_header != SchemaTypeXmlHeader::None
-    || schema_type
-      .children
-      .iter()
-      .any(|child| child.kind == SchemaTypeChildKind::XmlHeader)
 }
 
 pub fn has_xmlns_fields(schema_type: &SchemaType) -> bool {
   schema_type.has_xmlns_fields
-    || schema_type
-      .children
-      .iter()
-      .any(|child| child.kind == SchemaTypeChildKind::Xmlns)
 }
 
 pub fn has_mce_fields(schema_type: &SchemaType) -> bool {
   schema_type.has_mc_ignorable_field
-    || schema_type
-      .children
-      .iter()
-      .any(|child| child.kind == SchemaTypeChildKind::Mce)
 }
 
 pub fn is_collection_sequence_root(schema_type: &SchemaType) -> bool {
@@ -107,7 +95,6 @@ fn can_flatten_one_sequence_child(child: &SchemaTypeChild) -> bool {
         })
     }
     SchemaTypeChildKind::Sequence => child.children.iter().all(can_flatten_one_sequence_child),
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
@@ -223,7 +210,6 @@ fn flatten_one_sequence_child<'a>(
         flatten_one_sequence_child(grand_child, optional, repeated, initial_version, out);
       }
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
   }
 }
 
@@ -245,7 +231,6 @@ fn can_structure_one_sequence_child(child: &SchemaTypeChild) -> bool {
           .all(|item| collect_structured_choice_leaf_names(item, &mut leaf_name_set))
     }
     SchemaTypeChildKind::Sequence => child.children.iter().all(can_structure_one_sequence_child),
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
@@ -265,7 +250,6 @@ fn can_structure_one_sequence_choice_variant(child: &SchemaTypeChild) -> bool {
         || (child.children.len() == 1
           && can_structure_one_sequence_choice_variant(&child.children[0]))
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
@@ -281,10 +265,7 @@ fn can_structure_sequence_variant_child(child: &SchemaTypeChild) -> bool {
       .children
       .iter()
       .all(can_structure_sequence_variant_child),
-    SchemaTypeChildKind::Choice
-    | SchemaTypeChildKind::Xmlns
-    | SchemaTypeChildKind::XmlHeader
-    | SchemaTypeChildKind::Mce => false,
+    SchemaTypeChildKind::Choice => false,
   }
 }
 
@@ -325,7 +306,6 @@ fn collect_structured_choice_leaf_names<'a>(
         false
       }
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => false,
   }
 }
 
@@ -372,7 +352,6 @@ fn structure_one_sequence_child<'a>(
         structure_one_sequence_child(grand_child, optional, repeated, initial_version, out);
       }
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {}
   }
 }
 
@@ -418,9 +397,6 @@ fn structure_one_sequence_choice_variant<'a>(
         Vec::new()
       }
     }
-    SchemaTypeChildKind::Xmlns | SchemaTypeChildKind::XmlHeader | SchemaTypeChildKind::Mce => {
-      Vec::new()
-    }
   }
 }
 
@@ -451,10 +427,7 @@ fn structure_sequence_variant_child<'a>(
         structure_sequence_variant_child(grand_child, optional, repeated, initial_version, out);
       }
     }
-    SchemaTypeChildKind::Choice
-    | SchemaTypeChildKind::Xmlns
-    | SchemaTypeChildKind::XmlHeader
-    | SchemaTypeChildKind::Mce => {}
+    SchemaTypeChildKind::Choice => {}
   }
 }
 

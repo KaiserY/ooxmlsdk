@@ -506,20 +506,7 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
           r#type: r#type.clone(),
           property_comments: property_comments.clone(),
           version: "Office2007".to_string(),
-          validators: if *required {
-            vec![
-              crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidator {
-                name: "RequiredValidator".to_string(),
-                is_list: false,
-                r#type: String::new(),
-                union_id: 0,
-                is_initial_version: false,
-                arguments: Vec::new(),
-              },
-            ]
-          } else {
-            Vec::new()
-          },
+          required: *required,
         });
     }
     CompatibilityAction::PreserveNamespaceDecls => {
@@ -577,13 +564,10 @@ fn apply_rule(sdk_data_schemas: &mut [Schema], rule: &CompatibilityRule) -> Resu
             occurs: vec![SchemaTypeParticleOccur {
               max: 1,
               min: 0,
-              include_version: false,
               version: String::new(),
             }],
             items: vec![],
             initial_version: child_version,
-            require_filter: false,
-            namespace: String::new(),
           });
       }
     }

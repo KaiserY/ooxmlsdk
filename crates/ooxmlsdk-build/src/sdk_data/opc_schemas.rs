@@ -5,8 +5,8 @@ use std::path::Path;
 use crate::Result;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute,
-  SchemaTypeAttributeValidator, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
-  SchemaTypeKind, SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
+  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
+  SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
 };
 use crate::sdk_data::xsd::{ParsedAttribute, ParsedChildElement, parse_xsd};
 
@@ -106,17 +106,12 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
             occurs: vec![SchemaTypeParticleOccur {
               min: 0,
               max: u64::MAX,
-              include_version: false,
               version: String::new(),
             }],
             items: Vec::new(),
             initial_version: String::new(),
-            require_filter: false,
-            namespace: String::new(),
           }],
           initial_version: String::new(),
-          require_filter: false,
-          namespace: String::new(),
         },
         collection_sequence_root: false,
       },
@@ -148,18 +143,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
             },
             property_comments: attribute.field.replace('_', " ").to_uppercase(),
             version: String::new(),
-            validators: if attribute.required {
-              vec![SchemaTypeAttributeValidator {
-                name: "RequiredValidator".to_string(),
-                is_list: false,
-                r#type: String::new(),
-                union_id: 0,
-                is_initial_version: false,
-                arguments: Vec::new(),
-              }]
-            } else {
-              Vec::new()
-            },
+            required: attribute.required,
           })
           .collect(),
         children: Vec::new(),
@@ -244,7 +228,6 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
           occurs: vec![SchemaTypeParticleOccur {
             min: 0,
             max: u64::MAX,
-            include_version: false,
             version: String::new(),
           }],
           items: types
@@ -256,18 +239,13 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
               occurs: vec![SchemaTypeParticleOccur {
                 min: 1,
                 max: 1,
-                include_version: false,
                 version: String::new(),
               }],
               items: Vec::new(),
               initial_version: String::new(),
-              require_filter: false,
-              namespace: String::new(),
             })
             .collect(),
           initial_version: String::new(),
-          require_filter: false,
-          namespace: String::new(),
         },
         collection_sequence_root: false,
       },
@@ -358,18 +336,13 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
           occurs: vec![SchemaTypeParticleOccur {
             min: child.min_occurs,
             max: child.max_occurs,
-            include_version: false,
             version: String::new(),
           }],
           items: Vec::new(),
           initial_version: String::new(),
-          require_filter: false,
-          namespace: String::new(),
         })
         .collect(),
       initial_version: String::new(),
-      require_filter: false,
-      namespace: String::new(),
     },
     collection_sequence_root: false,
   }];
@@ -424,18 +397,13 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
           occurs: vec![SchemaTypeParticleOccur {
             min: child.min_occurs,
             max: child.max_occurs,
-            include_version: false,
             version: String::new(),
           }],
           items: Vec::new(),
           initial_version: String::new(),
-          require_filter: false,
-          namespace: String::new(),
         })
         .collect(),
       initial_version: String::new(),
-      require_filter: false,
-      namespace: String::new(),
     },
     collection_sequence_root: false,
   });
@@ -519,7 +487,7 @@ fn core_property_text_type(child: &ParsedChildElement) -> SchemaType {
       r#type: "EnumValue<opc_core_properties.XsiTypeValue>".to_string(),
       property_comments: "type".to_string(),
       version: String::new(),
-      validators: Vec::new(),
+      required: false,
     }]
   } else {
     Vec::new()
@@ -632,18 +600,7 @@ fn attributes_to_schema(attributes: &[ParsedAttribute]) -> Vec<SchemaTypeAttribu
       r#type: attribute.r#type.clone(),
       property_comments: attribute.field.clone(),
       version: String::new(),
-      validators: if attribute.required {
-        vec![SchemaTypeAttributeValidator {
-          name: "RequiredValidator".to_string(),
-          is_list: false,
-          r#type: String::new(),
-          union_id: 0,
-          is_initial_version: false,
-          arguments: Vec::new(),
-        }]
-      } else {
-        Vec::new()
-      },
+      required: attribute.required,
     })
     .collect()
 }

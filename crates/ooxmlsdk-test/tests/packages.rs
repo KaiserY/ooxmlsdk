@@ -319,6 +319,7 @@ fn open_document_dotx_asset_from_openxml_sdk() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn open_strict01_docx_asset_from_openxml_sdk() {
   let path = test_file_path("Strict01.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
@@ -513,6 +514,7 @@ fn open_5errors_docx_asset_currently_fails() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn open_of16_09_unknown_element_docx_asset_currently_fails_on_cx_chart_data_intentionally_changed()
 {
   let path = test_file_path("Of16-09-UnknownElement.docx");
@@ -564,6 +566,7 @@ fn open_mailmerge_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn open_svg_docx_asset_from_openxml_sdk() {
   let path = test_file_path("svg.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
@@ -874,6 +877,7 @@ fn round_trip_mailmerge_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn round_trip_svg_docx_asset_from_openxml_sdk() {
   let path = test_file_path("svg.docx");
   let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
@@ -1153,6 +1157,7 @@ fn open_notes_docx_asset_from_openxml_sdk() {
   );
   assert_eq!(package.main_document_part.image_parts.len(), 2);
   assert!(package.main_document_part.style_definitions_part.is_some());
+  #[cfg(feature = "microsoft365")]
   assert!(
     package
       .main_document_part
@@ -1231,6 +1236,7 @@ fn open_mcdoc_docx_asset_from_openxml_sdk() {
 
   assert_eq!(package.main_document_part.custom_xml_parts.len(), 1);
   assert!(package.main_document_part.style_definitions_part.is_some());
+  #[cfg(feature = "microsoft365")]
   assert!(
     package
       .main_document_part
@@ -1746,6 +1752,7 @@ fn round_trip_plain_docx_asset_from_openxml_sdk() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn round_trip_hello_world_docx_asset_from_openxml_sdk() {
   let path = test_file_path("HelloWorld.docx");
   let (original, roundtripped) = roundtrip_wordprocessing_document(&path);
@@ -1857,6 +1864,7 @@ fn round_trip_document_dotx_asset_from_openxml_sdk() {
 }
 
 #[test]
+#[cfg(feature = "microsoft365")]
 fn round_trip_strict01_docx_asset_from_openxml_sdk() {
   let path = test_file_path("Strict01.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
@@ -2452,12 +2460,14 @@ fn round_trip_mcdoc_docx_asset_from_openxml_sdk() {
       .style_definitions_part
       .is_some()
   );
+  #[cfg(feature = "microsoft365")]
   assert!(
     original
       .main_document_part
       .styles_with_effects_part
       .is_some()
   );
+  #[cfg(feature = "microsoft365")]
   assert!(
     roundtripped
       .main_document_part
@@ -2477,12 +2487,14 @@ fn round_trip_notes_docx_asset_from_openxml_sdk() {
 
   assert_eq!(original.main_document_part.image_parts.len(), 2);
   assert_eq!(roundtripped.main_document_part.image_parts.len(), 2);
+  #[cfg(feature = "microsoft365")]
   assert!(
     original
       .main_document_part
       .styles_with_effects_part
       .is_some()
   );
+  #[cfg(feature = "microsoft365")]
   assert!(
     roundtripped
       .main_document_part

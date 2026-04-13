@@ -7,7 +7,9 @@ This repository is a Rust workspace with three crates under `crates/`:
 - `crates/ooxmlsdk-build`: the code generation crate. It owns the JSON and Rust code generation pipeline.
 - `crates/ooxmlsdk-test`: the integration-test crate. It depends only on `crates/ooxmlsdk` and covers schema round trips plus package-level read/write flows using fixtures under `crates/ooxmlsdk-test/samples/` and `crates/ooxmlsdk-test/doc_samples/`.
 
-Treat the checked-in `sdk_data/` directory and `schemas/OpenPackagingConventions-XMLSchema/` directory as committed generator inputs. The checked-in files under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, `crates/ooxmlsdk/src/schemas.rs`, `crates/ooxmlsdk/src/deserializers.rs`, `crates/ooxmlsdk/src/serializers.rs`, and `crates/ooxmlsdk/src/namespaces.rs` are generated artifacts.
+Treat the checked-in `sdk_data/`, `data/`, and `schemas/OpenPackagingConventions-XMLSchema/` directories as committed generator inputs. The checked-in files under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, `crates/ooxmlsdk/src/schemas.rs`, `crates/ooxmlsdk/src/deserializers.rs`, `crates/ooxmlsdk/src/serializers.rs`, and `crates/ooxmlsdk/src/namespaces.rs` are generated artifacts.
+
+When working on particle decomposition or schema modeling, treat `data/` as the source of truth. Use `schemas/OfficeOpenXML-XMLSchema-Transitional/` and other checked-in XSDs as auxiliary references for coverage checks and real naming sources such as `xsd:group` names. Do not invent semantic names when the true source does not provide one; keep generic `Choice`/`Sequence` naming until a real XSD/data-backed name is available.
 
 `crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is part of the generator input model, not a generated artifact. Keep it in sync with `sdk_data/` when adding new schema or package-level knobs such as compatibility flags.
 
@@ -22,17 +24,21 @@ The runtime crate currently exports `common`, `deserializers`, `namespaces`, `pa
 - `cargo test -p ooxmlsdk-test --features strict`: run the integration tests including strict OOXML package coverage such as `Strict01.docx`.
 - `cargo test --workspace`: run the full workspace test suite.
 - `cargo test --workspace --no-default-features`: run the workspace test suite with default features disabled.
+- `cargo test --workspace --no-default-features --features parts`: run the workspace test suite for the Office2007-oriented `parts` surface without `microsoft365`.
 - `cargo bench -p ooxmlsdk-build --bench serde_bench`: run the serde comparison benchmark in the generator crate.
 - `cargo fmt --all`: format the workspace.
 - `cargo clippy --workspace --all-targets -- -D warnings`: run lints for the default `microsoft365` feature set.
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: run lints with default features disabled.
+- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: run lints for the Office2007-oriented `parts` surface without `microsoft365`.
 
 Run commands from the repository root. For normal validation, use this order and keep `cargo fmt --all` last:
 
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
 - `cargo test --workspace`
 - `cargo test --workspace --no-default-features`
+- `cargo test --workspace --no-default-features --features parts`
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo fmt --all`
 
@@ -55,7 +61,9 @@ When validating generator changes, feature-gated code, or generated schema outpu
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
 - `cargo test --workspace`
 - `cargo test --workspace --no-default-features`
+- `cargo test --workspace --no-default-features --features parts`
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo fmt --all`
 
@@ -63,9 +71,13 @@ Runtime behavior is currently covered by focused round-trip tests in `crates/oox
 
 Additional integration coverage also lives in `crates/ooxmlsdk-test/tests/spreadsheet.rs`, `crates/ooxmlsdk-test/tests/properties.rs`, and `crates/ooxmlsdk-test/tests/packages.rs`. Add new tests close to the behavior they protect.
 
-Feature-gated strict OOXML coverage lives in `crates/ooxmlsdk-test/tests/packages.rs` behind `#[cfg(feature = "strict")]`. Keep strict-only fixtures and assertions under the `strict` feature instead of expanding the default test surface.
+The `cargo test --workspace --no-default-features --features parts` lane is the Office2007-oriented `parts` validation surface. Keep fixtures that require Office 2010+ relationships, ChartEx, model3d, `stylesWithEffects`, Word 2013+ compatibility settings, or other `microsoft365`-gated runtime coverage out of that lane by gating the affected tests with `#[cfg(feature = "microsoft365")]`. Do not hide true Office2007 regressions behind that gate.
+
+Strict OOXML samples may still need separate gating from the default surface. If a test genuinely depends on strict-only runtime behavior, keep it out of the Office2007 `parts` lane and document why.
 
 `crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` fixtures into `open_failure`, `open_valid`, and `round_trip`. Only promote a fixture to `round_trip` when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid` so they do not get revisited as false positives.
+
+When adjusting `doc_samples` or package tests, gate only fixtures that are demonstrably version- or feature-specific. Prefer the smallest possible `#[cfg(...)]` around a test or assertion. Do not broadly gate failing tests until you have distinguished between a real runtime bug and a fixture that depends on disabled feature coverage.
 
 When validating work, do not overlap `cargo fmt`, `cargo test`, `cargo clippy`, or generation commands. Finish one command, capture its result, and only then start the next one. Do not switch target directories to avoid locks. If you encounter a target directory lock, wait for the existing lock to release.
 

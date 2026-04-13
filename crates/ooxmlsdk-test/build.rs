@@ -23,8 +23,12 @@ fn main() {
   for file_name in samples {
     let slug = slugify(&file_name);
     let test_name = format!("doc_sample_{slug}");
+    let version_cfg = version_cfg_attr(&file_name);
 
     if is_invalid(&file_name) {
+      if !version_cfg.is_empty() {
+        generated.push_str(&version_cfg);
+      }
       generated.push_str(&format!(
         "#[test]\nfn invalid_{test_name}() {{\n  assert_doc_sample_invalid({file_name:?});\n}}\n\n"
       ));
@@ -32,6 +36,9 @@ fn main() {
     }
 
     if is_valid_open_only(&file_name) {
+      if !version_cfg.is_empty() {
+        generated.push_str(&version_cfg);
+      }
       generated.push_str(&format!(
         "#[test]\nfn open_valid_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
       ));
@@ -39,14 +46,17 @@ fn main() {
     }
 
     if !is_round_trip_supported(&file_name) {
+      if !version_cfg.is_empty() {
+        generated.push_str(&version_cfg);
+      }
       generated.push_str(&format!(
         "#[test]\nfn open_{test_name}() {{\n  assert_doc_sample_opens({file_name:?});\n}}\n\n"
       ));
       continue;
     }
 
-    if file_name == "HelloWorld.docx" || file_name == "Youtube.xlsx" {
-      generated.push_str("#[cfg(feature = \"microsoft365\")]\n");
+    if !version_cfg.is_empty() {
+      generated.push_str(&version_cfg);
     }
 
     generated.push_str(&format!(
@@ -127,6 +137,54 @@ fn is_valid_open_only(file_name: &str) -> bool {
       | "MCExecl.xlsx"
       | "mcdoc.docx"
       | "missingcalcchainpart.xlsx"
+  )
+}
+
+fn version_cfg_attr(file_name: &str) -> String {
+  if is_microsoft365_doc_sample(file_name) {
+    "#[cfg(feature = \"microsoft365\")]\n".to_string()
+  } else {
+    String::new()
+  }
+}
+
+fn is_microsoft365_doc_sample(file_name: &str) -> bool {
+  matches!(
+    file_name,
+    "3dtestdash.pptx"
+      | "3dtestdot.pptx"
+      | "AnnotationRef.docx"
+      | "BadDocProps.docx"
+      | "Comments.docx"
+      | "Document.dotx"
+      | "DocProps.docx"
+      | "EmptyRelationshipElement.docx"
+      | "extlst.xlsx"
+      | "HelloWorld.docx"
+      | "Hyperlink.docx"
+      | "InvalidDocPropsct.docx"
+      | "malformed_uri.xlsx"
+      | "MoreDocProps.docx"
+      | "NoDocProps.docx"
+      | "Notes.docx"
+      | "Of16-01.docx"
+      | "Of16-01.pptx"
+      | "Of16-02.pptx"
+      | "Of16-03.docx"
+      | "Of16-03.pptx"
+      | "Of16-04.docx"
+      | "Of16-05.docx"
+      | "Of16-06.docx"
+      | "Of16-07.docx"
+      | "Of16-08.docx"
+      | "Of16-09-UnknownElement.docx"
+      | "Plain.docx"
+      | "Presentation.pptx"
+      | "Spreadsheet.xlsx"
+      | "Spreadsheet.xltx"
+      | "Strict01.docx"
+      | "svg.docx"
+      | "Youtube.xlsx"
   )
 }
 

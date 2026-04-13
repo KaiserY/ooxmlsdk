@@ -61,6 +61,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
         .types
         .iter()
         .map(|ty| {
+          let composite_kind = resolve_composite_kind(ty);
           let has_xmlns_fields =
             ty.has_xmlns_fields || !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement";
           let raw_child_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild> = ty
@@ -69,7 +70,9 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             .map(|child| (child.name.as_str(), child))
             .collect();
           let mut children = Vec::new();
-          if ty.particle.kind == "All" {
+          if composite_kind == SchemaTypeCompositeKind::OneChoice {
+            children.extend(gen_one_choice_children(ty, &raw_child_map, &type_map));
+          } else if ty.particle.kind == "All" {
             children.extend(ty.children.iter().map(|child| SchemaTypeChild {
               name: child.name.clone(),
               property_name: child.property_name.clone(),
@@ -148,7 +151,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             part: ty.part.clone(),
             base_class: ty.base_class.clone(),
             kind: resolve_kind(ty, &type_map),
-            composite_kind: resolve_composite_kind(ty),
+            composite_kind,
             xml_header,
             is_abstract: ty.is_abstract,
             has_xmlns_fields,
@@ -201,6 +204,75 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .collect();
 
   schemas
+}
+
+fn gen_one_choice_children(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> Vec<SchemaTypeChild> {
+  let mut variants = Vec::new();
+
+  if schema_type.particle.kind.is_empty() {
+    variants.extend(schema_type.children.iter().map(|child| SchemaTypeChild {
+      name: child.name.clone(),
+      property_name: child.property_name.clone(),
+      property_comments: child.property_comments.clone(),
+      kind: resolve_child_kind(child.name.as_str(), type_map),
+      optional: false,
+      repeated: false,
+      initial_version: String::new(),
+      children: Vec::new(),
+    }));
+  } else {
+    collect_one_choice_variants(
+      &schema_type.particle,
+      raw_child_map,
+      type_map,
+      &mut variants,
+    );
+  }
+
+  if variants.is_empty() {
+    return Vec::new();
+  }
+
+  let (optional, repeated, initial_version) = particle_cardinality(&schema_type.particle);
+
+  vec![SchemaTypeChild {
+    name: String::new(),
+    property_name: "children".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional,
+    repeated,
+    initial_version,
+    children: variants,
+  }]
+}
+
+fn collect_one_choice_variants(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  out: &mut Vec<SchemaTypeChild>,
+) {
+  match particle.kind.as_str() {
+    "Choice" => {
+      for item in &particle.items {
+        collect_choice_variant_children(item, raw_child_map, type_map, out, false, false);
+      }
+    }
+    "Group" | "Sequence" => {
+      for item in &particle.items {
+        collect_one_choice_variants(item, raw_child_map, type_map, out);
+      }
+    }
+    "Any" | "" => {
+      collect_choice_variant_children(particle, raw_child_map, type_map, out, false, false);
+    }
+    _ => {}
+  }
 }
 
 fn collect_choice_children(

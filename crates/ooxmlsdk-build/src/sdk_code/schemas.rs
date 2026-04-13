@@ -115,6 +115,13 @@ pub struct ResolvedCompositeChild<'a> {
   pub children: Vec<ResolvedCompositeChild<'a>>,
 }
 
+#[derive(Debug)]
+pub struct ResolvedOneChoice<'a> {
+  pub field_name: String,
+  pub enum_name: String,
+  pub variants: Vec<ResolvedOneSequenceChild<'a>>,
+}
+
 impl<'a> CodegenContext<'a> {
   pub fn new(schemas: &'a [Schema]) -> Self {
     let mut enum_type_map = HashMap::new();
@@ -385,6 +392,33 @@ impl<'a> CodegenContext<'a> {
     )?;
 
     Ok(resolved)
+  }
+
+  pub fn resolve_one_choice(&self, schema_type: &'a SchemaType) -> Result<ResolvedOneChoice<'a>> {
+    let choice_child = schema_type
+      .children
+      .first()
+      .filter(|child| child.kind == SchemaTypeChildKind::Choice)
+      .ok_or_else(|| format!("{:?}", schema_type.name))?;
+
+    let mut variants = Vec::with_capacity(choice_child.children.len());
+
+    for child in &choice_child.children {
+      if !matches!(
+        child.kind,
+        SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any
+      ) {
+        return Err(format!("{:?}", schema_type.name).into());
+      }
+
+      variants.push(self.resolve_one_sequence_child(schema_type, child.name.as_str())?);
+    }
+
+    Ok(ResolvedOneChoice {
+      field_name: one_sequence_choice_field_name(schema_type, 1, 0),
+      enum_name: one_sequence_choice_enum_name(schema_type, 1, 0),
+      variants,
+    })
   }
 
   fn collect_resolved_children(
@@ -814,7 +848,7 @@ pub fn gen_schema(
         && has_single_choice_child(schema_type)
       {
         let (field_option, enum_option, child_items) =
-          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
+          gen_one_choice_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
 
         if let Some(field) = field_option {
           fields.push(field);
@@ -1026,7 +1060,7 @@ pub fn gen_schema(
         && has_single_choice_child(schema_type)
       {
         let (field_option, enum_option, child_items) =
-          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
+          gen_one_choice_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
 
         if let Some(field) = field_option {
           fields.push(field);
@@ -1583,6 +1617,86 @@ fn gen_children(
   Ok((field_option, enum_option, items))
 }
 
+fn gen_one_choice_fields(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  field_cfg: VersionCfgContext,
+  item_cfg: VersionCfgContext,
+) -> Result<(Option<TokenStream>, Option<ItemEnum>, Vec<TokenStream>)> {
+  let resolved_choice = context.resolve_one_choice(schema_type)?;
+  if resolved_choice.variants.is_empty() {
+    return Ok((None, None, Vec::new()));
+  }
+
+  let choice_version = common_choice_version(
+    schema_type
+      .children
+      .first()
+      .map(|child| child.initial_version.as_str())
+      .unwrap_or_default(),
+    &resolved_choice
+      .variants
+      .iter()
+      .map(|child| child.version)
+      .collect::<Vec<_>>(),
+  );
+  let variant_cfg = if version_cfg_attrs(choice_version).is_empty() {
+    item_cfg
+  } else {
+    VersionCfgContext::new(true)
+  };
+  let field_attrs = module_version_cfg_attrs(choice_version, field_cfg);
+  let choice_field_ident: Ident = parse_str(&resolved_choice.field_name)?;
+  let child_choice_enum_ident: Ident = parse_str(&resolved_choice.enum_name)?;
+  let field_option = Some(quote! {
+    #( #field_attrs )*
+    #[sdk(choice)]
+    pub #choice_field_ident: Vec<#child_choice_enum_ident>,
+  });
+
+  let mut variants = Vec::new();
+
+  for child in &resolved_choice.variants {
+    let child_variant_name_ident: Ident =
+      parse_str(&choice_child_display_name(child).to_upper_camel_case())?;
+    let child_attrs = module_version_cfg_attrs(child.version, variant_cfg);
+    let (sdk_variant_attrs, child_variant_type, wrap_box): (TokenStream, Type, bool) =
+      child_variant_shape(child, schema, context)?;
+
+    if wrap_box {
+      variants.push(quote! {
+        #( #child_attrs )*
+        #sdk_variant_attrs
+        #child_variant_name_ident(std::boxed::Box<#child_variant_type>),
+      });
+    } else {
+      variants.push(quote! {
+        #( #child_attrs )*
+        #sdk_variant_attrs
+        #child_variant_name_ident(#child_variant_type),
+      });
+    }
+  }
+
+  let enum_attrs = module_version_cfg_attrs(choice_version, item_cfg);
+  let enum_tokens = quote! {
+    #( #enum_attrs )*
+    #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+    pub enum #child_choice_enum_ident {
+      #( #variants )*
+    }
+  };
+  let enum_option = Some(parse2(enum_tokens.clone()).map_err(|err| {
+    format!(
+      "failed to generate one-choice enum {} for {}: {err}\n{}",
+      child_choice_enum_ident, schema_type.class_name, enum_tokens
+    )
+  })?);
+
+  Ok((field_option, enum_option, Vec::new()))
+}
+
 fn gen_one_all_children_fields(
   schema_type: &SchemaType,
   schema: &Schema,
@@ -1669,6 +1783,55 @@ fn has_one_all_direct_children(schema_type: &SchemaType) -> bool {
 
 fn has_single_choice_child(schema_type: &SchemaType) -> bool {
   schema_type.children.len() == 1 && schema_type.children[0].kind == SchemaTypeChildKind::Choice
+}
+
+fn child_variant_shape(
+  child: &ResolvedOneSequenceChild<'_>,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<(TokenStream, Type, bool)> {
+  let child_qname = child.name;
+
+  if child.kind == SchemaTypeChildKind::Any {
+    return Ok((quote! { #[sdk(any)] }, parse_str("String")?, true));
+  }
+
+  let child_type = context
+    .type_map
+    .get(child.name)
+    .ok_or_else(|| format!("{:?}", child.name))?;
+  if can_inline_text_child(child_type) {
+    Ok((
+      quote! { #[sdk(text_child(qname = #child_qname))] },
+      leaf_text_wrapper_alias_type(child.name, schema, context)?,
+      false,
+    ))
+  } else {
+    let child_prefix = context
+      .type_prefix_map
+      .get(child.name)
+      .ok_or_else(|| format!("{:?}", child.name))?;
+
+    let child_variant_type: Type = if *child_prefix != schema.prefix {
+      let child_module_name = context
+        .type_module(child.name)
+        .ok_or_else(|| format!("{:?}", child.name))?;
+
+      parse_str(&format!(
+        "crate::schemas::{}::{}",
+        child_module_name,
+        child_type.class_name.to_upper_camel_case()
+      ))?
+    } else {
+      parse_str(&child_type.class_name.to_upper_camel_case())?
+    };
+
+    Ok((
+      quote! { #[sdk(child(qname = #child_qname))] },
+      child_variant_type,
+      true,
+    ))
+  }
 }
 
 fn collect_resolved_sequence_leafs<'a>(

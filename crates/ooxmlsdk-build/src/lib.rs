@@ -22,7 +22,7 @@ mod tests {
     let sdk_data_dir = workspace_root.join("sdk_data");
     let package_schema_dir = workspace_root.join("schemas/OpenPackagingConventions-XMLSchema");
     let runtime_src_dir = workspace_root.join("crates/ooxmlsdk/src");
-    let upstream_data_dir = workspace_root.join("../Open-XML-SDK/data");
+    let upstream_data_dir = workspace_root.join("data");
 
     sdk_data::gen_sdk_data(&upstream_data_dir, &sdk_data_dir, &package_schema_dir)
       .expect("failed to generate sdk data");

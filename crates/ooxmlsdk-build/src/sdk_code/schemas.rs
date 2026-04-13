@@ -219,9 +219,33 @@ impl<'a> CodegenContext<'a> {
       .iter()
       .find(|child| child.name == particle_name)
     {
-      let child_type = self
-        .type_by_name(child.name.as_str())
-        .ok_or_else(|| child.name.clone())?;
+      if child.kind == SchemaTypeChildKind::Any {
+        let field_name = if child.property_name.is_empty() {
+          Cow::Borrowed("unknown_xml")
+        } else {
+          Cow::Owned(escape_snake_case(child.property_name.to_snake_case()))
+        };
+        let property_comments = if child.property_comments.is_empty() {
+          Cow::Borrowed(" _")
+        } else {
+          Cow::Borrowed(child.property_comments.as_str())
+        };
+
+        return Ok(ResolvedOneSequenceChild {
+          name: child.name.as_str(),
+          field_name,
+          property_comments,
+          version: child.initial_version.as_str(),
+          kind: child.kind,
+        });
+      }
+
+      let child_type = self.type_by_name(child.name.as_str()).ok_or_else(|| {
+        format!(
+          "missing direct one-sequence child type for schema {} child {:?} kind {:?}",
+          schema_type.name, child.name, child.kind
+        )
+      })?;
       let field_name = Cow::Owned(child_field_name(child, child_type));
       let property_comments = if child.property_comments.is_empty() {
         Cow::Borrowed(" _")
@@ -238,9 +262,12 @@ impl<'a> CodegenContext<'a> {
       });
     }
 
-    let child_type = self
-      .type_by_name(particle_name)
-      .ok_or_else(|| particle_name.to_string())?;
+    let child_type = self.type_by_name(particle_name).ok_or_else(|| {
+      format!(
+        "missing nested one-sequence child type for schema {} particle {:?}",
+        schema_type.name, particle_name
+      )
+    })?;
 
     Ok(ResolvedOneSequenceChild {
       name: particle_name,
@@ -1793,7 +1820,7 @@ fn child_variant_shape(
   let child_qname = child.name;
 
   if child.kind == SchemaTypeChildKind::Any {
-    return Ok((quote! { #[sdk(any)] }, parse_str("String")?, true));
+    return Ok((quote! { #[sdk(any)] }, parse_str("String")?, false));
   }
 
   let child_type = context
@@ -1983,6 +2010,10 @@ fn child_field_shape(
 ) -> Result<(TokenStream, Type, bool)> {
   let child_qname = child.name;
 
+  if child.kind == SchemaTypeChildKind::Any {
+    return Ok((quote! { #[sdk(any)] }, parse_str("String")?, false));
+  }
+
   let child_type = context
     .type_map
     .get(child.name)
@@ -2104,10 +2135,27 @@ fn gen_one_sequence_fields(
   for flat_particle in flat_particles.into_iter() {
     match flat_particle.kind {
       FlatParticleKind::Leaf(particle) => {
-        let child = context.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
+        let child = context
+          .resolve_one_sequence_child(schema_type, particle.name.as_str())
+          .map_err(|err| {
+            format!(
+              "one-sequence leaf resolve failed for schema {} particle {:?} kind {:?}: {}",
+              schema_type.name, particle.name, particle.kind, err
+            )
+          })?;
         let (sdk_field_attrs, child_variant_type, wrap_box) =
-          child_field_shape(&child, schema, context)?;
-        let child_name_ident: Ident = parse_str(&child.field_name)?;
+          child_field_shape(&child, schema, context).map_err(|err| {
+            format!(
+              "one-sequence leaf shape failed for schema {} field {:?}: {}",
+              schema_type.name, child.field_name, err
+            )
+          })?;
+        let child_name_ident: Ident = parse_str(&child.field_name).map_err(|err| {
+          format!(
+            "invalid one-sequence field name for schema {} child {:?}: {}",
+            schema_type.name, child.field_name, err
+          )
+        })?;
 
         if !field_name_set.insert(child_name_ident.to_string()) {
           continue;
@@ -2182,13 +2230,23 @@ fn gen_one_sequence_fields(
           choice_slot_index,
         )?;
         choice_slot_index += 1;
-        let choice_field_ident: Ident = parse_str(&choice.field_name)?;
+        let choice_field_ident: Ident = parse_str(&choice.field_name).map_err(|err| {
+          format!(
+            "invalid one-sequence choice field name for schema {} choice {:?}: {}",
+            schema_type.name, choice.field_name, err
+          )
+        })?;
 
         if !field_name_set.insert(choice_field_ident.to_string()) {
           continue;
         }
 
-        let choice_enum_ident: Ident = parse_str(&choice.enum_name)?;
+        let choice_enum_ident: Ident = parse_str(&choice.enum_name).map_err(|err| {
+          format!(
+            "invalid one-sequence choice enum name for schema {} choice {:?}: {}",
+            schema_type.name, choice.enum_name, err
+          )
+        })?;
         let property_comments = choice.property_comments.as_str();
         let choice_version = common_choice_version(
           flat_particle.initial_version,
@@ -3408,5 +3466,69 @@ pub fn one_sequence_child_variant_type(
     ))?)
   } else {
     Ok(parse_str(&child_type.class_name.to_upper_camel_case())?)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::fs::File;
+  use std::io::BufReader;
+
+  #[test]
+  fn generates_slide_moniker_list_as_flat_sequence_with_any_tail() {
+    let file = File::open(
+      "../../sdk_data/schemas/schemas_microsoft_com_office_powerpoint_2013_main_command.json",
+    )
+    .unwrap();
+    let schema: Schema = serde_json::from_reader(BufReader::new(file)).unwrap();
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+    let schema_type = schema
+      .types
+      .iter()
+      .find(|item| item.class_name == "SlideMonikerList")
+      .unwrap();
+
+    assert!(is_one_sequence_flatten(schema_type));
+
+    let flat_particles = flatten_one_sequence_particles(schema_type);
+    assert_eq!(flat_particles.len(), 3);
+    for particle in &flat_particles {
+      if let FlatParticleKind::Leaf(child) = &particle.kind {
+        let resolved = context.resolve_one_sequence_child(schema_type, child.name.as_str());
+        assert!(
+          resolved.is_ok(),
+          "failed to resolve particle {:?}: {:?}",
+          child.kind,
+          resolved
+        );
+        let resolved = resolved.unwrap();
+        let field_shape = child_variant_shape(&resolved, &schema, &context);
+        assert!(
+          field_shape.is_ok(),
+          "failed to shape field {:?}",
+          resolved.field_name
+        );
+        let ident_result: std::result::Result<Ident, _> = parse_str(&resolved.field_name);
+        assert!(
+          ident_result.is_ok(),
+          "failed to parse field ident {:?}: {:?}",
+          resolved.field_name,
+          ident_result
+        );
+      }
+    }
+
+    let (fields, enums) = gen_one_sequence_fields(
+      schema_type,
+      &schema,
+      &context,
+      VersionCfgContext::new(false),
+      VersionCfgContext::new(false),
+    )
+    .unwrap();
+
+    assert_eq!(fields.len(), 3);
+    assert!(enums.is_empty());
   }
 }

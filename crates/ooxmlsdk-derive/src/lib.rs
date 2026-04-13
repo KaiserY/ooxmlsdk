@@ -120,6 +120,13 @@ struct SdkChoiceField {
 }
 
 #[derive(Clone)]
+struct SdkAnyField {
+  ident: Ident,
+  optional: bool,
+  repeated: bool,
+}
+
+#[derive(Clone)]
 struct SdkTextField {
   ident: Ident,
   ty: Type,
@@ -132,6 +139,7 @@ enum SdkTypeFieldKind {
   Child { qname: String },
   TextChild { qname: String },
   Choice,
+  Any,
   Text,
 }
 
@@ -408,11 +416,7 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
         }
         Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkTypeFieldKind::Text)),
         Meta::Path(path) if path.is_ident("choice") => return Ok(Some(SdkTypeFieldKind::Choice)),
-        Meta::Path(path) if path.is_ident("any") => {
-          return Ok(Some(SdkTypeFieldKind::Child {
-            qname: String::new(),
-          }));
-        }
+        Meta::Path(path) if path.is_ident("any") => return Ok(Some(SdkTypeFieldKind::Any)),
         Meta::NameValue(meta) if meta.path.is_ident("bit") => {}
         Meta::Path(path)
           if path.is_ident("xmlns") || path.is_ident("mce") || path.is_ident("xml_header") =>

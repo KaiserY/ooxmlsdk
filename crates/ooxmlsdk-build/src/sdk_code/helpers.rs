@@ -79,8 +79,9 @@ pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
 
 fn can_flatten_one_sequence_child(child: &SchemaTypeChild) -> bool {
   match child.kind {
-    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
-    SchemaTypeChildKind::Any => false,
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      child.children.is_empty()
+    }
     SchemaTypeChildKind::Choice => {
       !child.children.is_empty()
         && child.children.iter().all(|item| {
@@ -210,8 +211,9 @@ fn flatten_one_sequence_child<'a>(
 
 fn can_structure_one_sequence_child(child: &SchemaTypeChild) -> bool {
   match child.kind {
-    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
-    SchemaTypeChildKind::Any => false,
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      child.children.is_empty()
+    }
     SchemaTypeChildKind::Choice => {
       !child.children.is_empty()
         && child
@@ -514,6 +516,19 @@ mod tests {
     }
   }
 
+  fn any(optional: bool, repeated: bool, version: &'static str) -> SchemaTypeChild {
+    SchemaTypeChild {
+      name: String::new(),
+      property_name: "UnknownXml".to_string(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Any,
+      optional,
+      repeated,
+      initial_version: version.to_string(),
+      children: vec![],
+    }
+  }
+
   fn one_sequence_schema(items: Vec<SchemaTypeChild>) -> SchemaType {
     SchemaType {
       composite_kind: SchemaTypeCompositeKind::OneSequence,
@@ -616,6 +631,25 @@ mod tests {
     )]);
 
     assert!(!is_one_sequence_flatten(&schema_type));
+  }
+
+  #[test]
+  fn flattens_direct_any_particles() {
+    let schema_type = one_sequence_schema(vec![
+      child("a:CT_Test/a:first", false, false, ""),
+      any(true, true, ""),
+    ]);
+
+    assert!(is_one_sequence_flatten(&schema_type));
+
+    let flat = flatten_one_sequence_particles(&schema_type);
+    assert_eq!(flat.len(), 2);
+    let FlatParticleKind::Leaf(any_child) = flat[1].kind else {
+      panic!("expected any leaf");
+    };
+    assert_eq!(any_child.kind, SchemaTypeChildKind::Any);
+    assert!(flat[1].optional);
+    assert!(flat[1].repeated);
   }
 
   #[test]

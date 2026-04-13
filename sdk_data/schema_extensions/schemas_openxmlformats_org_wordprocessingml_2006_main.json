@@ -157,6 +157,10 @@
           "Kind": "Child",
           "Optional": true,
           "InsertBefore": "w:CT_P/w:p"
+        },
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
         }
       ]
     },
@@ -169,6 +173,100 @@
           "Kind": "Child",
           "Optional": true,
           "InsertBefore": "w:CT_P/w:p"
+        },
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "Paragraph",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlBlock",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_block_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlRow",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_row_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "TableRow",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_cell_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "TableCell",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlCell",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_cell_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlRun",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "SimpleField",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlRuby",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_ruby_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "SimpleFieldRuby",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_ruby_content"
         }
       ]
     },

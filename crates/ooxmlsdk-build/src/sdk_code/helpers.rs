@@ -124,6 +124,7 @@ pub struct StructuredParticle<'a> {
 
 #[derive(Clone, Debug)]
 pub struct StructuredChoice<'a> {
+  pub property_name: &'a str,
   pub variants: Vec<StructuredChoiceVariant<'a>>,
 }
 
@@ -212,17 +213,11 @@ fn can_structure_one_sequence_child(child: &SchemaTypeChild) -> bool {
     SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
     SchemaTypeChildKind::Any => false,
     SchemaTypeChildKind::Choice => {
-      let mut leaf_name_set = std::collections::HashSet::new();
-
       !child.children.is_empty()
         && child
           .children
           .iter()
           .all(can_structure_one_sequence_choice_variant)
-        && child
-          .children
-          .iter()
-          .all(|item| collect_structured_choice_leaf_names(item, &mut leaf_name_set))
     }
     SchemaTypeChildKind::Sequence => child.children.iter().all(can_structure_one_sequence_child),
   }
@@ -248,10 +243,6 @@ fn can_structure_one_sequence_choice_variant(child: &SchemaTypeChild) -> bool {
 }
 
 fn can_structure_sequence_variant_child(child: &SchemaTypeChild) -> bool {
-  if child.repeated {
-    return false;
-  }
-
   match child.kind {
     SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child.children.is_empty(),
     SchemaTypeChildKind::Any => false,
@@ -274,33 +265,6 @@ pub fn has_any_child(schema_type: &SchemaType) -> bool {
     .children
     .iter()
     .any(|child| child.kind == SchemaTypeChildKind::Any)
-}
-
-fn collect_structured_choice_leaf_names<'a>(
-  child: &'a SchemaTypeChild,
-  out: &mut std::collections::HashSet<&'a str>,
-) -> bool {
-  match child.kind {
-    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
-      !child.name.is_empty() && out.insert(child.name.as_str())
-    }
-    SchemaTypeChildKind::Choice => {
-      !child.children.is_empty()
-        && child
-          .children
-          .iter()
-          .all(|item| collect_structured_choice_leaf_names(item, out))
-    }
-    SchemaTypeChildKind::Sequence => {
-      if can_structure_sequence_variant_child(child) {
-        true
-      } else if child.children.len() == 1 {
-        collect_structured_choice_leaf_names(&child.children[0], out)
-      } else {
-        false
-      }
-    }
-  }
 }
 
 fn structure_one_sequence_child<'a>(
@@ -331,10 +295,14 @@ fn structure_one_sequence_child<'a>(
       for item in &child.children {
         variants.extend(structure_one_sequence_choice_variant(item, initial_version));
       }
+      dedupe_structured_choice_variants(&mut variants);
 
       if !variants.is_empty() {
         out.push(StructuredParticle {
-          kind: StructuredParticleKind::Choice(StructuredChoice { variants }),
+          kind: StructuredParticleKind::Choice(StructuredChoice {
+            property_name: child.property_name.as_str(),
+            variants,
+          }),
           optional,
           repeated,
           initial_version,
@@ -347,6 +315,38 @@ fn structure_one_sequence_child<'a>(
       }
     }
   }
+}
+
+fn dedupe_structured_choice_variants(variants: &mut Vec<StructuredChoiceVariant<'_>>) {
+  let mut seen = std::collections::HashSet::new();
+
+  variants.retain(|variant| seen.insert(structured_choice_variant_key(variant)));
+}
+
+fn structured_choice_variant_key(variant: &StructuredChoiceVariant<'_>) -> String {
+  match variant {
+    StructuredChoiceVariant::Leaf(child) => format!("leaf:{}", child.name),
+    StructuredChoiceVariant::Sequence(particles) => format!(
+      "sequence:{}",
+      particles
+        .iter()
+        .map(structured_sequence_particle_key)
+        .collect::<Vec<_>>()
+        .join("|")
+    ),
+  }
+}
+
+fn structured_sequence_particle_key(particle: &StructuredParticle<'_>) -> String {
+  let kind = match &particle.kind {
+    StructuredParticleKind::Leaf(child) => child.name.as_str(),
+    StructuredParticleKind::Choice(_) => "choice",
+  };
+
+  format!(
+    "{}:{}:{}:{}",
+    kind, particle.optional, particle.repeated, particle.initial_version
+  )
 }
 
 fn structure_one_sequence_choice_variant<'a>(
@@ -402,7 +402,7 @@ fn structure_sequence_variant_child<'a>(
   out: &mut Vec<StructuredParticle<'a>>,
 ) {
   let optional = parent_optional || child.optional;
-  let repeated = parent_repeated || child.repeated;
+  let repeated = parent_repeated;
   let initial_version = effective_version(parent_initial_version, child.initial_version.as_str());
 
   match child.kind {
@@ -718,6 +718,64 @@ mod tests {
     )]);
 
     assert!(!is_one_sequence_structurable(&schema_type));
+  }
+
+  #[test]
+  fn structures_choice_with_duplicate_leaf_variants_from_nested_groups() {
+    let schema_type = one_sequence_schema(vec![choice(
+      vec![
+        choice(
+          vec![child("w:CT_Test/w:item", false, false, "")],
+          true,
+          true,
+          "",
+        ),
+        choice(
+          vec![child("w:CT_Test/w:item", false, false, "")],
+          true,
+          true,
+          "",
+        ),
+      ],
+      true,
+      true,
+      "",
+    )]);
+
+    assert!(is_one_sequence_structurable(&schema_type));
+
+    let structured = structure_one_sequence_particles(&schema_type);
+    let StructuredParticleKind::Choice(choice) = &structured[0].kind else {
+      panic!("expected structured choice");
+    };
+    assert_eq!(choice.variants.len(), 1);
+  }
+
+  #[test]
+  fn structures_choice_with_duplicate_sequence_variants_from_nested_groups() {
+    let duplicate_sequence = sequence(
+      vec![
+        child("w:CT_Test/w:first", true, false, ""),
+        child("w:CT_Test/w:second", true, false, "Office2010"),
+      ],
+      false,
+      false,
+      "",
+    );
+    let schema_type = one_sequence_schema(vec![choice(
+      vec![duplicate_sequence.clone(), duplicate_sequence],
+      true,
+      true,
+      "",
+    )]);
+
+    assert!(is_one_sequence_structurable(&schema_type));
+
+    let structured = structure_one_sequence_particles(&schema_type);
+    let StructuredParticleKind::Choice(choice) = &structured[0].kind else {
+      panic!("expected structured choice");
+    };
+    assert_eq!(choice.variants.len(), 1);
   }
 
   #[test]

@@ -1,0 +1,76 @@
+{
+  "Types": [
+    {
+      "ClassName": "Base",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "Numerator",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "Denominator",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "FunctionName",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "Limit",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "SubArgument",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "SuperArgument",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "Degree",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    }
+  ]
+}

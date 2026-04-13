@@ -810,6 +810,24 @@ pub fn gen_schema(
           context,
           field_version_cfg,
         )?);
+      } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneChoice
+        && has_single_choice_child(schema_type)
+      {
+        let (field_option, enum_option, child_items) =
+          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        if let Some(enum_option) = enum_option {
+          let enum_type_attrs = missing_item_attrs(&enum_option.attrs, &type_attrs);
+          child_choice_enums.push(quote! {
+            #( #enum_type_attrs )*
+            #enum_option
+          });
+        }
+        items.extend(child_items);
       } else if matches!(
         schema_type.composite_kind,
         SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
@@ -1004,6 +1022,24 @@ pub fn gen_schema(
           context,
           field_version_cfg,
         )?);
+      } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneChoice
+        && has_single_choice_child(schema_type)
+      {
+        let (field_option, enum_option, child_items) =
+          gen_children(schema_type, schema, context, field_version_cfg, version_cfg)?;
+
+        if let Some(field) = field_option {
+          fields.push(field);
+        }
+
+        if let Some(enum_option) = enum_option {
+          let enum_type_attrs = missing_item_attrs(&enum_option.attrs, &type_attrs);
+          child_choice_enums.push(quote! {
+            #( #enum_type_attrs )*
+            #enum_option
+          });
+        }
+        items.extend(child_items);
       } else if is_one_sequence_flatten(schema_type) && is_one_sequence_flatten(base_class_type) {
         let (one_sequence_fields, one_sequence_enums) =
           gen_one_sequence_fields(schema_type, schema, context, field_version_cfg, version_cfg)?;
@@ -1375,7 +1411,7 @@ fn gen_children(
 
   let mut items: Vec<TokenStream> = vec![];
   let mut variants: Vec<TokenStream> = vec![];
-  let mut default_variant: Option<(Ident, Type)> = None;
+  let mut default_variant: Option<(Ident, Type, bool)> = None;
 
   for (variant_index, child) in resolved_children.iter().enumerate() {
     match child.kind {
@@ -1437,7 +1473,11 @@ fn gen_children(
           && (choice_version == sequence_version
             || (choice_version.is_empty() && !is_microsoft365_version(sequence_version)))
         {
-          default_variant = Some((variant_ident.clone(), parse2(quote! { #struct_ident })?));
+          default_variant = Some((
+            variant_ident.clone(),
+            parse2(quote! { #struct_ident })?,
+            false,
+          ));
         }
         let sequence_fields =
           gen_sequence_variant_fields(&sequence_variant, schema, context, sequence_field_cfg)?;
@@ -1625,6 +1665,10 @@ fn has_one_all_direct_children(schema_type: &SchemaType) -> bool {
         SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
       )
     })
+}
+
+fn has_single_choice_child(schema_type: &SchemaType) -> bool {
+  schema_type.children.len() == 1 && schema_type.children[0].kind == SchemaTypeChildKind::Choice
 }
 
 fn collect_resolved_sequence_leafs<'a>(
@@ -2014,7 +2058,7 @@ fn gen_one_sequence_fields(
             && (choice_version == variant.version
               || (choice_version.is_empty() && !is_microsoft365_version(variant.version)))
           {
-            default_variant = Some((variant_ident.clone(), variant_type.clone()));
+            default_variant = Some((variant_ident.clone(), variant_type.clone(), wrap_box));
           }
           let variant_tokens = if wrap_box {
             quote! {
@@ -2032,18 +2076,18 @@ fn gen_one_sequence_fields(
           variants.push(variant_tokens);
         }
 
-        let default_variant_ident = default_variant
-          .or_else(|| {
-            choice.variants.first().and_then(|variant| {
-              let (_, variant_type, _) =
-                choice_child_variant_shape(variant, schema, context).ok()?;
-              let variant_ident =
-                parse_str::<Ident>(&variant.field_name.to_upper_camel_case()).ok()?;
-              Some((variant_ident, variant_type))
+        let (default_variant_ident, default_variant_type, default_variant_wrap_box) =
+          default_variant
+            .or_else(|| {
+              choice.variants.first().and_then(|variant| {
+                let (_, variant_type, wrap_box) =
+                  choice_child_variant_shape(variant, schema, context).ok()?;
+                let variant_ident =
+                  parse_str::<Ident>(&variant.field_name.to_upper_camel_case()).ok()?;
+                Some((variant_ident, variant_type, wrap_box))
+              })
             })
-          })
-          .map(|(variant_ident, _variant_type)| variant_ident)
-          .ok_or_else(|| choice.enum_name.clone())?;
+            .ok_or_else(|| choice.enum_name.clone())?;
         let enum_item = quote! {
           #( #enum_attrs )*
           #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -2055,6 +2099,8 @@ fn gen_one_sequence_fields(
         enums.push(gen_choice_default_impl(
           &choice_enum_ident,
           &default_variant_ident,
+          &default_variant_type,
+          default_variant_wrap_box,
           enum_attrs.clone(),
         ));
 
@@ -2236,7 +2282,7 @@ fn gen_structured_one_sequence_fields(
                 && (choice_version == child.version
                   || (choice_version.is_empty() && !is_microsoft365_version(child.version)))
               {
-                default_variant = Some((variant_ident.clone(), variant_type.clone()));
+                default_variant = Some((variant_ident.clone(), variant_type.clone(), wrap_box));
               }
               if wrap_box {
                 variants.push(quote! {
@@ -2281,7 +2327,11 @@ fn gen_structured_one_sequence_fields(
                 && (choice_version == sequence_version
                   || (choice_version.is_empty() && !is_microsoft365_version(sequence_version)))
               {
-                default_variant = Some((variant_ident.clone(), parse2(quote! { #struct_ident })?));
+                default_variant = Some((
+                  variant_ident.clone(),
+                  parse2(quote! { #struct_ident })?,
+                  false,
+                ));
               }
 
               items.push(quote! {
@@ -2302,20 +2352,26 @@ fn gen_structured_one_sequence_fields(
           }
         }
 
-        let (default_variant_ident, _default_variant_type) = default_variant
-          .or_else(|| {
-            choice.variants.first().and_then(|variant| match variant {
-              ResolvedOneSequenceChoiceVariant::Leaf(child) => Some((
-                parse_str::<Ident>(&child.field_name.to_upper_camel_case()).ok()?,
-                one_sequence_child_variant_type(child, schema, context).ok()?,
-              )),
-              ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => Some((
-                parse_str::<Ident>(&sequence_variant.variant_name).ok()?,
-                parse_str::<Type>(&sequence_variant.struct_name).ok()?,
-              )),
+        let (default_variant_ident, default_variant_type, default_variant_wrap_box) =
+          default_variant
+            .or_else(|| {
+              choice.variants.first().and_then(|variant| match variant {
+                ResolvedOneSequenceChoiceVariant::Leaf(child) => Some((
+                  parse_str::<Ident>(&child.field_name.to_upper_camel_case()).ok()?,
+                  one_sequence_child_variant_type(child, schema, context).ok()?,
+                  matches!(
+                    choice_child_variant_shape(child, schema, context).ok()?,
+                    (_, _, true)
+                  ),
+                )),
+                ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => Some((
+                  parse_str::<Ident>(&sequence_variant.variant_name).ok()?,
+                  parse_str::<Type>(&sequence_variant.struct_name).ok()?,
+                  false,
+                )),
+              })
             })
-          })
-          .ok_or_else(|| choice.enum_name.clone())?;
+            .ok_or_else(|| choice.enum_name.clone())?;
 
         items.push(quote! {
           #( #enum_attrs )*
@@ -2327,6 +2383,8 @@ fn gen_structured_one_sequence_fields(
         items.push(gen_choice_default_impl(
           &choice_enum_ident,
           &default_variant_ident,
+          &default_variant_type,
+          default_variant_wrap_box,
           enum_attrs.clone(),
         ));
 
@@ -2662,7 +2720,7 @@ fn gen_mixed_choice_children_fields(
   };
 
   let mut variants = Vec::new();
-  let mut default_variant: Option<Ident> = None;
+  let mut default_variant: Option<(Ident, Type, bool)> = None;
   for (variant_index, child) in choice_variants.iter().enumerate() {
     match child.kind {
       SchemaTypeChildKind::Sequence => {
@@ -2691,7 +2749,7 @@ fn gen_mixed_choice_children_fields(
               && (choice_version == sequence_child.version
                 || (choice_version.is_empty() && !is_microsoft365_version(sequence_child.version)))
             {
-              default_variant = Some(variant_ident.clone());
+              default_variant = Some((variant_ident.clone(), variant_type.clone(), wrap_box));
             }
             if wrap_box {
               variants.push(quote! {
@@ -2765,7 +2823,11 @@ fn gen_mixed_choice_children_fields(
             && (choice_version == sequence_version
               || (choice_version.is_empty() && !is_microsoft365_version(sequence_version)))
           {
-            default_variant = Some(variant_ident.clone());
+            default_variant = Some((
+              variant_ident.clone(),
+              parse2(quote! { #struct_ident })?,
+              false,
+            ));
           }
           let sequence_fields =
             gen_sequence_variant_fields(&sequence_variant, schema, context, sequence_field_cfg)?;
@@ -2808,7 +2870,7 @@ fn gen_mixed_choice_children_fields(
           && (choice_version == child.version
             || (choice_version.is_empty() && !is_microsoft365_version(child.version)))
         {
-          default_variant = Some(variant_ident.clone());
+          default_variant = Some((variant_ident.clone(), variant_type.clone(), wrap_box));
         }
         if wrap_box {
           variants.push(quote! {
@@ -2827,18 +2889,45 @@ fn gen_mixed_choice_children_fields(
     }
   }
 
-  let default_variant_ident = default_variant
+  let (default_variant_ident, default_variant_type, default_variant_wrap_box) = default_variant
     .or_else(|| {
       choice_variants.first().and_then(|child| match child.kind {
-        SchemaTypeChildKind::Sequence => parse_str::<Ident>("Sequence1").ok(),
-        _ => parse_str::<Ident>(
-          &child
-            .variant_name
-            .to_string()
-            .to_snake_case()
-            .to_upper_camel_case(),
-        )
-        .ok(),
+        SchemaTypeChildKind::Sequence => Some((
+          parse_str::<Ident>("Sequence1").ok()?,
+          parse_str::<Type>(&one_sequence_choice_sequence_struct_name(
+            schema_type,
+            1,
+            0,
+            0,
+          ))
+          .ok()?,
+          false,
+        )),
+        _ => {
+          let synthetic_child = ResolvedOneSequenceChild {
+            name: child.name,
+            field_name: Cow::Owned(escape_snake_case(
+              child.variant_name.to_string().to_snake_case(),
+            )),
+            property_comments: Cow::Borrowed(" _"),
+            version: child.version,
+            kind: child.kind,
+          };
+          let (_, variant_type, wrap_box) =
+            choice_child_variant_shape(&synthetic_child, schema, context).ok()?;
+          Some((
+            parse_str::<Ident>(
+              &child
+                .variant_name
+                .to_string()
+                .to_snake_case()
+                .to_upper_camel_case(),
+            )
+            .ok()?,
+            variant_type,
+            wrap_box,
+          ))
+        }
       })
     })
     .ok_or_else(|| choice_enum_name.clone())?;
@@ -2853,6 +2942,8 @@ fn gen_mixed_choice_children_fields(
   enums.push(gen_choice_default_impl(
     &choice_enum_ident,
     &default_variant_ident,
+    &default_variant_type,
+    default_variant_wrap_box,
     enum_attrs.clone(),
   ));
 
@@ -3035,13 +3126,20 @@ fn gen_sequence_variant_fields(
 fn gen_choice_default_impl(
   choice_enum_ident: &Ident,
   default_variant_ident: &Ident,
+  default_variant_type: &Type,
+  wrap_box: bool,
   enum_attrs: Vec<Attribute>,
 ) -> TokenStream {
+  let default_value = if wrap_box {
+    quote! { <std::boxed::Box<#default_variant_type> as std::default::Default>::default() }
+  } else {
+    quote! { <#default_variant_type as std::default::Default>::default() }
+  };
   quote! {
     #( #enum_attrs )*
-    impl Default for #choice_enum_ident {
+    impl std::default::Default for #choice_enum_ident {
       fn default() -> Self {
-        Self::#default_variant_ident(Default::default())
+        Self::#default_variant_ident(#default_value)
       }
     }
   }

@@ -208,20 +208,29 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
         text_value_type: String::new(),
         api_kind: SchemaTypeApiKind::Struct,
         attributes: Vec::new(),
-        children: types
-          .children
-          .iter()
-          .map(|child| SchemaTypeChild {
-            name: content_types_child_type_name(child.q_name.as_str()),
-            property_name: String::new(),
-            property_comments: String::new(),
-            kind: SchemaTypeChildKind::Child,
-            optional: false,
-            repeated: false,
-            initial_version: String::new(),
-            children: Vec::new(),
-          })
-          .collect(),
+        children: vec![SchemaTypeChild {
+          name: String::new(),
+          property_name: "children".to_string(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Choice,
+          optional: true,
+          repeated: true,
+          initial_version: String::new(),
+          children: types
+            .children
+            .iter()
+            .map(|child| SchemaTypeChild {
+              name: content_types_child_type_name(child.q_name.as_str()),
+              property_name: String::new(),
+              property_comments: String::new(),
+              kind: SchemaTypeChildKind::Child,
+              optional: false,
+              repeated: false,
+              initial_version: String::new(),
+              children: Vec::new(),
+            })
+            .collect(),
+        }],
         particle: SchemaTypeParticle {
           kind: "Choice".to_string(),
           name: String::new(),

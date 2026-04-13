@@ -251,15 +251,29 @@ fn schema_module_cfg_attrs(schema: &SdkDataSchema) -> Vec<Attribute> {
 }
 
 fn schema_module_is_microsoft365_only(schema: &SdkDataSchema) -> bool {
-  (!schema.types.is_empty() || !schema.enums.is_empty())
+  let concrete_type_count = schema
+    .types
+    .iter()
+    .filter(|schema_type| !schema_type.is_abstract)
+    .count();
+
+  (concrete_type_count > 0 || !schema.enums.is_empty())
     && schema
       .types
       .iter()
-      .all(|schema_type| versioning::is_microsoft365_version(&schema_type.version))
-    && schema
-      .enums
-      .iter()
-      .all(|schema_enum| versioning::is_microsoft365_version(&schema_enum.version))
+      .filter(|schema_type| !schema_type.is_abstract)
+      .all(|schema_type| {
+        schema_type
+          .version
+          .as_deref()
+          .is_some_and(versioning::is_microsoft365_version)
+      })
+    && schema.enums.iter().all(|schema_enum| {
+      schema_enum
+        .version
+        .as_deref()
+        .is_some_and(versioning::is_microsoft365_version)
+    })
 }
 
 fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {
@@ -292,14 +306,22 @@ mod tests {
 
   fn schema_type(version: &str) -> SdkDataSchemaType {
     SdkDataSchemaType {
-      version: version.to_string(),
+      version: Some(version.to_string()),
+      ..SdkDataSchemaType::default()
+    }
+  }
+
+  fn abstract_schema_type(version: &str) -> SdkDataSchemaType {
+    SdkDataSchemaType {
+      version: (!version.is_empty()).then(|| version.to_string()),
+      is_abstract: true,
       ..SdkDataSchemaType::default()
     }
   }
 
   fn schema_enum(version: &str) -> SdkDataSchemaEnum {
     SdkDataSchemaEnum {
-      version: version.to_string(),
+      version: Some(version.to_string()),
       ..SdkDataSchemaEnum::default()
     }
   }
@@ -324,6 +346,23 @@ mod tests {
       vec![schema_type("Office2013")],
       vec![schema_enum("Office2007")],
     );
+
+    assert!(!schema_module_is_microsoft365_only(&schema));
+  }
+
+  #[test]
+  fn ignores_abstract_types_when_detecting_microsoft365_only_schema_modules() {
+    let schema = schema(
+      vec![schema_type("Office2010"), abstract_schema_type("")],
+      vec![],
+    );
+
+    assert!(schema_module_is_microsoft365_only(&schema));
+  }
+
+  #[test]
+  fn does_not_treat_abstract_only_schema_modules_as_microsoft365_only() {
+    let schema = schema(vec![abstract_schema_type("")], vec![]);
 
     assert!(!schema_module_is_microsoft365_only(&schema));
   }

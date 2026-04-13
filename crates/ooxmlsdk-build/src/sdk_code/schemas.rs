@@ -1,6 +1,6 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::{Attribute, Ident, ItemEnum, Type, Variant, parse_str, parse2};
@@ -226,7 +226,7 @@ impl<'a> CodegenContext<'a> {
         name: child.name.as_str(),
         field_name,
         property_comments,
-        version: child_type.version.as_str(),
+        version: schema_item_version(child_type),
         kind: child.kind,
       });
     }
@@ -243,7 +243,7 @@ impl<'a> CodegenContext<'a> {
       } else {
         Cow::Owned(child_type.summary.clone())
       },
-      version: child_type.version.as_str(),
+      version: schema_item_version(child_type),
       kind: child_kind_for_schema_type(child_type),
     })
   }
@@ -506,7 +506,7 @@ impl<'a> CodegenContext<'a> {
       variant_name,
       version: self
         .type_by_name(child.name.as_str())
-        .map(|item| item.version.as_str())
+        .map(schema_item_version)
         .unwrap_or_default(),
       is_any,
       kind: child.kind,
@@ -606,7 +606,8 @@ pub fn gen_schema(
 
   for schema_type in &schema.types {
     let struct_name_ident: Ident = parse_str(&schema_type.class_name.to_upper_camel_case())?;
-    let type_attrs = version_cfg.attrs(&schema_type.version);
+    let schema_type_version = schema_type.version.as_deref().unwrap_or_default();
+    let type_attrs = version_cfg.attrs(schema_type_version);
     let field_version_cfg = if type_attrs.is_empty() {
       version_cfg
     } else {
@@ -621,10 +622,10 @@ pub fn gen_schema(
       }
     };
     let summary_doc = format!(" {}", schema_type.summary);
-    let version_doc = if schema_type.version.is_empty() {
+    let version_doc = if schema_type_version.is_empty() {
       " Available in Office2007 and above.".to_string()
     } else {
-      format!(" Available in {} and above.", schema_type.version)
+      format!(" Available in {schema_type_version} and above.")
     };
     let qualified_doc = if schema_type.name.ends_with('/') {
       " When the object is serialized out as xml, it's qualified name is .".to_string()
@@ -800,7 +801,9 @@ pub fn gen_schema(
           context,
           field_version_cfg,
         )?);
-      } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll {
+      } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+        && has_one_all_direct_children(schema_type)
+      {
         fields.extend(gen_one_all_children_fields(
           schema_type,
           schema,
@@ -922,8 +925,9 @@ pub fn gen_schema(
         }
 
         if let Some(enum_option) = enum_option {
+          let enum_type_attrs = missing_item_attrs(&enum_option.attrs, &type_attrs);
           child_choice_enums.push(quote! {
-            #( #type_attrs )*
+            #( #enum_type_attrs )*
             #enum_option
           });
         }
@@ -991,7 +995,9 @@ pub fn gen_schema(
           context,
           field_version_cfg,
         )?);
-      } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll {
+      } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+        && has_one_all_direct_children(schema_type)
+      {
         fields.extend(gen_one_all_children_fields(
           schema_type,
           schema,
@@ -1045,8 +1051,9 @@ pub fn gen_schema(
         }
 
         if let Some(enum_option) = enum_option {
+          let enum_type_attrs = missing_item_attrs(&enum_option.attrs, &type_attrs);
           child_choice_enums.push(quote! {
-            #( #type_attrs )*
+            #( #enum_type_attrs )*
             #enum_option
           });
         }
@@ -1114,8 +1121,9 @@ fn gen_schema_enum(
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
   let enum_name_ident: Ident = parse_str(&schema_enum.name.to_upper_camel_case())?;
-  let enum_attrs = version_cfg.attrs(&schema_enum.version);
-  let nested_version_cfg = version_cfg.child(&schema_enum.version);
+  let schema_enum_version = schema_enum.version.as_deref().unwrap_or_default();
+  let enum_attrs = version_cfg.attrs(schema_enum_version);
+  let nested_version_cfg = version_cfg.child(schema_enum_version);
   let sdk_enum_attrs = if schema_enum.r#type.is_empty() {
     quote! {}
   } else {
@@ -1212,6 +1220,25 @@ fn gen_schema_enum_variants(
 
 fn module_version_cfg_attrs(version: &str, version_cfg: VersionCfgContext) -> Vec<Attribute> {
   version_cfg.attrs(version)
+}
+
+fn schema_item_version(schema_type: &SchemaType) -> &str {
+  schema_type.version.as_deref().unwrap_or_default()
+}
+
+fn missing_item_attrs<'a>(
+  item_attrs: &[Attribute],
+  wrapper_attrs: &'a [Attribute],
+) -> Vec<&'a Attribute> {
+  wrapper_attrs
+    .iter()
+    .filter(|wrapper_attr| {
+      let wrapper_tokens = wrapper_attr.to_token_stream().to_string();
+      !item_attrs
+        .iter()
+        .any(|item_attr| item_attr.to_token_stream().to_string() == wrapper_tokens)
+    })
+    .collect()
 }
 
 fn gen_attr(
@@ -1545,7 +1572,7 @@ fn gen_one_all_children_fields(
       Cow::Borrowed(child.property_comments.as_str())
     };
     let version = if child.initial_version.is_empty() {
-      child_type.version.as_str()
+      schema_item_version(child_type)
     } else {
       child.initial_version.as_str()
     };
@@ -1588,6 +1615,16 @@ fn gen_one_all_children_fields(
   }
 
   Ok(fields)
+}
+
+fn has_one_all_direct_children(schema_type: &SchemaType) -> bool {
+  !schema_type.children.is_empty()
+    && schema_type.children.iter().all(|child| {
+      matches!(
+        child.kind,
+        SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+      )
+    })
 }
 
 fn collect_resolved_sequence_leafs<'a>(
@@ -2422,7 +2459,7 @@ fn gen_direct_children_fields(
       Cow::Borrowed(child.property_comments.as_str())
     };
     let version = if child.initial_version.is_empty() {
-      child_type.version.as_str()
+      schema_item_version(child_type)
     } else {
       child.initial_version.as_str()
     };
@@ -2511,7 +2548,7 @@ fn build_direct_child_field_token(
     Cow::Borrowed(child.property_comments.as_str())
   };
   let version = if child.initial_version.is_empty() {
-    child_type.version.as_str()
+    schema_item_version(child_type)
   } else {
     child.initial_version.as_str()
   };

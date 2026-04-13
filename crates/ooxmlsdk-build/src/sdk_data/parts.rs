@@ -35,7 +35,7 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
         .unwrap_or_default();
       let root_type_version = type_map
         .get(root_type.as_str())
-        .map(|schema_type| schema_type.version.as_str())
+        .and_then(|schema_type| schema_type.version.as_deref())
         .unwrap_or_default();
       let schema_module = gen_context
         .type_name_module_name_map
@@ -83,7 +83,11 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
                   .get(&child.name)
                   .and_then(|type_name| type_map.get(type_name.as_str()))
                   .map(|schema_type| {
-                    effective_version(child_part_version, schema_type.version.as_str()).to_string()
+                    effective_version(
+                      child_part_version,
+                      schema_type.version.as_deref().unwrap_or_default(),
+                    )
+                    .to_string()
                   })
                   .or(Some(child_part_version.to_string()))
               })
@@ -98,7 +102,10 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
                     .get(&child.name)
                     .and_then(|type_name| type_map.get(type_name.as_str()))
                     .map(|schema_type| {
-                      effective_version(child_part_version, schema_type.version.as_str())
+                      effective_version(
+                        child_part_version,
+                        schema_type.version.as_deref().unwrap_or_default(),
+                      )
                     })
                     .or(Some(child_part_version))
                 })

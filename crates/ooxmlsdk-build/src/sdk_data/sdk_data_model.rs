@@ -88,7 +88,8 @@ pub struct SchemaType {
   pub name: String,
   pub class_name: String,
   pub summary: String,
-  pub version: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub version: Option<String>,
   pub part: String,
   pub base_class: String,
   pub kind: SchemaTypeKind,
@@ -205,7 +206,8 @@ pub struct SchemaEnum {
   pub name: String,
   pub r#type: String,
   pub facets: Vec<SchemaEnumFacet>,
-  pub version: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub version: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

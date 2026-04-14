@@ -31,7 +31,8 @@ pub fn validate_pattern<T: Display>(
   value: &T,
   regex: &str,
 ) -> Result<(), crate::common::SdkError> {
-  let regex = regex::Regex::new(regex).map_err(|err| {
+  let anchored_regex = format!(r"\A(?:{regex})\z");
+  let regex = regex::Regex::new(&anchored_regex).map_err(|err| {
     crate::common::SdkError::CommonError(format!("invalid validator regex for {ty}.{field}: {err}"))
   })?;
   let value_string = value.to_string();
@@ -203,8 +204,7 @@ pub fn validate_number_sign<T: Display>(
 }
 
 fn is_token(value: &str) -> bool {
-  !value.is_empty()
-    && value.trim() == value
+  value.trim() == value
     && !value.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
     && !value.contains("  ")
 }
@@ -214,10 +214,10 @@ fn is_ncname(value: &str) -> bool {
   let Some(first) = chars.next() else {
     return false;
   };
-  if !matches!(first, 'A'..='Z' | 'a'..='z' | '_') {
+  if !(first == '_' || first.is_alphabetic()) {
     return false;
   }
-  chars.all(|ch| matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '-' | '.'))
+  chars.all(|ch| ch == '_' || ch == '-' || ch == '.' || ch.is_alphanumeric())
 }
 
 fn is_qname(value: &str) -> bool {
@@ -232,7 +232,18 @@ fn is_qname(value: &str) -> bool {
 }
 
 fn is_uri(value: &str) -> bool {
-  !value.is_empty() && !value.chars().any(char::is_whitespace)
+  if value.chars().any(char::is_whitespace) {
+    return false;
+  }
+  if value.contains("##") {
+    return false;
+  }
+  if let Some(scheme_end) = value.find("://")
+    && value[scheme_end + 3..].starts_with('/')
+  {
+    return false;
+  }
+  true
 }
 
 #[cfg(test)]

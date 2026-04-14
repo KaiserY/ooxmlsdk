@@ -211,6 +211,8 @@ pub struct TypeRefDecl {
 #[serde(default, rename_all = "PascalCase")]
 pub struct ValidatorDecl {
   pub version: String,
+  pub source_id: u32,
+  pub union_id: Option<u64>,
   pub kind: ValidatorKind,
 }
 
@@ -241,6 +243,7 @@ pub enum ValidatorKind {
     min: Option<u32>,
     max: Option<u32>,
     exact: Option<u32>,
+    type_name: Option<String>,
   },
   Pattern {
     regex: String,
@@ -253,6 +256,9 @@ pub enum ValidatorKind {
     max: Option<String>,
     min_inclusive: bool,
     max_inclusive: bool,
+  },
+  NumberType {
+    type_name: String,
   },
   NumberSign {
     kind: NumberSignKind,
@@ -327,6 +333,8 @@ mod tests {
             },
             validators: vec![ValidatorDecl {
               version: "Office2007".to_string(),
+              source_id: 0,
+              union_id: None,
               kind: ValidatorKind::Pattern {
                 regex: "[A-Z]+".to_string(),
               },

@@ -25,6 +25,12 @@ pub enum NumberSignKind {
   Positive,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum StringLengthKind {
+  Characters,
+  HexBinaryBytes,
+}
+
 pub fn validate_pattern<T: Display>(
   ty: &'static str,
   field: &'static str,
@@ -57,7 +63,28 @@ pub fn validate_string_length<T: Display>(
   max: Option<u32>,
 ) -> Result<(), crate::common::SdkError> {
   let value_string = value.to_string();
-  let value_len = value_string.chars().count() as u32;
+  validate_string_length_with_kind(
+    ty,
+    field,
+    value_string,
+    min,
+    max,
+    StringLengthKind::Characters,
+  )
+}
+
+pub fn validate_string_length_with_kind(
+  ty: &'static str,
+  field: &'static str,
+  value_string: String,
+  min: Option<u32>,
+  max: Option<u32>,
+  kind: StringLengthKind,
+) -> Result<(), crate::common::SdkError> {
+  let value_len = match kind {
+    StringLengthKind::Characters => value_string.chars().count() as u32,
+    StringLengthKind::HexBinaryBytes => (value_string.chars().count() / 2) as u32,
+  };
   if let Some(min) = min
     && value_len < min
   {
@@ -203,6 +230,82 @@ pub fn validate_number_sign<T: Display>(
   }
 }
 
+pub fn validate_number_type<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+  type_name: &str,
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  let valid = match type_name {
+    "xsd:byte" => value_string.parse::<i8>().is_ok(),
+    "xsd:short" => value_string.parse::<i16>().is_ok(),
+    "xsd:int" => value_string.parse::<i32>().is_ok(),
+    "xsd:long" => value_string.parse::<i64>().is_ok(),
+    "xsd:unsignedByte" => value_string.parse::<u8>().is_ok(),
+    "xsd:unsignedShort" => value_string.parse::<u16>().is_ok(),
+    "xsd:unsignedInt" => value_string.parse::<u32>().is_ok(),
+    "xsd:unsignedLong" => value_string.parse::<u64>().is_ok(),
+    "xsd:integer" | "xsd:nonNegativeInteger" => value_string.parse::<i128>().is_ok(),
+    "xsd:decimal" | "xsd:double" => value_string.parse::<f64>().is_ok(),
+    "xsd:float" => value_string.parse::<f32>().is_ok(),
+    "wp:ST_PositionOffset"
+    | "xdr:ST_ColID"
+    | "xdr:ST_RowID"
+    | "a:ST_Angle"
+    | "a:ST_Percentage"
+    | "a:ST_PositivePercentage"
+    | "a:ST_PositiveFixedPercentage"
+    | "w:ST_DecimalNumber"
+    | "w:ST_NonNegativeDecimalNumber"
+    | "w:ST_SignedDecimalNumberMax-1"
+    | "w:ST_SignedDecimalNumberMax-2"
+    | "w:ST_SignedHpsMeasure_O12"
+    | "w:ST_SignedTwipsMeasure_O12"
+    | "w:ST_UnsignedDecimalNumberMin1" => value_string.parse::<i32>().is_ok(),
+    "a:ST_Coordinate" => value_string.parse::<i64>().is_ok(),
+    "ask:ST_LineSketchSeed"
+    | "cx:ST_AxisId"
+    | "a:ST_DrawingElementId"
+    | "w:ST_HpsMeasure_O12"
+    | "w:ST_TwipsMeasure_O12"
+    | "w:ST_UnsignedDecimalNumber" => value_string.parse::<u32>().is_ok(),
+    _ => false,
+  };
+
+  if valid {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "number_type",
+      value_string,
+      format!("value does not satisfy {type_name} numeric type"),
+    ))
+  }
+}
+
+pub fn validate_string_set<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+  values: &[&str],
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  if values.contains(&value_string.as_str()) {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "string_set",
+      value_string,
+      format!("value is not one of {}", values.join(", ")),
+    ))
+  }
+}
+
 fn is_token(value: &str) -> bool {
   value.trim() == value
     && !value.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
@@ -273,6 +376,13 @@ mod tests {
   }
 
   #[test]
+  fn validates_simple_numeric_type_mappings() {
+    assert!(validate_number_type("TestType", "field", &0, "a:ST_Angle").is_ok());
+    assert!(validate_number_type("TestType", "field", &-1, "w:ST_DecimalNumber").is_ok());
+    assert!(validate_number_type("TestType", "field", &-1, "w:ST_UnsignedDecimalNumber").is_err());
+  }
+
+  #[test]
   fn validates_string_formats() {
     assert!(
       validate_string_format("TestType", "field", &"abc-def", StringFormatKind::NcName).is_ok()
@@ -303,5 +413,19 @@ mod tests {
     assert!(validate_number_sign("TestType", "field", &1, NumberSignKind::Positive).is_ok());
     assert!(validate_number_sign("TestType", "field", &-1, NumberSignKind::NonNegative).is_err());
     assert!(validate_number_sign("TestType", "field", &0, NumberSignKind::Positive).is_err());
+  }
+
+  #[test]
+  fn validates_number_types() {
+    assert!(validate_number_type("TestType", "field", &"12", "xsd:int").is_ok());
+    assert!(validate_number_type("TestType", "field", &"12", "w:ST_TwipsMeasure_O12").is_ok());
+    assert!(validate_number_type("TestType", "field", &"-1", "w:ST_TwipsMeasure_O12").is_err());
+    assert!(validate_number_type("TestType", "field", &"abc", "xsd:int").is_err());
+  }
+
+  #[test]
+  fn validates_string_sets() {
+    assert!(validate_string_set("TestType", "field", &"auto", &["auto", "accent1"]).is_ok());
+    assert!(validate_string_set("TestType", "field", &"other", &["auto", "accent1"]).is_err());
   }
 }

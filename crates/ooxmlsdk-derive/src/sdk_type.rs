@@ -70,6 +70,172 @@ fn sdk_type_impl_tokens(
   }
 }
 
+fn validator_source_union(validator: &SdkFieldValidator) -> (u32, Option<u64>) {
+  match validator {
+    SdkFieldValidator::Pattern {
+      source_id,
+      union_id,
+      ..
+    }
+    | SdkFieldValidator::StringLength {
+      source_id,
+      union_id,
+      ..
+    }
+    | SdkFieldValidator::StringFormat {
+      source_id,
+      union_id,
+      ..
+    }
+    | SdkFieldValidator::StringSet {
+      source_id,
+      union_id,
+      ..
+    }
+    | SdkFieldValidator::NumberRange {
+      source_id,
+      union_id,
+      ..
+    }
+    | SdkFieldValidator::NumberType {
+      source_id,
+      union_id,
+      ..
+    }
+    | SdkFieldValidator::NumberSign {
+      source_id,
+      union_id,
+      ..
+    } => (*source_id, *union_id),
+  }
+}
+
+fn validator_token(
+  ident: &Ident,
+  field_ident: &Ident,
+  parse_ty: &Type,
+  validator: &SdkFieldValidator,
+) -> proc_macro2::TokenStream {
+  match validator {
+    SdkFieldValidator::Pattern { regex, .. } => quote! {
+      crate::validator::validate_pattern(
+        stringify!(#ident),
+        stringify!(#field_ident),
+        value,
+        #regex,
+      )?;
+    },
+    SdkFieldValidator::StringLength { min, max, .. } => {
+      let min_tokens = match min {
+        Some(min) => quote! { Some(#min) },
+        None => quote! { None },
+      };
+      let max_tokens = match max {
+        Some(max) => quote! { Some(#max) },
+        None => quote! { None },
+      };
+      let length_kind_tokens = if is_hex_binary_type(parse_ty)
+        || matches!(
+          validator,
+          SdkFieldValidator::StringLength {
+            type_name: Some(type_name),
+            ..
+          } if type_name == "w:ST_HexColorRGB"
+        ) {
+        quote! { crate::validator::StringLengthKind::HexBinaryBytes }
+      } else {
+        quote! { crate::validator::StringLengthKind::Characters }
+      };
+      quote! {
+        crate::validator::validate_string_length_with_kind(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value.to_string(),
+          #min_tokens,
+          #max_tokens,
+          #length_kind_tokens,
+        )?;
+      }
+    }
+    SdkFieldValidator::StringFormat { kind, .. } => {
+      let kind_tokens = match kind {
+        SdkStringFormatKind::Token => quote! { crate::validator::StringFormatKind::Token },
+        SdkStringFormatKind::NcName => quote! { crate::validator::StringFormatKind::NcName },
+        SdkStringFormatKind::QName => quote! { crate::validator::StringFormatKind::QName },
+        SdkStringFormatKind::Uri => quote! { crate::validator::StringFormatKind::Uri },
+        SdkStringFormatKind::Id => quote! { crate::validator::StringFormatKind::Id },
+      };
+      quote! {
+        crate::validator::validate_string_format(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
+          #kind_tokens,
+        )?;
+      }
+    }
+    SdkFieldValidator::StringSet { values, .. } => quote! {
+      crate::validator::validate_string_set(
+        stringify!(#ident),
+        stringify!(#field_ident),
+        value,
+        &[ #( #values ),* ],
+      )?;
+    },
+    SdkFieldValidator::NumberRange {
+      min,
+      max,
+      min_inclusive,
+      max_inclusive,
+      ..
+    } => {
+      let min_tokens = match min {
+        Some(min) => quote! { Some(#min) },
+        None => quote! { None },
+      };
+      let max_tokens = match max {
+        Some(max) => quote! { Some(#max) },
+        None => quote! { None },
+      };
+      quote! {
+        crate::validator::validate_number_range(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
+          #min_tokens,
+          #max_tokens,
+          #min_inclusive,
+          #max_inclusive,
+        )?;
+      }
+    }
+    SdkFieldValidator::NumberType { type_name, .. } => quote! {
+      crate::validator::validate_number_type(
+        stringify!(#ident),
+        stringify!(#field_ident),
+        value,
+        #type_name,
+      )?;
+    },
+    SdkFieldValidator::NumberSign { kind, .. } => {
+      let kind_tokens = match kind {
+        SdkNumberSignKind::NonNegative => {
+          quote! { crate::validator::NumberSignKind::NonNegative }
+        }
+        SdkNumberSignKind::Positive => quote! { crate::validator::NumberSignKind::Positive },
+      };
+      quote! {
+        crate::validator::validate_number_sign(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
+          #kind_tokens,
+        )?;
+      }
+    }
+  }
+}
+
 fn text_child_match_target(qname: &str) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
@@ -1194,98 +1360,66 @@ fn expand_named_struct(
       });
     }
 
-    let validator_tokens: Vec<_> = field
-      .validators
-      .iter()
-      .map(|validator| match validator {
-        SdkFieldValidator::Pattern { regex } => quote! {
-          crate::validator::validate_pattern(
-            stringify!(#ident),
-            stringify!(#field_ident),
-            value,
-            #regex,
-          )?;
-        },
-        SdkFieldValidator::StringLength { min, max } => {
-          let min_tokens = match min {
-            Some(min) => quote! { Some(#min) },
-            None => quote! { None },
-          };
-          let max_tokens = match max {
-            Some(max) => quote! { Some(#max) },
-            None => quote! { None },
-          };
+    let mut direct_validator_tokens = Vec::new();
+    let mut union_validator_tokens: std::collections::BTreeMap<u32, Vec<proc_macro2::TokenStream>> =
+      std::collections::BTreeMap::new();
+    for validator in &field.validators {
+      let token = validator_token(ident, field_ident, &parse_ty, validator);
+      let (source_id, union_id) = validator_source_union(validator);
+      if union_id.is_some() {
+        union_validator_tokens
+          .entry(source_id)
+          .or_default()
+          .push(token);
+      } else {
+        direct_validator_tokens.push(token);
+      }
+    }
+    let union_validator_tokens: Vec<_> = if union_validator_tokens.is_empty() {
+      Vec::new()
+    } else {
+      let branch_tokens: Vec<_> = union_validator_tokens
+        .into_values()
+        .map(|tokens| {
           quote! {
-            crate::validator::validate_string_length(
-              stringify!(#ident),
-              stringify!(#field_ident),
-              value,
-              #min_tokens,
-              #max_tokens,
-            )?;
+            (|| -> Result<(), crate::common::SdkError> {
+              #( #tokens )*
+              Ok::<(), crate::common::SdkError>(())
+            })()
           }
-        }
-        SdkFieldValidator::StringFormat { kind } => {
-          let kind_tokens = match kind {
-            SdkStringFormatKind::Token => quote! { crate::validator::StringFormatKind::Token },
-            SdkStringFormatKind::NcName => quote! { crate::validator::StringFormatKind::NcName },
-            SdkStringFormatKind::QName => quote! { crate::validator::StringFormatKind::QName },
-            SdkStringFormatKind::Uri => quote! { crate::validator::StringFormatKind::Uri },
-            SdkStringFormatKind::Id => quote! { crate::validator::StringFormatKind::Id },
-          };
-          quote! {
-            crate::validator::validate_string_format(
-              stringify!(#ident),
-              stringify!(#field_ident),
-              value,
-              #kind_tokens,
-            )?;
-          }
-        }
-        SdkFieldValidator::NumberRange {
-          min,
-          max,
-          min_inclusive,
-          max_inclusive,
-        } => {
-          let min_tokens = match min {
-            Some(min) => quote! { Some(#min) },
-            None => quote! { None },
-          };
-          let max_tokens = match max {
-            Some(max) => quote! { Some(#max) },
-            None => quote! { None },
-          };
-          quote! {
-            crate::validator::validate_number_range(
-              stringify!(#ident),
-              stringify!(#field_ident),
-              value,
-              #min_tokens,
-              #max_tokens,
-              #min_inclusive,
-              #max_inclusive,
-            )?;
-          }
-        }
-        SdkFieldValidator::NumberSign { kind } => {
-          let kind_tokens = match kind {
-            SdkNumberSignKind::NonNegative => {
-              quote! { crate::validator::NumberSignKind::NonNegative }
+        })
+        .collect();
+      vec![quote! {
+        {
+          let mut first_error: Option<crate::common::SdkError> = None;
+          let mut matched = false;
+          for branch_result in [#( #branch_tokens ),*] {
+            match branch_result {
+              Ok(()) => {
+                matched = true;
+                break;
+              }
+              Err(err) => {
+                if first_error.is_none() {
+                  first_error = Some(err);
+                }
+              }
             }
-            SdkNumberSignKind::Positive => quote! { crate::validator::NumberSignKind::Positive },
-          };
-          quote! {
-            crate::validator::validate_number_sign(
-              stringify!(#ident),
-              stringify!(#field_ident),
-              value,
-              #kind_tokens,
-            )?;
+          }
+          if !matched {
+            return Err(first_error.unwrap_or_else(|| {
+              crate::common::SdkError::CommonError(format!(
+                "all union validator branches failed for {}.{}",
+                stringify!(#ident),
+                stringify!(#field_ident),
+              ))
+            }));
           }
         }
-      })
-      .collect();
+      }]
+    };
+    let mut validator_tokens = direct_validator_tokens;
+    validator_tokens.extend(union_validator_tokens);
     if !validator_tokens.is_empty() {
       if field.optional {
         attr_validate_tokens.push(quote! {

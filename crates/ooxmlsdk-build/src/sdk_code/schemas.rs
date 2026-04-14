@@ -593,6 +593,21 @@ impl<'a> CodegenContext<'a> {
 
     Ok((enum_module_name, enum_name))
   }
+
+  pub fn resolve_enum_values(&self, attr_type: &str) -> Result<Vec<String>> {
+    let schema_enum = self
+      .enum_type_map
+      .get(attr_type)
+      .copied()
+      .ok_or_else(|| format!("failed to resolve enum values for {attr_type}"))?;
+    Ok(
+      schema_enum
+        .facets
+        .iter()
+        .flat_map(|facet| std::iter::once(facet.value.clone()).chain(facet.aliases.clone()))
+        .collect(),
+    )
+  }
 }
 
 pub(crate) fn one_sequence_choice_field_name(
@@ -1562,9 +1577,12 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
   let validator_attrs: Vec<TokenStream> = attr
     .validators
     .iter()
-    .map(|validator| match &validator.kind {
+    .map(|validator| {
+      let source_attr = validator.source_id;
+      let union_attr = validator.union_id.map(|union_id| quote! { union = #union_id, });
+      match &validator.kind {
       ValidatorKind::Pattern { regex } => quote! {
-        #[sdk(pattern(regex = #regex))]
+        #[sdk(pattern(source = #source_attr, #union_attr regex = #regex))]
       },
       ValidatorKind::StringFormat { kind } => {
         let kind_lit = match kind {
@@ -1575,16 +1593,22 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
           crate::sdk_code::codegen_ir::StringFormatKind::Id => "id",
         };
         quote! {
-          #[sdk(string_format(kind = #kind_lit))]
+          #[sdk(string_format(source = #source_attr, #union_attr kind = #kind_lit))]
         }
       }
-      ValidatorKind::StringLength { min, max, exact } => {
+      ValidatorKind::StringLength {
+        min,
+        max,
+        exact,
+        type_name,
+      } => {
         let effective_min = exact.or(*min);
         let effective_max = exact.or(*max);
         let min_attr = effective_min.map(|min| quote! { min = #min, });
         let max_attr = effective_max.map(|max| quote! { max = #max, });
+        let type_name_attr = type_name.as_ref().map(|type_name| quote! { type_name = #type_name, });
         quote! {
-          #[sdk(string_length(#min_attr #max_attr))]
+          #[sdk(string_length(source = #source_attr, #union_attr #type_name_attr #min_attr #max_attr))]
         }
       }
       ValidatorKind::NumberRange {
@@ -1597,6 +1621,8 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
         let max_attr = max.as_ref().map(|max| quote! { max = #max, });
         quote! {
           #[sdk(number_range(
+            source = #source_attr,
+            #union_attr
             #min_attr
             #max_attr
             min_inclusive = #min_inclusive,
@@ -1604,21 +1630,26 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
           ))]
         }
       }
+      ValidatorKind::NumberType { type_name } => quote! {
+        #[sdk(number_type(source = #source_attr, #union_attr type_name = #type_name))]
+      },
       ValidatorKind::NumberSign { kind } => {
         let kind_lit = match kind {
           crate::sdk_code::codegen_ir::NumberSignKind::NonNegative => "non_negative",
           crate::sdk_code::codegen_ir::NumberSignKind::Positive => "positive",
         };
         quote! {
-          #[sdk(number_sign(kind = #kind_lit))]
+          #[sdk(number_sign(source = #source_attr, #union_attr kind = #kind_lit))]
         }
       }
+      ValidatorKind::StringSet { values } => quote! {
+        #[sdk(string_set(source = #source_attr, #union_attr values = &[ #( #values ),* ]))]
+      },
       ValidatorKind::Required
       | ValidatorKind::EnumRef { .. }
-      | ValidatorKind::StringSet { .. }
       | ValidatorKind::Unsupported { .. }
       | ValidatorKind::Placeholder => quote! {},
-    })
+    }})
     .collect();
   let property_comments_doc = format!(" {}", attr.docs);
   let version_doc = if attr.version.is_empty() {
@@ -3071,26 +3102,35 @@ mod tests {
       validators: vec![
         crate::sdk_code::codegen_ir::ValidatorDecl {
           version: String::new(),
+          source_id: 0,
+          union_id: None,
           kind: ValidatorKind::Pattern {
             regex: "[A-Z]+".to_string(),
           },
         },
         crate::sdk_code::codegen_ir::ValidatorDecl {
           version: String::new(),
+          source_id: 1,
+          union_id: None,
           kind: ValidatorKind::StringFormat {
             kind: crate::sdk_code::codegen_ir::StringFormatKind::Token,
           },
         },
         crate::sdk_code::codegen_ir::ValidatorDecl {
           version: String::new(),
+          source_id: 2,
+          union_id: None,
           kind: ValidatorKind::StringLength {
             min: Some(2),
             max: Some(8),
             exact: None,
+            type_name: None,
           },
         },
         crate::sdk_code::codegen_ir::ValidatorDecl {
           version: String::new(),
+          source_id: 3,
+          union_id: None,
           kind: ValidatorKind::NumberRange {
             min: Some("0".to_string()),
             max: Some("10".to_string()),
@@ -3100,6 +3140,8 @@ mod tests {
         },
         crate::sdk_code::codegen_ir::ValidatorDecl {
           version: String::new(),
+          source_id: 4,
+          union_id: None,
           kind: ValidatorKind::NumberSign {
             kind: crate::sdk_code::codegen_ir::NumberSignKind::NonNegative,
           },
@@ -3112,12 +3154,14 @@ mod tests {
       .to_string();
 
     assert!(generated.contains("# [sdk (attr (qname = \":creationId\"))]"));
-    assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));
-    assert!(generated.contains("# [sdk (string_format (kind = \"token\"))]"));
-    assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));
+    assert!(generated.contains("# [sdk (pattern (source = 0u32 , regex = \"[A-Z]+\"))]"));
+    assert!(generated.contains("# [sdk (string_format (source = 1u32 , kind = \"token\"))]"));
+    assert!(
+      generated.contains("# [sdk (string_length (source = 2u32 , min = 2u32 , max = 8u32 ,))]")
+    );
     assert!(generated.contains(
-      "# [sdk (number_range (min = \"0\" , max = \"10\" , min_inclusive = true , max_inclusive = false))]"
+      "# [sdk (number_range (source = 3u32 , min = \"0\" , max = \"10\" , min_inclusive = true , max_inclusive = false))]"
     ));
-    assert!(generated.contains("# [sdk (number_sign (kind = \"non_negative\"))]"));
+    assert!(generated.contains("# [sdk (number_sign (source = 4u32 , kind = \"non_negative\"))]"));
   }
 }

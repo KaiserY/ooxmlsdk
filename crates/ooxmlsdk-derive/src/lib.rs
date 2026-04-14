@@ -148,22 +148,43 @@ enum SdkTypeFieldKind {
 enum SdkFieldValidator {
   Pattern {
     regex: String,
+    source_id: u32,
+    union_id: Option<u64>,
   },
   StringLength {
     min: Option<u32>,
     max: Option<u32>,
+    type_name: Option<String>,
+    source_id: u32,
+    union_id: Option<u64>,
   },
   StringFormat {
     kind: SdkStringFormatKind,
+    source_id: u32,
+    union_id: Option<u64>,
+  },
+  StringSet {
+    values: Vec<String>,
+    source_id: u32,
+    union_id: Option<u64>,
   },
   NumberRange {
     min: Option<String>,
     max: Option<String>,
     min_inclusive: bool,
     max_inclusive: bool,
+    source_id: u32,
+    union_id: Option<u64>,
+  },
+  NumberType {
+    type_name: String,
+    source_id: u32,
+    union_id: Option<u64>,
   },
   NumberSign {
     kind: SdkNumberSignKind,
+    source_id: u32,
+    union_id: Option<u64>,
   },
 }
 
@@ -466,6 +487,8 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
           if meta.path.is_ident("pattern")
             || meta.path.is_ident("string_length")
             || meta.path.is_ident("string_format")
+            || meta.path.is_ident("string_set")
+            || meta.path.is_ident("number_type")
             || meta.path.is_ident("number_range")
             || meta.path.is_ident("number_sign") =>
         {
@@ -502,22 +525,39 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
       match meta {
         Meta::List(meta) if meta.path.is_ident("pattern") => {
           let mut regex = None;
+          let mut source_id = 0;
+          let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("regex") {
               let value: LitStr = nested.value()?.parse()?;
               regex = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
               Ok(())
             } else {
               Err(nested.error("unsupported sdk pattern attribute"))
             }
           })?;
           if let Some(regex) = regex {
-            validators.push(SdkFieldValidator::Pattern { regex });
+            validators.push(SdkFieldValidator::Pattern {
+              regex,
+              source_id,
+              union_id,
+            });
           }
         }
         Meta::List(meta) if meta.path.is_ident("string_length") => {
           let mut min = None;
           let mut max = None;
+          let mut type_name = None;
+          let mut source_id = 0;
+          let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("min") {
               let value: syn::LitInt = nested.value()?.parse()?;
@@ -527,17 +567,66 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
               let value: syn::LitInt = nested.value()?.parse()?;
               max = Some(value.base10_parse::<u32>()?);
               Ok(())
+            } else if nested.path.is_ident("type_name") {
+              let value: LitStr = nested.value()?.parse()?;
+              type_name = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk string_length attribute"))
             }
           })?;
-          validators.push(SdkFieldValidator::StringLength { min, max });
+          validators.push(SdkFieldValidator::StringLength {
+            min,
+            max,
+            type_name,
+            source_id,
+            union_id,
+          });
+        }
+        Meta::List(meta) if meta.path.is_ident("number_type") => {
+          let mut type_name = None;
+          let mut source_id = 0;
+          let mut union_id = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("type_name") {
+              let value: LitStr = nested.value()?.parse()?;
+              type_name = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk number_type attribute"))
+            }
+          })?;
+          if let Some(type_name) = type_name {
+            validators.push(SdkFieldValidator::NumberType {
+              type_name,
+              source_id,
+              union_id,
+            });
+          }
         }
         Meta::List(meta) if meta.path.is_ident("number_range") => {
           let mut min = None;
           let mut max = None;
           let mut min_inclusive = true;
           let mut max_inclusive = true;
+          let mut source_id = 0;
+          let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("min") {
               let value: LitStr = nested.value()?.parse()?;
@@ -555,6 +644,14 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
               let value: syn::LitBool = nested.value()?.parse()?;
               max_inclusive = value.value;
               Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk number_range attribute"))
             }
@@ -564,10 +661,14 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
             max,
             min_inclusive,
             max_inclusive,
+            source_id,
+            union_id,
           });
         }
         Meta::List(meta) if meta.path.is_ident("string_format") => {
           let mut kind = None;
+          let mut source_id = 0;
+          let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("kind") {
               let value: LitStr = nested.value()?.parse()?;
@@ -580,16 +681,71 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
                 _ => return Err(nested.error("unsupported sdk string_format kind")),
               });
               Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk string_format attribute"))
             }
           })?;
           if let Some(kind) = kind {
-            validators.push(SdkFieldValidator::StringFormat { kind });
+            validators.push(SdkFieldValidator::StringFormat {
+              kind,
+              source_id,
+              union_id,
+            });
           }
+        }
+        Meta::List(meta) if meta.path.is_ident("string_set") => {
+          let mut values = Vec::new();
+          let mut source_id = 0;
+          let mut union_id = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("values") {
+              let expr: syn::Expr = nested.value()?.parse()?;
+              let syn::Expr::Reference(reference) = expr else {
+                return Err(nested.error("sdk string_set values must be a slice reference"));
+              };
+              let syn::Expr::Array(array) = *reference.expr else {
+                return Err(nested.error("sdk string_set values must be an array"));
+              };
+              for element in array.elems {
+                let syn::Expr::Lit(expr_lit) = element else {
+                  return Err(nested.error("sdk string_set values must be string literals"));
+                };
+                let syn::Lit::Str(value) = expr_lit.lit else {
+                  return Err(nested.error("sdk string_set values must be string literals"));
+                };
+                values.push(value.value());
+              }
+              Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk string_set attribute"))
+            }
+          })?;
+          validators.push(SdkFieldValidator::StringSet {
+            values,
+            source_id,
+            union_id,
+          });
         }
         Meta::List(meta) if meta.path.is_ident("number_sign") => {
           let mut kind = None;
+          let mut source_id = 0;
+          let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("kind") {
               let value: LitStr = nested.value()?.parse()?;
@@ -599,12 +755,24 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
                 _ => return Err(nested.error("unsupported sdk number_sign kind")),
               });
               Ok(())
+            } else if nested.path.is_ident("source") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              source_id = value.base10_parse::<u32>()?;
+              Ok(())
+            } else if nested.path.is_ident("union") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              union_id = Some(value.base10_parse::<u64>()?);
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk number_sign attribute"))
             }
           })?;
           if let Some(kind) = kind {
-            validators.push(SdkFieldValidator::NumberSign { kind });
+            validators.push(SdkFieldValidator::NumberSign {
+              kind,
+              source_id,
+              union_id,
+            });
           }
         }
         _ => {}
@@ -850,6 +1018,10 @@ fn is_string_like_type(ty: &Type) -> bool {
         | "SByteValue"
     )
   }))
+}
+
+fn is_hex_binary_type(ty: &Type) -> bool {
+  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "HexBinaryValue"))
 }
 
 fn choice_variant_payload_type(variant: &syn::Variant) -> syn::Result<Type> {

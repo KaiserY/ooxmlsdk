@@ -15,7 +15,7 @@ When working on particle decomposition or schema modeling, treat `data/` as the 
 
 The repository also keeps checked-in `sdk_data/`, but the current ignored generator test still reads upstream data from `../Open-XML-SDK/data` before regenerating `sdk_data/` and runtime code. Do not assume that external checkout is available unless you have explicitly prepared it.
 
-The runtime crate currently exports `common`, `deserializers`, `namespaces`, `parts` behind the `parts` feature, `schemas`, `serializers`, and `simple_type`. The public feature surface in this repository is currently `microsoft365`, `parts`, and `strict`. The `strict` feature gates strict OOXML compatibility coverage and the corresponding feature-gated integration tests. There is no shipped `validators` module.
+The runtime crate currently exports `common`, `deserializers`, `namespaces`, `parts` behind the `parts` feature, `schemas`, `serializers`, `simple_type`, and `validator` behind the `validators` feature. The public feature surface in this repository is currently `microsoft365`, `parts`, `strict`, and `validators`. The `strict` feature gates strict OOXML compatibility coverage and the corresponding feature-gated integration tests. The `validators` feature gates optional schema validator APIs and validator-focused integration tests.
 
 ## Build, Test, and Development Commands
 - `cargo build --workspace`: build all workspace crates.
@@ -25,11 +25,13 @@ The runtime crate currently exports `common`, `deserializers`, `namespaces`, `pa
 - `cargo test --workspace`: run the full workspace test suite.
 - `cargo test --workspace --no-default-features`: run the workspace test suite with default features disabled.
 - `cargo test --workspace --no-default-features --features parts`: run the workspace test suite for the Office2007-oriented `parts` surface without `microsoft365`.
+- `cargo test -p ooxmlsdk-test --features validators`: run validator-focused integration tests, including file-level validate coverage.
 - `cargo bench -p ooxmlsdk-build --bench serde_bench`: run the serde comparison benchmark in the generator crate.
 - `cargo fmt --all`: format the workspace.
 - `cargo clippy --workspace --all-targets -- -D warnings`: run lints for the default `microsoft365` feature set.
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: run lints with default features disabled.
 - `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: run lints for the Office2007-oriented `parts` surface without `microsoft365`.
+- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: lint the validator-focused integration lane.
 
 Run commands from the repository root. For normal validation, use this order and keep `cargo fmt --all` last:
 
@@ -43,6 +45,11 @@ Run commands from the repository root. For normal validation, use this order and
 - `cargo fmt --all`
 
 For fast iteration on runtime or doc-sample work, treat `cargo test -p ooxmlsdk-test` as the primary gate first. Defer workspace-wide, `strict`, and clippy runs unless the change touches generator code, shared runtime code, or feature-gated behavior.
+
+When changing validator IR, validator runtime helpers, or validator-facing derive output, also run the validator-specific lane:
+
+- `cargo test -p ooxmlsdk-test --features validators`
+- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`
 
 Execute Cargo commands in the repository's default `target/` directory. Do not switch `target/` directories or introduce `CARGO_TARGET_DIR`. Run generation, test, clippy, and format commands sequentially, never in parallel. If Cargo reports a lock on the artifact directory, wait for the lock to clear and then continue.
 
@@ -72,6 +79,8 @@ When validating generator changes, feature-gated code, or generated schema outpu
 Runtime behavior is currently covered by focused round-trip tests in `crates/ooxmlsdk-test/tests/wordprocessing.rs` and `crates/ooxmlsdk-test/tests/presentation.rs`. Add new tests close to the behavior they protect and keep assertions stable: verify both parsed fields and serialized XML where possible.
 
 Additional integration coverage also lives in `crates/ooxmlsdk-test/tests/spreadsheet.rs`, `crates/ooxmlsdk-test/tests/properties.rs`, and `crates/ooxmlsdk-test/tests/packages.rs`. Add new tests close to the behavior they protect.
+
+Validator-focused integration coverage lives in `crates/ooxmlsdk-test/tests/validators.rs` and `crates/ooxmlsdk-test/tests/file_validators.rs`. Keep these tests behind `validators` and prefer traceable upstream Open XML SDK fixtures and assertions. For package-level validator migrations where upstream reports multiple errors, it is acceptable to assert the first Rust-side validation error when the implementation intentionally stops at first failure.
 
 The `cargo test --workspace --no-default-features --features parts` lane is the Office2007-oriented `parts` validation surface. Keep fixtures that require Office 2010+ relationships, ChartEx, model3d, `stylesWithEffects`, Word 2013+ compatibility settings, or other `microsoft365`-gated runtime coverage out of that lane by gating the affected tests with `#[cfg(feature = "microsoft365")]`. Do not hide true Office2007 regressions behind that gate.
 

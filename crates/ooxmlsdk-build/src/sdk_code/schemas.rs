@@ -8,7 +8,7 @@ use syn::{Attribute, Ident, Type, Variant, parse_str, parse2};
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, FieldDecl, FieldWireDecl, MemberDecl,
-  SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl,
+  SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind,
 };
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::helpers::{
@@ -1559,6 +1559,40 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
   let sdk_attr_attrs = quote! {
     #[sdk(attr(qname = #qname))]
   };
+  let validator_attrs: Vec<TokenStream> = attr
+    .validators
+    .iter()
+    .map(|validator| match &validator.kind {
+      ValidatorKind::Pattern { regex } => quote! {
+        #[sdk(pattern(regex = #regex))]
+      },
+      ValidatorKind::StringLength { min, max } => {
+        let min_attr = min.map(|min| quote! { min = #min, });
+        let max_attr = max.map(|max| quote! { max = #max, });
+        quote! {
+          #[sdk(string_length(#min_attr #max_attr))]
+        }
+      }
+      ValidatorKind::NumberRange {
+        min,
+        max,
+        min_inclusive,
+        max_inclusive,
+      } => {
+        let min_attr = min.as_ref().map(|min| quote! { min = #min, });
+        let max_attr = max.as_ref().map(|max| quote! { max = #max, });
+        quote! {
+          #[sdk(number_range(
+            #min_attr
+            #max_attr
+            min_inclusive = #min_inclusive,
+            max_inclusive = #max_inclusive
+          ))]
+        }
+      }
+      ValidatorKind::StringSet { .. } | ValidatorKind::Placeholder => quote! {},
+    })
+    .collect();
   let property_comments_doc = format!(" {}", attr.docs);
   let version_doc = if attr.version.is_empty() {
     " Available in Office2007 and above.".to_string()
@@ -1579,6 +1613,7 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
       #[doc = ""]
       #[doc = #qualified_doc]
       #sdk_attr_attrs
+      #( #validator_attrs )*
       #bit_attrs
       pub #attr_name_ident: #type_ident,
     },
@@ -1590,6 +1625,7 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
       #[doc = ""]
       #[doc = #qualified_doc]
       #sdk_attr_attrs
+      #( #validator_attrs )*
       #bit_attrs
       pub #attr_name_ident: Option<#type_ident>,
     },
@@ -2988,5 +3024,58 @@ mod tests {
     assert!(generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(generated.contains("FallbackHolderChoiceSequence2"));
     assert!(generated.contains("leaf_b"));
+  }
+
+  #[test]
+  fn emits_attribute_validator_attrs_from_codegen_ir() {
+    let attr = FieldDecl {
+      rust_name: "creation_id".to_string(),
+      docs: String::new(),
+      version: "Office2016".to_string(),
+      wire: FieldWireDecl::Attribute {
+        qname: ":creationId".to_string(),
+        bit: None,
+      },
+      cardinality: Cardinality::Optional,
+      type_ref: TypeRefDecl {
+        rust_type: "StringValue".to_string(),
+        module_path: Some("crate::simple_type".to_string()),
+      },
+      validators: vec![
+        crate::sdk_code::codegen_ir::ValidatorDecl {
+          version: String::new(),
+          kind: ValidatorKind::Pattern {
+            regex: "[A-Z]+".to_string(),
+          },
+        },
+        crate::sdk_code::codegen_ir::ValidatorDecl {
+          version: String::new(),
+          kind: ValidatorKind::StringLength {
+            min: Some(2),
+            max: Some(8),
+          },
+        },
+        crate::sdk_code::codegen_ir::ValidatorDecl {
+          version: String::new(),
+          kind: ValidatorKind::NumberRange {
+            min: Some("0".to_string()),
+            max: Some("10".to_string()),
+            min_inclusive: true,
+            max_inclusive: false,
+          },
+        },
+      ],
+    };
+
+    let generated = gen_attr_from_decl(&attr, VersionCfgContext::default())
+      .unwrap()
+      .to_string();
+
+    assert!(generated.contains("# [sdk (attr (qname = \":creationId\"))]"));
+    assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));
+    assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));
+    assert!(generated.contains(
+      "# [sdk (number_range (min = \"0\" , max = \"10\" , min_inclusive = true , max_inclusive = false))]"
+    ));
   }
 }

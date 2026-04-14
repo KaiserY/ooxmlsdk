@@ -44,6 +44,14 @@ pub enum SdkError {
     field: &'static str,
     value: String,
   },
+  #[error("validation failed for `{field}` on {ty} with {validator}: {message} ({value:?})")]
+  ValidationError {
+    ty: &'static str,
+    field: &'static str,
+    validator: &'static str,
+    value: String,
+    message: String,
+  },
   #[error("unexpected EOF while parsing {context}")]
   UnexpectedEof { context: &'static str },
   #[error("unknown error")]
@@ -82,6 +90,23 @@ pub fn invalid_field_value(
     ty,
     field,
     value: value.into(),
+  }
+}
+
+#[inline]
+pub fn validation_error(
+  ty: &'static str,
+  field: &'static str,
+  validator: &'static str,
+  value: impl Into<String>,
+  message: impl Into<String>,
+) -> SdkError {
+  SdkError::ValidationError {
+    ty,
+    field,
+    validator,
+    value: value.into(),
+    message: message.into(),
   }
 }
 

@@ -91,6 +91,7 @@ struct SdkAttrField {
   name: String,
   ty: Type,
   optional: bool,
+  validators: Vec<SdkFieldValidator>,
 }
 
 #[derive(Clone)]
@@ -141,6 +142,23 @@ enum SdkTypeFieldKind {
   Choice,
   Any,
   Text,
+}
+
+#[derive(Clone)]
+enum SdkFieldValidator {
+  Pattern {
+    regex: String,
+  },
+  StringLength {
+    min: Option<u32>,
+    max: Option<u32>,
+  },
+  NumberRange {
+    min: Option<String>,
+    max: Option<String>,
+    min_inclusive: bool,
+    max_inclusive: bool,
+  },
 }
 
 enum SdkChoiceVariantKind {
@@ -423,6 +441,13 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
         {
           continue;
         }
+        Meta::List(meta)
+          if meta.path.is_ident("pattern")
+            || meta.path.is_ident("string_length")
+            || meta.path.is_ident("number_range") =>
+        {
+          continue;
+        }
         other => {
           return Err(syn::Error::new_spanned(
             other,
@@ -438,6 +463,92 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
     }));
   }
   Ok(None)
+}
+
+fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFieldValidator>> {
+  let mut validators = Vec::new();
+
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      match meta {
+        Meta::List(meta) if meta.path.is_ident("pattern") => {
+          let mut regex = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("regex") {
+              let value: LitStr = nested.value()?.parse()?;
+              regex = Some(value.value());
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk pattern attribute"))
+            }
+          })?;
+          if let Some(regex) = regex {
+            validators.push(SdkFieldValidator::Pattern { regex });
+          }
+        }
+        Meta::List(meta) if meta.path.is_ident("string_length") => {
+          let mut min = None;
+          let mut max = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("min") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              min = Some(value.base10_parse::<u32>()?);
+              Ok(())
+            } else if nested.path.is_ident("max") {
+              let value: syn::LitInt = nested.value()?.parse()?;
+              max = Some(value.base10_parse::<u32>()?);
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk string_length attribute"))
+            }
+          })?;
+          validators.push(SdkFieldValidator::StringLength { min, max });
+        }
+        Meta::List(meta) if meta.path.is_ident("number_range") => {
+          let mut min = None;
+          let mut max = None;
+          let mut min_inclusive = true;
+          let mut max_inclusive = true;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("min") {
+              let value: LitStr = nested.value()?.parse()?;
+              min = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("max") {
+              let value: LitStr = nested.value()?.parse()?;
+              max = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("min_inclusive") {
+              let value: syn::LitBool = nested.value()?.parse()?;
+              min_inclusive = value.value;
+              Ok(())
+            } else if nested.path.is_ident("max_inclusive") {
+              let value: syn::LitBool = nested.value()?.parse()?;
+              max_inclusive = value.value;
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk number_range attribute"))
+            }
+          })?;
+          validators.push(SdkFieldValidator::NumberRange {
+            min,
+            max,
+            min_inclusive,
+            max_inclusive,
+          });
+        }
+        _ => {}
+      }
+    }
+  }
+
+  Ok(validators)
 }
 
 fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {

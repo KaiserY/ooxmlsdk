@@ -20,5 +20,6 @@ microsoft365 = []
 [dependencies]
 ooxmlsdk-derive = { workspace = true }
 quick-xml = { workspace = true }
+regex = { workspace = true }
 thiserror = { workspace = true }
 zip = { workspace = true, optional = true }

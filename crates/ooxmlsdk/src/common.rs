@@ -6,6 +6,7 @@ mod xml;
 
 pub use error::{
   SdkError, invalid_enum_value, invalid_field_value, missing_field, unexpected_eof, unexpected_tag,
+  validation_error,
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;

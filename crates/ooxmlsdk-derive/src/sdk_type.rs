@@ -30,10 +30,16 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
 fn sdk_type_impl_tokens(
   ident: &Ident,
   impl_items: proc_macro2::TokenStream,
+  validate_items: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   quote! {
     impl crate::sdk::SdkType for #ident {}
-    impl crate::validator::SdkValidator for #ident {}
+    impl crate::validator::SdkValidator for #ident {
+      fn validate(&self) -> Result<(), crate::common::SdkError> {
+        #validate_items
+        Ok(())
+      }
+    }
 
     impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;
@@ -419,6 +425,7 @@ fn expand_sequence_helper_struct(
         Ok(())
       }
     },
+    quote! {},
   ))
 }
 
@@ -996,6 +1003,7 @@ fn expand_named_struct(
         name,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
+        validators: parse_sdk_type_field_validators(&field.attrs)?,
       }),
       Some(SdkTypeFieldKind::Child { qname }) => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
@@ -1054,6 +1062,7 @@ fn expand_named_struct(
   let mut attr_write_tokens = Vec::new();
   let mut attr_init_tokens = Vec::new();
   let mut attr_finish_tokens = Vec::new();
+  let mut attr_validate_tokens = Vec::new();
   for field in &attr_fields {
     let field_ident = &field.ident;
     let name_lit = LitStr::new(&field.name, Span::call_site());
@@ -1098,6 +1107,82 @@ fn expand_named_struct(
       attr_write_tokens.push(quote! {
         crate::common::write_attr_value(writer, #name_lit, &self.#field_ident)?;
       });
+    }
+
+    let validator_tokens: Vec<_> = field
+      .validators
+      .iter()
+      .map(|validator| match validator {
+        SdkFieldValidator::Pattern { regex } => quote! {
+          crate::validator::validate_pattern(
+            stringify!(#ident),
+            stringify!(#field_ident),
+            value,
+            #regex,
+          )?;
+        },
+        SdkFieldValidator::StringLength { min, max } => {
+          let min_tokens = match min {
+            Some(min) => quote! { Some(#min) },
+            None => quote! { None },
+          };
+          let max_tokens = match max {
+            Some(max) => quote! { Some(#max) },
+            None => quote! { None },
+          };
+          quote! {
+            crate::validator::validate_string_length(
+              stringify!(#ident),
+              stringify!(#field_ident),
+              value,
+              #min_tokens,
+              #max_tokens,
+            )?;
+          }
+        }
+        SdkFieldValidator::NumberRange {
+          min,
+          max,
+          min_inclusive,
+          max_inclusive,
+        } => {
+          let min_tokens = match min {
+            Some(min) => quote! { Some(#min) },
+            None => quote! { None },
+          };
+          let max_tokens = match max {
+            Some(max) => quote! { Some(#max) },
+            None => quote! { None },
+          };
+          quote! {
+            crate::validator::validate_number_range(
+              stringify!(#ident),
+              stringify!(#field_ident),
+              value,
+              #min_tokens,
+              #max_tokens,
+              #min_inclusive,
+              #max_inclusive,
+            )?;
+          }
+        }
+      })
+      .collect();
+    if !validator_tokens.is_empty() {
+      if field.optional {
+        attr_validate_tokens.push(quote! {
+          if let Some(value) = &self.#field_ident {
+            #( #validator_tokens )*
+          }
+        });
+      } else {
+        attr_validate_tokens.push(quote! {
+          {
+            let value = &self.#field_ident;
+            #( #validator_tokens )*
+          }
+        });
+      }
     }
   }
 
@@ -1904,7 +1989,12 @@ fn expand_named_struct(
     || text_field.is_some();
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}
-    impl crate::validator::SdkValidator for #ident {}
+    impl crate::validator::SdkValidator for #ident {
+      fn validate(&self) -> Result<(), crate::common::SdkError> {
+        #( #attr_validate_tokens )*
+        Ok(())
+      }
+    }
 
     impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;

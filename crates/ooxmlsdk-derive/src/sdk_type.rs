@@ -229,6 +229,7 @@ fn expand_sequence_helper_struct(
   let mut child_dispatch_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
+  let mut child_validate_tokens = Vec::new();
 
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
 
@@ -249,6 +250,16 @@ fn expand_sequence_helper_struct(
           inner_ty
         } else {
           payload_ty.clone()
+        };
+        let validate_child_tokens = if box_inner_type(&payload_ty).is_some() {
+          quote! { child.as_ref() }
+        } else {
+          quote! { child }
+        };
+        let validate_self_tokens = if box_inner_type(&payload_ty).is_some() {
+          quote! { self.#field_ident.as_ref() }
+        } else {
+          quote! { &self.#field_ident }
         };
         let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
           quote! { std::boxed::Box::new(parsed_child) }
@@ -271,6 +282,11 @@ fn expand_sequence_helper_struct(
           child_write_tokens.push(quote! {
             for child in &self.#field_ident {
               child.write_xml(writer, xmlns_prefix)?;
+            }
+          });
+          child_validate_tokens.push(quote! {
+            for child in &self.#field_ident {
+              crate::validator::SdkValidator::validate(#validate_child_tokens)?;
             }
           });
           child_dispatch_tokens.push(quote! {
@@ -303,9 +319,17 @@ fn expand_sequence_helper_struct(
                 child.write_xml(writer, xmlns_prefix)?;
               }
             });
+            child_validate_tokens.push(quote! {
+              if let Some(child) = &self.#field_ident {
+                crate::validator::SdkValidator::validate(#validate_child_tokens)?;
+              }
+            });
           } else {
             child_write_tokens.push(quote! {
               self.#field_ident.write_xml(writer, xmlns_prefix)?;
+            });
+            child_validate_tokens.push(quote! {
+              crate::validator::SdkValidator::validate(#validate_self_tokens)?;
             });
           }
           child_dispatch_tokens.push(quote! {
@@ -427,7 +451,9 @@ fn expand_sequence_helper_struct(
         Ok(())
       }
     },
-    quote! {},
+    quote! {
+      #( #child_validate_tokens )*
+    },
   ))
 }
 
@@ -492,6 +518,7 @@ fn expand_helper_struct(
   let mut child_visit_parse_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
+  let mut child_validate_tokens = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
   let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
@@ -506,6 +533,16 @@ fn expand_helper_struct(
       inner_ty
     } else {
       payload_ty.clone()
+    };
+    let validate_child_tokens = if box_inner_type(&payload_ty).is_some() {
+      quote! { child.as_ref() }
+    } else {
+      quote! { child }
+    };
+    let validate_self_tokens = if box_inner_type(&payload_ty).is_some() {
+      quote! { self.#field_ident.as_ref() }
+    } else {
+      quote! { &self.#field_ident }
     };
     let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
       quote! { std::boxed::Box::new(parsed_child) }
@@ -589,6 +626,11 @@ fn expand_helper_struct(
           child.write_xml(writer, xmlns_prefix)?;
         }
       });
+      child_validate_tokens.push(quote! {
+        for child in &self.#field_ident {
+          crate::validator::SdkValidator::validate(#validate_child_tokens)?;
+        }
+      });
       child_parse_tokens.push(build_arm(&xml_reader_ident, false));
       child_visit_parse_tokens.push(build_arm(&visitor_reader_ident, true));
     } else {
@@ -609,9 +651,17 @@ fn expand_helper_struct(
             child.write_xml(writer, xmlns_prefix)?;
           }
         });
+        child_validate_tokens.push(quote! {
+          if let Some(child) = &self.#field_ident {
+            crate::validator::SdkValidator::validate(#validate_child_tokens)?;
+          }
+        });
       } else {
         child_write_tokens.push(quote! {
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
+        });
+        child_validate_tokens.push(quote! {
+          crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
       child_parse_tokens.push(build_arm(&xml_reader_ident, false));
@@ -624,9 +674,20 @@ fn expand_helper_struct(
   let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
+  let mut choice_validate_tokens = Vec::new();
   for field in &choice_fields {
     let field_ident = &field.ident;
     let choice_ty = unwrap_option_vec_type(&field.ty);
+    let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
+      quote! { choice.as_ref() }
+    } else {
+      quote! { choice }
+    };
+    let validate_self_tokens = if box_inner_type(&choice_ty).is_some() {
+      quote! { self.#field_ident.as_ref() }
+    } else {
+      quote! { &self.#field_ident }
+    };
     let build_visit_arm = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
@@ -709,6 +770,11 @@ fn expand_helper_struct(
           choice.write_xml(writer, xmlns_prefix)?;
         }
       });
+      choice_validate_tokens.push(quote! {
+        for choice in &self.#field_ident {
+          crate::validator::SdkValidator::validate(#validate_choice_tokens)?;
+        }
+      });
       choice_parse_tokens.push(build_parse_arm(&xml_reader_ident));
       choice_visit_parse_tokens.push(build_visit_arm(&visitor_reader_ident));
     } else {
@@ -729,9 +795,17 @@ fn expand_helper_struct(
             choice.write_xml(writer, xmlns_prefix)?;
           }
         });
+        choice_validate_tokens.push(quote! {
+          if let Some(choice) = &self.#field_ident {
+            crate::validator::SdkValidator::validate(#validate_choice_tokens)?;
+          }
+        });
       } else {
         choice_write_tokens.push(quote! {
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
+        });
+        choice_validate_tokens.push(quote! {
+          crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
       choice_parse_tokens.push(build_parse_arm(&xml_reader_ident));
@@ -858,6 +932,14 @@ fn expand_helper_struct(
 
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}
+    #[cfg(feature = "validators")]
+    impl crate::validator::SdkValidator for #ident {
+      fn validate(&self) -> Result<(), crate::common::SdkError> {
+        #( #child_validate_tokens )*
+        #( #choice_validate_tokens )*
+        Ok(())
+      }
+    }
 
     impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;
@@ -1316,6 +1398,7 @@ fn expand_named_struct(
   let mut child_visit_parse_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
+  let mut child_validate_tokens = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
   let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
@@ -1330,6 +1413,16 @@ fn expand_named_struct(
       inner_ty
     } else {
       payload_ty.clone()
+    };
+    let validate_child_tokens = if box_inner_type(&payload_ty).is_some() {
+      quote! { child.as_ref() }
+    } else {
+      quote! { child }
+    };
+    let validate_self_tokens = if box_inner_type(&payload_ty).is_some() {
+      quote! { self.#field_ident.as_ref() }
+    } else {
+      quote! { &self.#field_ident }
     };
     let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
       quote! { std::boxed::Box::new(parsed_child) }
@@ -1413,6 +1506,11 @@ fn expand_named_struct(
           child.write_xml(writer, xmlns_prefix)?;
         }
       });
+      child_validate_tokens.push(quote! {
+        for child in &self.#field_ident {
+          crate::validator::SdkValidator::validate(#validate_child_tokens)?;
+        }
+      });
       child_parse_tokens.push(build_arm(&xml_reader_ident, false));
       child_visit_parse_tokens.push(build_arm(&visitor_reader_ident, true));
     } else {
@@ -1433,9 +1531,17 @@ fn expand_named_struct(
             child.write_xml(writer, xmlns_prefix)?;
           }
         });
+        child_validate_tokens.push(quote! {
+          if let Some(child) = &self.#field_ident {
+            crate::validator::SdkValidator::validate(#validate_child_tokens)?;
+          }
+        });
       } else {
         child_write_tokens.push(quote! {
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
+        });
+        child_validate_tokens.push(quote! {
+          crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
       child_parse_tokens.push(build_arm(&xml_reader_ident, false));
@@ -1491,9 +1597,20 @@ fn expand_named_struct(
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
   let mut choice_text_parse_tokens = Vec::new();
+  let mut choice_validate_tokens = Vec::new();
   for field in &choice_fields {
     let field_ident = &field.ident;
     let choice_ty = unwrap_option_vec_type(&field.ty);
+    let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
+      quote! { choice.as_ref() }
+    } else {
+      quote! { choice }
+    };
+    let validate_self_tokens = if box_inner_type(&choice_ty).is_some() {
+      quote! { self.#field_ident.as_ref() }
+    } else {
+      quote! { &self.#field_ident }
+    };
     let build_visit_block = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
@@ -1595,6 +1712,11 @@ fn expand_named_struct(
           choice.write_xml(writer, xmlns_prefix)?;
         }
       });
+      choice_validate_tokens.push(quote! {
+        for choice in &self.#field_ident {
+          crate::validator::SdkValidator::validate(#validate_choice_tokens)?;
+        }
+      });
       choice_parse_tokens.push(build_parse_block(&xml_reader_ident));
       choice_visit_parse_tokens.push(build_visit_block(&visitor_reader_ident));
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
@@ -1616,9 +1738,17 @@ fn expand_named_struct(
             choice.write_xml(writer, xmlns_prefix)?;
           }
         });
+        choice_validate_tokens.push(quote! {
+          if let Some(choice) = &self.#field_ident {
+            crate::validator::SdkValidator::validate(#validate_choice_tokens)?;
+          }
+        });
       } else {
         choice_write_tokens.push(quote! {
           self.#field_ident.write_xml(writer, xmlns_prefix)?;
+        });
+        choice_validate_tokens.push(quote! {
+          crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
       choice_parse_tokens.push(build_parse_block(&xml_reader_ident));
@@ -2029,6 +2159,8 @@ fn expand_named_struct(
     impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #( #attr_validate_tokens )*
+        #( #child_validate_tokens )*
+        #( #choice_validate_tokens )*
         Ok(())
       }
     }

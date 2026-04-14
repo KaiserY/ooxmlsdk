@@ -34,6 +34,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   let mut child_dispatch_tokens = Vec::with_capacity(variants.len());
   let mut any_dispatch_tokens = Vec::new();
   let mut text_from_string_tokens = Vec::new();
+  let mut validate_arms = Vec::new();
 
   for variant in variants {
     if variant.fields.len() != 1 {
@@ -75,6 +76,18 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(value) => value.write_xml(writer, xmlns_prefix),
         };
         write_arms.push(write_arm);
+        let validate_arm = if is_box_type(&payload_ty) {
+          quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value.as_ref()),
+          }
+        } else {
+          quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value),
+          }
+        };
+        validate_arms.push(validate_arm);
       }
       SdkChoiceVariantKind::TextChild { qnames } => {
         let qname_patterns = choice_qname_patterns(&qnames);
@@ -158,6 +171,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         };
         write_arms.push(write_arm);
+        validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(_) => Ok(()),
+        });
       }
       SdkChoiceVariantKind::Any => {
         let constructor = if is_box_type(&payload_ty) {
@@ -170,6 +187,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(value) => writer.write_str(value.as_ref()),
         };
         write_arms.push(write_arm);
+        validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(_) => Ok(()),
+        });
         any_dispatch_tokens.push(quote! {
           #(#cfg_attrs)*
           {
@@ -184,6 +205,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(value) => crate::common::write_escaped_text(writer, value),
         };
         write_arms.push(write_arm);
+        validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(_) => Ok(()),
+        });
         text_from_string_tokens.push(quote! {
           #(#cfg_attrs)*
           return Some(Self::#variant_ident(value.to_owned().into()));
@@ -214,7 +239,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   Ok(quote! {
     impl crate::sdk::SdkChoice for #ident {}
     #[cfg(feature = "validators")]
-    impl crate::validator::SdkValidator for #ident {}
+    impl crate::validator::SdkValidator for #ident {
+      fn validate(&self) -> Result<(), crate::common::SdkError> {
+        match self {
+          #( #validate_arms )*
+        }
+      }
+    }
 
     impl #ident {
       #[allow(unreachable_code)]

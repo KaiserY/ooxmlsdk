@@ -43,6 +43,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let mut self_field_values = Vec::new();
   let mut child_match_arms = Vec::new();
   let mut child_save_stmts = Vec::new();
+  let mut child_validate_stmts = Vec::new();
   let root_type = part_root_type_from_fields(fields);
   let has_root_element = root_type.is_some();
   let content_kind = part_content_kind_from_fields(fields);
@@ -166,6 +167,11 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             #child_item_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
           }
         });
+        child_validate_stmts.push(quote! {
+          for #child_item_ident in &self.#child_field_ident {
+            crate::validator::SdkValidator::validate(#child_item_ident)?;
+          }
+        });
         self_field_values.push(quote! { #child_field_ident });
       }
       PartChildKind::Required => {
@@ -208,6 +214,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         child_save_stmts.push(quote! {
           self.#child_field_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
         });
+        child_validate_stmts.push(quote! {
+          crate::validator::SdkValidator::validate(self.#child_field_ident.as_ref())?;
+        });
         self_field_values.push(quote! { #child_field_ident });
       }
       PartChildKind::Optional => {
@@ -243,6 +252,11 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         child_save_stmts.push(quote! {
           if let Some(#child_item_ident) = &self.#child_field_ident {
             #child_item_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
+          }
+        });
+        child_validate_stmts.push(quote! {
+          if let Some(#child_item_ident) = &self.#child_field_ident {
+            crate::validator::SdkValidator::validate(#child_item_ident.as_ref())?;
           }
         });
         self_field_values.push(quote! { #child_field_ident });
@@ -489,11 +503,37 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     );
   }
 
+  #[allow(unused_mut)]
+  let mut part_validate_stmts = child_validate_stmts;
+  if has_root_element {
+    part_validate_stmts.insert(
+      0,
+      quote! {
+        crate::validator::SdkValidator::validate(&self.root_element)?;
+      },
+    );
+  }
+
   Ok(quote! {
     impl crate::sdk::SdkPart for #ident {}
     #[cfg(feature = "validators")]
-    impl crate::validator::SdkValidator for #ident {}
+    impl crate::validator::SdkValidator for #ident {
+      fn validate(&self) -> Result<(), crate::common::SdkError> {
+        #( #part_validate_stmts )*
+        Ok(())
+      }
+    }
     impl #ident {
+      #[cfg(feature = "validators")]
+      pub fn validate(&self) -> Result<(), crate::common::SdkError> {
+        crate::validator::SdkValidator::validate(self)
+      }
+
+      #[cfg(feature = "validators")]
+      pub fn is_valid(&self) -> bool {
+        self.validate().is_ok()
+      }
+
       #( #impl_items )*
     }
   })

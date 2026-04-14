@@ -10,6 +10,21 @@ pub trait SdkValidator {
   }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum StringFormatKind {
+  Token,
+  NcName,
+  QName,
+  Uri,
+  Id,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum NumberSignKind {
+  NonNegative,
+  Positive,
+}
+
 pub fn validate_pattern<T: Display>(
   ty: &'static str,
   field: &'static str,
@@ -65,6 +80,32 @@ pub fn validate_string_length<T: Display>(
     ));
   }
   Ok(())
+}
+
+pub fn validate_string_format<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+  kind: StringFormatKind,
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  let valid = match kind {
+    StringFormatKind::Token => is_token(&value_string),
+    StringFormatKind::NcName | StringFormatKind::Id => is_ncname(&value_string),
+    StringFormatKind::QName => is_qname(&value_string),
+    StringFormatKind::Uri => is_uri(&value_string),
+  };
+  if valid {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "string_format",
+      value_string,
+      format!("value does not satisfy {kind:?} format"),
+    ))
+  }
 }
 
 pub fn validate_number_range<T: Display>(
@@ -132,6 +173,68 @@ pub fn validate_number_range<T: Display>(
   Ok(())
 }
 
+pub fn validate_number_sign<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+  kind: NumberSignKind,
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  let parsed_value = value_string.parse::<f64>().map_err(|err| {
+    crate::common::SdkError::CommonError(format!(
+      "failed to parse numeric validator value for {ty}.{field}: {err}"
+    ))
+  })?;
+  let valid = match kind {
+    NumberSignKind::NonNegative => parsed_value >= 0.0,
+    NumberSignKind::Positive => parsed_value > 0.0,
+  };
+  if valid && !parsed_value.is_nan() {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "number_sign",
+      value_string,
+      format!("value does not satisfy {kind:?} constraint"),
+    ))
+  }
+}
+
+fn is_token(value: &str) -> bool {
+  !value.is_empty()
+    && value.trim() == value
+    && !value.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
+    && !value.contains("  ")
+}
+
+fn is_ncname(value: &str) -> bool {
+  let mut chars = value.chars();
+  let Some(first) = chars.next() else {
+    return false;
+  };
+  if !matches!(first, 'A'..='Z' | 'a'..='z' | '_') {
+    return false;
+  }
+  chars.all(|ch| matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '-' | '.'))
+}
+
+fn is_qname(value: &str) -> bool {
+  let mut parts = value.split(':');
+  let Some(first) = parts.next() else {
+    return false;
+  };
+  let Some(second) = parts.next() else {
+    return is_ncname(first);
+  };
+  parts.next().is_none() && is_ncname(first) && is_ncname(second)
+}
+
+fn is_uri(value: &str) -> bool {
+  !value.is_empty() && !value.chars().any(char::is_whitespace)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -156,5 +259,38 @@ mod tests {
     );
     assert!(validate_number_range("TestType", "field", &5, Some("5"), None, false, true).is_err());
     assert!(validate_number_range("TestType", "field", &5, None, Some("5"), true, false).is_err());
+  }
+
+  #[test]
+  fn validates_string_formats() {
+    assert!(
+      validate_string_format("TestType", "field", &"abc-def", StringFormatKind::NcName).is_ok()
+    );
+    assert!(
+      validate_string_format("TestType", "field", &"ns:value", StringFormatKind::QName).is_ok()
+    );
+    assert!(
+      validate_string_format("TestType", "field", &"two  spaces", StringFormatKind::Token).is_err()
+    );
+    assert!(
+      validate_string_format(
+        "TestType",
+        "field",
+        &"bad:name:extra",
+        StringFormatKind::QName
+      )
+      .is_err()
+    );
+    assert!(
+      validate_string_format("TestType", "field", &"urn:test", StringFormatKind::Uri).is_ok()
+    );
+  }
+
+  #[test]
+  fn validates_number_signs() {
+    assert!(validate_number_sign("TestType", "field", &0, NumberSignKind::NonNegative).is_ok());
+    assert!(validate_number_sign("TestType", "field", &1, NumberSignKind::Positive).is_ok());
+    assert!(validate_number_sign("TestType", "field", &-1, NumberSignKind::NonNegative).is_err());
+    assert!(validate_number_sign("TestType", "field", &0, NumberSignKind::Positive).is_err());
   }
 }

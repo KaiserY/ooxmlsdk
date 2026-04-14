@@ -1566,9 +1566,23 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
       ValidatorKind::Pattern { regex } => quote! {
         #[sdk(pattern(regex = #regex))]
       },
-      ValidatorKind::StringLength { min, max } => {
-        let min_attr = min.map(|min| quote! { min = #min, });
-        let max_attr = max.map(|max| quote! { max = #max, });
+      ValidatorKind::StringFormat { kind } => {
+        let kind_lit = match kind {
+          crate::sdk_code::codegen_ir::StringFormatKind::Token => "token",
+          crate::sdk_code::codegen_ir::StringFormatKind::NcName => "ncname",
+          crate::sdk_code::codegen_ir::StringFormatKind::QName => "qname",
+          crate::sdk_code::codegen_ir::StringFormatKind::Uri => "uri",
+          crate::sdk_code::codegen_ir::StringFormatKind::Id => "id",
+        };
+        quote! {
+          #[sdk(string_format(kind = #kind_lit))]
+        }
+      }
+      ValidatorKind::StringLength { min, max, exact } => {
+        let effective_min = exact.or(*min);
+        let effective_max = exact.or(*max);
+        let min_attr = effective_min.map(|min| quote! { min = #min, });
+        let max_attr = effective_max.map(|max| quote! { max = #max, });
         quote! {
           #[sdk(string_length(#min_attr #max_attr))]
         }
@@ -1590,7 +1604,20 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
           ))]
         }
       }
-      ValidatorKind::StringSet { .. } | ValidatorKind::Placeholder => quote! {},
+      ValidatorKind::NumberSign { kind } => {
+        let kind_lit = match kind {
+          crate::sdk_code::codegen_ir::NumberSignKind::NonNegative => "non_negative",
+          crate::sdk_code::codegen_ir::NumberSignKind::Positive => "positive",
+        };
+        quote! {
+          #[sdk(number_sign(kind = #kind_lit))]
+        }
+      }
+      ValidatorKind::Required
+      | ValidatorKind::EnumRef { .. }
+      | ValidatorKind::StringSet { .. }
+      | ValidatorKind::Unsupported { .. }
+      | ValidatorKind::Placeholder => quote! {},
     })
     .collect();
   let property_comments_doc = format!(" {}", attr.docs);
@@ -3050,9 +3077,16 @@ mod tests {
         },
         crate::sdk_code::codegen_ir::ValidatorDecl {
           version: String::new(),
+          kind: ValidatorKind::StringFormat {
+            kind: crate::sdk_code::codegen_ir::StringFormatKind::Token,
+          },
+        },
+        crate::sdk_code::codegen_ir::ValidatorDecl {
+          version: String::new(),
           kind: ValidatorKind::StringLength {
             min: Some(2),
             max: Some(8),
+            exact: None,
           },
         },
         crate::sdk_code::codegen_ir::ValidatorDecl {
@@ -3064,6 +3098,12 @@ mod tests {
             max_inclusive: false,
           },
         },
+        crate::sdk_code::codegen_ir::ValidatorDecl {
+          version: String::new(),
+          kind: ValidatorKind::NumberSign {
+            kind: crate::sdk_code::codegen_ir::NumberSignKind::NonNegative,
+          },
+        },
       ],
     };
 
@@ -3073,9 +3113,11 @@ mod tests {
 
     assert!(generated.contains("# [sdk (attr (qname = \":creationId\"))]"));
     assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));
+    assert!(generated.contains("# [sdk (string_format (kind = \"token\"))]"));
     assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));
     assert!(generated.contains(
       "# [sdk (number_range (min = \"0\" , max = \"10\" , min_inclusive = true , max_inclusive = false))]"
     ));
+    assert!(generated.contains("# [sdk (number_sign (kind = \"non_negative\"))]"));
   }
 }

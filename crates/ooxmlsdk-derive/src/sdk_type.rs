@@ -22,6 +22,7 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
     )),
     _ => Ok(quote! {
       impl crate::sdk::SdkType for #ident {}
+      #[cfg(feature = "validators")]
       impl crate::validator::SdkValidator for #ident {}
     }),
   }
@@ -34,6 +35,7 @@ fn sdk_type_impl_tokens(
 ) -> proc_macro2::TokenStream {
   quote! {
     impl crate::sdk::SdkType for #ident {}
+    #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #validate_items
@@ -958,6 +960,7 @@ fn expand_named_struct(
   if local_name.is_empty() {
     return Ok(quote! {
       impl crate::sdk::SdkType for #ident {}
+      #[cfg(feature = "validators")]
       impl crate::validator::SdkValidator for #ident {}
     });
   }
@@ -1140,6 +1143,23 @@ fn expand_named_struct(
             )?;
           }
         }
+        SdkFieldValidator::StringFormat { kind } => {
+          let kind_tokens = match kind {
+            SdkStringFormatKind::Token => quote! { crate::validator::StringFormatKind::Token },
+            SdkStringFormatKind::NcName => quote! { crate::validator::StringFormatKind::NcName },
+            SdkStringFormatKind::QName => quote! { crate::validator::StringFormatKind::QName },
+            SdkStringFormatKind::Uri => quote! { crate::validator::StringFormatKind::Uri },
+            SdkStringFormatKind::Id => quote! { crate::validator::StringFormatKind::Id },
+          };
+          quote! {
+            crate::validator::validate_string_format(
+              stringify!(#ident),
+              stringify!(#field_ident),
+              value,
+              #kind_tokens,
+            )?;
+          }
+        }
         SdkFieldValidator::NumberRange {
           min,
           max,
@@ -1163,6 +1183,22 @@ fn expand_named_struct(
               #max_tokens,
               #min_inclusive,
               #max_inclusive,
+            )?;
+          }
+        }
+        SdkFieldValidator::NumberSign { kind } => {
+          let kind_tokens = match kind {
+            SdkNumberSignKind::NonNegative => {
+              quote! { crate::validator::NumberSignKind::NonNegative }
+            }
+            SdkNumberSignKind::Positive => quote! { crate::validator::NumberSignKind::Positive },
+          };
+          quote! {
+            crate::validator::validate_number_sign(
+              stringify!(#ident),
+              stringify!(#field_ident),
+              value,
+              #kind_tokens,
             )?;
           }
         }
@@ -1989,6 +2025,7 @@ fn expand_named_struct(
     || text_field.is_some();
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}
+    #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #( #attr_validate_tokens )*

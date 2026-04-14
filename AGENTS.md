@@ -46,6 +46,8 @@ For fast iteration on runtime or doc-sample work, treat `cargo test -p ooxmlsdk-
 
 Execute Cargo commands in the repository's default `target/` directory. Do not switch `target/` directories or introduce `CARGO_TARGET_DIR`. Run generation, test, clippy, and format commands sequentially, never in parallel. If Cargo reports a lock on the artifact directory, wait for the lock to clear and then continue.
 
+For long-running Cargo commands such as `cargo test`, `cargo clippy`, and generation flows, prefer linear execution and patient waiting over short polling loops. Start the command, let it run, and wait for completion before analyzing results unless there is a concrete reason to interrupt. Do not rely on `ps`, process-list probing, or similar background-process heuristics to decide whether Cargo is still active; sandboxing and wrapper processes can make those signals misleading. Treat Cargo's own lock messages and final exit status as the source of truth.
+
 ## Coding Style & Naming Conventions
 Follow standard Rust formatting and keep the workspace `rustfmt`-clean. Use snake_case for modules and functions, PascalCase for Rust types, and preserve the schema-derived module naming pattern already in use, for example `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
 
@@ -80,6 +82,8 @@ Strict OOXML samples may still need separate gating from the default surface. If
 When adjusting `doc_samples` or package tests, gate only fixtures that are demonstrably version- or feature-specific. Prefer the smallest possible `#[cfg(...)]` around a test or assertion. Do not broadly gate failing tests until you have distinguished between a real runtime bug and a fixture that depends on disabled feature coverage.
 
 When validating work, do not overlap `cargo fmt`, `cargo test`, `cargo clippy`, or generation commands. Finish one command, capture its result, and only then start the next one. Do not switch target directories to avoid locks. If you encounter a target directory lock, wait for the existing lock to release.
+
+When a validation command is expected to take a long time, avoid frequent status checks that only poll for intermediate output. Prefer waiting for the command to complete, then inspect the final output and failures in one pass. This keeps execution predictable and avoids false conclusions from partial logs.
 
 ## Commit Guidelines
 Keep commit subjects short, imperative, and scoped to the affected area, for example `Regenerate spreadsheet serializer output` or `Tighten XML attribute decoding errors`.

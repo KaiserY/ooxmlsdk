@@ -214,15 +214,39 @@ pub struct ValidatorDecl {
   pub kind: ValidatorKind,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "PascalCase")]
+pub enum StringFormatKind {
+  #[default]
+  Token,
+  NcName,
+  QName,
+  Uri,
+  Id,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "PascalCase")]
+pub enum NumberSignKind {
+  #[default]
+  NonNegative,
+  Positive,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase", rename_all_fields = "PascalCase")]
 pub enum ValidatorKind {
+  Required,
   StringLength {
     min: Option<u32>,
     max: Option<u32>,
+    exact: Option<u32>,
   },
   Pattern {
     regex: String,
+  },
+  StringFormat {
+    kind: StringFormatKind,
   },
   NumberRange {
     min: Option<String>,
@@ -230,8 +254,19 @@ pub enum ValidatorKind {
     min_inclusive: bool,
     max_inclusive: bool,
   },
+  NumberSign {
+    kind: NumberSignKind,
+  },
+  EnumRef {
+    type_name: String,
+    union_id: u64,
+    is_list: bool,
+  },
   StringSet {
     values: Vec<String>,
+  },
+  Unsupported {
+    name: String,
   },
   #[default]
   Placeholder,

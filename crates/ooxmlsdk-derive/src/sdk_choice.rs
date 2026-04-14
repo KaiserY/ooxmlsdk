@@ -213,6 +213,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
 
   Ok(quote! {
     impl crate::sdk::SdkChoice for #ident {}
+    #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {}
 
     impl #ident {

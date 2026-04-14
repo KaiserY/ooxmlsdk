@@ -153,12 +153,33 @@ enum SdkFieldValidator {
     min: Option<u32>,
     max: Option<u32>,
   },
+  StringFormat {
+    kind: SdkStringFormatKind,
+  },
   NumberRange {
     min: Option<String>,
     max: Option<String>,
     min_inclusive: bool,
     max_inclusive: bool,
   },
+  NumberSign {
+    kind: SdkNumberSignKind,
+  },
+}
+
+#[derive(Clone)]
+enum SdkStringFormatKind {
+  Token,
+  NcName,
+  QName,
+  Uri,
+  Id,
+}
+
+#[derive(Clone)]
+enum SdkNumberSignKind {
+  NonNegative,
+  Positive,
 }
 
 enum SdkChoiceVariantKind {
@@ -444,7 +465,9 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
         Meta::List(meta)
           if meta.path.is_ident("pattern")
             || meta.path.is_ident("string_length")
-            || meta.path.is_ident("number_range") =>
+            || meta.path.is_ident("string_format")
+            || meta.path.is_ident("number_range")
+            || meta.path.is_ident("number_sign") =>
         {
           continue;
         }
@@ -542,6 +565,47 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
             min_inclusive,
             max_inclusive,
           });
+        }
+        Meta::List(meta) if meta.path.is_ident("string_format") => {
+          let mut kind = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("kind") {
+              let value: LitStr = nested.value()?.parse()?;
+              kind = Some(match value.value().as_str() {
+                "token" => SdkStringFormatKind::Token,
+                "ncname" => SdkStringFormatKind::NcName,
+                "qname" => SdkStringFormatKind::QName,
+                "uri" => SdkStringFormatKind::Uri,
+                "id" => SdkStringFormatKind::Id,
+                _ => return Err(nested.error("unsupported sdk string_format kind")),
+              });
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk string_format attribute"))
+            }
+          })?;
+          if let Some(kind) = kind {
+            validators.push(SdkFieldValidator::StringFormat { kind });
+          }
+        }
+        Meta::List(meta) if meta.path.is_ident("number_sign") => {
+          let mut kind = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("kind") {
+              let value: LitStr = nested.value()?.parse()?;
+              kind = Some(match value.value().as_str() {
+                "non_negative" => SdkNumberSignKind::NonNegative,
+                "positive" => SdkNumberSignKind::Positive,
+                _ => return Err(nested.error("unsupported sdk number_sign kind")),
+              });
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk number_sign attribute"))
+            }
+          })?;
+          if let Some(kind) = kind {
+            validators.push(SdkFieldValidator::NumberSign { kind });
+          }
         }
         _ => {}
       }

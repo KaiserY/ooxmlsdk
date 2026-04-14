@@ -1,8 +1,9 @@
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, EnumValueType, EnumVariantDecl, FieldDecl,
-  FieldWireDecl, MemberDecl, SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl,
-  ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode, XmlnsMode,
+  FieldWireDecl, MemberDecl, NumberSignKind, SchemaModuleDecl, StringFormatKind, SystemSupportDecl,
+  TypeDecl, TypeKind, TypeRefDecl, ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl,
+  XmlHeaderMode, XmlnsMode,
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticleKind, classify_attr_type,
@@ -1727,12 +1728,12 @@ fn build_attr_validator_decls(attr: &SchemaTypeAttribute) -> Vec<ValidatorDecl> 
   attr
     .validators
     .iter()
-    .filter_map(build_validator_decl)
+    .flat_map(build_validator_decls)
     .collect()
 }
 
 #[allow(dead_code)]
-fn build_validator_decl(validator: &SchemaTypeAttributeValidator) -> Option<ValidatorDecl> {
+fn build_validator_decls(validator: &SchemaTypeAttributeValidator) -> Vec<ValidatorDecl> {
   let version = if validator.is_initial_version {
     "Office2007".to_string()
   } else {
@@ -1740,26 +1741,53 @@ fn build_validator_decl(validator: &SchemaTypeAttributeValidator) -> Option<Vali
   };
 
   match validator.name.as_str() {
-    "RequiredValidator" => None,
-    "StringValidator" => {
-      build_string_validator_kind(validator).map(|kind| ValidatorDecl { version, kind })
-    }
-    "NumberValidator" => {
-      build_number_validator_kind(validator).map(|kind| ValidatorDecl { version, kind })
-    }
-    _ => None,
+    "RequiredValidator" => vec![ValidatorDecl {
+      version,
+      kind: ValidatorKind::Required,
+    }],
+    "StringValidator" => build_string_validator_kinds(validator)
+      .into_iter()
+      .map(|kind| ValidatorDecl {
+        version: version.clone(),
+        kind,
+      })
+      .collect(),
+    "NumberValidator" => build_number_validator_kinds(validator)
+      .into_iter()
+      .map(|kind| ValidatorDecl {
+        version: version.clone(),
+        kind,
+      })
+      .collect(),
+    "EnumValidator" => vec![ValidatorDecl {
+      version,
+      kind: ValidatorKind::EnumRef {
+        type_name: validator.r#type.clone(),
+        union_id: validator.union_id,
+        is_list: validator.is_list,
+      },
+    }],
+    "OfficeVersionValidator" => Vec::new(),
+    _ => vec![ValidatorDecl {
+      version,
+      kind: ValidatorKind::Unsupported {
+        name: validator.name.clone(),
+      },
+    }],
   }
 }
 
 #[allow(dead_code)]
-fn build_string_validator_kind(validator: &SchemaTypeAttributeValidator) -> Option<ValidatorKind> {
-  let pattern = validator
+fn build_string_validator_kinds(validator: &SchemaTypeAttributeValidator) -> Vec<ValidatorKind> {
+  let mut kinds = Vec::new();
+
+  if let Some(regex) = validator
     .arguments
     .iter()
     .find(|argument| argument.name == "Pattern")
-    .map(|argument| argument.value.clone());
-  if let Some(regex) = pattern {
-    return Some(ValidatorKind::Pattern { regex });
+    .map(|argument| argument.value.clone())
+  {
+    kinds.push(ValidatorKind::Pattern { regex });
   }
 
   let min = validator
@@ -1772,16 +1800,34 @@ fn build_string_validator_kind(validator: &SchemaTypeAttributeValidator) -> Opti
     .iter()
     .find(|argument| argument.name == "MaxLength")
     .and_then(|argument| argument.value.parse::<u32>().ok());
+  let exact = validator
+    .arguments
+    .iter()
+    .find(|argument| argument.name == "Length")
+    .and_then(|argument| argument.value.parse::<u32>().ok());
 
-  if min.is_some() || max.is_some() {
-    return Some(ValidatorKind::StringLength { min, max });
+  if min.is_some() || max.is_some() || exact.is_some() {
+    kinds.push(ValidatorKind::StringLength { min, max, exact });
   }
 
-  None
+  for (name, kind) in [
+    ("IsToken", StringFormatKind::Token),
+    ("IsNcName", StringFormatKind::NcName),
+    ("IsQName", StringFormatKind::QName),
+    ("IsUri", StringFormatKind::Uri),
+    ("IsId", StringFormatKind::Id),
+  ] {
+    if has_true_bool_argument(validator, name) {
+      kinds.push(ValidatorKind::StringFormat { kind });
+    }
+  }
+
+  kinds
 }
 
 #[allow(dead_code)]
-fn build_number_validator_kind(validator: &SchemaTypeAttributeValidator) -> Option<ValidatorKind> {
+fn build_number_validator_kinds(validator: &SchemaTypeAttributeValidator) -> Vec<ValidatorKind> {
+  let mut kinds = Vec::new();
   let min_inclusive = validator
     .arguments
     .iter()
@@ -1808,18 +1854,39 @@ fn build_number_validator_kind(validator: &SchemaTypeAttributeValidator) -> Opti
     && max_inclusive.is_none()
     && max_exclusive.is_none()
   {
-    return None;
+  } else {
+    let min_inclusive_flag = min_inclusive.is_some();
+    let max_inclusive_flag = max_inclusive.is_some();
+
+    kinds.push(ValidatorKind::NumberRange {
+      min: min_inclusive.or(min_exclusive),
+      max: max_inclusive.or(max_exclusive),
+      min_inclusive: min_inclusive_flag,
+      max_inclusive: max_inclusive_flag,
+    });
   }
 
-  let min_inclusive_flag = min_inclusive.is_some();
-  let max_inclusive_flag = max_inclusive.is_some();
+  if has_true_bool_argument(validator, "IsNonNegative") {
+    kinds.push(ValidatorKind::NumberSign {
+      kind: NumberSignKind::NonNegative,
+    });
+  }
 
-  Some(ValidatorKind::NumberRange {
-    min: min_inclusive.or(min_exclusive),
-    max: max_inclusive.or(max_exclusive),
-    min_inclusive: min_inclusive_flag,
-    max_inclusive: max_inclusive_flag,
-  })
+  if has_true_bool_argument(validator, "IsPositive") {
+    kinds.push(ValidatorKind::NumberSign {
+      kind: NumberSignKind::Positive,
+    });
+  }
+
+  kinds
+}
+
+fn has_true_bool_argument(validator: &SchemaTypeAttributeValidator, name: &str) -> bool {
+  validator
+    .arguments
+    .iter()
+    .find(|argument| argument.name == name)
+    .is_some_and(|argument| argument.value.eq_ignore_ascii_case("true"))
 }
 
 #[cfg(test)]
@@ -1975,12 +2042,18 @@ mod tests {
     );
     assert_eq!(
       field.validators,
-      vec![ValidatorDecl {
-        version: String::new(),
-        kind: ValidatorKind::Pattern {
-          regex: "[a-z]+".to_string(),
+      vec![
+        ValidatorDecl {
+          version: String::new(),
+          kind: ValidatorKind::Required,
         },
-      }]
+        ValidatorDecl {
+          version: String::new(),
+          kind: ValidatorKind::Pattern {
+            regex: "[a-z]+".to_string(),
+          },
+        },
+      ]
     );
   }
 
@@ -2653,7 +2726,7 @@ mod tests {
   }
 
   #[test]
-  fn drops_required_and_maps_pattern_and_range_validators() {
+  fn preserves_required_and_maps_common_validator_kinds() {
     let attr = SchemaTypeAttribute {
       validators: vec![
         SchemaTypeAttributeValidator {
@@ -2671,6 +2744,22 @@ mod tests {
           ..Default::default()
         },
         SchemaTypeAttributeValidator {
+          name: "StringValidator".to_string(),
+          arguments: vec![
+            SchemaTypeAttributeValidatorArgument {
+              name: "Length".to_string(),
+              r#type: "Long".to_string(),
+              value: "4".to_string(),
+            },
+            SchemaTypeAttributeValidatorArgument {
+              name: "IsToken".to_string(),
+              r#type: "Boolean".to_string(),
+              value: "True".to_string(),
+            },
+          ],
+          ..Default::default()
+        },
+        SchemaTypeAttributeValidator {
           name: "NumberValidator".to_string(),
           arguments: vec![
             SchemaTypeAttributeValidatorArgument {
@@ -2683,7 +2772,23 @@ mod tests {
               r#type: "Long".to_string(),
               value: "10".to_string(),
             },
+            SchemaTypeAttributeValidatorArgument {
+              name: "IsPositive".to_string(),
+              r#type: "Boolean".to_string(),
+              value: "true".to_string(),
+            },
           ],
+          ..Default::default()
+        },
+        SchemaTypeAttributeValidator {
+          name: "EnumValidator".to_string(),
+          r#type: "w:ST_Test".to_string(),
+          union_id: 7,
+          is_list: true,
+          ..Default::default()
+        },
+        SchemaTypeAttributeValidator {
+          name: "OfficeVersionValidator".to_string(),
           ..Default::default()
         },
       ],
@@ -2692,9 +2797,16 @@ mod tests {
 
     let validators = build_attr_validator_decls(&attr);
 
-    assert_eq!(validators.len(), 2);
+    assert_eq!(validators.len(), 7);
     assert_eq!(
       validators[0],
+      ValidatorDecl {
+        version: String::new(),
+        kind: ValidatorKind::Required,
+      }
+    );
+    assert_eq!(
+      validators[1],
       ValidatorDecl {
         version: "Office2007".to_string(),
         kind: ValidatorKind::Pattern {
@@ -2703,7 +2815,27 @@ mod tests {
       }
     );
     assert_eq!(
-      validators[1],
+      validators[2],
+      ValidatorDecl {
+        version: String::new(),
+        kind: ValidatorKind::StringLength {
+          min: None,
+          max: None,
+          exact: Some(4),
+        },
+      }
+    );
+    assert_eq!(
+      validators[3],
+      ValidatorDecl {
+        version: String::new(),
+        kind: ValidatorKind::StringFormat {
+          kind: StringFormatKind::Token,
+        },
+      }
+    );
+    assert_eq!(
+      validators[4],
       ValidatorDecl {
         version: String::new(),
         kind: ValidatorKind::NumberRange {
@@ -2711,6 +2843,62 @@ mod tests {
           max: Some("10".to_string()),
           min_inclusive: true,
           max_inclusive: false,
+        },
+      }
+    );
+    assert_eq!(
+      validators[5],
+      ValidatorDecl {
+        version: String::new(),
+        kind: ValidatorKind::NumberSign {
+          kind: NumberSignKind::Positive,
+        },
+      }
+    );
+    assert_eq!(
+      validators[6],
+      ValidatorDecl {
+        version: String::new(),
+        kind: ValidatorKind::EnumRef {
+          type_name: "w:ST_Test".to_string(),
+          union_id: 7,
+          is_list: true,
+        },
+      }
+    );
+  }
+
+  #[test]
+  fn preserves_enum_validator_context_and_ignores_office_version() {
+    let attr = SchemaTypeAttribute {
+      validators: vec![
+        SchemaTypeAttributeValidator {
+          name: "EnumValidator".to_string(),
+          r#type: "w:ST_StylePaneSortMethods_O14".to_string(),
+          union_id: 3,
+          is_list: false,
+          is_initial_version: true,
+          ..Default::default()
+        },
+        SchemaTypeAttributeValidator {
+          name: "OfficeVersionValidator".to_string(),
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let validators = build_attr_validator_decls(&attr);
+
+    assert_eq!(validators.len(), 1);
+    assert_eq!(
+      validators[0],
+      ValidatorDecl {
+        version: "Office2007".to_string(),
+        kind: ValidatorKind::EnumRef {
+          type_name: "w:ST_StylePaneSortMethods_O14".to_string(),
+          union_id: 3,
+          is_list: false,
         },
       }
     );

@@ -16,10 +16,11 @@ readme.workspace = true
 default = ["microsoft365", "parts"]
 parts = ["dep:zip"]
 microsoft365 = []
+validators = ["dep:regex"]
 
 [dependencies]
 ooxmlsdk-derive = { workspace = true }
 quick-xml = { workspace = true }
-regex = { workspace = true }
+regex = { workspace = true, optional = true }
 thiserror = { workspace = true }
 zip = { workspace = true, optional = true }

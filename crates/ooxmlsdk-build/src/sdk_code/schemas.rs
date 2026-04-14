@@ -2297,18 +2297,17 @@ fn gen_one_sequence_fields(
           variants.push(variant_tokens);
         }
 
-        let (default_variant_ident, default_variant_type, default_variant_wrap_box) =
-          default_variant
-            .or_else(|| {
-              choice.variants.first().and_then(|variant| {
-                let (_, variant_type, wrap_box) =
-                  choice_child_variant_shape(variant, schema, context).ok()?;
-                let variant_ident =
-                  parse_str::<Ident>(&variant.field_name.to_upper_camel_case()).ok()?;
-                Some((variant_ident, variant_type, wrap_box))
-              })
+        default_variant
+          .or_else(|| {
+            choice.variants.first().and_then(|variant| {
+              let (_, variant_type, wrap_box) =
+                choice_child_variant_shape(variant, schema, context).ok()?;
+              let variant_ident =
+                parse_str::<Ident>(&variant.field_name.to_upper_camel_case()).ok()?;
+              Some((variant_ident, variant_type, wrap_box))
             })
-            .ok_or_else(|| choice.enum_name.clone())?;
+          })
+          .ok_or_else(|| choice.enum_name.clone())?;
         let enum_item = quote! {
           #( #enum_attrs )*
           #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -2317,14 +2316,6 @@ fn gen_one_sequence_fields(
           }
         };
         enums.push(enum_item);
-        enums.push(gen_choice_default_impl(
-          &choice_enum_ident,
-          &default_variant_ident,
-          &default_variant_type,
-          default_variant_wrap_box,
-          enum_attrs.clone(),
-        ));
-
         if flat_particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
@@ -2573,26 +2564,25 @@ fn gen_structured_one_sequence_fields(
           }
         }
 
-        let (default_variant_ident, default_variant_type, default_variant_wrap_box) =
-          default_variant
-            .or_else(|| {
-              choice.variants.first().and_then(|variant| match variant {
-                ResolvedOneSequenceChoiceVariant::Leaf(child) => Some((
-                  parse_str::<Ident>(&child.field_name.to_upper_camel_case()).ok()?,
-                  one_sequence_child_variant_type(child, schema, context).ok()?,
-                  matches!(
-                    choice_child_variant_shape(child, schema, context).ok()?,
-                    (_, _, true)
-                  ),
-                )),
-                ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => Some((
-                  parse_str::<Ident>(&sequence_variant.variant_name).ok()?,
-                  parse_str::<Type>(&sequence_variant.struct_name).ok()?,
-                  false,
-                )),
-              })
+        default_variant
+          .or_else(|| {
+            choice.variants.first().and_then(|variant| match variant {
+              ResolvedOneSequenceChoiceVariant::Leaf(child) => Some((
+                parse_str::<Ident>(&child.field_name.to_upper_camel_case()).ok()?,
+                one_sequence_child_variant_type(child, schema, context).ok()?,
+                matches!(
+                  choice_child_variant_shape(child, schema, context).ok()?,
+                  (_, _, true)
+                ),
+              )),
+              ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => Some((
+                parse_str::<Ident>(&sequence_variant.variant_name).ok()?,
+                parse_str::<Type>(&sequence_variant.struct_name).ok()?,
+                false,
+              )),
             })
-            .ok_or_else(|| choice.enum_name.clone())?;
+          })
+          .ok_or_else(|| choice.enum_name.clone())?;
 
         items.push(quote! {
           #( #enum_attrs )*
@@ -2601,14 +2591,6 @@ fn gen_structured_one_sequence_fields(
             #( #variants )*
           }
         });
-        items.push(gen_choice_default_impl(
-          &choice_enum_ident,
-          &default_variant_ident,
-          &default_variant_type,
-          default_variant_wrap_box,
-          enum_attrs.clone(),
-        ));
-
         if particle.repeated {
           fields.push(quote! {
             #( #field_attrs )*
@@ -3110,7 +3092,7 @@ fn gen_mixed_choice_children_fields(
     }
   }
 
-  let (default_variant_ident, default_variant_type, default_variant_wrap_box) = default_variant
+  default_variant
     .or_else(|| {
       choice_variants.first().and_then(|child| match child.kind {
         SchemaTypeChildKind::Sequence => Some((
@@ -3160,14 +3142,6 @@ fn gen_mixed_choice_children_fields(
       #( #variants )*
     }
   });
-  enums.push(gen_choice_default_impl(
-    &choice_enum_ident,
-    &default_variant_ident,
-    &default_variant_type,
-    default_variant_wrap_box,
-    enum_attrs.clone(),
-  ));
-
   let choice_property_comments: Cow<'_, str> = {
     let names = choice_variants
       .iter()
@@ -3342,28 +3316,6 @@ fn gen_sequence_variant_fields(
   }
 
   Ok(fields)
-}
-
-fn gen_choice_default_impl(
-  choice_enum_ident: &Ident,
-  default_variant_ident: &Ident,
-  default_variant_type: &Type,
-  wrap_box: bool,
-  enum_attrs: Vec<Attribute>,
-) -> TokenStream {
-  let default_value = if wrap_box {
-    quote! { <std::boxed::Box<#default_variant_type> as std::default::Default>::default() }
-  } else {
-    quote! { <#default_variant_type as std::default::Default>::default() }
-  };
-  quote! {
-    #( #enum_attrs )*
-    impl std::default::Default for #choice_enum_ident {
-      fn default() -> Self {
-        Self::#default_variant_ident(#default_value)
-      }
-    }
-  }
 }
 
 fn gen_root_all_fields(

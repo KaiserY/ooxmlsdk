@@ -13,6 +13,8 @@ pub mod sdk_data_model;
 pub mod xsd;
 
 use crate::Result;
+use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
+use crate::sdk_code::schemas::CodegenContext;
 use crate::sdk_data::{
   context::Context,
   mce::gen_mc_schema_from_xsd,
@@ -58,11 +60,18 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   schemas.sort_by(|left, right| left.module_name.cmp(&right.module_name));
   let schema_extensions = read_schema_extensions(&out_dir.join("schema_extensions"))?;
   apply_schema_extensions(&mut schemas, &schema_extensions)?;
+  let codegen_context = CodegenContext::new(&schemas);
 
-  for schema in schemas {
+  for schema in &schemas {
+    let ir = build_codegen_ir(schema, &codegen_context).map_err(|err| {
+      format!(
+        "failed to build codegen IR for {}: {err}",
+        schema.module_name
+      )
+    })?;
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
-      &schema,
+      &ir,
     )?;
   }
 

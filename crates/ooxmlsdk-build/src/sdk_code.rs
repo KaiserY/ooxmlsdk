@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use serde_json::Value;
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
@@ -8,8 +9,10 @@ use std::path::Path;
 use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
+use crate::sdk_code::codegen_ir::SchemaModuleDecl;
+use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
-use crate::sdk_code::schemas::{CodegenContext, gen_schema};
+use crate::sdk_code::schemas::{CodegenContext, gen_schema_from_ir};
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::sdk_data_model::{
   Namespace as SdkDataNamespace, Part as SdkDataPart, Schema as SdkDataSchema,
@@ -29,24 +32,32 @@ const FILE_HEADER: &str = r#"//
 //
 "#;
 
+struct LoadedSchema {
+  ir: SchemaModuleDecl,
+}
+
+enum SchemaInputRecord {
+  Legacy(SdkDataSchema),
+  Ir(SchemaModuleDecl),
+}
+
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
-  let sdk_data_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
+  let loaded_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
   let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
-  let context = CodegenContext::new(&sdk_data_schemas);
 
-  write_schemas(&sdk_data_schemas, &context, out_dir_path)?;
+  write_schemas(&loaded_schemas, out_dir_path)?;
   write_parts(&sdk_data_parts, out_dir_path)?;
   write_namespaces(&sdk_data_namespaces, out_dir_path)?;
 
   Ok(())
 }
 
-fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<SdkDataSchema>> {
-  let mut sdk_data_schemas = vec![];
+fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {
+  let mut input_records = vec![];
 
   for entry in fs::read_dir(sdk_data_schemas_dir_path)? {
     let entry = entry?;
@@ -64,13 +75,35 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<SdkDataSchema>> 
     if file_name.starts_with("package_") {
       continue;
     }
-    let sdk_data_schema: SdkDataSchema = serde_json::from_reader(reader)?;
-    sdk_data_schemas.push(sdk_data_schema);
+    let value: Value = serde_json::from_reader(reader)?;
+    if is_codegen_ir_schema_json(&value) {
+      input_records.push(SchemaInputRecord::Ir(serde_json::from_value(value)?));
+    } else {
+      input_records.push(SchemaInputRecord::Legacy(serde_json::from_value(value)?));
+    }
   }
 
-  sdk_data_schemas.sort_by(|a, b| a.module_name.cmp(&b.module_name));
+  input_records.sort_by(|a, b| schema_input_module_name(a).cmp(schema_input_module_name(b)));
 
-  Ok(sdk_data_schemas)
+  let legacy_schemas: Vec<SdkDataSchema> = input_records
+    .iter()
+    .filter_map(|item| match item {
+      SchemaInputRecord::Legacy(schema) => Some(schema.clone()),
+      SchemaInputRecord::Ir(_) => None,
+    })
+    .collect();
+  let context = CodegenContext::new(&legacy_schemas);
+
+  input_records
+    .into_iter()
+    .map(|record| match record {
+      SchemaInputRecord::Legacy(legacy) => {
+        let ir = build_codegen_ir(&legacy, &context)?;
+        Ok(LoadedSchema { ir })
+      }
+      SchemaInputRecord::Ir(ir) => Ok(LoadedSchema { ir }),
+    })
+    .collect()
 }
 
 fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<SdkDataPart>> {
@@ -111,38 +144,33 @@ fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
   Ok(namespaces)
 }
 
-fn write_schemas(
-  sdk_data_schemas: &[SdkDataSchema],
-  context: &CodegenContext<'_>,
-  out_dir_path: &Path,
-) -> Result<()> {
+fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result<()> {
   let out_schemas_dir_path = out_dir_path.join("schemas");
   fs::create_dir_all(&out_schemas_dir_path)?;
   clear_generated_rs_files(&out_schemas_dir_path)?;
 
   let mut schemas_mod_list: Vec<ItemMod> = vec![];
 
-  for sdk_data_schema in sdk_data_schemas {
-    let schema_path = out_schemas_dir_path.join(format!("{}.rs", sdk_data_schema.module_name));
+  for loaded_schema in loaded_schemas {
+    let schema_path = out_schemas_dir_path.join(format!("{}.rs", loaded_schema.ir.module_name));
     write_generated_module(
       &schema_path,
-      gen_schema(
-        sdk_data_schema,
-        context,
-        schema_module_is_microsoft365_only(sdk_data_schema),
+      gen_schema_from_ir(
+        &loaded_schema.ir,
+        schema_module_is_microsoft365_only_ir(&loaded_schema.ir),
       )
       .map_err(|err| {
         format!(
           "failed to generate schema {}: {err:?}",
-          sdk_data_schema.module_name
+          loaded_schema.ir.module_name
         )
       })?,
     )?;
 
     push_module_decl(
       &mut schemas_mod_list,
-      &sdk_data_schema.module_name,
-      schema_module_cfg_attrs(sdk_data_schema),
+      &loaded_schema.ir.module_name,
+      schema_module_cfg_attrs_ir(&loaded_schema.ir),
     )?;
   }
 
@@ -244,26 +272,40 @@ fn push_module_decl(
   Ok(())
 }
 
-fn schema_module_cfg_attrs(schema: &SdkDataSchema) -> Vec<Attribute> {
-  if schema_module_is_microsoft365_only(schema) {
+fn schema_module_cfg_attrs_ir(schema: &SchemaModuleDecl) -> Vec<Attribute> {
+  if schema_module_is_microsoft365_only_ir(schema) {
     version_cfg_attrs("Microsoft365")
   } else {
     Vec::new()
   }
 }
 
-fn schema_module_is_microsoft365_only(schema: &SdkDataSchema) -> bool {
+fn schema_module_is_microsoft365_only_ir(schema: &SchemaModuleDecl) -> bool {
   let concrete_type_count = schema
     .types
     .iter()
-    .filter(|schema_type| !schema_type.is_abstract)
+    .filter(|schema_type| {
+      !schema_type.is_abstract
+        && matches!(
+          schema_type.kind,
+          crate::sdk_code::codegen_ir::TypeKind::ElementStruct
+            | crate::sdk_code::codegen_ir::TypeKind::LeafTextAlias
+        )
+    })
     .count();
 
   (concrete_type_count > 0 || !schema.enums.is_empty())
     && schema
       .types
       .iter()
-      .filter(|schema_type| !schema_type.is_abstract)
+      .filter(|schema_type| {
+        !schema_type.is_abstract
+          && matches!(
+            schema_type.kind,
+            crate::sdk_code::codegen_ir::TypeKind::ElementStruct
+              | crate::sdk_code::codegen_ir::TypeKind::LeafTextAlias
+          )
+      })
       .all(|schema_type| {
         schema_type
           .version
@@ -291,40 +333,71 @@ fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {
   Ok(())
 }
 
+fn schema_input_module_name(record: &SchemaInputRecord) -> &str {
+  match record {
+    SchemaInputRecord::Legacy(schema) => &schema.module_name,
+    SchemaInputRecord::Ir(schema) => &schema.module_name,
+  }
+}
+
+fn is_codegen_ir_schema_json(value: &Value) -> bool {
+  value
+    .get("Types")
+    .and_then(Value::as_array)
+    .and_then(|types| types.first())
+    .and_then(Value::as_object)
+    .is_some_and(|ty| ty.contains_key("RustName"))
+    || value
+      .get("Enums")
+      .and_then(Value::as_array)
+      .and_then(|enums| enums.first())
+      .and_then(Value::as_object)
+      .is_some_and(|en| en.contains_key("RustName"))
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_data::sdk_data_model::{
-    SchemaEnum as SdkDataSchemaEnum, SchemaType as SdkDataSchemaType,
-  };
+  use crate::sdk_code::codegen_ir::{EnumDecl, TypeDecl, TypeKind};
+  use serde_json::json;
 
-  fn schema(types: Vec<SdkDataSchemaType>, enums: Vec<SdkDataSchemaEnum>) -> SdkDataSchema {
-    SdkDataSchema {
+  fn schema(types: Vec<TypeDecl>, enums: Vec<EnumDecl>) -> SchemaModuleDecl {
+    SchemaModuleDecl {
       types,
       enums,
-      ..SdkDataSchema::default()
+      ..SchemaModuleDecl::default()
     }
   }
 
-  fn schema_type(version: &str) -> SdkDataSchemaType {
-    SdkDataSchemaType {
+  fn schema_type(version: &str) -> TypeDecl {
+    TypeDecl {
       version: Some(version.to_string()),
-      ..SdkDataSchemaType::default()
+      kind: TypeKind::ElementStruct,
+      ..TypeDecl::default()
     }
   }
 
-  fn abstract_schema_type(version: &str) -> SdkDataSchemaType {
-    SdkDataSchemaType {
+  fn abstract_schema_type(version: &str) -> TypeDecl {
+    TypeDecl {
       version: (!version.is_empty()).then(|| version.to_string()),
       is_abstract: true,
-      ..SdkDataSchemaType::default()
+      kind: TypeKind::ElementStruct,
+      ..TypeDecl::default()
     }
   }
 
-  fn schema_enum(version: &str) -> SdkDataSchemaEnum {
-    SdkDataSchemaEnum {
+  fn helper_type(version: &str) -> TypeDecl {
+    TypeDecl {
       version: Some(version.to_string()),
-      ..SdkDataSchemaEnum::default()
+      kind: TypeKind::HelperStruct,
+      ..TypeDecl::default()
+    }
+  }
+
+  fn schema_enum(version: &str) -> EnumDecl {
+    EnumDecl {
+      version: Some(version.to_string()),
+      ..EnumDecl::default()
     }
   }
 
@@ -332,14 +405,14 @@ mod tests {
   fn treats_enum_only_microsoft365_schema_modules_as_microsoft365_only() {
     let schema = schema(vec![], vec![schema_enum("Office2016")]);
 
-    assert!(schema_module_is_microsoft365_only(&schema));
+    assert!(schema_module_is_microsoft365_only_ir(&schema));
   }
 
   #[test]
   fn does_not_treat_empty_schema_modules_as_microsoft365_only() {
     let schema = schema(vec![], vec![]);
 
-    assert!(!schema_module_is_microsoft365_only(&schema));
+    assert!(!schema_module_is_microsoft365_only_ir(&schema));
   }
 
   #[test]
@@ -349,7 +422,7 @@ mod tests {
       vec![schema_enum("Office2007")],
     );
 
-    assert!(!schema_module_is_microsoft365_only(&schema));
+    assert!(!schema_module_is_microsoft365_only_ir(&schema));
   }
 
   #[test]
@@ -359,13 +432,43 @@ mod tests {
       vec![],
     );
 
-    assert!(schema_module_is_microsoft365_only(&schema));
+    assert!(schema_module_is_microsoft365_only_ir(&schema));
   }
 
   #[test]
   fn does_not_treat_abstract_only_schema_modules_as_microsoft365_only() {
     let schema = schema(vec![abstract_schema_type("")], vec![]);
 
-    assert!(!schema_module_is_microsoft365_only(&schema));
+    assert!(!schema_module_is_microsoft365_only_ir(&schema));
+  }
+
+  #[test]
+  fn ignores_helper_types_when_detecting_microsoft365_only_schema_modules() {
+    let schema = schema(vec![helper_type("Office2013")], vec![]);
+
+    assert!(!schema_module_is_microsoft365_only_ir(&schema));
+  }
+
+  #[test]
+  fn detects_codegen_ir_schema_json_by_rust_name_keys() {
+    let ir_json = json!({
+      "ModuleName": "schemas_example",
+      "TargetNamespace": "urn:example",
+      "Prefix": "ex",
+      "TypedNamespace": "DocumentFormat.OpenXml.Example",
+      "Enums": [{"RustName": "ExampleEnum"}],
+      "Types": [{"RustName": "ExampleType"}]
+    });
+    let legacy_json = json!({
+      "ModuleName": "schemas_example",
+      "TargetNamespace": "urn:example",
+      "Prefix": "ex",
+      "TypedNamespace": "DocumentFormat.OpenXml.Example",
+      "Enums": [{"Name": "ExampleEnum"}],
+      "Types": [{"ClassName": "ExampleType"}]
+    });
+
+    assert!(is_codegen_ir_schema_json(&ir_json));
+    assert!(!is_codegen_ir_schema_json(&legacy_json));
   }
 }

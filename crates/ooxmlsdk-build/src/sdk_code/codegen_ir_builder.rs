@@ -1,8 +1,8 @@
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
-  Cardinality, EnumDecl, EnumValueType, EnumVariantDecl, FieldDecl, FieldWireDecl, MemberDecl,
-  SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorDecl,
-  ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode, XmlnsMode,
+  Cardinality, ContentModelDecl, ElementKind, EnumDecl, EnumValueType, EnumVariantDecl, FieldDecl,
+  FieldWireDecl, MemberDecl, SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl,
+  ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode, XmlnsMode,
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticleKind, classify_attr_type,
@@ -20,13 +20,88 @@ use crate::sdk_data::sdk_data_model::{
   Schema, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute, SchemaTypeAttributeValidator,
   SchemaTypeXmlHeader,
 };
+use crate::simple_type::simple_type_mapping;
 use crate::utils::escape_snake_case;
 use heck::{ToSnakeCase, ToUpperCamelCase};
+
+fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
+  let mut counts = std::collections::HashMap::<String, usize>::new();
+  for member in members.iter() {
+    let MemberDecl::Variant(variant) = member else {
+      continue;
+    };
+    *counts.entry(variant.rust_name.clone()).or_insert(0) += 1;
+  }
+
+  let mut used = std::collections::HashSet::<String>::new();
+  for member in members.iter_mut() {
+    let MemberDecl::Variant(variant) = member else {
+      continue;
+    };
+    if counts.get(&variant.rust_name).copied().unwrap_or_default() <= 1 {
+      used.insert(variant.rust_name.clone());
+      continue;
+    }
+
+    let base_name = variant.rust_name.clone();
+    let prefix_name = variant_qname_prefix(variant)
+      .map(|prefix| format!("{}{}", prefix.to_upper_camel_case(), base_name))
+      .filter(|candidate| !candidate.is_empty());
+
+    if let Some(candidate) = prefix_name
+      && used.insert(candidate.clone())
+    {
+      variant.rust_name = candidate;
+      continue;
+    }
+
+    let mut index = 2usize;
+    loop {
+      let candidate = format!("{base_name}{index}");
+      if used.insert(candidate.clone()) {
+        variant.rust_name = candidate;
+        break;
+      }
+      index += 1;
+    }
+  }
+}
+
+fn variant_qname_prefix(variant: &VariantDecl) -> Option<&str> {
+  let qname = match &variant.wire {
+    VariantWireDecl::Child { qnames } | VariantWireDecl::TextChild { qnames } => qnames.first()?,
+    VariantWireDecl::Any | VariantWireDecl::Text => return None,
+  };
+  let element_qname = qname.split('/').nth(1).unwrap_or(qname.as_str());
+  element_qname.split(':').next()
+}
+
+fn child_variant_rust_name(qname: &str) -> String {
+  let element_qname = qname.split('/').nth(1).unwrap_or(qname);
+  let mut parts = element_qname.split(':');
+  match (parts.next(), parts.next()) {
+    (Some(prefix), Some(local)) => {
+      format!(
+        "{}{}",
+        prefix.to_upper_camel_case(),
+        local.to_upper_camel_case()
+      )
+    }
+    (Some(local), None) => local.to_upper_camel_case(),
+    _ => element_qname.to_upper_camel_case(),
+  }
+}
 
 pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result<SchemaModuleDecl> {
   let mut types = Vec::new();
   for schema_type in &schema.types {
-    let (primary_type, extra_types) = build_type_decl(schema_type, schema, context)?;
+    let (primary_type, extra_types) =
+      build_type_decl(schema_type, schema, context).map_err(|err| {
+        format!(
+          "failed to build IR type {} ({}) in {}: {err}",
+          schema_type.class_name, schema_type.name, schema.module_name
+        )
+      })?;
     types.push(primary_type);
     types.extend(extra_types);
   }
@@ -81,17 +156,28 @@ fn build_type_decl(
     .map(|attr| build_attr_member_decl(attr, schema, context))
     .collect::<Result<Vec<_>>>()?;
   let extra_types = if has_mixed_choice_children_pattern(schema_type) {
-    build_mixed_choice_children_members(schema_type, schema, context, &mut members)?
+    build_mixed_choice_children_members(schema_type, schema, context, &mut members)
+      .map_err(|err| format!("mixed choice children: {err}"))?
   } else if is_one_sequence_flatten(schema_type) {
-    build_flatten_one_sequence_members(schema_type, schema, context, &mut members)?
+    build_flatten_one_sequence_members(schema_type, schema, context, &mut members)
+      .map_err(|err| format!("flatten one-sequence: {err}"))?
   } else if is_one_sequence_structurable(schema_type) {
-    build_structured_one_sequence_members(schema_type, schema, context, &mut members)?
+    build_structured_one_sequence_members(schema_type, schema, context, &mut members)
+      .map_err(|err| format!("structured one-sequence: {err}"))?
   } else {
     let direct_child_members = build_direct_child_member_decls(schema_type, schema, context)?;
-    members.extend(direct_child_members.clone());
-    let extra_types = build_simple_one_choice_members(schema_type, schema, context, &mut members)?;
-    if extra_types.is_empty() && direct_child_members.is_empty() {
-      build_generic_children_members(schema_type, schema, context, &mut members)?
+    let content_model = build_content_model_decl(schema_type);
+    if content_model != Some(ContentModelDecl::GenericChildrenFallback) {
+      members.extend(direct_child_members.clone());
+    }
+    let extra_types = build_simple_one_choice_members(schema_type, schema, context, &mut members)
+      .map_err(|err| format!("simple one-choice: {err}"))?;
+    if content_model == Some(ContentModelDecl::GenericChildrenFallback) && extra_types.is_empty() {
+      build_generic_children_members(schema_type, schema, context, &mut members)
+        .map_err(|err| format!("generic children fallback: {err}"))?
+    } else if extra_types.is_empty() && direct_child_members.is_empty() {
+      build_generic_children_members(schema_type, schema, context, &mut members)
+        .map_err(|err| format!("generic children fallback: {err}"))?
     } else {
       extra_types
     }
@@ -103,11 +189,28 @@ fn build_type_decl(
       xml_qname: (!schema_type.name.is_empty()).then(|| schema_type.name.clone()),
       docs: schema_type.summary.clone(),
       version: schema_type.version.clone(),
+      is_abstract: schema_type.is_abstract,
       kind: if schema_type.api_kind == SchemaTypeApiKind::LeafTextWrapper {
         TypeKind::LeafTextAlias
       } else {
         TypeKind::ElementStruct
       },
+      element_kind: if schema_type.api_kind == SchemaTypeApiKind::LeafTextWrapper {
+        None
+      } else {
+        Some(match schema_type.kind {
+          crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText => ElementKind::LeafText,
+          crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf => ElementKind::Leaf,
+          crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite => ElementKind::Composite,
+          crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived => ElementKind::Derived,
+          crate::sdk_data::sdk_data_model::SchemaTypeKind::Struct => ElementKind::Composite,
+        })
+      },
+      content_model: build_content_model_decl(schema_type),
+      base_rust_name: (!schema_type.base_class.is_empty()
+        && schema_type.base_class != "OpenXmlPartRootElement")
+        .then(|| schema_type.base_class.clone()),
+      xml_content: build_xml_content_type_ref(schema_type, schema, context)?,
       support: SystemSupportDecl {
         xmlns_mode: if schema_type.has_xmlns_fields {
           XmlnsMode::MapOnly
@@ -185,6 +288,129 @@ fn build_attr_type_ref(
   )
 }
 
+fn build_xml_content_type_ref(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<Option<TypeRefDecl>> {
+  if !schema_type.text_value_type.is_empty() {
+    return Ok(Some(TypeRefDecl {
+      rust_type: schema_type.text_value_type.clone(),
+      module_path: Some("crate::simple_type".to_string()),
+    }));
+  }
+
+  if schema_type.kind == crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText {
+    // continue below
+  } else if schema_type.kind == crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived {
+    let Some(base_type) = context.type_by_class_name(schema_type.base_class.as_str()) else {
+      return Ok(None);
+    };
+    if base_type.text_value_type.is_empty()
+      && base_type.kind != crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText
+      && base_type.api_kind != SchemaTypeApiKind::LeafTextWrapper
+    {
+      return Ok(None);
+    }
+  } else {
+    return Ok(None);
+  }
+
+  if schema_type.name.is_empty() || !schema_type.name.contains('/') {
+    return Ok(None);
+  }
+
+  let first_name = &schema_type.name[..schema_type.name.find('/').unwrap()];
+
+  if let Some(schema_enum) = context.enum_by_type(first_name) {
+    let enum_module = context
+      .enum_module_by_type(first_name)
+      .ok_or_else(|| format!("{first_name:?}"))?;
+
+    return Ok(Some(TypeRefDecl {
+      rust_type: schema_enum.name.to_upper_camel_case(),
+      module_path: if enum_module == schema.module_name {
+        None
+      } else {
+        Some(format!("crate::schemas::{enum_module}"))
+      },
+    }));
+  }
+
+  if let Some(type_ref) = build_simple_type_ref_from_name(first_name) {
+    return Ok(Some(type_ref));
+  }
+
+  let kind = classify_attr_type(first_name).ok_or_else(|| first_name.to_string())?;
+  let AttrTypeKind::Simple { simple_type, .. } = kind else {
+    return Ok(None);
+  };
+
+  Ok(Some(TypeRefDecl {
+    rust_type: simple_type.to_string(),
+    module_path: Some("crate::simple_type".to_string()),
+  }))
+}
+
+fn build_simple_type_ref_from_name(name: &str) -> Option<TypeRefDecl> {
+  let simple_type = simple_type_mapping(name);
+  if simple_type == name {
+    None
+  } else {
+    Some(TypeRefDecl {
+      rust_type: simple_type.to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    })
+  }
+}
+
+fn build_child_type_ref_from_name(
+  child_name: &str,
+  child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<TypeRefDecl> {
+  if let Some(child_type) = context.type_by_name(child_name) {
+    build_child_type_ref(child_kind, child_type, schema, context)
+  } else if let Some(type_ref) = build_simple_type_ref_from_name(child_name) {
+    Ok(type_ref)
+  } else {
+    Err(child_name.to_string().into())
+  }
+}
+
+fn effective_child_kind_from_name(
+  child_name: &str,
+  child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
+  context: &CodegenContext<'_>,
+) -> crate::sdk_data::sdk_data_model::SchemaTypeChildKind {
+  use crate::sdk_data::sdk_data_model::{
+    SchemaTypeApiKind, SchemaTypeChildKind, SchemaTypeXmlHeader,
+  };
+
+  if !matches!(
+    child_kind,
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+  ) {
+    return child_kind;
+  }
+
+  let Some(child_type) = context.type_by_name(child_name) else {
+    return child_kind;
+  };
+
+  if child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
+    && child_type.attributes.is_empty()
+    && !child_type.has_xmlns_fields
+    && !child_type.has_mc_ignorable_field
+    && child_type.xml_header == SchemaTypeXmlHeader::None
+  {
+    SchemaTypeChildKind::TextChild
+  } else {
+    SchemaTypeChildKind::Child
+  }
+}
+
 fn build_direct_child_member_decls(
   schema_type: &SchemaType,
   schema: &Schema,
@@ -202,9 +428,6 @@ fn build_direct_child_member_decls(
       continue;
     }
 
-    let child_type = context
-      .type_by_name(child.name.as_str())
-      .ok_or_else(|| child.name.clone())?;
     let rust_name = if child.property_name.is_empty() {
       escape_snake_case(
         child
@@ -222,10 +445,15 @@ fn build_direct_child_member_decls(
     }
 
     let version = if child.initial_version.is_empty() {
-      child_type.version.clone().unwrap_or_default()
+      context
+        .type_by_name(child.name.as_str())
+        .and_then(|child_type| child_type.version.clone())
+        .unwrap_or_default()
     } else {
       child.initial_version.clone()
     };
+
+    let effective_kind = effective_child_kind_from_name(child.name.as_str(), child.kind, context);
 
     members.push(MemberDecl::Field(FieldDecl {
       rust_name,
@@ -235,7 +463,7 @@ fn build_direct_child_member_decls(
         child.property_comments.clone()
       },
       version,
-      wire: match child.kind {
+      wire: match effective_kind {
         crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child => FieldWireDecl::Child {
           qname: child.name.clone(),
         },
@@ -253,7 +481,12 @@ fn build_direct_child_member_decls(
       } else {
         Cardinality::One
       },
-      type_ref: build_child_type_ref(child.kind, child_type, schema, context)?,
+      type_ref: build_child_type_ref_from_name(
+        child.name.as_str(),
+        effective_kind,
+        schema,
+        context,
+      )?,
       validators: Vec::new(),
     }));
   }
@@ -274,10 +507,8 @@ fn build_child_type_ref(
     && !child_type.has_mc_ignorable_field
     && child_type.xml_header == SchemaTypeXmlHeader::None
   {
-    return Ok(TypeRefDecl {
-      rust_type: child_type.text_value_type.clone(),
-      module_path: Some("crate::simple_type".to_string()),
-    });
+    return build_xml_content_type_ref(child_type, schema, context)?
+      .ok_or_else(|| child_type.name.clone().into());
   }
 
   let child_prefix = context
@@ -333,18 +564,26 @@ fn build_simple_one_choice_members(
     validators: Vec::new(),
   }));
 
+  let mut enum_members = resolved_choice
+    .variants
+    .iter()
+    .map(|variant| build_simple_one_choice_variant_decl(variant, schema, context))
+    .collect::<Result<Vec<_>>>()?;
+  disambiguate_choice_variant_names(&mut enum_members);
+
   Ok(vec![TypeDecl {
     rust_name: resolved_choice.enum_name.clone(),
     xml_qname: None,
     docs: format!(" Choice variants for {}.", schema_type.class_name),
     version: schema_type.version.clone(),
+    is_abstract: false,
     kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    xml_content: None,
     support: SystemSupportDecl::default(),
-    members: resolved_choice
-      .variants
-      .iter()
-      .map(|variant| build_simple_one_choice_variant_decl(variant, schema, context))
-      .collect::<Result<Vec<_>>>()?,
+    members: enum_members,
   }])
 }
 
@@ -353,8 +592,13 @@ fn build_simple_one_choice_variant_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
-  let wire = match variant.kind {
+  let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
+
+  let wire = match effective_kind {
     crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => VariantWireDecl::Any,
+    crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild if variant.name.is_empty() => {
+      VariantWireDecl::Text
+    }
     crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => VariantWireDecl::TextChild {
       qnames: vec![variant.name.to_string()],
     },
@@ -363,26 +607,30 @@ fn build_simple_one_choice_variant_decl(
     },
   };
 
-  let payload = if variant.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
+  let payload = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
     TypeRefDecl {
       rust_type: "String".to_string(),
       module_path: None,
     }
+  } else if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
+    && variant.name.is_empty()
+  {
+    TypeRefDecl {
+      rust_type: "StringValue".to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    }
   } else {
-    let child_type = context
-      .type_by_name(variant.name)
-      .ok_or_else(|| variant.name.to_string())?;
-    build_child_type_ref(variant.kind, child_type, schema, context)?
+    build_child_type_ref_from_name(variant.name, effective_kind, schema, context)?
   };
 
-  let display_name = if variant.name.is_empty() {
-    variant.field_name.as_ref()
+  let rust_name = if variant.name.is_empty() {
+    variant.field_name.to_upper_camel_case()
   } else {
-    variant.name.split('/').nth(1).unwrap_or(variant.name)
+    child_variant_rust_name(variant.name)
   };
 
   Ok(MemberDecl::Variant(VariantDecl {
-    rust_name: display_name.to_upper_camel_case(),
+    rust_name,
     docs: variant.property_comments.to_string(),
     version: variant.version.to_string(),
     wire,
@@ -415,11 +663,13 @@ fn build_flatten_one_sequence_members(
           continue;
         }
 
+        let effective_kind = effective_child_kind_from_name(child.name, child.kind, context);
+
         let field = FieldDecl {
           rust_name: child.field_name.to_string(),
           docs: child.property_comments.to_string(),
           version: effective_version(child.version, flat_particle.initial_version).to_string(),
-          wire: match child.kind {
+          wire: match effective_kind {
             crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => {
               FieldWireDecl::TextChild {
                 qname: child.name.to_string(),
@@ -437,16 +687,13 @@ fn build_flatten_one_sequence_members(
           } else {
             Cardinality::One
           },
-          type_ref: if child.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
+          type_ref: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
             TypeRefDecl {
               rust_type: "String".to_string(),
               module_path: None,
             }
           } else {
-            let child_type = context
-              .type_by_name(child.name)
-              .ok_or_else(|| child.name.to_string())?;
-            build_child_type_ref(child.kind, child_type, schema, context)?
+            build_child_type_ref_from_name(child.name, effective_kind, schema, context)?
           },
           validators: Vec::new(),
         };
@@ -496,18 +743,26 @@ fn build_flatten_one_sequence_members(
           validators: Vec::new(),
         }));
 
+        let mut enum_members = choice
+          .variants
+          .iter()
+          .map(|variant| build_one_sequence_choice_variant_decl(variant, schema, context))
+          .collect::<Result<Vec<_>>>()?;
+        disambiguate_choice_variant_names(&mut enum_members);
+
         extra_types.push(TypeDecl {
           rust_name: choice.enum_name,
           xml_qname: None,
           docs: choice.property_comments,
           version: schema_type.version.clone(),
+          is_abstract: false,
           kind: TypeKind::ChoiceEnum,
+          element_kind: None,
+          content_model: None,
+          base_rust_name: None,
+          xml_content: None,
           support: SystemSupportDecl::default(),
-          members: choice
-            .variants
-            .iter()
-            .map(|variant| build_one_sequence_choice_variant_decl(variant, schema, context))
-            .collect::<Result<Vec<_>>>()?,
+          members: enum_members,
         });
       }
     }
@@ -526,8 +781,13 @@ fn build_one_sequence_choice_variant_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
-  let wire = match variant.kind {
+  let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
+
+  let wire = match effective_kind {
     crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => VariantWireDecl::Any,
+    crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild if variant.name.is_empty() => {
+      VariantWireDecl::Text
+    }
     crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => VariantWireDecl::TextChild {
       qnames: vec![variant.name.to_string()],
     },
@@ -536,20 +796,28 @@ fn build_one_sequence_choice_variant_decl(
     },
   };
 
-  let payload = if variant.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
+  let payload = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
     TypeRefDecl {
       rust_type: "String".to_string(),
       module_path: None,
     }
+  } else if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
+    && variant.name.is_empty()
+  {
+    TypeRefDecl {
+      rust_type: "StringValue".to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    }
   } else {
-    let child_type = context
-      .type_by_name(variant.name)
-      .ok_or_else(|| variant.name.to_string())?;
-    build_child_type_ref(variant.kind, child_type, schema, context)?
+    build_child_type_ref_from_name(variant.name, effective_kind, schema, context)?
   };
 
   Ok(MemberDecl::Variant(VariantDecl {
-    rust_name: variant.field_name.to_upper_camel_case(),
+    rust_name: if variant.name.is_empty() {
+      variant.field_name.to_upper_camel_case()
+    } else {
+      child_variant_rust_name(variant.name)
+    },
     docs: variant.property_comments.to_string(),
     version: variant.version.to_string(),
     wire,
@@ -668,12 +936,19 @@ fn build_structured_one_sequence_members(
           }
         }
 
+        disambiguate_choice_variant_names(&mut enum_members);
+
         extra_types.push(TypeDecl {
           rust_name: choice.enum_name,
           xml_qname: None,
           docs: choice.property_comments,
           version: schema_type.version.clone(),
+          is_abstract: false,
           kind: TypeKind::ChoiceEnum,
+          element_kind: None,
+          content_model: None,
+          base_rust_name: None,
+          xml_content: None,
           support: SystemSupportDecl::default(),
           members: enum_members,
         });
@@ -697,11 +972,13 @@ fn build_one_sequence_leaf_field_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<FieldDecl> {
+  let effective_kind = effective_child_kind_from_name(child.name, child.kind, context);
+
   Ok(FieldDecl {
     rust_name: child.field_name.to_string(),
     docs: child.property_comments.to_string(),
     version,
-    wire: match child.kind {
+    wire: match effective_kind {
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => FieldWireDecl::TextChild {
         qname: child.name.to_string(),
       },
@@ -717,16 +994,13 @@ fn build_one_sequence_leaf_field_decl(
     } else {
       Cardinality::One
     },
-    type_ref: if child.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
+    type_ref: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
       TypeRefDecl {
         rust_type: "String".to_string(),
         module_path: None,
       }
     } else {
-      let child_type = context
-        .type_by_name(child.name)
-        .ok_or_else(|| child.name.to_string())?;
-      build_child_type_ref(child.kind, child_type, schema, context)?
+      build_child_type_ref_from_name(child.name, effective_kind, schema, context)?
     },
     validators: Vec::new(),
   })
@@ -752,7 +1026,12 @@ fn build_structured_one_sequence_helper_struct_decl(
     xml_qname: None,
     docs: sequence_variant.property_comments.clone(),
     version: (!helper_version.is_empty()).then_some(helper_version),
+    is_abstract: false,
     kind: TypeKind::HelperStruct,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    xml_content: None,
     support: SystemSupportDecl::default(),
     members: sequence_variant
       .fields
@@ -910,12 +1189,19 @@ fn build_mixed_choice_children_members(
     }
   }
 
+  disambiguate_choice_variant_names(&mut enum_members);
+
   extra_types.push(TypeDecl {
     rust_name: choice_enum_name,
     xml_qname: None,
     docs: build_mixed_choice_property_comments(&choice_variants),
     version: schema_type.version.clone(),
+    is_abstract: false,
     kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    xml_content: None,
     support: SystemSupportDecl::default(),
     members: enum_members,
   });
@@ -941,9 +1227,6 @@ fn build_direct_child_member_decl_from_schema_child(
   ) {
     return Ok(None);
   }
-  let child_type = context
-    .type_by_name(child.name.as_str())
-    .ok_or_else(|| child.name.clone())?;
   let field_name = if child.property_name.is_empty() {
     escape_snake_case(
       child
@@ -957,10 +1240,15 @@ fn build_direct_child_member_decl_from_schema_child(
     escape_snake_case(child.property_name.to_snake_case())
   };
   let version = if child.initial_version.is_empty() {
-    child_type.version.clone().unwrap_or_default()
+    context
+      .type_by_name(child.name.as_str())
+      .and_then(|child_type| child_type.version.clone())
+      .unwrap_or_default()
   } else {
     child.initial_version.clone()
   };
+  let effective_kind = effective_child_kind_from_name(child.name.as_str(), child.kind, context);
+
   Ok(Some(FieldDecl {
     rust_name: field_name,
     docs: if child.property_comments.is_empty() {
@@ -969,7 +1257,7 @@ fn build_direct_child_member_decl_from_schema_child(
       child.property_comments.clone()
     },
     version,
-    wire: match child.kind {
+    wire: match effective_kind {
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child => FieldWireDecl::Child {
         qname: child.name.clone(),
       },
@@ -985,7 +1273,7 @@ fn build_direct_child_member_decl_from_schema_child(
     } else {
       Cardinality::One
     },
-    type_ref: build_child_type_ref(child.kind, child_type, schema, context)?,
+    type_ref: build_child_type_ref_from_name(child.name.as_str(), effective_kind, schema, context)?,
     validators: Vec::new(),
   }))
 }
@@ -1335,17 +1623,90 @@ fn build_generic_children_members(
     }
   }
 
+  disambiguate_choice_variant_names(&mut enum_members);
+
   extra_types.push(TypeDecl {
     rust_name: choice_enum_name,
     xml_qname: None,
     docs: "Choice of child elements.".to_string(),
     version: schema_type.version.clone(),
+    is_abstract: false,
     kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    xml_content: None,
     support: SystemSupportDecl::default(),
     members: enum_members,
   });
 
   Ok(extra_types)
+}
+
+fn build_content_model_decl(schema_type: &SchemaType) -> Option<ContentModelDecl> {
+  use crate::sdk_data::sdk_data_model::{SchemaTypeChildKind, SchemaTypeCompositeKind};
+
+  if !matches!(
+    schema_type.kind,
+    crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite
+      | crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived
+  ) {
+    return None;
+  }
+
+  if schema_type.children.is_empty() {
+    return None;
+  }
+
+  let value = if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+    && !schema_type.children.is_empty()
+    && schema_type.children.iter().all(|child| {
+      matches!(
+        child.kind,
+        SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+      )
+    }) {
+    ContentModelDecl::OneAllDirectChildren
+  } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneChoice
+    && schema_type.children.len() == 1
+    && schema_type.children[0].kind == SchemaTypeChildKind::Choice
+  {
+    ContentModelDecl::OneChoiceSingle
+  } else if has_mixed_choice_children_pattern(schema_type) {
+    ContentModelDecl::MixedChoiceChildren
+  } else if matches!(
+    schema_type.composite_kind,
+    SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
+  ) && schema_type.children.len() == 1
+    && schema_type.children[0].kind == SchemaTypeChildKind::Any
+  {
+    ContentModelDecl::SequenceAnyOnly
+  } else if matches!(
+    schema_type.composite_kind,
+    SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
+  ) && schema_type.children.len() == 1
+    && schema_type.children[0].kind == SchemaTypeChildKind::Choice
+  {
+    ContentModelDecl::SequenceSingleChoice
+  } else if matches!(
+    schema_type.composite_kind,
+    SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
+  ) && schema_type.children.iter().all(|child| {
+    matches!(
+      child.kind,
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+    )
+  }) {
+    ContentModelDecl::SequenceDirectChildren
+  } else if is_one_sequence_flatten(schema_type) {
+    ContentModelDecl::OneSequenceFlatten
+  } else if is_one_sequence_structurable(schema_type) {
+    ContentModelDecl::OneSequenceStructured
+  } else {
+    ContentModelDecl::GenericChildrenFallback
+  };
+
+  Some(value)
 }
 
 fn common_choice_version_ir<'a>(container_version: &'a str, variant_versions: &[&str]) -> &'a str {
@@ -1900,10 +2261,10 @@ mod tests {
       })
       .collect();
     assert_eq!(variants.len(), 1);
-    assert_eq!(variants[0].rust_name, "TextLeaf");
+    assert_eq!(variants[0].rust_name, "TText");
     assert_eq!(
       variants[0].wire,
-      VariantWireDecl::Child {
+      VariantWireDecl::TextChild {
         qnames: vec!["t:CT_Text/t:text".to_string()],
       }
     );

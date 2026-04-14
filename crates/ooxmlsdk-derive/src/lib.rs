@@ -10,6 +10,7 @@ mod sdk_choice;
 mod sdk_enum;
 mod sdk_part;
 mod sdk_type;
+mod sdk_validator;
 
 #[proc_macro_derive(SdkEnum, attributes(sdk))]
 pub fn sdk_enum(input: TokenStream) -> TokenStream {
@@ -42,6 +43,15 @@ pub fn sdk_choice(input: TokenStream) -> TokenStream {
 pub fn sdk_part(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match sdk_part::expand_sdk_part(&input) {
+    Ok(tokens) => tokens.into(),
+    Err(err) => err.to_compile_error().into(),
+  }
+}
+
+#[proc_macro_derive(SdkValidator)]
+pub fn sdk_validator(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  match sdk_validator::expand_sdk_validator(&input) {
     Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }

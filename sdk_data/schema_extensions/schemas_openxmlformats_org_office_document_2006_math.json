@@ -1,7 +1,34 @@
 {
   "Types": [
     {
+      "ClassName": "OfficeMath",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "Paragraph",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content_math"
+        }
+      ]
+    },
+    {
       "ClassName": "Base",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_o_math_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "OfficeMathArgumentType",
       "Children": [
         {
           "Kind": "Choice",

@@ -389,6 +389,7 @@ fn collect_choice_variant_children(
           repeated,
         );
       }
+      normalize_choice_children(&mut variants);
       if !variants.is_empty() {
         out.push(SchemaTypeChild {
           name: String::new(),
@@ -420,7 +421,9 @@ fn collect_choice_variant_children(
           let mut child = sequence_children.remove(0);
           child.optional |= optional;
           child.repeated |= repeated;
-          child.initial_version = initial_version;
+          child.initial_version =
+            effective_initial_version(initial_version.as_str(), child.initial_version.as_str())
+              .to_string();
           out.push(child);
           return;
         }
@@ -438,6 +441,98 @@ fn collect_choice_variant_children(
     }
     _ => {}
   }
+}
+
+fn normalize_choice_children(children: &mut Vec<SchemaTypeChild>) {
+  for child in children.iter_mut() {
+    normalize_choice_wrappers(child);
+  }
+
+  flatten_anonymous_choice_children(children);
+}
+
+fn normalize_choice_wrappers(child: &mut SchemaTypeChild) {
+  match child.kind {
+    SchemaTypeChildKind::Choice => normalize_choice_children(&mut child.children),
+    SchemaTypeChildKind::Sequence => {
+      for nested in child.children.iter_mut() {
+        normalize_choice_wrappers(nested);
+      }
+      collapse_single_anonymous_sequence_child(child);
+    }
+    _ => {}
+  }
+}
+
+fn flatten_anonymous_choice_children(children: &mut Vec<SchemaTypeChild>) {
+  let mut flattened = Vec::with_capacity(children.len());
+
+  for child in children.drain(..) {
+    if is_anonymous_wrapper(&child, SchemaTypeChildKind::Choice) {
+      flattened.extend(child.children);
+    } else {
+      flattened.push(child);
+    }
+  }
+
+  *children = flattened;
+}
+
+pub(crate) fn normalize_schema_type_children(children: &mut [SchemaTypeChild]) {
+  for child in children.iter_mut() {
+    normalize_choice_wrappers(child);
+  }
+}
+
+fn collapse_single_anonymous_sequence_child(child: &mut SchemaTypeChild) {
+  if child.kind != SchemaTypeChildKind::Sequence || child.children.len() != 1 {
+    return;
+  }
+
+  if !is_anonymous_wrapper(&child.children[0], SchemaTypeChildKind::Sequence) {
+    return;
+  }
+
+  let mut nested = child.children.remove(0);
+  child.optional |= nested.optional;
+  child.repeated |= nested.repeated;
+  child.initial_version = effective_initial_version(
+    child.initial_version.as_str(),
+    nested.initial_version.as_str(),
+  )
+  .to_string();
+  child.children = std::mem::take(&mut nested.children);
+}
+
+fn is_anonymous_wrapper(child: &SchemaTypeChild, kind: SchemaTypeChildKind) -> bool {
+  child.kind == kind
+    && child.name.is_empty()
+    && child.property_name.is_empty()
+    && child.property_comments.is_empty()
+}
+
+fn effective_initial_version<'a>(left: &'a str, right: &'a str) -> &'a str {
+  match (left, right) {
+    ("", version) => version,
+    (version, "") => version,
+    (left, right) if left == right => left,
+    (left, right) => {
+      if is_microsoft365_version(left) {
+        left
+      } else if is_microsoft365_version(right) {
+        right
+      } else {
+        left
+      }
+    }
+  }
+}
+
+fn is_microsoft365_version(version: &str) -> bool {
+  matches!(
+    version,
+    "Office2010" | "Office2013" | "Office2016" | "Office2019" | "Office2021" | "Microsoft365"
+  )
 }
 
 fn schema_child_from_particle(
@@ -732,5 +827,134 @@ fn gen_particle(
       })
       .collect(),
     items: particle.items.iter().map(gen_particle).collect(),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn child(name: &str) -> SchemaTypeChild {
+    SchemaTypeChild {
+      name: name.to_string(),
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Child,
+      optional: true,
+      repeated: true,
+      initial_version: String::new(),
+      children: Vec::new(),
+    }
+  }
+
+  fn anonymous_wrapper(
+    kind: SchemaTypeChildKind,
+    children: Vec<SchemaTypeChild>,
+  ) -> SchemaTypeChild {
+    SchemaTypeChild {
+      name: String::new(),
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind,
+      optional: true,
+      repeated: true,
+      initial_version: String::new(),
+      children,
+    }
+  }
+
+  #[test]
+  fn flattens_anonymous_choice_children() {
+    let mut children = vec![
+      anonymous_wrapper(
+        SchemaTypeChildKind::Choice,
+        vec![
+          child("w:CT_CustomXmlRun/w:customXml"),
+          child("w:CT_SimpleField/w:fldSimple"),
+        ],
+      ),
+      child("w:CT_Rel/w:subDoc"),
+    ];
+
+    normalize_choice_children(&mut children);
+
+    assert_eq!(children.len(), 3);
+    assert_eq!(children[0].name, "w:CT_CustomXmlRun/w:customXml");
+    assert_eq!(children[1].name, "w:CT_SimpleField/w:fldSimple");
+    assert_eq!(children[2].name, "w:CT_Rel/w:subDoc");
+  }
+
+  #[test]
+  fn preserves_named_choice_wrappers() {
+    let mut children = vec![SchemaTypeChild {
+      name: String::new(),
+      property_name: "eg_p_content".to_string(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: false,
+      repeated: true,
+      initial_version: String::new(),
+      children: vec![child("w:CT_R/w:r")],
+    }];
+
+    normalize_choice_children(&mut children);
+
+    assert_eq!(children.len(), 1);
+    assert_eq!(children[0].property_name, "eg_p_content");
+    assert_eq!(children[0].kind, SchemaTypeChildKind::Choice);
+  }
+
+  #[test]
+  fn recursively_flattens_anonymous_choice_wrappers_inside_named_choices() {
+    let mut children = vec![SchemaTypeChild {
+      name: String::new(),
+      property_name: "eg_p_content".to_string(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: false,
+      repeated: true,
+      initial_version: String::new(),
+      children: vec![anonymous_wrapper(
+        SchemaTypeChildKind::Choice,
+        vec![child("w:CT_R/w:r"), child("m:CT_OMath/m:oMath")],
+      )],
+    }];
+
+    normalize_choice_children(&mut children);
+
+    assert_eq!(children.len(), 1);
+    assert_eq!(children[0].property_name, "eg_p_content");
+    assert_eq!(children[0].children.len(), 2);
+    assert_eq!(children[0].children[0].name, "w:CT_R/w:r");
+    assert_eq!(children[0].children[1].name, "m:CT_OMath/m:oMath");
+  }
+
+  #[test]
+  fn collapses_nested_anonymous_sequence_wrapper() {
+    let mut child = anonymous_wrapper(
+      SchemaTypeChildKind::Sequence,
+      vec![anonymous_wrapper(
+        SchemaTypeChildKind::Sequence,
+        vec![
+          child("w:CT_RunTrackChange/w14:conflictIns"),
+          child("w:CT_RunTrackChange/w14:conflictDel"),
+        ],
+      )],
+    );
+    child.initial_version = "Office2010".to_string();
+
+    normalize_choice_wrappers(&mut child);
+
+    assert_eq!(child.kind, SchemaTypeChildKind::Sequence);
+    assert_eq!(child.initial_version, "Office2010");
+    assert_eq!(child.children.len(), 2);
+    assert_eq!(
+      child.children[0].name,
+      "w:CT_RunTrackChange/w14:conflictIns"
+    );
+    assert_eq!(
+      child.children[1].name,
+      "w:CT_RunTrackChange/w14:conflictDel"
+    );
   }
 }

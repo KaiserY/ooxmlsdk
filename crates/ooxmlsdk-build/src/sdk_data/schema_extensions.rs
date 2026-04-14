@@ -5,6 +5,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
+use crate::sdk_data::schemas::normalize_schema_type_children;
 use crate::sdk_data::sdk_data_model::{Schema, SchemaEnum, SchemaEnumFacet, SchemaTypeAttribute};
 use crate::sdk_data::sdk_data_model::{SchemaTypeChild, SchemaTypeChildKind};
 
@@ -113,6 +114,7 @@ pub fn apply_schema_extensions(
 
       merge_schema_type_attributes(&mut schema_type.attributes, &extension.attributes);
       merge_schema_type_children(&mut schema_type.children, &extension.children);
+      normalize_schema_type_children(&mut schema_type.children);
     }
 
     for extension in &extensions.enums {
@@ -306,5 +308,101 @@ fn runtime_schema_type_child(extension: &SchemaTypeChildExtension) -> SchemaType
       .iter()
       .map(runtime_schema_type_child)
       .collect(),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::sdk_data::sdk_data_model::{
+    SchemaType, SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
+    SchemaTypeKind, SchemaTypeParticle, SchemaTypeXmlHeader,
+  };
+
+  fn anonymous_choice(children: Vec<SchemaTypeChild>) -> SchemaTypeChild {
+    SchemaTypeChild {
+      name: String::new(),
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: false,
+      repeated: true,
+      initial_version: String::new(),
+      children,
+    }
+  }
+
+  fn leaf(name: &str) -> SchemaTypeChild {
+    SchemaTypeChild {
+      name: name.to_string(),
+      property_name: String::new(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Child,
+      optional: true,
+      repeated: true,
+      initial_version: String::new(),
+      children: Vec::new(),
+    }
+  }
+
+  #[test]
+  fn normalizes_named_choice_after_extension_merge() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Paragraph".to_string(),
+        children: vec![anonymous_choice(vec![anonymous_choice(vec![
+          leaf("w:CT_R/w:r"),
+          leaf("m:CT_OMath/m:oMath"),
+        ])])],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+          particle: SchemaTypeParticle::default(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Paragraph".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            name: String::new(),
+            property_name: "eg_p_content".to_string(),
+            optional: false,
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let paragraph = &schemas[0].types[0];
+    assert_eq!(paragraph.children.len(), 1);
+    assert_eq!(paragraph.children[0].property_name, "eg_p_content");
+    assert_eq!(paragraph.children[0].children.len(), 2);
+    assert_eq!(paragraph.children[0].children[0].name, "w:CT_R/w:r");
+    assert_eq!(paragraph.children[0].children[1].name, "m:CT_OMath/m:oMath");
   }
 }

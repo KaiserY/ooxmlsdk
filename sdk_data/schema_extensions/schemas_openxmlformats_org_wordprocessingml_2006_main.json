@@ -235,6 +235,60 @@
       ]
     },
     {
+      "ClassName": "TextBoxContent",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "Header",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "Footer",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "Comment",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "Footnote",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
+      "ClassName": "Endnote",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
       "ClassName": "CustomXmlRun",
       "Children": [
         {
@@ -245,6 +299,33 @@
     },
     {
       "ClassName": "SimpleField",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "Hyperlink",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "BidirectionalEmbedding",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "BidirectionalOverride",
       "Children": [
         {
           "Kind": "Choice",
@@ -267,6 +348,69 @@
         {
           "Kind": "Choice",
           "PropertyName": "eg_ruby_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "RubyContent",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_ruby_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "RubyBase",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_ruby_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "RubyContentType",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_ruby_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "SdtContentBlock",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_block_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "SdtContentRun",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "SdtContentCell",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_cell_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "SdtContentRow",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_content_row_content"
         }
       ]
     },

@@ -160,6 +160,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         write_arms.push(write_arm);
       }
       SdkChoiceVariantKind::Any => {
+        let constructor = if is_box_type(&payload_ty) {
+          quote! { Self::#variant_ident(std::boxed::Box::new(xml)) }
+        } else {
+          quote! { Self::#variant_ident(xml) }
+        };
         let write_arm = quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(value) => writer.write_str(value.as_ref()),
@@ -169,7 +174,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           {
             let xml = crate::common::read_outer_xml(xml_reader, e, empty_tag)?;
-            return Ok(Self::#variant_ident(std::boxed::Box::new(xml)));
+            return Ok(#constructor);
           }
         });
       }

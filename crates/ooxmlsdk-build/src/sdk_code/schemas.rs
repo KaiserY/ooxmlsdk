@@ -933,7 +933,7 @@ pub fn gen_schema(
           #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
           pub enum #child_choice_enum_ident {
             #[sdk(any)]
-            UnknownXml(std::boxed::Box<String>),
+            UnknownXml(String),
           }
         });
       } else if matches!(
@@ -1569,7 +1569,7 @@ fn gen_children(
 
         let (sdk_variant_attrs, child_variant_type, wrap_box): (TokenStream, Type, bool) =
           if child.is_any {
-            (quote! { #[sdk(any)] }, parse_str("String")?, true)
+            (quote! { #[sdk(any)] }, parse_str("String")?, false)
           } else {
             let child_type = context
               .type_map
@@ -2082,7 +2082,7 @@ fn choice_child_variant_shape(
   }
 
   if child.kind == SchemaTypeChildKind::Any {
-    return Ok((quote! { #[sdk(any)] }, parse_str("String")?, true));
+    return Ok((quote! { #[sdk(any)] }, parse_str("String")?, false));
   }
 
   let child_type = context
@@ -3482,5 +3482,26 @@ mod tests {
 
     assert_eq!(fields.len(), 3);
     assert!(enums.is_empty());
+  }
+
+  #[test]
+  fn generates_any_only_choice_without_boxed_string_payload() {
+    let file = File::open(
+      "../../sdk_data/schemas/schemas_microsoft_com_office_2006_metadata_content_type.json",
+    )
+    .unwrap();
+    let schema: Schema = serde_json::from_reader(BufReader::new(file)).unwrap();
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+    let schema_type = schema
+      .types
+      .iter()
+      .find(|item| item.class_name == "ContentTypeSchema")
+      .unwrap();
+
+    let _ = schema_type;
+    let generated = gen_schema(&schema, &context, false).unwrap().to_string();
+
+    assert!(generated.contains("UnknownXml (String)"));
+    assert!(!generated.contains("UnknownXml (std :: boxed :: Box < String >)"));
   }
 }

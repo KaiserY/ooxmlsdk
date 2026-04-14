@@ -154,7 +154,28 @@ pub struct SchemaTypeAttribute {
   pub property_comments: String,
   pub version: String,
   pub required: bool,
+  #[serde(default)]
+  pub validators: Vec<SchemaTypeAttributeValidator>,
   pub bit: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeAttributeValidator {
+  pub name: String,
+  pub is_list: bool,
+  pub r#type: String,
+  pub union_id: u64,
+  pub is_initial_version: bool,
+  pub arguments: Vec<SchemaTypeAttributeValidatorArgument>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeAttributeValidatorArgument {
+  pub name: String,
+  pub r#type: String,
+  pub value: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

@@ -173,6 +173,30 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                   .validators
                   .iter()
                   .any(|validator| validator.name == "RequiredValidator"),
+                validators: attr
+                  .validators
+                  .iter()
+                  .map(
+                    |validator| crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidator {
+                      name: validator.name.clone(),
+                      is_list: validator.is_list,
+                      r#type: validator.r#type.clone(),
+                      union_id: validator.union_id,
+                      is_initial_version: validator.is_initial_version,
+                      arguments: validator
+                        .arguments
+                        .iter()
+                        .map(|argument| {
+                          crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidatorArgument {
+                            name: argument.name.clone(),
+                            r#type: argument.r#type.clone(),
+                            value: argument.value.clone(),
+                          }
+                        })
+                        .collect(),
+                    },
+                  )
+                  .collect(),
                 ..Default::default()
               })
               .collect(),

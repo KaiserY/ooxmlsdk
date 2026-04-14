@@ -7,3 +7,4 @@ pub mod parts;
 pub mod schemas;
 pub mod sdk;
 pub mod simple_type;
+pub mod validator;

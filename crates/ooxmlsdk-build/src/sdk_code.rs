@@ -15,6 +15,8 @@ use crate::sdk_data::sdk_data_model::{
   Namespace as SdkDataNamespace, Part as SdkDataPart, Schema as SdkDataSchema,
 };
 
+pub mod codegen_ir;
+pub mod codegen_ir_builder;
 pub mod helpers;
 pub mod parts;
 pub mod schemas;

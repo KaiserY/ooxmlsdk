@@ -22,6 +22,7 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
     )),
     _ => Ok(quote! {
       impl crate::sdk::SdkType for #ident {}
+      impl crate::validator::SdkValidator for #ident {}
     }),
   }
 }
@@ -32,6 +33,7 @@ fn sdk_type_impl_tokens(
 ) -> proc_macro2::TokenStream {
   quote! {
     impl crate::sdk::SdkType for #ident {}
+    impl crate::validator::SdkValidator for #ident {}
 
     impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;
@@ -949,6 +951,7 @@ fn expand_named_struct(
   if local_name.is_empty() {
     return Ok(quote! {
       impl crate::sdk::SdkType for #ident {}
+      impl crate::validator::SdkValidator for #ident {}
     });
   }
   let tag_qname = if tag_prefix.is_empty() {
@@ -1901,6 +1904,7 @@ fn expand_named_struct(
     || text_field.is_some();
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}
+    impl crate::validator::SdkValidator for #ident {}
 
     impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;

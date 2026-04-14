@@ -830,8 +830,7 @@ pub fn gen_schema_from_ir(
           Clone,
           Debug,
           Default,
-          ooxmlsdk_derive::SdkType,
-          ooxmlsdk_derive::SdkValidator
+          ooxmlsdk_derive::SdkType
         )]
         #sdk_type_attrs
         pub struct #struct_name_ident {
@@ -1274,8 +1273,7 @@ pub fn gen_schema_from_ir(
         Clone,
         Debug,
         Default,
-        ooxmlsdk_derive::SdkType,
-        ooxmlsdk_derive::SdkValidator
+        ooxmlsdk_derive::SdkType
       )]
       #sdk_type_attrs
       pub struct #struct_name_ident {
@@ -1476,8 +1474,7 @@ fn gen_helper_struct_type_decl(
       Clone,
       Debug,
       Default,
-      ooxmlsdk_derive::SdkType,
-      ooxmlsdk_derive::SdkValidator
+      ooxmlsdk_derive::SdkType
     )]
     pub struct #struct_ident {
       #( #fields )*

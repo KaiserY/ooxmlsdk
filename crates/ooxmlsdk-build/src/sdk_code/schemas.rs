@@ -300,8 +300,40 @@ impl<'a> CodegenContext<'a> {
           version: child.initial_version.as_str(),
           kind: child.kind,
         });
+      } else if child.kind == SchemaTypeChildKind::Any {
+        variants.push(ResolvedOneSequenceChild {
+          name: "",
+          field_name: if child.property_name.is_empty() {
+            Cow::Borrowed("unknown_xml")
+          } else {
+            Cow::Owned(escape_snake_case(child.property_name.to_snake_case()))
+          },
+          property_comments: if child.property_comments.is_empty() {
+            Cow::Borrowed(" _")
+          } else {
+            Cow::Borrowed(child.property_comments.as_str())
+          },
+          version: child.initial_version.as_str(),
+          kind: child.kind,
+        });
       } else {
-        variants.push(self.resolve_one_sequence_child(schema_type, child.name.as_str())?);
+        let child_type = self.type_by_name(child.name.as_str()).ok_or_else(|| {
+          format!(
+            "missing direct one-sequence child type for schema {} child {:?} kind {:?}",
+            schema_type.name, child.name, child.kind
+          )
+        })?;
+        variants.push(ResolvedOneSequenceChild {
+          name: child.name.as_str(),
+          field_name: Cow::Owned(child_field_name(child, child_type)),
+          property_comments: if child.property_comments.is_empty() {
+            Cow::Borrowed(" _")
+          } else {
+            Cow::Borrowed(child.property_comments.as_str())
+          },
+          version: schema_item_version(child_type),
+          kind: child.kind,
+        });
       }
     }
 
@@ -2862,9 +2894,9 @@ mod tests {
       .to_string();
 
     assert!(generated.contains("pub leaf_child : std :: boxed :: Box < Leaf >"));
-    assert!(generated.contains("pub sequence_holder_choice : Option < SequenceHolderChoice >"));
+    assert!(generated.contains("pub text_child : Option < crate :: simple_type :: StringValue >"));
     assert!(generated.contains("pub unknown_xml : Vec < String >"));
-    assert!(generated.contains("pub enum SequenceHolderChoice"));
+    assert!(!generated.contains("pub enum SequenceHolderChoice"));
   }
 
   #[test]

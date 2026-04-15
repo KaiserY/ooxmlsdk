@@ -877,31 +877,43 @@ fn build_simple_one_choice_members(
   context: &CodegenContext<'_>,
   members: &mut Vec<MemberDecl>,
 ) -> Result<Vec<TypeDecl>> {
-  let resolved_choice = match context.resolve_one_choice(schema_type) {
-    Ok(resolved_choice) => resolved_choice,
+  let choice_child = match schema_type.children.first() {
+    Some(choice_child) => choice_child,
+    None => return Ok(Vec::new()),
+  };
+
+  let (choice_field_name, choice_enum_name, resolved_variants) = match context
+    .resolve_one_choice(schema_type)
+  {
+    Ok(resolved_choice) => (
+      resolved_choice.field_name,
+      resolved_choice.enum_name,
+      resolved_choice.variants,
+    ),
+    Err(_) if has_resolvable_single_choice_child(schema_type) => {
+      let resolved_choice = context.resolve_one_sequence_choice(schema_type, choice_child, 1, 0)?;
+      (
+        resolved_choice.field_name,
+        resolved_choice.enum_name,
+        resolved_choice.variants,
+      )
+    }
     Err(_) => return Ok(Vec::new()),
   };
 
-  if resolved_choice.variants.is_empty() {
+  if resolved_variants.is_empty() {
     return Ok(Vec::new());
   }
 
-  let choice_child = schema_type.children.first();
-  let choice_version = choice_child
-    .map(|child| child.initial_version.clone())
-    .unwrap_or_default();
-  let choice_cardinality = if let Some(choice_child) = choice_child {
-    merged_cardinality(
-      resolve_choice_particle_cardinality(schema_type),
-      choice_child.optional,
-      choice_child.repeated,
-    )
-  } else {
-    resolve_choice_particle_cardinality(schema_type).unwrap_or(Cardinality::Optional)
-  };
+  let choice_version = choice_child.initial_version.clone();
+  let choice_cardinality = merged_cardinality(
+    resolve_choice_particle_cardinality(schema_type),
+    choice_child.optional,
+    choice_child.repeated,
+  );
 
-  if resolved_choice.variants.len() == 1 {
-    let variant = &resolved_choice.variants[0];
+  if resolved_variants.len() == 1 {
+    let variant = &resolved_variants[0];
     let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
     let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
     if xml_content.is_some()
@@ -964,7 +976,7 @@ fn build_simple_one_choice_members(
   }
 
   members.push(MemberDecl::Field(FieldDecl {
-    rust_name: resolved_choice.field_name.clone(),
+    rust_name: choice_field_name,
     docs: " Choice of child elements.".to_string(),
     version: choice_version.clone(),
     wire: FieldWireDecl::Choice,
@@ -974,21 +986,20 @@ fn build_simple_one_choice_members(
       Cardinality::Optional
     },
     type_ref: TypeRefDecl {
-      rust_type: resolved_choice.enum_name.clone(),
+      rust_type: choice_enum_name.clone(),
       module_path: None,
     },
     validators: Vec::new(),
   }));
 
-  let mut enum_members = resolved_choice
-    .variants
+  let mut enum_members = resolved_variants
     .iter()
     .map(|variant| build_simple_one_choice_variant_decl(variant, schema, context))
     .collect::<Result<Vec<_>>>()?;
   disambiguate_choice_variant_names(&mut enum_members);
 
   Ok(vec![TypeDecl {
-    rust_name: resolved_choice.enum_name.clone(),
+    rust_name: choice_enum_name,
     xml_qname: None,
     docs: format!(" Choice variants for {}.", schema_type.class_name),
     version: schema_type.version.clone(),
@@ -1127,6 +1138,23 @@ fn build_flatten_one_sequence_members(
           choice_slot_index,
         )?;
         choice_slot_index += 1;
+
+        if choice.variants.len() == 1 {
+          let child = &choice.variants[0];
+          let field = build_one_sequence_leaf_field_decl(
+            child,
+            effective_version(child.version, flat_particle.initial_version).to_string(),
+            flat_particle.optional,
+            flat_particle.repeated,
+            schema,
+            context,
+          )?;
+          if !field_name_set.insert(field.rust_name.clone()) {
+            continue;
+          }
+          members.push(MemberDecl::Field(field));
+          continue;
+        }
 
         if !field_name_set.insert(choice.field_name.clone()) {
           continue;
@@ -3322,6 +3350,104 @@ mod tests {
   }
 
   #[test]
+  fn collapses_single_variant_sequence_single_choice_into_named_direct_field() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Color/t:color".to_string(),
+          class_name: "Color".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_BorderPr/".to_string(),
+          class_name: "BorderPropertiesType".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![SchemaTypeChild {
+            kind: SchemaTypeChildKind::Choice,
+            repeated: true,
+            children: vec![SchemaTypeChild {
+              name: "t:CT_Color/t:color".to_string(),
+              kind: SchemaTypeChildKind::Child,
+              property_name: "Color".to_string(),
+              property_comments: "Color".to_string(),
+              ..Default::default()
+            }],
+            ..Default::default()
+          }],
+          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
+            kind: "Sequence".to_string(),
+            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
+              kind: "Choice".to_string(),
+              items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
+                kind: "Element".to_string(),
+                name: "t:CT_Color/t:color".to_string(),
+                occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
+                  min: Some(1),
+                  max: Some(4),
+                  ..Default::default()
+                }],
+                ..Default::default()
+              }],
+              ..Default::default()
+            }],
+            ..Default::default()
+          },
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let border_properties = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "BorderPropertiesType")
+      .unwrap();
+    assert_eq!(
+      border_properties.content_model,
+      Some(ContentModelDecl::SequenceSingleChoice)
+    );
+    assert!(
+      ir.types
+        .iter()
+        .all(|ty| ty.rust_name != "BorderPropertiesTypeChoice")
+    );
+
+    let field = border_properties
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(field.rust_name, "color");
+    assert_eq!(field.docs, "Color");
+    assert_eq!(field.cardinality, Cardinality::Many);
+    assert_eq!(
+      field.wire,
+      FieldWireDecl::Child {
+        qname: "t:CT_Color/t:color".to_string(),
+      }
+    );
+    assert_eq!(
+      field.type_ref,
+      TypeRefDecl {
+        rust_type: "Color".to_string(),
+        module_path: None,
+      }
+    );
+  }
+
+  #[test]
   fn collapses_single_field_sequence_variant_into_direct_choice_variant() {
     let schema = Schema {
       module_name: "test_module".to_string(),
@@ -3863,34 +3989,16 @@ mod tests {
     assert_eq!(fields[0].rust_name, "leaf_child");
     assert!(matches!(fields[0].wire, FieldWireDecl::Child { .. }));
     assert_eq!(fields[0].cardinality, Cardinality::One);
-    assert_eq!(fields[1].rust_name, "sequence_holder_choice");
-    assert!(matches!(fields[1].wire, FieldWireDecl::Choice));
+    assert_eq!(fields[1].rust_name, "text_child");
+    assert!(matches!(fields[1].wire, FieldWireDecl::TextChild { .. }));
     assert_eq!(fields[1].cardinality, Cardinality::Optional);
     assert_eq!(fields[2].rust_name, "unknown_xml");
     assert_eq!(fields[2].wire, FieldWireDecl::Any);
     assert_eq!(fields[2].cardinality, Cardinality::Many);
-
-    let choice_enum = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "SequenceHolderChoice")
-      .unwrap();
-    assert_eq!(choice_enum.kind, TypeKind::ChoiceEnum);
-    let variants: Vec<_> = choice_enum
-      .members
-      .iter()
-      .filter_map(|member| match member {
-        MemberDecl::Variant(variant) => Some(variant),
-        _ => None,
-      })
-      .collect();
-    assert_eq!(variants.len(), 1);
-    assert_eq!(variants[0].rust_name, "TText");
-    assert_eq!(
-      variants[0].wire,
-      VariantWireDecl::TextChild {
-        qnames: vec!["t:CT_Text/t:text".to_string()],
-      }
+    assert!(
+      ir.types
+        .iter()
+        .all(|ty| ty.rust_name != "SequenceHolderChoice")
     );
   }
 

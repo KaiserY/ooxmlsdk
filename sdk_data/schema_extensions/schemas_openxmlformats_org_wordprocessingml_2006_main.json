@@ -226,6 +226,33 @@
       ]
     },
     {
+      "ClassName": "PreviousTableCellProperties",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_cell_markup_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "TableCellProperties",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_cell_markup_elements"
+        }
+      ]
+    },
+    {
+      "ClassName": "SectionProperties",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_hdr_ftr_references"
+        }
+      ]
+    },
+    {
       "ClassName": "CustomXmlCell",
       "Children": [
         {
@@ -262,6 +289,15 @@
       ]
     },
     {
+      "ClassName": "HeaderFooterType",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
       "ClassName": "Comment",
       "Children": [
         {
@@ -289,6 +325,15 @@
       ]
     },
     {
+      "ClassName": "FootnoteEndnoteType",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "PropertyName": "eg_block_level_elts"
+        }
+      ]
+    },
+    {
       "ClassName": "CustomXmlRun",
       "Children": [
         {
@@ -303,6 +348,15 @@
         {
           "Kind": "Choice",
           "PropertyName": "eg_p_content"
+        }
+      ]
+    },
+    {
+      "ClassName": "Drawing",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "Repeated": true
         }
       ]
     },

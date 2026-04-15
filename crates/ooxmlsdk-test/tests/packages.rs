@@ -8,7 +8,6 @@ use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
-use ooxmlsdk::schemas::opc_core_properties::KeywordsChoice;
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   AltChunk, Body, BodyChoice, CommentChoice, Document, Hyperlink, HyperlinkChoice, Paragraph,
@@ -21,16 +20,7 @@ const ALT_CHUNK_TARGET: &str = "afchunk.xml";
 const ALT_CHUNK_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><root><element>Some text</element></root>";
 
 fn keywords_text(value: Option<&ooxmlsdk::schemas::opc_core_properties::Keywords>) -> Option<&str> {
-  value.and_then(|keywords| {
-    keywords.xml_content.as_deref().or_else(|| {
-      keywords
-        .keywords_choice
-        .iter()
-        .find_map(|child| match child {
-          KeywordsChoice::CpValue(value) => value.xml_content.as_deref(),
-        })
-    })
-  })
+  value.and_then(|keywords| keywords.xml_content.as_deref())
 }
 
 fn test_file_path(file_name: &str) -> std::path::PathBuf {
@@ -100,7 +90,7 @@ fn main_document_body_child_count(
   document
     .body
     .as_deref()
-    .map(|body| body.body_choice.len() + usize::from(body.w_sect_pr.is_some()))
+    .map(|body| body.eg_block_level_elts.len() + usize::from(body.w_sect_pr.is_some()))
     .unwrap_or_default()
 }
 
@@ -108,7 +98,7 @@ fn first_body_child(document: &Document) -> Option<&BodyChoice> {
   document
     .body
     .as_deref()
-    .and_then(|body| body.body_choice.first())
+    .and_then(|body| body.eg_block_level_elts.first())
 }
 
 fn first_body_mut(document: &mut Document) -> Option<&mut Body> {
@@ -137,35 +127,35 @@ fn assert_unexpected_tag(
 fn first_paragraph(
   body: &Body,
 ) -> Option<&ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph> {
-  body.body_choice.iter().find_map(|child| match child {
-    BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-    _ => None,
-  })
+  body
+    .eg_block_level_elts
+    .iter()
+    .find_map(|child| match child {
+      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      _ => None,
+    })
 }
 
 fn body_paragraph_count(body: &Body) -> usize {
   body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter(|child| matches!(child, BodyChoice::WP(_)))
     .count()
 }
 
 fn first_hyperlink(paragraph: &Paragraph) -> Option<&Hyperlink> {
-  paragraph
-    .paragraph_choice
-    .iter()
-    .find_map(|child| match child {
-      ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
-      _ => None,
-    })
+  paragraph.eg_p_content.iter().find_map(|child| match child {
+    ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
+    _ => None,
+  })
 }
 
 fn paragraph_bookmark_start_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WBookmarkStart(_)))
     .count()
@@ -175,7 +165,7 @@ fn paragraph_bookmark_end_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WBookmarkEnd(_)))
     .count()
@@ -185,7 +175,7 @@ fn paragraph_comment_range_start_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WCommentRangeStart(_)))
     .count()
@@ -195,7 +185,7 @@ fn paragraph_comment_range_end_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WCommentRangeEnd(_)))
     .count()
@@ -205,7 +195,7 @@ fn paragraph_comment_reference_count(
   paragraph: &ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Paragraph,
 ) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter_map(|child| match child {
       ParagraphChoice::WR(run) => Some(run.as_ref()),
@@ -222,16 +212,13 @@ fn paragraph_comment_reference_count(
 }
 
 fn first_paragraph_text(paragraph: &Paragraph) -> Option<&str> {
-  paragraph
-    .paragraph_choice
-    .iter()
-    .find_map(|child| match child {
-      ParagraphChoice::WR(run) => run.run_choice.iter().find_map(|run_child| match run_child {
-        RunChoice::WT(text) => text.xml_content.as_deref(),
-        _ => None,
-      }),
+  paragraph.eg_p_content.iter().find_map(|child| match child {
+    ParagraphChoice::WR(run) => run.run_choice.iter().find_map(|run_child| match run_child {
+      RunChoice::WT(text) => text.xml_content.as_deref(),
       _ => None,
-    })
+    }),
+    _ => None,
+  })
 }
 
 fn append_run_text(run: &Run, out: &mut String) {
@@ -247,11 +234,11 @@ fn append_run_text(run: &Run, out: &mut String) {
 fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
-  for child in &paragraph.paragraph_choice {
+  for child in &paragraph.eg_p_content {
     match child {
       ParagraphChoice::WR(run) => append_run_text(run, &mut text),
       ParagraphChoice::WHyperlink(hyperlink) => {
-        for hyperlink_child in &hyperlink.hyperlink_choice {
+        for hyperlink_child in &hyperlink.eg_p_content {
           if let HyperlinkChoice::WR(run) = hyperlink_child {
             append_run_text(run.as_ref(), &mut text);
           }
@@ -269,7 +256,7 @@ fn comment_text(
 ) -> String {
   let mut text = String::new();
 
-  for child in &comment.comment_choice {
+  for child in &comment.eg_block_level_elts {
     if let CommentChoice::WP(paragraph) = child {
       text.push_str(&paragraph_text(paragraph.as_ref()));
     }
@@ -696,7 +683,7 @@ fn open_simple_sdt_docx_asset_from_openxml_sdk() {
   let Some(properties) = sdt.sdt_properties.as_deref() else {
     panic!("expected w:sdtPr");
   };
-  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.sdt_properties_choice.first() else {
+  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.children.first() else {
     panic!("expected w:alias");
   };
 
@@ -723,12 +710,12 @@ fn open_hyperlink_docx_asset_from_openxml_sdk() {
   assert_eq!(body_paragraph_count(body), 2);
 
   let hyperlink_paragraph = body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph)
         if paragraph
-          .paragraph_choice
+          .eg_p_content
           .iter()
           .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
       {
@@ -848,11 +835,11 @@ fn round_trip_mcinleaf_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -869,11 +856,11 @@ fn round_trip_mailmerge_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -891,11 +878,11 @@ fn round_trip_svg_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1407,11 +1394,11 @@ fn round_trip_data_bound_content_controls_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1428,11 +1415,11 @@ fn round_trip_of16_01_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1449,11 +1436,11 @@ fn round_trip_of16_02_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1470,11 +1457,11 @@ fn round_trip_of16_03_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1491,11 +1478,11 @@ fn round_trip_of16_04_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1512,11 +1499,11 @@ fn round_trip_of16_05_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1533,11 +1520,11 @@ fn round_trip_of16_06_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1554,11 +1541,11 @@ fn round_trip_of16_07_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1575,11 +1562,11 @@ fn round_trip_of16_08_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1641,7 +1628,7 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
   let body =
     first_body_mut(&mut package.main_document_part.root_element).expect("expected document body");
   body
-    .body_choice
+    .eg_block_level_elts
     .push(BodyChoice::WAltChunk(Box::new(AltChunk {
       id: Some(ALT_CHUNK_ID.to_string()),
       alt_chunk_properties: None,
@@ -1677,7 +1664,7 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
       .as_deref()
       .is_some_and(|body| {
         body
-          .body_choice
+          .eg_block_level_elts
           .iter()
           .any(|body_child| matches!(body_child, BodyChoice::WAltChunk(_)))
       })
@@ -1695,7 +1682,7 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
       .as_deref()
       .is_some_and(|body| {
         body
-          .body_choice
+          .eg_block_level_elts
           .iter()
           .any(|body_child| matches!(body_child, BodyChoice::WAltChunk(_)))
       })
@@ -1728,11 +1715,12 @@ fn round_trip_plain_docx_asset_from_openxml_sdk() {
   let roundtripped_paragraph = first_paragraph(roundtripped_body).expect("expected paragraph");
 
   assert_eq!(
-    original_body.body_choice.len() + usize::from(original_body.w_sect_pr.is_some()),
+    original_body.eg_block_level_elts.len() + usize::from(original_body.w_sect_pr.is_some()),
     2
   );
   assert_eq!(
-    roundtripped_body.body_choice.len() + usize::from(roundtripped_body.w_sect_pr.is_some()),
+    roundtripped_body.eg_block_level_elts.len()
+      + usize::from(roundtripped_body.w_sect_pr.is_some()),
     2
   );
   assert_eq!(paragraph_bookmark_start_count(original_paragraph), 1);
@@ -1764,11 +1752,12 @@ fn round_trip_hello_world_docx_asset_from_openxml_sdk() {
   let roundtripped_paragraph = first_paragraph(roundtripped_body).expect("expected paragraph");
 
   assert_eq!(
-    original_body.body_choice.len() + usize::from(original_body.w_sect_pr.is_some()),
+    original_body.eg_block_level_elts.len() + usize::from(original_body.w_sect_pr.is_some()),
     2
   );
   assert_eq!(
-    roundtripped_body.body_choice.len() + usize::from(roundtripped_body.w_sect_pr.is_some()),
+    roundtripped_body.eg_block_level_elts.len()
+      + usize::from(roundtripped_body.w_sect_pr.is_some()),
     2
   );
   assert_eq!(paragraph_bookmark_start_count(original_paragraph), 0);
@@ -1794,17 +1783,17 @@ fn round_trip_document_docx_asset_from_openxml_sdk() {
   let roundtripped_body =
     first_body(&roundtripped.main_document_part.root_element).expect("expected body");
 
-  assert!(original_body.body_choice.len() > 10);
-  assert!(roundtripped_body.body_choice.len() > 10);
+  assert!(original_body.eg_block_level_elts.len() > 10);
+  assert!(roundtripped_body.eg_block_level_elts.len() > 10);
   assert!(
     original_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WSdt(_)))
   );
   assert!(
     roundtripped_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WSdt(_)))
   );
@@ -1838,8 +1827,8 @@ fn round_trip_document_dotx_asset_from_openxml_sdk() {
     first_body(&roundtripped.main_document_part.root_element).expect("expected body");
 
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
   assert_eq!(
     main_document_body_child_count(&original.main_document_part.root_element),
@@ -1898,11 +1887,11 @@ fn round_trip_annotation_ref_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
-  assert!(!original_body.body_choice.is_empty());
-  assert!(!roundtripped_body.body_choice.is_empty());
+  assert!(!original_body.eg_block_level_elts.is_empty());
+  assert!(!roundtripped_body.eg_block_level_elts.is_empty());
 }
 
 #[test]
@@ -1914,7 +1903,7 @@ fn round_trip_hello_o14_docx_asset_from_openxml_sdk() {
   let roundtripped_body =
     first_body(&roundtripped.main_document_part.root_element).expect("expected body");
   let original_paragraph = original_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .find_map(|child| match child {
       BodyChoice::WP(paragraph) if paragraph_text(paragraph.as_ref()).contains("Hello O14") => {
@@ -1924,7 +1913,7 @@ fn round_trip_hello_o14_docx_asset_from_openxml_sdk() {
     })
     .expect("expected paragraph text");
   let roundtripped_paragraph = roundtripped_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .find_map(|child| match child {
       BodyChoice::WP(paragraph) if paragraph_text(paragraph.as_ref()).contains("Hello O14") => {
@@ -1991,24 +1980,24 @@ fn round_trip_may_12_04_docx_asset_from_openxml_sdk() {
     Some(84)
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
   assert!(
     original_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|_| original_body.w_sect_pr.is_some())
   );
   assert!(
     roundtripped_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|_| roundtripped_body.w_sect_pr.is_some())
   );
 
   let original_first_paragraph = original_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .find_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -2016,7 +2005,7 @@ fn round_trip_may_12_04_docx_asset_from_openxml_sdk() {
     })
     .expect("expected first paragraph");
   let roundtripped_first_paragraph = roundtripped_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .find_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -2036,7 +2025,7 @@ fn round_trip_may_12_04_docx_asset_from_openxml_sdk() {
   );
 
   let original_paragraph_texts: Vec<String> = original_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph_text(paragraph.as_ref())),
@@ -2044,7 +2033,7 @@ fn round_trip_may_12_04_docx_asset_from_openxml_sdk() {
     })
     .collect();
   let roundtripped_paragraph_texts: Vec<String> = roundtripped_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph_text(paragraph.as_ref())),
@@ -2191,12 +2180,12 @@ fn round_trip_hyperlink_docx_asset_from_openxml_sdk() {
   assert_eq!(body_paragraph_count(roundtripped_body), 2);
 
   let original_hyperlink_paragraph = original_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph)
         if paragraph
-          .paragraph_choice
+          .eg_p_content
           .iter()
           .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
       {
@@ -2207,12 +2196,12 @@ fn round_trip_hyperlink_docx_asset_from_openxml_sdk() {
     .next()
     .expect("expected paragraph with hyperlink");
   let roundtripped_hyperlink_paragraph = roundtripped_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph)
         if paragraph
-          .paragraph_choice
+          .eg_p_content
           .iter()
           .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
       {
@@ -2291,8 +2280,8 @@ fn round_trip_no_doc_props_docx_asset_from_openxml_sdk() {
     roundtripped.main_document_part.inner_path
   );
   assert_eq!(
-    original_body.body_choice.len(),
-    roundtripped_body.body_choice.len()
+    original_body.eg_block_level_elts.len(),
+    roundtripped_body.eg_block_level_elts.len()
   );
 }
 
@@ -3072,13 +3061,12 @@ fn round_trip_simple_sdt_docx_asset_from_openxml_sdk() {
   let Some(roundtripped_properties) = roundtripped_sdt.sdt_properties.as_deref() else {
     panic!("expected roundtripped w:sdtPr");
   };
-  let Some(SdtPropertiesChoice::WAlias(original_alias)) =
-    original_properties.sdt_properties_choice.first()
+  let Some(SdtPropertiesChoice::WAlias(original_alias)) = original_properties.children.first()
   else {
     panic!("expected original w:alias");
   };
   let Some(SdtPropertiesChoice::WAlias(roundtripped_alias)) =
-    roundtripped_properties.sdt_properties_choice.first()
+    roundtripped_properties.children.first()
   else {
     panic!("expected roundtripped w:alias");
   };

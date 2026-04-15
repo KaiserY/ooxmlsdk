@@ -88,6 +88,8 @@ pub enum ContentModelDecl {
   #[default]
   None,
   OneAllDirectChildren,
+  DirectChildrenOnly,
+  ChoiceOnly,
   OneChoiceSingle,
   MixedChoiceChildren,
   SequenceAnyOnly,

@@ -13,7 +13,7 @@ fn first_body(document: &Document) -> &Body {
 
 fn first_paragraph(body: &Body) -> &Paragraph {
   body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .find_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -24,7 +24,7 @@ fn first_paragraph(body: &Body) -> &Paragraph {
 
 fn first_run(paragraph: &Paragraph) -> &Run {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .find_map(|child| match child {
       ParagraphChoice::WR(run) => Some(run.as_ref()),
@@ -35,7 +35,7 @@ fn first_run(paragraph: &Paragraph) -> &Run {
 
 fn first_hyperlink(paragraph: &Paragraph) -> &Hyperlink {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .find_map(|child| match child {
       ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
@@ -46,7 +46,7 @@ fn first_hyperlink(paragraph: &Paragraph) -> &Hyperlink {
 
 fn first_hyperlink_run(hyperlink: &Hyperlink) -> &Run {
   hyperlink
-    .hyperlink_choice
+    .eg_p_content
     .iter()
     .find_map(|child| match child {
       HyperlinkChoice::WR(run) => Some(run.as_ref()),
@@ -57,7 +57,7 @@ fn first_hyperlink_run(hyperlink: &Hyperlink) -> &Run {
 
 fn first_sdt_block(body: &Body) -> &SdtBlock {
   body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .find_map(|child| match child {
       BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
@@ -99,11 +99,11 @@ fn append_run_text(run: &Run, out: &mut String) {
 fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
-  for child in &paragraph.paragraph_choice {
+  for child in &paragraph.eg_p_content {
     match child {
       ParagraphChoice::WR(run) => append_run_text(run, &mut text),
       ParagraphChoice::WHyperlink(hyperlink) => {
-        for hyperlink_child in &hyperlink.hyperlink_choice {
+        for hyperlink_child in &hyperlink.eg_p_content {
           if let HyperlinkChoice::WR(run) = hyperlink_child {
             append_run_text(run.as_ref(), &mut text);
           }
@@ -118,7 +118,7 @@ fn paragraph_text(paragraph: &Paragraph) -> String {
 
 fn paragraph_run_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ParagraphChoice::WR(_)))
     .count()
@@ -126,7 +126,7 @@ fn paragraph_run_count(paragraph: &Paragraph) -> usize {
 
 fn paragraph_sdt_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ParagraphChoice::WSdt(_)))
     .count()
@@ -134,7 +134,7 @@ fn paragraph_sdt_count(paragraph: &Paragraph) -> usize {
 
 fn paragraph_bookmark_start_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ParagraphChoice::WBookmarkStart(_)))
     .count()
@@ -142,7 +142,7 @@ fn paragraph_bookmark_start_count(paragraph: &Paragraph) -> usize {
 
 fn paragraph_bookmark_end_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ParagraphChoice::WBookmarkEnd(_)))
     .count()
@@ -150,7 +150,7 @@ fn paragraph_bookmark_end_count(paragraph: &Paragraph) -> usize {
 
 fn paragraph_comment_range_start_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ParagraphChoice::WCommentRangeStart(_)))
     .count()
@@ -158,7 +158,7 @@ fn paragraph_comment_range_start_count(paragraph: &Paragraph) -> usize {
 
 fn paragraph_comment_range_end_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter(|child| matches!(child, ParagraphChoice::WCommentRangeEnd(_)))
     .count()
@@ -166,7 +166,7 @@ fn paragraph_comment_range_end_count(paragraph: &Paragraph) -> usize {
 
 fn paragraph_comment_reference_count(paragraph: &Paragraph) -> usize {
   paragraph
-    .paragraph_choice
+    .eg_p_content
     .iter()
     .filter_map(|child| match child {
       ParagraphChoice::WR(run) => Some(run.as_ref()),
@@ -187,9 +187,9 @@ fn comment_text(
 ) -> String {
   let mut text = String::new();
 
-  for child in &comment.comment_choice {
+  for child in &comment.eg_block_level_elts {
     if let CommentChoice::WP(paragraph) = child {
-      for paragraph_child in &paragraph.paragraph_choice {
+      for paragraph_child in &paragraph.eg_p_content {
         if let ParagraphChoice::WR(run) = paragraph_child {
           append_run_text(run, &mut text);
         }
@@ -202,7 +202,7 @@ fn comment_text(
 
 fn body_paragraph_count(body: &Body) -> usize {
   body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter(|child| matches!(child, BodyChoice::WP(_)))
     .count()
@@ -320,9 +320,9 @@ fn document_round_trip_with_two_paragraphs_from_openxml_reader_test() {
     assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_TWO_PARAGRAPHS_XML);
 
   let body = first_body(&parsed);
-  assert_eq!(body.body_choice.len(), 2);
-  assert!(matches!(body.body_choice[0], BodyChoice::WP(_)));
-  assert!(matches!(body.body_choice[1], BodyChoice::WP(_)));
+  assert_eq!(body.eg_block_level_elts.len(), 2);
+  assert!(matches!(body.eg_block_level_elts[0], BodyChoice::WP(_)));
+  assert!(matches!(body.eg_block_level_elts[1], BodyChoice::WP(_)));
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );
@@ -391,10 +391,15 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
 
   let body = first_body(&parsed);
   assert_eq!(body_paragraph_count(body), 2);
-  assert!(body.body_choice.iter().any(|_| body.w_sect_pr.is_some()));
+  assert!(
+    body
+      .eg_block_level_elts
+      .iter()
+      .any(|_| body.w_sect_pr.is_some())
+  );
 
   let hyperlink_paragraph = body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -402,7 +407,7 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
     })
     .find(|paragraph| {
       paragraph
-        .paragraph_choice
+        .eg_p_content
         .iter()
         .any(|child| matches!(child, ParagraphChoice::WHyperlink(_)))
     })
@@ -422,7 +427,7 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
   let reparsed_body = first_body(&reparsed);
   assert_eq!(body_paragraph_count(reparsed_body), 2);
   let reparsed_hyperlink_paragraph = reparsed_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -430,7 +435,7 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
     })
     .find(|paragraph| {
       paragraph
-        .paragraph_choice
+        .eg_p_content
         .iter()
         .any(|child| matches!(child, ParagraphChoice::WHyperlink(_)))
     })
@@ -518,7 +523,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
 
   let body = first_body(&parsed);
   let paragraph = body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -535,7 +540,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
 
   let reparsed_body = first_body(&reparsed);
   let reparsed_paragraph = reparsed_body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
@@ -606,25 +611,25 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   let body = first_body(&parsed);
   assert!(
     body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WSdt(_)))
   );
   assert!(
     body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WBookmarkStart(_)))
   );
   assert!(
     body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WBookmarkEnd(_)))
   );
   assert!(
     body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WP(_)))
   );
@@ -633,38 +638,35 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   let Some(properties) = sdt.sdt_properties.as_deref() else {
     panic!("expected w:sdtPr");
   };
-  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.sdt_properties_choice.first() else {
+  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.children.first() else {
     panic!("expected sdt alias");
   };
   assert_eq!(alias.val.as_str(), "RichTextContentControl");
 
   let hyperlink = body
-    .body_choice
+    .eg_block_level_elts
     .iter()
     .filter_map(|child| match child {
       BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
       _ => None,
     })
     .find_map(|paragraph| {
-      paragraph
-        .paragraph_choice
-        .iter()
-        .find_map(|child| match child {
-          ParagraphChoice::WHyperlink(hyperlink)
-            if hyperlink
-              .hyperlink_choice
-              .iter()
-              .any(|hyperlink_child| match hyperlink_child {
-                HyperlinkChoice::WR(run) => {
-                  first_text(run.as_ref()).xml_content.as_deref() == Some("EricWhite.com")
-                }
-                _ => false,
-              }) =>
-          {
-            Some(hyperlink.as_ref())
-          }
-          _ => None,
-        })
+      paragraph.eg_p_content.iter().find_map(|child| match child {
+        ParagraphChoice::WHyperlink(hyperlink)
+          if hyperlink
+            .eg_p_content
+            .iter()
+            .any(|hyperlink_child| match hyperlink_child {
+              HyperlinkChoice::WR(run) => {
+                first_text(run.as_ref()).xml_content.as_deref() == Some("EricWhite.com")
+              }
+              _ => false,
+            }) =>
+        {
+          Some(hyperlink.as_ref())
+        }
+        _ => None,
+      })
     })
     .expect("expected EricWhite.com hyperlink");
   assert_eq!(hyperlink.id.as_deref(), Some("rId26"));
@@ -682,19 +684,19 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   let reparsed_body = first_body(&reparsed);
   assert!(
     reparsed_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WSdt(_)))
   );
   assert!(
     reparsed_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WBookmarkStart(_)))
   );
   assert!(
     reparsed_body
-      .body_choice
+      .eg_block_level_elts
       .iter()
       .any(|child| matches!(child, BodyChoice::WBookmarkEnd(_)))
   );

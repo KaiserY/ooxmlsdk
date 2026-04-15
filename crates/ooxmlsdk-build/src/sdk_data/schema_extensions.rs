@@ -38,6 +38,8 @@ pub struct SchemaTypeChildExtension {
   pub property_name: String,
   #[serde(default)]
   pub optional: bool,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub repeated: Option<bool>,
   pub insert_before: Option<String>,
   #[serde(default)]
   pub children: Vec<SchemaTypeChildExtension>,
@@ -238,6 +240,9 @@ fn merge_schema_type_child(target: &mut SchemaTypeChild, extension: &SchemaTypeC
   }
   target.kind = extension.kind;
   target.optional = extension.optional;
+  if let Some(repeated) = extension.repeated {
+    target.repeated = repeated;
+  }
 
   merge_schema_type_children(&mut target.children, &extension.children);
 }
@@ -301,7 +306,7 @@ fn runtime_schema_type_child(extension: &SchemaTypeChildExtension) -> SchemaType
     property_comments: String::new(),
     kind: extension.kind,
     optional: extension.optional,
-    repeated: false,
+    repeated: extension.repeated.unwrap_or(false),
     initial_version: String::new(),
     children: extension
       .children
@@ -387,6 +392,7 @@ mod tests {
             name: String::new(),
             property_name: "eg_p_content".to_string(),
             optional: false,
+            repeated: None,
             insert_before: None,
             children: Vec::new(),
           }],
@@ -404,5 +410,142 @@ mod tests {
     assert_eq!(paragraph.children[0].children.len(), 2);
     assert_eq!(paragraph.children[0].children[0].name, "w:CT_R/w:r");
     assert_eq!(paragraph.children[0].children[1].name, "m:CT_OMath/m:oMath");
+  }
+
+  #[test]
+  fn preserves_existing_repeated_when_extension_only_renames_choice() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Drawing".to_string(),
+        children: vec![SchemaTypeChild {
+          name: String::new(),
+          property_name: "children".to_string(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Choice,
+          optional: false,
+          repeated: true,
+          initial_version: String::new(),
+          children: vec![
+            leaf("wp:CT_Anchor/wp:anchor"),
+            leaf("wp:CT_Inline/wp:inline"),
+          ],
+        }],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneChoice,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+          particle: SchemaTypeParticle::default(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Drawing".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            name: String::new(),
+            property_name: "drawing_choice".to_string(),
+            optional: false,
+            repeated: None,
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let drawing = &schemas[0].types[0];
+    assert_eq!(drawing.children.len(), 1);
+    assert_eq!(drawing.children[0].property_name, "drawing_choice");
+    assert!(drawing.children[0].repeated);
+  }
+
+  #[test]
+  fn applies_repeated_override_when_extension_explicitly_sets_it() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Drawing".to_string(),
+        children: vec![SchemaTypeChild {
+          name: String::new(),
+          property_name: "children".to_string(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Choice,
+          optional: false,
+          repeated: false,
+          initial_version: String::new(),
+          children: vec![
+            leaf("wp:CT_Anchor/wp:anchor"),
+            leaf("wp:CT_Inline/wp:inline"),
+          ],
+        }],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneChoice,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+          particle: SchemaTypeParticle::default(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Drawing".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            name: String::new(),
+            property_name: String::new(),
+            optional: false,
+            repeated: Some(true),
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let drawing = &schemas[0].types[0];
+    assert_eq!(drawing.children.len(), 1);
+    assert!(drawing.children[0].repeated);
   }
 }

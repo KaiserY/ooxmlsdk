@@ -615,6 +615,18 @@ pub(crate) fn one_sequence_choice_field_name(
   choice_slot_count: usize,
   slot_index: usize,
 ) -> String {
+  if choice_slot_count <= 1
+    && let Some(property_name) = schema_type
+      .children
+      .iter()
+      .filter(|child| child.kind == SchemaTypeChildKind::Choice)
+      .nth(slot_index)
+      .map(|child| child.property_name.as_str())
+      .filter(|property_name| !property_name.is_empty())
+  {
+    return escape_snake_case(property_name.to_snake_case());
+  }
+
   if choice_slot_count <= 1 {
     format!("{}_choice", schema_type.class_name.to_snake_case())
   } else {
@@ -910,11 +922,30 @@ pub fn gen_schema_from_ir(
             true,
           )?);
         }
-        ContentModelDecl::OneChoiceSingle | ContentModelDecl::SequenceSingleChoice => {
-          fields.extend(gen_choice_fields_from_decl(
-            &choice_fields,
+        ContentModelDecl::DirectChildrenOnly => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            &direct_child_fields,
+            ir,
             field_version_cfg,
+            false,
           )?);
+        }
+        ContentModelDecl::ChoiceOnly
+        | ContentModelDecl::OneChoiceSingle
+        | ContentModelDecl::SequenceSingleChoice => {
+          if !direct_child_fields.is_empty() {
+            fields.extend(gen_direct_child_fields_from_decl(
+              &direct_child_fields,
+              ir,
+              field_version_cfg,
+              false,
+            )?);
+          } else {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
+              field_version_cfg,
+            )?);
+          }
         }
         ContentModelDecl::MixedChoiceChildren => {
           let mixed_fields: Vec<&FieldDecl> = type_decl
@@ -1009,6 +1040,13 @@ pub fn gen_schema_from_ir(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               field_version_cfg,
+            )?);
+          } else if !direct_child_fields.is_empty() {
+            fields.extend(gen_direct_child_fields_from_decl(
+              &direct_child_fields,
+              ir,
+              field_version_cfg,
+              false,
             )?);
           }
         }
@@ -1109,11 +1147,40 @@ pub fn gen_schema_from_ir(
             true,
           )?);
         }
-        ContentModelDecl::OneChoiceSingle | ContentModelDecl::SequenceSingleChoice => {
-          fields.extend(gen_choice_fields_from_decl(
-            &choice_fields,
+        ContentModelDecl::DirectChildrenOnly => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            if direct_child_fields.is_empty() {
+              &base_direct_child_fields
+            } else {
+              &direct_child_fields
+            },
+            ir,
             field_version_cfg,
+            false,
           )?);
+        }
+        ContentModelDecl::ChoiceOnly
+        | ContentModelDecl::OneChoiceSingle
+        | ContentModelDecl::SequenceSingleChoice => {
+          if !direct_child_fields.is_empty()
+            || (choice_fields.is_empty() && !base_direct_child_fields.is_empty())
+          {
+            fields.extend(gen_direct_child_fields_from_decl(
+              if direct_child_fields.is_empty() {
+                &base_direct_child_fields
+              } else {
+                &direct_child_fields
+              },
+              ir,
+              field_version_cfg,
+              false,
+            )?);
+          } else {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
+              field_version_cfg,
+            )?);
+          }
         }
         ContentModelDecl::OneSequenceFlatten => {
           let flatten_fields: Vec<&FieldDecl> = type_decl
@@ -1195,6 +1262,17 @@ pub fn gen_schema_from_ir(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               field_version_cfg,
+            )?);
+          } else if !direct_child_fields.is_empty() || !base_direct_child_fields.is_empty() {
+            fields.extend(gen_direct_child_fields_from_decl(
+              if direct_child_fields.is_empty() {
+                &base_direct_child_fields
+              } else {
+                &direct_child_fields
+              },
+              ir,
+              field_version_cfg,
+              false,
             )?);
           }
         }
@@ -2708,10 +2786,8 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub choice_holder_choice : Vec < ChoiceHolderChoice >"));
-    assert!(generated.contains("pub enum ChoiceHolderChoice"));
-    assert!(generated.contains("# [sdk (child (qname = \"t:CT_Leaf/t:leaf\"))]"));
-    assert!(generated.contains("TLeaf (std :: boxed :: Box < Leaf >)"));
+    assert!(generated.contains("t:CT_Leaf/t:leaf"));
+    assert!(!generated.contains("pub enum ChoiceHolderChoice"));
   }
 
   #[test]

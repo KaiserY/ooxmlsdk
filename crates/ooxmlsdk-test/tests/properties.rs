@@ -133,7 +133,7 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
     titles.vt_vector.base_type,
     VectorBaseValues::Lpstr
   ));
-  assert_eq!(titles.vt_vector.vt_vector_choice.len(), 1);
+  assert_eq!(titles.vt_vector.children.len(), 1);
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<ap:Properties"));
   assert!(serialized.contains("<ap:TitlesOfParts>"));
@@ -155,13 +155,10 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
     property.format_id.as_str(),
     "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}"
   );
-  assert_eq!(property.custom_document_property_choice.len(), 1);
-  let Some(CustomDocumentPropertyChoice::VtBool(value)) =
-    property.custom_document_property_choice.first()
-  else {
+  let Some(CustomDocumentPropertyChoice::VtBool(value)) = property.children.as_ref() else {
     panic!("expected vt:bool");
   };
-  assert!(*value);
+  assert!(value);
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<op:Properties"));
   assert!(serialized.contains("fmtid=\"{D5CDD505-2E9C-101B-9397-08002B2CF9AE}\""));

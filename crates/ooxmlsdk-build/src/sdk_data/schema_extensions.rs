@@ -25,6 +25,8 @@ pub struct SchemaTypeExtension {
   pub has_mc_ignorable_field: Option<bool>,
   pub text_value_type: Option<String>,
   #[serde(default)]
+  pub mc_alternate_content_insert_before: Vec<String>,
+  #[serde(default)]
   pub attributes: Vec<SchemaTypeAttribute>,
   #[serde(default)]
   pub children: Vec<SchemaTypeChildExtension>,
@@ -115,7 +117,10 @@ pub fn apply_schema_extensions(
       }
 
       merge_schema_type_attributes(&mut schema_type.attributes, &extension.attributes);
-      merge_schema_type_children(&mut schema_type.children, &extension.children);
+      let mut expanded_children =
+        expand_mc_alternate_content_insert_before(&extension.mc_alternate_content_insert_before);
+      expanded_children.extend(extension.children.iter().cloned());
+      merge_schema_type_children(&mut schema_type.children, &expanded_children);
       normalize_schema_type_children(&mut schema_type.children);
     }
 
@@ -139,6 +144,23 @@ pub fn apply_schema_extensions(
   }
 
   Ok(())
+}
+
+fn expand_mc_alternate_content_insert_before(
+  insert_before: &[String],
+) -> Vec<SchemaTypeChildExtension> {
+  insert_before
+    .iter()
+    .map(|insert_before| SchemaTypeChildExtension {
+      kind: SchemaTypeChildKind::Child,
+      name: "mc:CT_AlternateContent/mc:AlternateContent".to_string(),
+      property_name: "mc_alternate_content".to_string(),
+      optional: true,
+      repeated: None,
+      insert_before: Some(insert_before.clone()),
+      children: Vec::new(),
+    })
+    .collect()
 }
 
 fn merge_schema_type_attributes(
@@ -503,6 +525,142 @@ mod tests {
       "eg_block_level_elts"
     );
     assert_eq!(body.children[0].children[1].name, "w:CT_SectPr/w:sectPr");
+  }
+
+  #[test]
+  fn expands_mc_alternate_content_insert_before_shorthand() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Workbook".to_string(),
+        children: vec![leaf("x15ac:CT_AbsolutePath/x15ac:absPath")],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Workbook".to_string(),
+          mc_alternate_content_insert_before: vec![
+            "x15ac:CT_AbsolutePath/x15ac:absPath".to_string(),
+          ],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let workbook = &schemas[0].types[0];
+    assert_eq!(workbook.children.len(), 2);
+    assert_eq!(
+      workbook.children[0].name,
+      "mc:CT_AlternateContent/mc:AlternateContent"
+    );
+    assert_eq!(workbook.children[0].property_name, "mc_alternate_content");
+    assert!(workbook.children[0].optional);
+    assert_eq!(
+      workbook.children[1].name,
+      "x15ac:CT_AbsolutePath/x15ac:absPath"
+    );
+  }
+
+  #[test]
+  fn expands_mc_alternate_content_shorthand_before_choice_target() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Body".to_string(),
+        children: vec![SchemaTypeChild {
+          name: String::new(),
+          property_name: String::new(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Sequence,
+          optional: false,
+          repeated: false,
+          initial_version: String::new(),
+          children: vec![
+            anonymous_choice(vec![leaf("w:CT_P/w:p"), leaf("w:CT_Tbl/w:tbl")]),
+            leaf("w:CT_SectPr/w:sectPr"),
+          ],
+        }],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Body".to_string(),
+          mc_alternate_content_insert_before: vec!["w:CT_P/w:p".to_string()],
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            name: String::new(),
+            property_name: "eg_block_level_elts".to_string(),
+            optional: false,
+            repeated: None,
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let body = &schemas[0].types[0];
+    assert_eq!(body.children.len(), 1);
+    assert_eq!(body.children[0].kind, SchemaTypeChildKind::Sequence);
+    assert_eq!(body.children[0].children.len(), 3);
+    assert_eq!(
+      body.children[0].children[0].name,
+      "mc:CT_AlternateContent/mc:AlternateContent"
+    );
+    assert_eq!(
+      body.children[0].children[1].property_name,
+      "eg_block_level_elts"
+    );
+    assert_eq!(body.children[0].children[2].name, "w:CT_SectPr/w:sectPr");
   }
 
   #[test]

@@ -150,14 +150,10 @@
     },
     {
       "ClassName": "Body",
+      "McAlternateContentInsertBefore": [
+        "w:CT_P/w:p"
+      ],
       "Children": [
-        {
-          "Name": "mc:CT_AlternateContent/mc:AlternateContent",
-          "PropertyName": "mc_alternate_content",
-          "Kind": "Child",
-          "Optional": true,
-          "InsertBefore": "w:CT_P/w:p"
-        },
         {
           "Kind": "Choice",
           "PropertyName": "eg_block_level_elts"
@@ -166,14 +162,10 @@
     },
     {
       "ClassName": "BodyType",
+      "McAlternateContentInsertBefore": [
+        "w:CT_P/w:p"
+      ],
       "Children": [
-        {
-          "Name": "mc:CT_AlternateContent/mc:AlternateContent",
-          "PropertyName": "mc_alternate_content",
-          "Kind": "Child",
-          "Optional": true,
-          "InsertBefore": "w:CT_P/w:p"
-        },
         {
           "Kind": "Choice",
           "PropertyName": "eg_block_level_elts"
@@ -470,14 +462,8 @@
     },
     {
       "ClassName": "Run",
-      "Children": [
-        {
-          "Name": "mc:CT_AlternateContent/mc:AlternateContent",
-          "PropertyName": "mc_alternate_content",
-          "Kind": "Child",
-          "Optional": true,
-          "InsertBefore": "w:CT_Drawing/w:drawing"
-        }
+      "McAlternateContentInsertBefore": [
+        "w:CT_Drawing/w:drawing"
       ]
     },
     {

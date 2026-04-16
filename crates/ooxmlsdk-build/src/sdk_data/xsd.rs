@@ -35,7 +35,6 @@ pub(crate) struct ParsedComplexType {
   pub attributes: Vec<ParsedAttribute>,
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Default)]
 pub(crate) struct ParsedChildElement {
   pub q_name: String,
@@ -44,7 +43,6 @@ pub(crate) struct ParsedChildElement {
   pub complex_type: Option<ParsedComplexType>,
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Default)]
 pub(crate) struct ParsedAttribute {
   pub field: String,

@@ -3006,7 +3006,6 @@ fn common_choice_version_ir<'a>(container_version: &'a str, variant_versions: &[
   }
 }
 
-#[allow(dead_code)]
 fn build_attr_validator_decls(
   attr: &SchemaTypeAttribute,
   context: &CodegenContext<'_>,
@@ -3042,7 +3041,6 @@ fn build_attr_validator_decls(
     .collect()
 }
 
-#[allow(dead_code)]
 fn build_validator_decls(
   source_id: u32,
   validator: &SchemaTypeAttributeValidator,
@@ -3113,7 +3111,6 @@ fn build_validator_decls(
   }
 }
 
-#[allow(dead_code)]
 fn build_string_validator_kinds(validator: &SchemaTypeAttributeValidator) -> Vec<ValidatorKind> {
   let mut kinds = Vec::new();
 
@@ -3175,7 +3172,6 @@ fn build_string_validator_kinds(validator: &SchemaTypeAttributeValidator) -> Vec
   kinds
 }
 
-#[allow(dead_code)]
 fn build_number_validator_kinds(validator: &SchemaTypeAttributeValidator) -> Vec<ValidatorKind> {
   let mut kinds = Vec::new();
   let min_inclusive = validator

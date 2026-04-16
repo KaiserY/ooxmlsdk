@@ -503,16 +503,18 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     );
   }
 
-  #[allow(unused_mut)]
-  let mut part_validate_stmts = child_validate_stmts;
-  if has_root_element {
+  let part_validate_stmts = if has_root_element {
+    let mut part_validate_stmts = child_validate_stmts;
     part_validate_stmts.insert(
       0,
       quote! {
         crate::validator::SdkValidator::validate(&self.root_element)?;
       },
     );
-  }
+    part_validate_stmts
+  } else {
+    child_validate_stmts
+  };
 
   Ok(quote! {
     impl crate::sdk::SdkPart for #ident {}

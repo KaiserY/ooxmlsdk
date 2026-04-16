@@ -11,7 +11,12 @@ use ooxmlsdk::parts::{
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   AltChunk, Body, BodyChoice, CommentChoice, Document, Hyperlink, HyperlinkChoice, Paragraph,
-  ParagraphChoice, Run, RunChoice, SdtPropertiesChoice,
+  ParagraphChoice, ParagraphChoice2Choice, ParagraphChoice2Choice1Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice, ParagraphChoice2Choice1RunLevelEltsChoice1Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice,
+  ParagraphPContentBaseChoice, Run, RunChoice, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -145,10 +150,10 @@ fn body_paragraph_count(body: &Body) -> usize {
 }
 
 fn first_hyperlink(paragraph: &Paragraph) -> Option<&Hyperlink> {
-  paragraph.eg_p_content.iter().find_map(|child| match child {
-    ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
-    _ => None,
-  })
+  paragraph
+    .eg_p_content
+    .iter()
+    .find_map(paragraph_choice_hyperlink)
 }
 
 fn paragraph_bookmark_start_count(
@@ -157,7 +162,7 @@ fn paragraph_bookmark_start_count(
   paragraph
     .eg_p_content
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WBookmarkStart(_)))
+    .filter(|child| paragraph_choice_has_bookmark_start(child))
     .count()
 }
 
@@ -167,7 +172,7 @@ fn paragraph_bookmark_end_count(
   paragraph
     .eg_p_content
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WBookmarkEnd(_)))
+    .filter(|child| paragraph_choice_has_bookmark_end(child))
     .count()
 }
 
@@ -177,7 +182,7 @@ fn paragraph_comment_range_start_count(
   paragraph
     .eg_p_content
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WCommentRangeStart(_)))
+    .filter(|child| paragraph_choice_has_comment_range_start(child))
     .count()
 }
 
@@ -187,7 +192,7 @@ fn paragraph_comment_range_end_count(
   paragraph
     .eg_p_content
     .iter()
-    .filter(|child| matches!(child, ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ParagraphChoice::WCommentRangeEnd(_)))
+    .filter(|child| paragraph_choice_has_comment_range_end(child))
     .count()
 }
 
@@ -197,10 +202,7 @@ fn paragraph_comment_reference_count(
   paragraph
     .eg_p_content
     .iter()
-    .filter_map(|child| match child {
-      ParagraphChoice::WR(run) => Some(run.as_ref()),
-      _ => None,
-    })
+    .filter_map(paragraph_choice_run)
     .map(|run| {
       run
         .run_choice
@@ -212,13 +214,16 @@ fn paragraph_comment_reference_count(
 }
 
 fn first_paragraph_text(paragraph: &Paragraph) -> Option<&str> {
-  paragraph.eg_p_content.iter().find_map(|child| match child {
-    ParagraphChoice::WR(run) => run.run_choice.iter().find_map(|run_child| match run_child {
-      RunChoice::WT(text) => text.xml_content.as_deref(),
+  paragraph
+    .eg_p_content
+    .iter()
+    .find_map(|child| match paragraph_choice_run(child) {
+      Some(run) => run.run_choice.iter().find_map(|run_child| match run_child {
+        RunChoice::WT(text) => text.xml_content.as_deref(),
+        _ => None,
+      }),
       _ => None,
-    }),
-    _ => None,
-  })
+    })
 }
 
 fn append_run_text(run: &Run, out: &mut String) {
@@ -235,20 +240,116 @@ fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
   for child in &paragraph.eg_p_content {
-    match child {
-      ParagraphChoice::WR(run) => append_run_text(run, &mut text),
-      ParagraphChoice::WHyperlink(hyperlink) => {
-        for hyperlink_child in &hyperlink.eg_p_content {
-          if let HyperlinkChoice::WR(run) = hyperlink_child {
-            append_run_text(run.as_ref(), &mut text);
-          }
+    if let Some(run) = paragraph_choice_run(child) {
+      append_run_text(run, &mut text);
+    }
+
+    if let Some(hyperlink) = paragraph_choice_hyperlink(child) {
+      for hyperlink_child in &hyperlink.eg_p_content {
+        if let HyperlinkChoice::WR(run) = hyperlink_child {
+          append_run_text(run.as_ref(), &mut text);
         }
       }
-      _ => {}
     }
   }
 
   text
+}
+
+fn paragraph_choice_run(choice: &ParagraphChoice) -> Option<&Run> {
+  match choice {
+    ParagraphChoice::Choice2(choice) => match choice.as_ref() {
+      ParagraphChoice2Choice::WR(run) => Some(run.as_ref()),
+      _ => None,
+    },
+    _ => None,
+  }
+}
+
+fn paragraph_choice_hyperlink(choice: &ParagraphChoice) -> Option<&Hyperlink> {
+  match choice {
+    ParagraphChoice::EgPContentBase(choice) => match choice.as_ref() {
+      ParagraphPContentBaseChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
+      _ => None,
+    },
+    _ => None,
+  }
+}
+
+fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
+  paragraph_choice_has_range_markup(choice, |choice| {
+    matches!(
+      choice,
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WBookmarkStart(_)
+    )
+  })
+}
+
+fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
+  paragraph_choice_has_range_markup(choice, |choice| {
+    matches!(
+      choice,
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WBookmarkEnd(_)
+    )
+  })
+}
+
+fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
+  paragraph_choice_has_range_markup(choice, |choice| {
+    matches!(
+      choice,
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WCommentRangeStart(_)
+    )
+  })
+}
+
+fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
+  paragraph_choice_has_range_markup(choice, |choice| {
+    matches!(
+      choice,
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WCommentRangeEnd(_)
+    )
+  })
+}
+
+fn paragraph_choice_has_range_markup(
+  choice: &ParagraphChoice,
+  predicate: impl Fn(
+    &ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice,
+  ) -> bool,
+) -> bool {
+  let ParagraphChoice::Choice2(choice) = choice else {
+    return false;
+  };
+  let ParagraphChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return false;
+  };
+  let ParagraphChoice2Choice1Choice::EgRunLevelElts(choice) = choice.as_ref() else {
+    return false;
+  };
+  let ParagraphChoice2Choice1RunLevelEltsChoice::Choice1(choice) = choice.as_ref() else {
+    return false;
+  };
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice::Choice1(choice) = choice.as_ref() else {
+    return false;
+  };
+  #[cfg(feature = "microsoft365")]
+  let choice = match choice.as_ref() {
+    ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice::EgRangeMarkupElements(choice) => {
+      choice
+    }
+    _ => return false,
+  };
+  #[cfg(not(feature = "microsoft365"))]
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice::EgRangeMarkupElements(choice) =
+    choice.as_ref();
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice::Choice1(choice) =
+    choice.as_ref()
+  else {
+    return false;
+  };
+
+  predicate(choice.as_ref())
 }
 
 fn comment_text(
@@ -717,7 +818,7 @@ fn open_hyperlink_docx_asset_from_openxml_sdk() {
         if paragraph
           .eg_p_content
           .iter()
-          .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
+          .any(|choice| paragraph_choice_hyperlink(choice).is_some()) =>
       {
         Some(paragraph.as_ref())
       }
@@ -2187,7 +2288,7 @@ fn round_trip_hyperlink_docx_asset_from_openxml_sdk() {
         if paragraph
           .eg_p_content
           .iter()
-          .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
+          .any(|choice| paragraph_choice_hyperlink(choice).is_some()) =>
       {
         Some(paragraph.as_ref())
       }
@@ -2203,7 +2304,7 @@ fn round_trip_hyperlink_docx_asset_from_openxml_sdk() {
         if paragraph
           .eg_p_content
           .iter()
-          .any(|choice| matches!(choice, ParagraphChoice::WHyperlink(_))) =>
+          .any(|choice| paragraph_choice_hyperlink(choice).is_some()) =>
       {
         Some(paragraph.as_ref())
       }

@@ -70,7 +70,13 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             .map(|child| (child.name.as_str(), child))
             .collect();
           let mut children = Vec::new();
-          if composite_kind == SchemaTypeCompositeKind::OneChoice {
+          if ty.name == "w:CT_P/w:p" {
+            children.extend(gen_hardcoded_paragraph_children(
+              ty,
+              &raw_child_map,
+              &type_map,
+            ));
+          } else if composite_kind == SchemaTypeCompositeKind::OneChoice {
             children.extend(gen_one_choice_children(ty, &raw_child_map, &type_map));
           } else if ty.particle.kind == "All" {
             children.extend(ty.children.iter().map(|child| SchemaTypeChild {
@@ -228,6 +234,505 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .collect();
 
   schemas
+}
+
+fn gen_hardcoded_paragraph_children(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> Vec<SchemaTypeChild> {
+  let paragraph_properties = hardcoded_schema_child(
+    schema_type,
+    raw_child_map,
+    type_map,
+    "w:CT_PPr/w:pPr",
+    true,
+    false,
+    "",
+  );
+
+  let eg_range_markup_elements = SchemaTypeChild {
+    name: String::new(),
+    property_name: "eg_range_markup_elements".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![
+      SchemaTypeChild {
+        name: String::new(),
+        property_name: "choice1".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Choice,
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: [
+          "w:CT_Bookmark/w:bookmarkStart",
+          "w:CT_MarkupRange/w:bookmarkEnd",
+          "w:CT_MarkupRange/w:commentRangeStart",
+          "w:CT_MarkupRange/w:commentRangeEnd",
+        ]
+        .into_iter()
+        .map(|name| {
+          hardcoded_schema_child(schema_type, raw_child_map, type_map, name, false, false, "")
+        })
+        .collect(),
+      },
+      SchemaTypeChild {
+        name: String::new(),
+        property_name: "choice2".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Choice,
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: [
+          "w:CT_MoveBookmark/w:moveFromRangeStart",
+          "w:CT_MarkupRange/w:moveFromRangeEnd",
+          "w:CT_MoveBookmark/w:moveToRangeStart",
+          "w:CT_MarkupRange/w:moveToRangeEnd",
+          "w:CT_TrackChange/w:customXmlInsRangeStart",
+          "w:CT_Markup/w:customXmlInsRangeEnd",
+          "w:CT_TrackChange/w:customXmlDelRangeStart",
+          "w:CT_Markup/w:customXmlDelRangeEnd",
+          "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+          "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+          "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+          "w:CT_Markup/w:customXmlMoveToRangeEnd",
+        ]
+        .into_iter()
+        .map(|name| {
+          hardcoded_schema_child(schema_type, raw_child_map, type_map, name, false, false, "")
+        })
+        .collect(),
+      },
+    ],
+  };
+
+  let run_level_range_choice = SchemaTypeChild {
+    name: String::new(),
+    property_name: "choice1".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![
+      eg_range_markup_elements,
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+        false,
+        false,
+        "Office2010",
+      ),
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+        false,
+        false,
+        "Office2010",
+      ),
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+        false,
+        false,
+        "Office2010",
+      ),
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+        false,
+        false,
+        "Office2010",
+      ),
+    ],
+  };
+
+  let eg_omath_math_elements = SchemaTypeChild {
+    name: String::new(),
+    property_name: "eg_omath_math_elements".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![
+      "m:CT_Acc/m:acc",
+      "m:CT_Bar/m:bar",
+      "m:CT_Box/m:box",
+      "m:CT_BorderBox/m:borderBox",
+      "m:CT_D/m:d",
+      "m:CT_EqArr/m:eqArr",
+      "m:CT_F/m:f",
+      "m:CT_Func/m:func",
+      "m:CT_GroupChr/m:groupChr",
+      "m:CT_LimLow/m:limLow",
+      "m:CT_LimUpp/m:limUpp",
+      "m:CT_M/m:m",
+      "m:CT_Nary/m:nary",
+      "m:CT_Phant/m:phant",
+      "m:CT_Rad/m:rad",
+      "m:CT_SPre/m:sPre",
+      "m:CT_SSub/m:sSub",
+      "m:CT_SSubSup/m:sSubSup",
+      "m:CT_SSup/m:sSup",
+    ]
+    .into_iter()
+    .map(|name| {
+      hardcoded_schema_child(schema_type, raw_child_map, type_map, name, false, false, "")
+    })
+    .chain(std::iter::once(SchemaTypeChild {
+      name: String::new(),
+      property_name: "choice1".to_string(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: false,
+      repeated: false,
+      initial_version: String::new(),
+      children: vec![hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "m:CT_R/m:r",
+        false,
+        false,
+        "",
+      )],
+    }))
+    .collect(),
+  };
+
+  let eg_math_content = SchemaTypeChild {
+    name: String::new(),
+    property_name: "eg_math_content".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "m:CT_OMathPara/m:oMathPara",
+        false,
+        false,
+        "",
+      ),
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "m:CT_OMath/m:oMath",
+        false,
+        false,
+        "",
+      ),
+    ],
+  };
+
+  let math_content_choice = SchemaTypeChild {
+    name: String::new(),
+    property_name: "choice2".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![eg_math_content, eg_omath_math_elements],
+  };
+
+  let eg_run_level_elts = SchemaTypeChild {
+    name: String::new(),
+    property_name: "eg_run_level_elts".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![
+      SchemaTypeChild {
+        name: String::new(),
+        property_name: "choice1".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Choice,
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: vec![
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_ProofErr/w:proofErr",
+            false,
+            false,
+            "",
+          ),
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_PermStart/w:permStart",
+            false,
+            false,
+            "",
+          ),
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_Perm/w:permEnd",
+            false,
+            false,
+            "",
+          ),
+          run_level_range_choice,
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_RunTrackChange/w:ins",
+            false,
+            false,
+            "",
+          ),
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_RunTrackChange/w:del",
+            false,
+            false,
+            "",
+          ),
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_RunTrackChange/w:moveFrom",
+            false,
+            false,
+            "",
+          ),
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_RunTrackChange/w:moveTo",
+            false,
+            false,
+            "",
+          ),
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_ContentPart/w:contentPart",
+            false,
+            false,
+            "Office2010",
+          ),
+          SchemaTypeChild {
+            name: String::new(),
+            property_name: "sequence1".to_string(),
+            property_comments: String::new(),
+            kind: SchemaTypeChildKind::Sequence,
+            optional: false,
+            repeated: false,
+            initial_version: "Office2010".to_string(),
+            children: vec![
+              hardcoded_schema_child(
+                schema_type,
+                raw_child_map,
+                type_map,
+                "w:CT_RunTrackChange/w14:conflictIns",
+                false,
+                false,
+                "Office2010",
+              ),
+              hardcoded_schema_child(
+                schema_type,
+                raw_child_map,
+                type_map,
+                "w:CT_RunTrackChange/w14:conflictDel",
+                false,
+                false,
+                "Office2010",
+              ),
+            ],
+          },
+        ],
+      },
+      math_content_choice,
+    ],
+  };
+
+  let complex_run_content_choice = SchemaTypeChild {
+    name: String::new(),
+    property_name: "choice2".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: vec![
+      SchemaTypeChild {
+        name: String::new(),
+        property_name: "choice1".to_string(),
+        property_comments: String::new(),
+        kind: SchemaTypeChildKind::Choice,
+        optional: false,
+        repeated: false,
+        initial_version: String::new(),
+        children: vec![
+          hardcoded_schema_child(
+            schema_type,
+            raw_child_map,
+            type_map,
+            "w:CT_SdtRun/w:sdt",
+            false,
+            false,
+            "",
+          ),
+          eg_run_level_elts,
+        ],
+      },
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_R/w:r",
+        false,
+        false,
+        "",
+      ),
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_BdoContentRun/w:bdo",
+        false,
+        false,
+        "Office2010",
+      ),
+      hardcoded_schema_child(
+        schema_type,
+        raw_child_map,
+        type_map,
+        "w:CT_DirContentRun/w:dir",
+        false,
+        false,
+        "Office2010",
+      ),
+    ],
+  };
+
+  let eg_p_content_children = vec![
+    SchemaTypeChild {
+      name: String::new(),
+      property_name: "eg_p_content_base".to_string(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: false,
+      repeated: false,
+      initial_version: String::new(),
+      children: vec![
+        hardcoded_schema_child(
+          schema_type,
+          raw_child_map,
+          type_map,
+          "w:CT_CustomXmlRun/w:customXml",
+          false,
+          false,
+          "",
+        ),
+        hardcoded_schema_child(
+          schema_type,
+          raw_child_map,
+          type_map,
+          "w:CT_SimpleField/w:fldSimple",
+          false,
+          false,
+          "",
+        ),
+        hardcoded_schema_child(
+          schema_type,
+          raw_child_map,
+          type_map,
+          "w:CT_Hyperlink/w:hyperlink",
+          false,
+          false,
+          "",
+        ),
+      ],
+    },
+    complex_run_content_choice,
+    hardcoded_schema_child(
+      schema_type,
+      raw_child_map,
+      type_map,
+      "w:CT_Rel/w:subDoc",
+      false,
+      false,
+      "",
+    ),
+  ];
+
+  vec![
+    paragraph_properties,
+    SchemaTypeChild {
+      name: String::new(),
+      property_name: "eg_p_content".to_string(),
+      property_comments: String::new(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: false,
+      repeated: true,
+      initial_version: String::new(),
+      children: eg_p_content_children,
+    },
+  ]
+}
+
+fn hardcoded_schema_child(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  raw_child_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  name: &str,
+  optional: bool,
+  repeated: bool,
+  initial_version: &str,
+) -> SchemaTypeChild {
+  let raw_child = raw_child_map.get(name).unwrap_or_else(|| {
+    panic!(
+      "missing hardcoded child {name} for schema {}",
+      schema_type.name
+    )
+  });
+
+  SchemaTypeChild {
+    name: raw_child.name.clone(),
+    property_name: raw_child.property_name.clone(),
+    property_comments: raw_child.property_comments.clone(),
+    kind: resolve_child_kind(name, type_map),
+    optional,
+    repeated,
+    initial_version: initial_version.to_string(),
+    children: Vec::new(),
+  }
 }
 
 fn gen_one_choice_children(

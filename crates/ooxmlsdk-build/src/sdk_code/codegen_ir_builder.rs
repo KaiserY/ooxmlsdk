@@ -19,7 +19,7 @@ use crate::sdk_code::schemas::{
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute, SchemaTypeAttributeValidator,
-  SchemaTypeXmlHeader,
+  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeXmlHeader,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::escape_snake_case;
@@ -220,8 +220,12 @@ fn build_type_decl(
     .iter()
     .map(|attr| build_attr_member_decl(attr, schema, context))
     .collect::<Result<Vec<_>>>()?;
-  let source_content_model = build_content_model_decl(schema_type);
-  let extra_types = if has_mixed_choice_children_pattern(schema_type) {
+  let mut source_content_model = build_content_model_decl(schema_type);
+  let extra_types = if should_build_recursive_paragraph_choices(schema_type) {
+    source_content_model = Some(ContentModelDecl::OneSequenceStructured);
+    build_recursive_paragraph_choice_members(schema_type, schema, context, &mut members)
+      .map_err(|err| format!("recursive paragraph choices: {err}"))?
+  } else if has_mixed_choice_children_pattern(schema_type) {
     build_mixed_choice_children_members(schema_type, schema, context, &mut members)
       .map_err(|err| format!("mixed choice children: {err}"))?
   } else if is_one_sequence_flatten(schema_type) {
@@ -313,6 +317,515 @@ fn build_type_decl(
     },
     extra_types,
   ))
+}
+
+fn should_build_recursive_paragraph_choices(schema_type: &SchemaType) -> bool {
+  schema_type.name == "w:CT_P/w:p"
+    && schema_type.children.iter().any(|child| {
+      child.kind == SchemaTypeChildKind::Choice
+        && child.property_name == "eg_p_content"
+        && child
+          .children
+          .iter()
+          .any(|nested| nested.kind == SchemaTypeChildKind::Choice)
+    })
+}
+
+fn build_recursive_paragraph_choice_members(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  members: &mut Vec<MemberDecl>,
+) -> Result<Vec<TypeDecl>> {
+  members.extend(build_direct_child_member_decls(
+    schema_type,
+    schema,
+    context,
+  )?);
+
+  let choice_child = schema_type
+    .children
+    .iter()
+    .find(|child| {
+      child.kind == SchemaTypeChildKind::Choice && child.property_name == "eg_p_content"
+    })
+    .ok_or_else(|| format!("{} missing eg_p_content choice", schema_type.name))?;
+
+  let field_name = one_sequence_choice_field_name(schema_type, 1, 0);
+  let enum_name = one_sequence_choice_enum_name(schema_type, 1, 0);
+  let mut extra_types = Vec::new();
+  let top_choice = build_recursive_choice_enum_decl(
+    schema_type,
+    schema,
+    context,
+    choice_child,
+    &enum_name,
+    &mut extra_types,
+  )?;
+  let leaf_versions = collect_choice_leaf_versions(choice_child, context);
+  let choice_version =
+    common_choice_version_ir(choice_child.initial_version.as_str(), &leaf_versions).to_string();
+
+  members.push(MemberDecl::Field(FieldDecl {
+    rust_name: field_name,
+    docs: build_recursive_choice_docs(choice_child),
+    version: choice_version,
+    wire: FieldWireDecl::Choice,
+    cardinality: if choice_child.repeated {
+      Cardinality::Many
+    } else if choice_child.optional {
+      Cardinality::Optional
+    } else {
+      Cardinality::One
+    },
+    type_ref: TypeRefDecl {
+      rust_type: enum_name,
+      module_path: None,
+    },
+    validators: Vec::new(),
+  }));
+  extra_types.push(top_choice);
+
+  Ok(extra_types)
+}
+
+fn build_recursive_choice_enum_decl(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  choice_child: &SchemaTypeChild,
+  enum_name: &str,
+  extra_types: &mut Vec<TypeDecl>,
+) -> Result<TypeDecl> {
+  let mut members = Vec::new();
+
+  for (index, child) in choice_child.children.iter().enumerate() {
+    members.push(build_recursive_choice_member_decl(
+      schema_type,
+      schema,
+      context,
+      enum_name,
+      child,
+      index,
+      extra_types,
+    )?);
+  }
+
+  disambiguate_choice_variant_names(&mut members);
+
+  Ok(TypeDecl {
+    rust_name: enum_name.to_string(),
+    xml_qname: None,
+    docs: build_recursive_choice_docs(choice_child),
+    version: schema_type.version.clone(),
+    is_abstract: false,
+    kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    xml_content: None,
+    support: SystemSupportDecl::default(),
+    members,
+  })
+}
+
+fn build_recursive_choice_member_decl(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  parent_enum_name: &str,
+  child: &SchemaTypeChild,
+  child_index: usize,
+  extra_types: &mut Vec<TypeDecl>,
+) -> Result<MemberDecl> {
+  if let Some(collapsed) = collapse_single_child_choice_wrapper(child) {
+    let mut member = build_recursive_choice_member_decl(
+      schema_type,
+      schema,
+      context,
+      parent_enum_name,
+      collapsed.child,
+      child_index,
+      extra_types,
+    )?;
+    apply_recursive_choice_member_version_override(&mut member, &collapsed.initial_version);
+    return Ok(member);
+  }
+
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      build_recursive_choice_leaf_variant_decl(schema_type, schema, context, child)
+    }
+    SchemaTypeChildKind::Sequence => build_recursive_choice_sequence_variant_decl(
+      schema_type,
+      schema,
+      context,
+      parent_enum_name,
+      child,
+      child_index,
+      extra_types,
+    ),
+    SchemaTypeChildKind::Choice => build_recursive_choice_nested_variant_decl(
+      schema_type,
+      schema,
+      context,
+      parent_enum_name,
+      child,
+      child_index,
+      extra_types,
+    ),
+  }
+}
+
+fn build_recursive_choice_leaf_variant_decl(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  child: &SchemaTypeChild,
+) -> Result<MemberDecl> {
+  let resolved_child = if child.kind == SchemaTypeChildKind::Any {
+    ResolvedOneSequenceChild {
+      name: "",
+      field_name: std::borrow::Cow::Borrowed(if child.property_name.is_empty() {
+        "unknown_xml"
+      } else {
+        child.property_name.as_str()
+      }),
+      property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
+        " _"
+      } else {
+        child.property_comments.as_str()
+      }),
+      version: child.initial_version.as_str(),
+      kind: child.kind,
+    }
+  } else {
+    context.resolve_one_sequence_child(schema_type, child.name.as_str())?
+  };
+
+  build_one_sequence_choice_variant_decl(&resolved_child, schema, context)
+}
+
+fn build_recursive_choice_sequence_variant_decl(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  parent_enum_name: &str,
+  child: &SchemaTypeChild,
+  child_index: usize,
+  extra_types: &mut Vec<TypeDecl>,
+) -> Result<MemberDecl> {
+  let sequence_leafs = collect_sequence_leaf_children(&child.children);
+  let struct_name = recursive_choice_sequence_struct_name(parent_enum_name, child, child_index);
+  let variant_name = recursive_choice_variant_name(child, child_index);
+  let property_comments = format!(
+    " Sequence of {}",
+    sequence_leafs
+      .iter()
+      .map(|field| field.name.split('/').nth(1).unwrap_or(field.name.as_str()))
+      .collect::<Vec<_>>()
+      .join(", ")
+  );
+  let sequence_variant = ResolvedOneSequenceSequenceVariant {
+    variant_name,
+    struct_name,
+    property_comments,
+    fields: sequence_leafs
+      .iter()
+      .map(|field| {
+        let resolved_child = context.resolve_one_sequence_child(schema_type, &field.name)?;
+        Ok(crate::sdk_code::schemas::ResolvedOneSequenceSequenceField {
+          child: resolved_child,
+          optional: field.optional,
+          repeated: field.repeated,
+          initial_version: field.initial_version.as_str(),
+        })
+      })
+      .collect::<Result<Vec<_>>>()?,
+  };
+
+  extra_types.push(build_structured_one_sequence_helper_struct_decl(
+    &sequence_variant,
+    schema,
+    context,
+  )?);
+
+  build_structured_one_sequence_sequence_variant_decl(&sequence_variant)
+}
+
+fn build_recursive_choice_nested_variant_decl(
+  schema_type: &SchemaType,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+  parent_enum_name: &str,
+  child: &SchemaTypeChild,
+  child_index: usize,
+  extra_types: &mut Vec<TypeDecl>,
+) -> Result<MemberDecl> {
+  let nested_enum_name = recursive_choice_nested_enum_name(parent_enum_name, child, child_index);
+  let nested_type = build_recursive_choice_enum_decl(
+    schema_type,
+    schema,
+    context,
+    child,
+    &nested_enum_name,
+    extra_types,
+  )?;
+  extra_types.push(nested_type);
+
+  let nested_qnames = collect_choice_leaf_qnames(child);
+  let nested_versions = collect_choice_leaf_versions(child, context);
+  let version =
+    common_choice_version_ir(child.initial_version.as_str(), &nested_versions).to_string();
+
+  Ok(MemberDecl::Variant(VariantDecl {
+    rust_name: recursive_choice_variant_name(child, child_index),
+    docs: build_recursive_choice_docs(child),
+    version,
+    wire: VariantWireDecl::Child {
+      qnames: nested_qnames,
+    },
+    payload: TypeRefDecl {
+      rust_type: nested_enum_name,
+      module_path: None,
+    },
+  }))
+}
+
+struct CollapsedRecursiveChoiceWrapper<'a> {
+  child: &'a SchemaTypeChild,
+  initial_version: String,
+}
+
+fn collapse_single_child_choice_wrapper<'a>(
+  child: &'a SchemaTypeChild,
+) -> Option<CollapsedRecursiveChoiceWrapper<'a>> {
+  if child.kind != SchemaTypeChildKind::Choice
+    || !is_generic_choice_wrapper_name(child.property_name.as_str())
+    || child.children.len() != 1
+  {
+    return None;
+  }
+
+  let mut initial_version = child.initial_version.clone();
+  let mut inner = &child.children[0];
+
+  while inner.kind == SchemaTypeChildKind::Choice
+    && is_generic_choice_wrapper_name(inner.property_name.as_str())
+    && inner.children.len() == 1
+  {
+    initial_version =
+      effective_version(initial_version.as_str(), inner.initial_version.as_str()).to_string();
+    inner = &inner.children[0];
+  }
+
+  initial_version =
+    effective_version(initial_version.as_str(), inner.initial_version.as_str()).to_string();
+
+  Some(CollapsedRecursiveChoiceWrapper {
+    child: inner,
+    initial_version,
+  })
+}
+
+fn is_generic_choice_wrapper_name(property_name: &str) -> bool {
+  property_name.is_empty()
+    || property_name
+      .strip_prefix("choice")
+      .is_some_and(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()))
+}
+
+fn apply_recursive_choice_member_version_override(member: &mut MemberDecl, initial_version: &str) {
+  if initial_version.is_empty() {
+    return;
+  }
+
+  let MemberDecl::Variant(variant) = member else {
+    return;
+  };
+  variant.version = effective_version(initial_version, variant.version.as_str()).to_string();
+}
+
+fn collect_choice_leaf_qnames(child: &SchemaTypeChild) -> Vec<String> {
+  let mut names = Vec::new();
+  collect_choice_leaf_qnames_inner(child, &mut names);
+  names
+}
+
+fn collect_choice_leaf_qnames_inner(child: &SchemaTypeChild, out: &mut Vec<String>) {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => {
+      if !child.name.is_empty() {
+        out.push(child.name.clone());
+      }
+    }
+    SchemaTypeChildKind::Any => {}
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      for nested in &child.children {
+        collect_choice_leaf_qnames_inner(nested, out);
+      }
+    }
+  }
+}
+
+fn collect_choice_leaf_versions<'a>(
+  child: &'a SchemaTypeChild,
+  context: &'a CodegenContext<'a>,
+) -> Vec<&'a str> {
+  let mut versions = Vec::new();
+  collect_choice_leaf_versions_inner(child, context, &mut versions);
+  versions
+}
+
+fn collect_choice_leaf_versions_inner<'a>(
+  child: &'a SchemaTypeChild,
+  context: &'a CodegenContext<'a>,
+  out: &mut Vec<&'a str>,
+) {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => {
+      if !child.initial_version.is_empty() {
+        out.push(child.initial_version.as_str());
+      } else if !child.name.is_empty()
+        && let Some(child_type) = context.type_by_name(child.name.as_str())
+      {
+        out.push(recursive_schema_item_version(child_type));
+      }
+    }
+    SchemaTypeChildKind::Any => {
+      if !child.initial_version.is_empty() {
+        out.push(child.initial_version.as_str());
+      }
+    }
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      for nested in &child.children {
+        collect_choice_leaf_versions_inner(nested, context, out);
+      }
+    }
+  }
+}
+
+fn recursive_schema_item_version(schema_type: &SchemaType) -> &str {
+  schema_type.version.as_deref().unwrap_or_default()
+}
+
+fn collect_sequence_leaf_children(children: &[SchemaTypeChild]) -> Vec<&SchemaTypeChild> {
+  let mut out = Vec::new();
+  collect_sequence_leaf_children_inner(children, &mut out);
+  out
+}
+
+fn collect_sequence_leaf_children_inner<'a>(
+  children: &'a [SchemaTypeChild],
+  out: &mut Vec<&'a SchemaTypeChild>,
+) {
+  for child in children {
+    match child.kind {
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+        out.push(child);
+      }
+      SchemaTypeChildKind::Sequence => collect_sequence_leaf_children_inner(&child.children, out),
+      SchemaTypeChildKind::Choice => {}
+    }
+  }
+}
+
+fn build_recursive_choice_docs(choice_child: &SchemaTypeChild) -> String {
+  format!(
+    "Choice of {}",
+    choice_child
+      .children
+      .iter()
+      .enumerate()
+      .map(|(index, child)| recursive_choice_display_name(child, index))
+      .collect::<Vec<_>>()
+      .join(", ")
+  )
+}
+
+fn recursive_choice_display_name(child: &SchemaTypeChild, child_index: usize) -> String {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child
+      .name
+      .split('/')
+      .nth(1)
+      .unwrap_or(child.name.as_str())
+      .to_string(),
+    SchemaTypeChildKind::Any => {
+      if child.property_name.is_empty() {
+        "any".to_string()
+      } else {
+        child.property_name.clone()
+      }
+    }
+    SchemaTypeChildKind::Choice => {
+      if child.property_name.is_empty() {
+        format!("choice{}", child_index + 1)
+      } else {
+        child.property_name.clone()
+      }
+    }
+    SchemaTypeChildKind::Sequence => {
+      if child.property_name.is_empty() {
+        format!("sequence{}", child_index + 1)
+      } else {
+        child.property_name.clone()
+      }
+    }
+  }
+}
+
+fn recursive_choice_variant_name(child: &SchemaTypeChild, child_index: usize) -> String {
+  match child.kind {
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      if child.property_name.is_empty() {
+        format!(
+          "{}{}",
+          match child.kind {
+            SchemaTypeChildKind::Choice => "Choice",
+            SchemaTypeChildKind::Sequence => "Sequence",
+            _ => unreachable!(),
+          },
+          child_index + 1
+        )
+      } else {
+        child.property_name.to_upper_camel_case()
+      }
+    }
+    _ => child_variant_rust_name(child.name.as_str()),
+  }
+}
+
+fn recursive_choice_nested_enum_name(
+  parent_enum_name: &str,
+  child: &SchemaTypeChild,
+  child_index: usize,
+) -> String {
+  let base = parent_enum_name.trim_end_matches("Choice");
+  let stem = if child.property_name.is_empty() {
+    format!("Choice{}", child_index + 1)
+  } else {
+    strip_group_prefix(child.property_name.as_str()).to_upper_camel_case()
+  };
+  format!("{base}{stem}Choice")
+}
+
+fn recursive_choice_sequence_struct_name(
+  parent_enum_name: &str,
+  child: &SchemaTypeChild,
+  child_index: usize,
+) -> String {
+  let base = parent_enum_name.trim_end_matches("Choice");
+  let stem = if child.property_name.is_empty() {
+    format!("Sequence{}", child_index + 1)
+  } else {
+    child.property_name.to_upper_camel_case()
+  };
+  format!("{base}{stem}")
+}
+
+fn strip_group_prefix(property_name: &str) -> &str {
+  property_name.strip_prefix("eg_").unwrap_or(property_name)
 }
 
 fn refine_content_model_decl(
@@ -3009,6 +3522,318 @@ mod tests {
         .count(),
       1
     );
+  }
+
+  #[test]
+  fn builds_recursive_paragraph_group_choices_into_codegen_ir() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "w".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "w:CT_PPr/w:pPr".to_string(),
+          class_name: "ParagraphProperties".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_R/w:r".to_string(),
+          class_name: "Run".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_SimpleField/w:fldSimple".to_string(),
+          class_name: "SimpleField".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_Hyperlink/w:hyperlink".to_string(),
+          class_name: "Hyperlink".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_Rel/w:subDoc".to_string(),
+          class_name: "SubDocumentReference".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_ProofErr/w:proofErr".to_string(),
+          class_name: "ProofError".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_Bookmark/w:bookmarkStart".to_string(),
+          class_name: "BookmarkStart".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_RunTrackChange/w14:conflictIns".to_string(),
+          class_name: "RunConflictInsertion".to_string(),
+          version: Some("Office2010".to_string()),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_RunTrackChange/w14:conflictDel".to_string(),
+          class_name: "RunConflictDeletion".to_string(),
+          version: Some("Office2010".to_string()),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "m:CT_OMathPara/m:oMathPara".to_string(),
+          class_name: "MathParagraph".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "m:CT_R/m:r".to_string(),
+          class_name: "MathRun".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "w:CT_P/w:p".to_string(),
+          class_name: "Paragraph".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![
+            SchemaTypeChild {
+              name: "w:CT_PPr/w:pPr".to_string(),
+              property_name: "paragraph_properties".to_string(),
+              kind: SchemaTypeChildKind::Child,
+              optional: true,
+              ..Default::default()
+            },
+            SchemaTypeChild {
+              kind: SchemaTypeChildKind::Choice,
+              property_name: "eg_p_content".to_string(),
+              repeated: true,
+              children: vec![
+                SchemaTypeChild {
+                  kind: SchemaTypeChildKind::Choice,
+                  property_name: "eg_content_run_content".to_string(),
+                  children: vec![
+                    SchemaTypeChild {
+                      kind: SchemaTypeChildKind::Choice,
+                      property_name: "eg_run_level_elts".to_string(),
+                      children: vec![
+                        SchemaTypeChild {
+                          name: "w:CT_ProofErr/w:proofErr".to_string(),
+                          kind: SchemaTypeChildKind::Child,
+                          ..Default::default()
+                        },
+                        SchemaTypeChild {
+                          kind: SchemaTypeChildKind::Choice,
+                          property_name: "eg_range_markup_elements".to_string(),
+                          children: vec![SchemaTypeChild {
+                            name: "w:CT_Bookmark/w:bookmarkStart".to_string(),
+                            kind: SchemaTypeChildKind::Child,
+                            ..Default::default()
+                          }],
+                          ..Default::default()
+                        },
+                        SchemaTypeChild {
+                          kind: SchemaTypeChildKind::Sequence,
+                          property_name: "sequence1".to_string(),
+                          initial_version: "Office2010".to_string(),
+                          children: vec![
+                            SchemaTypeChild {
+                              name: "w:CT_RunTrackChange/w14:conflictIns".to_string(),
+                              kind: SchemaTypeChildKind::Child,
+                              initial_version: "Office2010".to_string(),
+                              ..Default::default()
+                            },
+                            SchemaTypeChild {
+                              name: "w:CT_RunTrackChange/w14:conflictDel".to_string(),
+                              kind: SchemaTypeChildKind::Child,
+                              initial_version: "Office2010".to_string(),
+                              ..Default::default()
+                            },
+                          ],
+                          ..Default::default()
+                        },
+                        SchemaTypeChild {
+                          kind: SchemaTypeChildKind::Choice,
+                          property_name: "eg_math_content".to_string(),
+                          children: vec![
+                            SchemaTypeChild {
+                              name: "m:CT_OMathPara/m:oMathPara".to_string(),
+                              kind: SchemaTypeChildKind::Child,
+                              ..Default::default()
+                            },
+                            SchemaTypeChild {
+                              kind: SchemaTypeChildKind::Choice,
+                              property_name: "eg_omath_math_elements".to_string(),
+                              children: vec![SchemaTypeChild {
+                                kind: SchemaTypeChildKind::Choice,
+                                property_name: "choice1".to_string(),
+                                children: vec![SchemaTypeChild {
+                                  name: "m:CT_R/m:r".to_string(),
+                                  kind: SchemaTypeChildKind::Child,
+                                  ..Default::default()
+                                }],
+                                ..Default::default()
+                              }],
+                              ..Default::default()
+                            },
+                          ],
+                          ..Default::default()
+                        },
+                      ],
+                      ..Default::default()
+                    },
+                    SchemaTypeChild {
+                      name: "w:CT_R/w:r".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      ..Default::default()
+                    },
+                  ],
+                  ..Default::default()
+                },
+                SchemaTypeChild {
+                  name: "w:CT_SimpleField/w:fldSimple".to_string(),
+                  kind: SchemaTypeChildKind::Child,
+                  ..Default::default()
+                },
+                SchemaTypeChild {
+                  name: "w:CT_Hyperlink/w:hyperlink".to_string(),
+                  kind: SchemaTypeChildKind::Child,
+                  ..Default::default()
+                },
+                SchemaTypeChild {
+                  name: "w:CT_Rel/w:subDoc".to_string(),
+                  kind: SchemaTypeChildKind::Child,
+                  ..Default::default()
+                },
+              ],
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let paragraph = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "Paragraph")
+      .unwrap();
+    assert_eq!(
+      paragraph.content_model,
+      Some(ContentModelDecl::OneSequenceStructured)
+    );
+    assert!(paragraph.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Field(field)
+        if field.rust_name == "paragraph_properties"
+          && matches!(field.wire, FieldWireDecl::Child { .. })
+          && field.cardinality == Cardinality::Optional
+    )));
+    assert!(paragraph.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Field(field)
+        if field.rust_name == "eg_p_content"
+          && matches!(field.wire, FieldWireDecl::Choice)
+          && field.cardinality == Cardinality::Many
+          && field.type_ref.rust_type == "ParagraphChoice"
+    )));
+
+    let paragraph_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "ParagraphChoice")
+      .unwrap();
+    assert!(paragraph_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "EgContentRunContent"
+          && variant.payload.rust_type == "ParagraphContentRunContentChoice"
+    )));
+
+    let content_run_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "ParagraphContentRunContentChoice")
+      .unwrap();
+    assert!(content_run_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "EgRunLevelElts"
+          && variant.payload.rust_type == "ParagraphContentRunContentRunLevelEltsChoice"
+    )));
+
+    let run_level_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "ParagraphContentRunContentRunLevelEltsChoice")
+      .unwrap();
+    assert!(run_level_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "EgRangeMarkupElements"
+          && variant.payload.rust_type
+            == "ParagraphContentRunContentRunLevelEltsRangeMarkupElementsChoice"
+    )));
+    assert!(run_level_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "Sequence1"
+          && variant.payload.rust_type == "ParagraphContentRunContentRunLevelEltsSequence1"
+    )));
+
+    let conflict_sequence = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "ParagraphContentRunContentRunLevelEltsSequence1")
+      .unwrap();
+    let conflict_fields = conflict_sequence
+      .members
+      .iter()
+      .filter_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        MemberDecl::Variant(_) => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(conflict_fields.len(), 2);
+    assert!(
+      conflict_fields
+        .iter()
+        .all(|field| field.cardinality == Cardinality::One)
+    );
+
+    assert!(run_level_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "EgMathContent"
+          && variant.payload.rust_type
+            == "ParagraphContentRunContentRunLevelEltsMathContentChoice"
+    )));
+
+    let omath_math_elements_choice = ir
+      .types
+      .iter()
+      .find(|ty| {
+        ty.rust_name == "ParagraphContentRunContentRunLevelEltsMathContentOmathMathElementsChoice"
+      })
+      .unwrap();
+    assert!(
+      omath_math_elements_choice
+        .members
+        .iter()
+        .any(|member| matches!(
+          member,
+          MemberDecl::Variant(variant)
+            if variant.rust_name == "MR"
+              && variant.payload.rust_type == "MathRun"
+        ))
+    );
+    assert!(ir.types.iter().all(|ty| {
+      ty.rust_name
+        != "ParagraphContentRunContentRunLevelEltsMathContentOmathMathElementsChoice1Choice"
+    }));
   }
 
   #[test]

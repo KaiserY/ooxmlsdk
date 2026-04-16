@@ -813,6 +813,74 @@ mod tests {
   }
 
   #[test]
+  fn structures_paragraph_like_prefix_sequence_and_conflict_sequence() {
+    let schema_type = one_sequence_schema(vec![
+      sequence(
+        vec![child("w:CT_PPr/w:pPr", false, false, "")],
+        true,
+        false,
+        "",
+      ),
+      choice(
+        vec![
+          child("w:CT_R/w:r", false, false, ""),
+          sequence(
+            vec![
+              child(
+                "w:CT_RunTrackChange/w14:conflictIns",
+                false,
+                false,
+                "Office2010",
+              ),
+              child(
+                "w:CT_RunTrackChange/w14:conflictDel",
+                false,
+                false,
+                "Office2010",
+              ),
+            ],
+            false,
+            false,
+            "Office2010",
+          ),
+          child("w:CT_Rel/w:subDoc", false, false, ""),
+        ],
+        false,
+        true,
+        "",
+      ),
+    ]);
+
+    assert!(!is_one_sequence_flatten(&schema_type));
+    assert!(is_one_sequence_structurable(&schema_type));
+
+    let structured = structure_one_sequence_particles(&schema_type);
+    assert_eq!(structured.len(), 2);
+    let StructuredParticleKind::Leaf(prefix_leaf) = &structured[0].kind else {
+      panic!("expected prefix leaf");
+    };
+    assert_eq!(prefix_leaf.name, "w:CT_PPr/w:pPr");
+    let StructuredParticleKind::Choice(content_choice) = &structured[1].kind else {
+      panic!("expected paragraph content choice");
+    };
+    assert_eq!(content_choice.variants.len(), 3);
+    let StructuredChoiceVariant::Sequence(conflict_sequence) = &content_choice.variants[1] else {
+      panic!("expected conflict sequence variant");
+    };
+    assert_eq!(conflict_sequence.len(), 2);
+    let StructuredParticleKind::Leaf(first) = &conflict_sequence[0].kind else {
+      panic!("expected first conflict leaf");
+    };
+    assert_eq!(first.name, "w:CT_RunTrackChange/w14:conflictIns");
+    assert_eq!(conflict_sequence[0].initial_version, "Office2010");
+    let StructuredParticleKind::Leaf(second) = &conflict_sequence[1].kind else {
+      panic!("expected second conflict leaf");
+    };
+    assert_eq!(second.name, "w:CT_RunTrackChange/w14:conflictDel");
+    assert_eq!(conflict_sequence[1].initial_version, "Office2010");
+  }
+
+  #[test]
   fn one_choice_composite_kind_is_source_metadata_only() {
     let schema_type = composite_schema(
       SchemaTypeCompositeKind::OneChoice,

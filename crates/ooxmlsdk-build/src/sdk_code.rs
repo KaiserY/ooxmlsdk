@@ -12,7 +12,9 @@ use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
-use crate::sdk_code::schemas::{CodegenContext, gen_schema_from_ir};
+use crate::sdk_code::schemas::{
+  CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
+};
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::sdk_data_model::{
   Namespace as SdkDataNamespace, Part as SdkDataPart, Schema as SdkDataSchema,
@@ -148,6 +150,12 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
   let out_schemas_dir_path = out_dir_path.join("schemas");
   fs::create_dir_all(&out_schemas_dir_path)?;
   clear_generated_rs_files(&out_schemas_dir_path)?;
+  let schema_graph = TypeContainmentGraph::from_modules(
+    &loaded_schemas
+      .iter()
+      .map(|loaded| &loaded.ir)
+      .collect::<Vec<_>>(),
+  );
 
   let mut schemas_mod_list: Vec<ItemMod> = vec![];
 
@@ -155,9 +163,10 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", loaded_schema.ir.module_name));
     write_generated_module(
       &schema_path,
-      gen_schema_from_ir(
+      gen_schema_from_ir_with_type_graph(
         &loaded_schema.ir,
         schema_module_is_microsoft365_only_ir(&loaded_schema.ir),
+        &schema_graph,
       )
       .map_err(|err| {
         format!(

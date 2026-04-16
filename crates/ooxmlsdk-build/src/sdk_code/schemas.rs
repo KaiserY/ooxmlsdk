@@ -2,7 +2,7 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use syn::{Attribute, Ident, Type, Variant, parse_str, parse2};
 
 use crate::Result;
@@ -120,6 +120,121 @@ pub struct ResolvedOneChoice<'a> {
   pub field_name: String,
   pub enum_name: String,
   pub variants: Vec<ResolvedOneSequenceChild<'a>>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct TypeContainmentGraph {
+  edges: HashMap<String, Vec<String>>,
+  nodes: HashSet<String>,
+}
+
+impl TypeContainmentGraph {
+  pub(crate) fn from_modules(modules: &[&SchemaModuleDecl]) -> Self {
+    let mut graph = Self::default();
+
+    for module in modules {
+      for type_decl in &module.types {
+        graph
+          .nodes
+          .insert(local_type_key(module, &type_decl.rust_name));
+      }
+    }
+
+    for module in modules {
+      for type_decl in &module.types {
+        let owner_key = local_type_key(module, &type_decl.rust_name);
+        let owner_edges = graph.edges.entry(owner_key).or_default();
+
+        for member in &type_decl.members {
+          match member {
+            MemberDecl::Field(field) => {
+              if matches!(field.cardinality, Cardinality::Many) {
+                continue;
+              }
+
+              let target = match &field.wire {
+                FieldWireDecl::Child { .. } | FieldWireDecl::Any | FieldWireDecl::Choice => {
+                  schema_type_key_from_ref(module, &field.type_ref)
+                }
+                FieldWireDecl::TextChild { .. } => {
+                  if is_value_like_type_ref(module, &field.type_ref) {
+                    None
+                  } else {
+                    schema_type_key_from_ref(module, &field.type_ref)
+                  }
+                }
+                FieldWireDecl::Attribute { .. } | FieldWireDecl::Text => None,
+              };
+
+              if let Some(target) = target {
+                owner_edges.push(target);
+              }
+            }
+            MemberDecl::Variant(variant) => {
+              let target = match &variant.wire {
+                crate::sdk_code::codegen_ir::VariantWireDecl::Any
+                | crate::sdk_code::codegen_ir::VariantWireDecl::Text => {
+                  schema_type_key_from_ref(module, &variant.payload)
+                }
+                crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. } => {
+                  if is_value_like_type_ref(module, &variant.payload) {
+                    None
+                  } else {
+                    schema_type_key_from_ref(module, &variant.payload)
+                  }
+                }
+                crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
+                | crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => None,
+              };
+
+              if let Some(target) = target {
+                owner_edges.push(target);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    graph
+  }
+
+  fn contains_node(&self, node: &str) -> bool {
+    self.nodes.contains(node)
+  }
+
+  fn has_outgoing_edges(&self, node: &str) -> bool {
+    self
+      .edges
+      .get(node)
+      .is_some_and(|children| !children.is_empty())
+  }
+
+  fn can_reach(&self, start: &str, goal: &str) -> bool {
+    if start == goal {
+      return true;
+    }
+
+    let mut stack = vec![start];
+    let mut visited = HashSet::new();
+
+    while let Some(node) = stack.pop() {
+      if !visited.insert(node) {
+        continue;
+      }
+
+      if let Some(children) = self.edges.get(node) {
+        for child in children {
+          if child == goal {
+            return true;
+          }
+          stack.push(child.as_str());
+        }
+      }
+    }
+
+    false
+  }
 }
 
 fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
@@ -753,6 +868,15 @@ pub fn gen_schema_from_ir(
   ir: &SchemaModuleDecl,
   suppress_version_cfg_attrs: bool,
 ) -> Result<TokenStream> {
+  let type_graph = TypeContainmentGraph::from_modules(&[ir]);
+  gen_schema_from_ir_with_type_graph(ir, suppress_version_cfg_attrs, &type_graph)
+}
+
+pub(crate) fn gen_schema_from_ir_with_type_graph(
+  ir: &SchemaModuleDecl,
+  suppress_version_cfg_attrs: bool,
+  type_graph: &TypeContainmentGraph,
+) -> Result<TokenStream> {
   let version_cfg = VersionCfgContext::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<TokenStream> = vec![];
   let type_decl_by_name: std::collections::HashMap<_, _> = ir
@@ -957,7 +1081,9 @@ pub fn gen_schema_from_ir(
         ContentModelDecl::OneAllDirectChildren => {
           fields.extend(gen_direct_child_fields_from_decl(
             &direct_child_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
             true,
           )?);
@@ -965,7 +1091,9 @@ pub fn gen_schema_from_ir(
         ContentModelDecl::DirectChildrenOnly => {
           fields.extend(gen_direct_child_fields_from_decl(
             &direct_child_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
             false,
           )?);
@@ -976,7 +1104,9 @@ pub fn gen_schema_from_ir(
           if !direct_child_fields.is_empty() {
             fields.extend(gen_direct_child_fields_from_decl(
               &direct_child_fields,
+              &type_decl.rust_name,
               ir,
+              type_graph,
               field_version_cfg,
               false,
             )?);
@@ -1008,7 +1138,9 @@ pub fn gen_schema_from_ir(
             .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
             &mixed_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
           )?);
         }
@@ -1045,7 +1177,9 @@ pub fn gen_schema_from_ir(
         ContentModelDecl::SequenceDirectChildren => {
           fields.extend(gen_direct_child_fields_from_decl(
             &direct_child_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
             false,
           )?);
@@ -1071,7 +1205,9 @@ pub fn gen_schema_from_ir(
             .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
             &flatten_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
           )?);
         }
@@ -1084,7 +1220,9 @@ pub fn gen_schema_from_ir(
           } else if !direct_child_fields.is_empty() {
             fields.extend(gen_direct_child_fields_from_decl(
               &direct_child_fields,
+              &type_decl.rust_name,
               ir,
+              type_graph,
               field_version_cfg,
               false,
             )?);
@@ -1182,7 +1320,9 @@ pub fn gen_schema_from_ir(
             } else {
               &direct_child_fields
             },
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
             true,
           )?);
@@ -1194,7 +1334,9 @@ pub fn gen_schema_from_ir(
             } else {
               &direct_child_fields
             },
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
             false,
           )?);
@@ -1211,7 +1353,9 @@ pub fn gen_schema_from_ir(
               } else {
                 &direct_child_fields
               },
+              &type_decl.rust_name,
               ir,
+              type_graph,
               field_version_cfg,
               false,
             )?);
@@ -1243,7 +1387,9 @@ pub fn gen_schema_from_ir(
             .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
             &flatten_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
           )?);
         }
@@ -1268,7 +1414,9 @@ pub fn gen_schema_from_ir(
             .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
             &mixed_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
           )?);
         }
@@ -1293,7 +1441,9 @@ pub fn gen_schema_from_ir(
             .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
             &structured_fields,
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
           )?);
         }
@@ -1310,7 +1460,9 @@ pub fn gen_schema_from_ir(
               } else {
                 &direct_child_fields
               },
+              &type_decl.rust_name,
               ir,
+              type_graph,
               field_version_cfg,
               false,
             )?);
@@ -1323,7 +1475,9 @@ pub fn gen_schema_from_ir(
             } else {
               &direct_child_fields
             },
+            &type_decl.rust_name,
             ir,
+            type_graph,
             field_version_cfg,
             false,
           )?);
@@ -1426,9 +1580,12 @@ pub fn gen_schema_from_ir(
       TypeKind::ChoiceEnum => {
         token_stream_list.push(gen_choice_type_decl(type_decl, ir, version_cfg)?)
       }
-      TypeKind::HelperStruct => {
-        token_stream_list.push(gen_helper_struct_type_decl(type_decl, ir, version_cfg)?)
-      }
+      TypeKind::HelperStruct => token_stream_list.push(gen_helper_struct_type_decl(
+        type_decl,
+        ir,
+        type_graph,
+        version_cfg,
+      )?),
       _ => {}
     }
   }
@@ -1606,6 +1763,7 @@ fn gen_choice_type_decl(
 fn gen_helper_struct_type_decl(
   type_decl: &TypeDecl,
   module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
   let struct_ident: Ident = parse_str(&type_decl.rust_name.to_upper_camel_case())?;
@@ -1631,7 +1789,13 @@ fn gen_helper_struct_type_decl(
       _ => None,
     })
     .collect();
-  let fields = gen_flatten_one_sequence_fields_from_decl(&helper_fields, module, nested_cfg)?;
+  let fields = gen_flatten_one_sequence_fields_from_decl(
+    &helper_fields,
+    &type_decl.rust_name,
+    module,
+    type_graph,
+    nested_cfg,
+  )?;
 
   Ok(quote! {
     #( #type_attrs )*
@@ -1876,6 +2040,72 @@ fn is_value_like_type_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -> 
   })
 }
 
+fn module_type_namespace(module_name: &str) -> String {
+  format!("crate::schemas::{module_name}")
+}
+
+fn local_type_key(module: &SchemaModuleDecl, rust_type: &str) -> String {
+  format!(
+    "{}::{rust_type}",
+    module_type_namespace(&module.module_name)
+  )
+}
+
+fn schema_type_key_from_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -> Option<String> {
+  let module_path = match type_ref.module_path.as_deref() {
+    Some("crate::simple_type") => return None,
+    Some(module_path) => module_path.to_string(),
+    None => module_type_namespace(&module.module_name),
+  };
+
+  Some(format!("{module_path}::{}", type_ref.rust_type))
+}
+
+fn direct_child_field_needs_box(
+  owner_rust_name: &str,
+  field: &FieldDecl,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+  force_optional_when_not_repeated: bool,
+) -> bool {
+  let effective_cardinality =
+    if force_optional_when_not_repeated && !matches!(field.cardinality, Cardinality::Many) {
+      Cardinality::Optional
+    } else {
+      field.cardinality
+    };
+
+  match &field.wire {
+    FieldWireDecl::Child { .. } => {}
+    FieldWireDecl::TextChild { .. } if !is_value_like_type_ref(module, &field.type_ref) => {}
+    FieldWireDecl::TextChild { .. } => return false,
+    _ => return false,
+  }
+
+  if matches!(effective_cardinality, Cardinality::Many) {
+    return false;
+  }
+
+  if matches!(effective_cardinality, Cardinality::One) {
+    return true;
+  }
+
+  let Some(target_key) = schema_type_key_from_ref(module, &field.type_ref) else {
+    return false;
+  };
+
+  if !type_graph.contains_node(&target_key) {
+    return true;
+  }
+
+  if type_graph.has_outgoing_edges(&target_key) {
+    return true;
+  }
+
+  let owner_key = local_type_key(module, owner_rust_name);
+  type_graph.can_reach(&target_key, &owner_key)
+}
+
 fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   let mut fields = Vec::new();
 
@@ -1905,7 +2135,9 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
 fn gen_direct_child_fields_from_decl(
   fields: &[&FieldDecl],
+  owner_rust_name: &str,
   module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
   field_cfg: VersionCfgContext,
   force_optional_when_not_repeated: bool,
 ) -> Result<Vec<TokenStream>> {
@@ -1916,14 +2148,18 @@ fn gen_direct_child_fields_from_decl(
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
     let field_type = type_from_decl_ref(&field.type_ref)?;
     let property_comments = field.docs.as_str();
-    let (sdk_field_attrs, wrap_box) = match &field.wire {
-      FieldWireDecl::Child { qname } => (quote! { #[sdk(child(qname = #qname))] }, true),
-      FieldWireDecl::TextChild { qname } => (
-        quote! { #[sdk(text_child(qname = #qname))] },
-        !is_value_like_type_ref(module, &field.type_ref),
-      ),
+    let sdk_field_attrs = match &field.wire {
+      FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
+      FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
+    let wrap_box = direct_child_field_needs_box(
+      owner_rust_name,
+      field,
+      module,
+      type_graph,
+      force_optional_when_not_repeated,
+    );
 
     let effective_cardinality =
       if force_optional_when_not_repeated && !matches!(field.cardinality, Cardinality::Many) {
@@ -1973,7 +2209,9 @@ fn gen_direct_child_fields_from_decl(
 
 fn gen_flatten_one_sequence_fields_from_decl(
   fields: &[&FieldDecl],
+  owner_rust_name: &str,
   module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
   field_cfg: VersionCfgContext,
 ) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
@@ -2015,7 +2253,9 @@ fn gen_flatten_one_sequence_fields_from_decl(
       FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } => {
         tokens.extend(gen_direct_child_fields_from_decl(
           std::slice::from_ref(field),
+          owner_rust_name,
           module,
+          type_graph,
           field_cfg,
           false,
         )?);
@@ -2487,6 +2727,72 @@ mod tests {
     assert!(generated.contains("pub text_child : Option < crate :: simple_type :: StringValue >"));
     assert!(generated.contains("pub unknown_xml : Vec < String >"));
     assert!(!generated.contains("pub enum SequenceHolderChoice"));
+  }
+
+  #[test]
+  fn keeps_box_for_recursive_direct_child_fields() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_recursive_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "Node".to_string(),
+          xml_qname: Some("t:CT_Node/t:node".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Composite),
+          content_model: Some(ContentModelDecl::DirectChildrenOnly),
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "child".to_string(),
+            docs: "Child".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Child {
+              qname: "t:node".to_string(),
+            },
+            cardinality: Cardinality::Optional,
+            type_ref: TypeRefDecl {
+              rust_type: "Node".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Wrapper".to_string(),
+          xml_qname: Some("t:CT_Wrapper/t:wrapper".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Composite),
+          content_model: Some(ContentModelDecl::DirectChildrenOnly),
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "node".to_string(),
+            docs: "Node".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Child {
+              qname: "t:node".to_string(),
+            },
+            cardinality: Cardinality::Optional,
+            type_ref: TypeRefDecl {
+              rust_type: "Node".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("pub child : Option <"));
+    assert!(generated.contains("std :: boxed :: Box < Node >"));
+    assert!(!generated.contains("pub child : Option < Node >"));
+    assert!(generated.contains("pub node : Option <"));
+    assert!(generated.contains("std :: boxed :: Box < Node >"));
+    assert!(!generated.contains("pub node : Option < Node >"));
   }
 
   #[test]

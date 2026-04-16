@@ -26,23 +26,23 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
   assert_eq!(
     parsed
       .created
-      .as_deref()
+      .as_ref()
       .and_then(|v| v.xml_content.as_deref()),
     Some("2024-10-26T22:14:00Z")
   );
   assert_eq!(
     parsed
       .modified
-      .as_deref()
+      .as_ref()
       .and_then(|v| v.xml_content.as_deref()),
     Some("2024-10-26T22:15:00Z")
   );
   assert!(matches!(
-    parsed.created.as_deref().and_then(|v| v.xsi_type.as_ref()),
+    parsed.created.as_ref().and_then(|v| v.xsi_type.as_ref()),
     Some(XsiTypeValue::DctermsW3cdtf)
   ));
   assert!(matches!(
-    parsed.modified.as_deref().and_then(|v| v.xsi_type.as_ref()),
+    parsed.modified.as_ref().and_then(|v| v.xsi_type.as_ref()),
     Some(XsiTypeValue::DctermsW3cdtf)
   ));
   let serialized = trim_xml_declaration(&serialized);
@@ -69,23 +69,23 @@ fn core_properties_round_trip_from_more_doc_props_test() {
   assert_eq!(
     parsed
       .created
-      .as_deref()
+      .as_ref()
       .and_then(|v| v.xml_content.as_deref()),
     Some("2014-10-28T11:34:00Z")
   );
   assert_eq!(
     parsed
       .modified
-      .as_deref()
+      .as_ref()
       .and_then(|v| v.xml_content.as_deref()),
     Some("2015-06-20T07:40:00Z")
   );
   assert!(matches!(
-    parsed.created.as_deref().and_then(|v| v.xsi_type.as_ref()),
+    parsed.created.as_ref().and_then(|v| v.xsi_type.as_ref()),
     Some(XsiTypeValue::DctermsW3cdtf)
   ));
   assert!(matches!(
-    parsed.modified.as_deref().and_then(|v| v.xsi_type.as_ref()),
+    parsed.modified.as_ref().and_then(|v| v.xsi_type.as_ref()),
     Some(XsiTypeValue::DctermsW3cdtf)
   ));
   let serialized = trim_xml_declaration(&serialized);
@@ -125,7 +125,7 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
 
   let titles = parsed
     .titles_of_parts
-    .as_deref()
+    .as_ref()
     .expect("expected ap:TitlesOfParts");
 
   assert_eq!(titles.vt_vector.size, 1);

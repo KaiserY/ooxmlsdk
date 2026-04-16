@@ -16,7 +16,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 fn first_body(document: &Document) -> &Body {
-  document.body.as_deref().expect("expected document body")
+  document.body.as_ref().expect("expected document body")
 }
 
 fn first_paragraph(body: &Body) -> &Paragraph {
@@ -809,7 +809,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   );
 
   let sdt = first_sdt_block(body);
-  let Some(properties) = sdt.sdt_properties.as_deref() else {
+  let Some(properties) = sdt.sdt_properties.as_ref() else {
     panic!("expected w:sdtPr");
   };
   let Some(SdtPropertiesChoice::WAlias(alias)) = properties.children.first() else {

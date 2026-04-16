@@ -95,7 +95,7 @@ fn main_document_body_child_count(
 ) -> usize {
   document
     .body
-    .as_deref()
+    .as_ref()
     .map(|body| body.eg_block_level_elts.len() + usize::from(body.w_sect_pr.is_some()))
     .unwrap_or_default()
 }
@@ -103,16 +103,16 @@ fn main_document_body_child_count(
 fn first_body_child(document: &Document) -> Option<&BodyChoice> {
   document
     .body
-    .as_deref()
+    .as_ref()
     .and_then(|body| body.eg_block_level_elts.first())
 }
 
 fn first_body_mut(document: &mut Document) -> Option<&mut Body> {
-  document.body.as_deref_mut()
+  document.body.as_mut().map(std::boxed::Box::as_mut)
 }
 
 fn first_body(document: &Document) -> Option<&Body> {
-  document.body.as_deref()
+  document.body.as_ref().map(std::boxed::Box::as_ref)
 }
 
 fn assert_unexpected_tag(
@@ -824,7 +824,7 @@ fn open_simple_sdt_docx_asset_from_openxml_sdk() {
   assert!(sdt.sdt_properties.is_some());
   assert!(sdt.sdt_content_block.is_some());
 
-  let Some(properties) = sdt.sdt_properties.as_deref() else {
+  let Some(properties) = sdt.sdt_properties.as_ref() else {
     panic!("expected w:sdtPr");
   };
   let Some(SdtPropertiesChoice::WAlias(alias)) = properties.children.first() else {
@@ -1208,7 +1208,7 @@ fn open_doc_props_docx_asset_from_openxml_sdk() {
     package
       .core_file_properties_part
       .as_ref()
-      .map(|part| keywords_text(part.root_element.keywords.as_deref())),
+      .map(|part| keywords_text(part.root_element.keywords.as_ref())),
     Some(Some("Test-Keywords"))
   );
   assert_eq!(
@@ -1800,7 +1800,7 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
       .main_document_part
       .root_element
       .body
-      .as_deref()
+      .as_ref()
       .is_some_and(|body| {
         body
           .eg_block_level_elts
@@ -1818,7 +1818,7 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
       .main_document_part
       .root_element
       .body
-      .as_deref()
+      .as_ref()
       .is_some_and(|body| {
         body
           .eg_block_level_elts
@@ -2435,16 +2435,11 @@ fn round_trip_doc_props_docx_asset_from_openxml_sdk() {
     Some("Eric White")
   );
   assert_eq!(
-    keywords_text(original_core_properties.root_element.keywords.as_deref()),
+    keywords_text(original_core_properties.root_element.keywords.as_ref()),
     Some("Test-Keywords")
   );
   assert_eq!(
-    keywords_text(
-      roundtripped_core_properties
-        .root_element
-        .keywords
-        .as_deref()
-    ),
+    keywords_text(roundtripped_core_properties.root_element.keywords.as_ref()),
     Some("Test-Keywords")
   );
   assert_eq!(
@@ -3166,10 +3161,10 @@ fn round_trip_simple_sdt_docx_asset_from_openxml_sdk() {
     panic!("expected first body child to be w:sdt");
   };
 
-  let Some(original_properties) = original_sdt.sdt_properties.as_deref() else {
+  let Some(original_properties) = original_sdt.sdt_properties.as_ref() else {
     panic!("expected original w:sdtPr");
   };
-  let Some(roundtripped_properties) = roundtripped_sdt.sdt_properties.as_deref() else {
+  let Some(roundtripped_properties) = roundtripped_sdt.sdt_properties.as_ref() else {
     panic!("expected roundtripped w:sdtPr");
   };
   let Some(SdtPropertiesChoice::WAlias(original_alias)) = original_properties.children.first()

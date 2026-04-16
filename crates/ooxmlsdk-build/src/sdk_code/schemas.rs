@@ -2590,6 +2590,8 @@ mod tests {
   use super::*;
   use crate::sdk_code::codegen_ir::SchemaModuleDecl;
   use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
+  use crate::sdk_data::context::Context;
+  use crate::sdk_data::schemas::gen_schemas;
   use crate::sdk_data::sdk_data_model::{SchemaTypeApiKind, SchemaTypeCompositeKind};
   use serde_json::Value;
   use std::fs;
@@ -2653,6 +2655,20 @@ mod tests {
       let context = CodegenContext::new(&legacy_schemas);
       build_codegen_ir(&schema, &context).unwrap()
     }
+  }
+
+  fn load_workspace_codegen_inputs() -> (&'static [Schema], CodegenContext<'static>) {
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root");
+    let context = Context::new(&workspace_root.join("data")).expect("context");
+    let schemas = gen_schemas(&context);
+    let leaked_schemas = Box::leak(Box::new(schemas)).as_slice();
+    let codegen_context = CodegenContext::new(leaked_schemas);
+
+    (leaked_schemas, codegen_context)
   }
 
   #[test]
@@ -2759,6 +2775,36 @@ mod tests {
 
     assert!(generated.contains("UnknownXml (String)"));
     assert!(!generated.contains("UnknownXml (std :: boxed :: Box < String >)"));
+  }
+
+  #[test]
+  fn prebuilt_ir_generation_ignores_schema_particle_shape() {
+    let (schemas, context) = load_workspace_codegen_inputs();
+    let schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("wordprocessing schema");
+    let ir = build_codegen_ir(schema, &context).expect("build ir");
+
+    let from_ir = gen_schema_from_ir(&ir, false)
+      .expect("render from ir")
+      .to_string();
+    let from_prebuilt = gen_schema(schema, Some(&ir), &context, false)
+      .expect("render from prebuilt ir")
+      .to_string();
+
+    let mut poisoned_schema = schema.clone();
+    for schema_type in &mut poisoned_schema.types {
+      schema_type.children.clear();
+      schema_type.composite_kind = SchemaTypeCompositeKind::None;
+    }
+
+    let from_poisoned = gen_schema(&poisoned_schema, Some(&ir), &context, false)
+      .expect("render from poisoned prebuilt ir")
+      .to_string();
+
+    assert_eq!(from_prebuilt, from_ir);
+    assert_eq!(from_poisoned, from_ir);
   }
 
   #[test]

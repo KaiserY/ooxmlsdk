@@ -1,9 +1,9 @@
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
-  Cardinality, ContentModelDecl, ElementKind, EnumDecl, EnumValueType, EnumVariantDecl, FieldDecl,
-  FieldWireDecl, MemberDecl, NumberSignKind, SchemaModuleDecl, StringFormatKind, SystemSupportDecl,
-  TypeDecl, TypeKind, TypeRefDecl, ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl,
-  XmlHeaderMode, XmlnsMode,
+  Cardinality, ContentModelDecl, ContentParticleDecl, ContentParticleKind, ElementKind, EnumDecl,
+  EnumValueType, EnumVariantDecl, FieldDecl, FieldWireDecl, MemberDecl, NumberSignKind,
+  SchemaModuleDecl, StringFormatKind, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl,
+  ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode, XmlnsMode,
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticle, StructuredParticleKind, classify_attr_type,
@@ -108,6 +108,7 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
   }
 
   dedupe_helper_struct_types(&mut types)?;
+  populate_content_structures(&mut types, schema, context)?;
 
   Ok(SchemaModuleDecl {
     module_name: schema.module_name.clone(),
@@ -146,6 +147,219 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
       .collect(),
     types,
   })
+}
+
+fn populate_content_structures(
+  types: &mut [TypeDecl],
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<()> {
+  let schema_type_by_name: std::collections::HashMap<&str, &SchemaType> = schema
+    .types
+    .iter()
+    .map(|schema_type| (schema_type.name.as_str(), schema_type))
+    .collect();
+
+  for type_decl in types.iter_mut() {
+    type_decl.content_structure = if type_decl.kind != TypeKind::ElementStruct {
+      None
+    } else {
+      type_decl
+        .xml_qname
+        .as_deref()
+        .and_then(|xml_qname| schema_type_by_name.get(xml_qname).copied())
+        .and_then(|schema_type| build_content_structure_from_schema_type(schema_type, context))
+    };
+  }
+
+  Ok(())
+}
+
+fn build_content_structure_from_schema_type(
+  schema_type: &SchemaType,
+  context: &CodegenContext<'_>,
+) -> Option<ContentParticleDecl> {
+  if schema_type.children.is_empty()
+    && schema_type.kind == crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived
+    && let Some(base_type) = context.type_by_class_name(schema_type.base_class.as_str())
+  {
+    return build_content_structure_from_schema_type(base_type, context);
+  }
+
+  let content_children = top_level_content_children(schema_type);
+  if content_children.is_empty() {
+    return None;
+  }
+
+  if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+    && content_children.iter().all(|child| {
+      matches!(
+        child.kind,
+        SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+      )
+    })
+  {
+    return Some(normalize_content_particle_decl(ContentParticleDecl {
+      kind: ContentParticleKind::All,
+      qname: None,
+      version: String::new(),
+      cardinality: Cardinality::One,
+      children: content_children
+        .iter()
+        .map(|child| build_content_particle_from_schema_child(child, context))
+        .collect(),
+    }));
+  }
+
+  if content_children.len() == 1 {
+    return Some(normalize_content_particle_decl(
+      build_content_particle_from_schema_child(&content_children[0], context),
+    ));
+  }
+
+  Some(normalize_content_particle_decl(ContentParticleDecl {
+    kind: ContentParticleKind::Sequence,
+    qname: None,
+    version: String::new(),
+    cardinality: Cardinality::One,
+    children: content_children
+      .iter()
+      .map(|child| build_content_particle_from_schema_child(child, context))
+      .collect(),
+  }))
+}
+
+fn build_content_particle_from_schema_child(
+  child: &SchemaTypeChild,
+  context: &CodegenContext<'_>,
+) -> ContentParticleDecl {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => {
+      let effective_kind = effective_child_kind_from_name(child.name.as_str(), child.kind, context);
+      let version = if child.initial_version.is_empty() {
+        context
+          .type_by_name(child.name.as_str())
+          .and_then(|child_type| child_type.version.clone())
+          .unwrap_or_default()
+      } else {
+        child.initial_version.clone()
+      };
+
+      ContentParticleDecl {
+        kind: match effective_kind {
+          SchemaTypeChildKind::TextChild => {
+            if child.name.is_empty() {
+              ContentParticleKind::Text
+            } else {
+              ContentParticleKind::TextChild
+            }
+          }
+          _ => ContentParticleKind::Child,
+        },
+        qname: (!child.name.is_empty()).then(|| child.name.clone()),
+        version,
+        cardinality: cardinality_from_flags(child.optional, child.repeated),
+        children: Vec::new(),
+      }
+    }
+    SchemaTypeChildKind::Any => ContentParticleDecl {
+      kind: ContentParticleKind::Any,
+      qname: None,
+      version: child.initial_version.clone(),
+      cardinality: cardinality_from_flags(child.optional, child.repeated),
+      children: Vec::new(),
+    },
+    SchemaTypeChildKind::Choice => ContentParticleDecl {
+      kind: ContentParticleKind::Choice,
+      qname: None,
+      version: child.initial_version.clone(),
+      cardinality: cardinality_from_flags(child.optional, child.repeated),
+      children: child
+        .children
+        .iter()
+        .map(|nested| build_content_particle_from_schema_child(nested, context))
+        .collect(),
+    },
+    SchemaTypeChildKind::Sequence => ContentParticleDecl {
+      kind: ContentParticleKind::Sequence,
+      qname: None,
+      version: child.initial_version.clone(),
+      cardinality: cardinality_from_flags(child.optional, child.repeated),
+      children: child
+        .children
+        .iter()
+        .map(|nested| build_content_particle_from_schema_child(nested, context))
+        .collect(),
+    },
+  }
+}
+
+fn normalize_content_particle_decl(mut node: ContentParticleDecl) -> ContentParticleDecl {
+  node.children = node
+    .children
+    .into_iter()
+    .map(normalize_content_particle_decl)
+    .collect();
+
+  if node.kind == ContentParticleKind::Sequence {
+    let wrapper_cardinality = node.cardinality;
+    let wrapper_version = node.version.clone();
+    let mut flattened = Vec::new();
+
+    for mut child in node.children.drain(..) {
+      child.cardinality = merge_content_cardinality(wrapper_cardinality, child.cardinality);
+      child.version =
+        effective_version(child.version.as_str(), wrapper_version.as_str()).to_string();
+
+      if child.kind == ContentParticleKind::Sequence {
+        flattened.extend(child.children);
+      } else {
+        flattened.push(child);
+      }
+    }
+
+    node.children = flattened;
+    node.cardinality = Cardinality::One;
+    node.version.clear();
+  } else if node.kind == ContentParticleKind::Choice {
+    if node.cardinality != Cardinality::One {
+      for child in &mut node.children {
+        if child.cardinality != Cardinality::Many {
+          child.cardinality = Cardinality::One;
+        }
+      }
+    }
+    node.version = common_choice_version_ir(
+      node.version.as_str(),
+      &node
+        .children
+        .iter()
+        .map(|child| child.version.as_str())
+        .collect::<Vec<_>>(),
+    )
+    .to_string();
+  }
+
+  if matches!(
+    node.kind,
+    ContentParticleKind::Choice | ContentParticleKind::Sequence
+  ) && node.children.len() == 1
+  {
+    let mut child = node.children.remove(0);
+    child.cardinality = merge_content_cardinality(node.cardinality, child.cardinality);
+    child.version = effective_version(child.version.as_str(), node.version.as_str()).to_string();
+    return child;
+  }
+
+  node
+}
+
+fn merge_content_cardinality(left: Cardinality, right: Cardinality) -> Cardinality {
+  match (left, right) {
+    (Cardinality::Many, _) | (_, Cardinality::Many) => Cardinality::Many,
+    (Cardinality::Optional, _) | (_, Cardinality::Optional) => Cardinality::Optional,
+    _ => Cardinality::One,
+  }
 }
 
 fn dedupe_helper_struct_types(types: &mut Vec<TypeDecl>) -> Result<()> {
@@ -313,6 +527,7 @@ fn build_type_decl(
         },
         has_mce: schema_type.has_mc_ignorable_field,
       },
+      content_structure: None,
       members,
     },
     extra_types,
@@ -530,6 +745,7 @@ fn build_recursive_choice_enum_decl(
     base_rust_name: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    content_structure: None,
     members,
   })
 }
@@ -1536,6 +1752,7 @@ fn build_simple_one_choice_members(
     base_rust_name: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    content_structure: None,
     members: enum_members,
   }])
 }
@@ -1727,6 +1944,7 @@ fn build_flatten_one_sequence_members(
           base_rust_name: None,
           xml_content: None,
           support: SystemSupportDecl::default(),
+          content_structure: None,
           members: enum_members,
         });
       }
@@ -1921,6 +2139,7 @@ fn build_structured_one_sequence_members(
           base_rust_name: None,
           xml_content: None,
           support: SystemSupportDecl::default(),
+          content_structure: None,
           members: enum_members,
         });
       }
@@ -2073,6 +2292,7 @@ fn build_structured_one_sequence_helper_struct_decl(
     base_rust_name: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    content_structure: None,
     members: sequence_variant
       .fields
       .iter()
@@ -2243,6 +2463,7 @@ fn build_mixed_choice_children_members(
     base_rust_name: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    content_structure: None,
     members: enum_members,
   });
 
@@ -2674,6 +2895,7 @@ fn build_generic_children_members(
     base_rust_name: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
+    content_structure: None,
     members: enum_members,
   });
 
@@ -3026,11 +3248,134 @@ fn has_true_bool_argument(validator: &SchemaTypeAttributeValidator, name: &str) 
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::sdk_data::context::Context;
+  use crate::sdk_data::schemas::gen_schemas;
   use crate::sdk_data::sdk_data_model::{
     SchemaEnum, SchemaEnumFacet, SchemaTypeAttributeValidator,
     SchemaTypeAttributeValidatorArgument, SchemaTypeChild, SchemaTypeChildKind,
     SchemaTypeCompositeKind,
   };
+  use std::collections::HashMap;
+
+  fn expected_content_structure_from_schema_type(
+    schema_type: &SchemaType,
+    context: &CodegenContext<'_>,
+  ) -> Option<ContentParticleDecl> {
+    if schema_type.children.is_empty()
+      && schema_type.kind == crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived
+      && let Some(base_type) = context.type_by_class_name(schema_type.base_class.as_str())
+    {
+      return expected_content_structure_from_schema_type(base_type, context);
+    }
+
+    let content_children = top_level_content_children(schema_type);
+    if content_children.is_empty() {
+      return None;
+    }
+
+    if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
+      && content_children.iter().all(|child| {
+        matches!(
+          child.kind,
+          SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+        )
+      })
+    {
+      return Some(normalize_content_particle_decl(ContentParticleDecl {
+        kind: ContentParticleKind::All,
+        qname: None,
+        version: String::new(),
+        cardinality: Cardinality::One,
+        children: content_children
+          .iter()
+          .map(|child| expected_content_particle_from_schema_child(child, context))
+          .collect(),
+      }));
+    }
+
+    if content_children.len() == 1 {
+      return Some(normalize_content_particle_decl(
+        expected_content_particle_from_schema_child(&content_children[0], context),
+      ));
+    }
+
+    Some(normalize_content_particle_decl(ContentParticleDecl {
+      kind: ContentParticleKind::Sequence,
+      qname: None,
+      version: String::new(),
+      cardinality: Cardinality::One,
+      children: content_children
+        .iter()
+        .map(|child| expected_content_particle_from_schema_child(child, context))
+        .collect(),
+    }))
+  }
+
+  fn expected_content_particle_from_schema_child(
+    child: &SchemaTypeChild,
+    context: &CodegenContext<'_>,
+  ) -> ContentParticleDecl {
+    match child.kind {
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => {
+        let effective_kind =
+          effective_child_kind_from_name(child.name.as_str(), child.kind, context);
+        let version = if child.initial_version.is_empty() {
+          context
+            .type_by_name(child.name.as_str())
+            .and_then(|child_type| child_type.version.clone())
+            .unwrap_or_default()
+        } else {
+          child.initial_version.clone()
+        };
+
+        ContentParticleDecl {
+          kind: match effective_kind {
+            SchemaTypeChildKind::TextChild => {
+              if child.name.is_empty() {
+                ContentParticleKind::Text
+              } else {
+                ContentParticleKind::TextChild
+              }
+            }
+            _ => ContentParticleKind::Child,
+          },
+          qname: (!child.name.is_empty()).then(|| child.name.clone()),
+          version,
+          cardinality: cardinality_from_flags(child.optional, child.repeated),
+          children: Vec::new(),
+        }
+      }
+      SchemaTypeChildKind::Any => ContentParticleDecl {
+        kind: ContentParticleKind::Any,
+        qname: None,
+        version: child.initial_version.clone(),
+        cardinality: cardinality_from_flags(child.optional, child.repeated),
+        children: Vec::new(),
+      },
+      SchemaTypeChildKind::Choice => ContentParticleDecl {
+        kind: ContentParticleKind::Choice,
+        qname: None,
+        version: child.initial_version.clone(),
+        cardinality: cardinality_from_flags(child.optional, child.repeated),
+        children: child
+          .children
+          .iter()
+          .map(|nested| expected_content_particle_from_schema_child(nested, context))
+          .collect(),
+      },
+      SchemaTypeChildKind::Sequence => ContentParticleDecl {
+        kind: ContentParticleKind::Sequence,
+        qname: None,
+        version: child.initial_version.clone(),
+        cardinality: cardinality_from_flags(child.optional, child.repeated),
+        children: child
+          .children
+          .iter()
+          .map(|nested| expected_content_particle_from_schema_child(nested, context))
+          .collect(),
+      },
+    }
+  }
 
   #[test]
   fn carries_schema_enums_into_codegen_ir() {
@@ -5924,5 +6269,59 @@ mod tests {
     );
     assert!(fields.iter().any(|field| field.rust_name == "leaf_d"));
     assert!(fields.iter().any(|field| field.rust_name == "leaf_e"));
+  }
+
+  #[test]
+  fn stores_ir_content_structure_that_matches_lowered_schema_children() {
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root");
+    let context = Context::new(&workspace_root.join("data")).expect("context");
+    let schemas = gen_schemas(&context);
+    let codegen_context = CodegenContext::new(&schemas);
+    let mut ir_by_type_name = HashMap::new();
+
+    for schema in &schemas {
+      let ir = build_codegen_ir(schema, &codegen_context).expect("build ir");
+      for type_decl in &ir.types {
+        if let Some(xml_qname) = &type_decl.xml_qname {
+          ir_by_type_name.insert(xml_qname.clone(), type_decl.clone());
+        }
+      }
+    }
+
+    let mut failures = Vec::new();
+
+    for schema in &schemas {
+      for schema_type in &schema.types {
+        let Some(type_decl) = ir_by_type_name.get(schema_type.name.as_str()) else {
+          failures.push(format!(
+            "{} ({}) missing primary IR type",
+            schema_type.class_name, schema_type.name
+          ));
+          continue;
+        };
+
+        let expected = expected_content_structure_from_schema_type(schema_type, &codegen_context);
+        if type_decl.content_structure != expected {
+          failures.push(format!(
+            "{} ({}) expected {} but IR stored {}",
+            schema_type.class_name,
+            schema_type.name,
+            serde_json::to_string(&expected).unwrap_or_else(|_| "<expected>".to_string()),
+            serde_json::to_string(&type_decl.content_structure)
+              .unwrap_or_else(|_| "<actual>".to_string()),
+          ));
+        }
+      }
+    }
+
+    assert!(
+      failures.is_empty(),
+      "IR content_structure mismatches:\n{}",
+      failures.join("\n")
+    );
   }
 }

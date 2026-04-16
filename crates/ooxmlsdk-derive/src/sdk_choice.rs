@@ -51,7 +51,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     let kind = parse_sdk_choice_variant_kind(&variant.attrs)?.ok_or_else(|| {
       syn::Error::new_spanned(
         variant,
-        "missing #[sdk(child(...))], #[sdk(text_child(...))] or #[sdk(any)] on choice variant",
+        "missing #[sdk(child(...))], #[sdk(text_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
       )
     })?;
     let payload_ty = choice_variant_payload_type(variant)?;
@@ -97,7 +97,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         validate_arms.push(validate_arm);
       }
-      SdkChoiceVariantKind::Choice => {
+      SdkChoiceVariantKind::Choice | SdkChoiceVariantKind::Sequence => {
         let constructor = if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
         } else {

@@ -206,6 +206,7 @@ enum SdkNumberSignKind {
 enum SdkChoiceVariantKind {
   Child { qnames: Vec<String> },
   Choice,
+  Sequence,
   TextChild { qnames: Vec<String> },
   Any,
   Text,
@@ -823,6 +824,9 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
         }
         Meta::Path(path) if path.is_ident("choice") => {
           return Ok(Some(SdkChoiceVariantKind::Choice));
+        }
+        Meta::Path(path) if path.is_ident("sequence") => {
+          return Ok(Some(SdkChoiceVariantKind::Sequence));
         }
         Meta::Path(path) if path.is_ident("any") => return Ok(Some(SdkChoiceVariantKind::Any)),
         Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkChoiceVariantKind::Text)),

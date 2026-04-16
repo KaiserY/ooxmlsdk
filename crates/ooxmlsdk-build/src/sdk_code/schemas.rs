@@ -1537,6 +1537,13 @@ fn gen_choice_type_decl(
           #variant_ident(#payload_type),
         });
       }
+      crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => {
+        variants.push(quote! {
+          #( #variant_attrs )*
+          #[sdk(sequence)]
+          #variant_ident(std::boxed::Box<#payload_type>),
+        });
+      }
       crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { qnames } => {
         if qnames.is_empty() {
           return Err(variant.rust_name.clone().into());
@@ -1840,10 +1847,10 @@ fn type_from_decl_ref(type_ref: &TypeRefDecl) -> Result<Type> {
   if let Some(module_path) = &type_ref.module_path {
     Ok(parse_str(&format!(
       "{module_path}::{}",
-      type_ref.rust_type
+      type_ref.rust_type.to_upper_camel_case()
     ))?)
   } else {
-    Ok(parse_str(&type_ref.rust_type)?)
+    Ok(parse_str(&type_ref.rust_type.to_upper_camel_case())?)
   }
 }
 
@@ -2589,6 +2596,7 @@ mod tests {
     assert!(
       generated.contains("Sequence2 (std :: boxed :: Box < StructuredHolderChoiceSequence2 >)")
     );
+    assert!(generated.contains("# [sdk (sequence)] Sequence2"));
     assert!(generated.contains("pub struct StructuredHolderChoiceSequence2"));
     assert!(generated.contains("pub leaf_c : std :: boxed :: Box < LeafC >"));
     assert!(generated.contains("pub leaf_d : std :: boxed :: Box < LeafD >"));
@@ -2774,6 +2782,7 @@ mod tests {
     assert!(
       generated.contains("Sequence2 (std :: boxed :: Box < FallbackHolderChoiceSequence2 >)")
     );
+    assert!(generated.contains("# [sdk (sequence)] Sequence2"));
     assert!(generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(generated.contains("FallbackHolderChoiceSequence2"));
     assert!(generated.contains("leaf_b"));

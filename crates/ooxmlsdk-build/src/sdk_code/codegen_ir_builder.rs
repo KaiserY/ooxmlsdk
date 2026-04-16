@@ -70,7 +70,9 @@ fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
 
 fn variant_qname_prefix(variant: &VariantDecl) -> Option<&str> {
   let qname = match &variant.wire {
-    VariantWireDecl::Child { qnames } | VariantWireDecl::TextChild { qnames } => qnames.first()?,
+    VariantWireDecl::Child { qnames }
+    | VariantWireDecl::Sequence { qnames }
+    | VariantWireDecl::TextChild { qnames } => qnames.first()?,
     VariantWireDecl::Any | VariantWireDecl::Text => return None,
   };
   let element_qname = qname.split('/').nth(1).unwrap_or(qname.as_str());
@@ -1122,7 +1124,7 @@ fn recursive_choice_nested_enum_name(
   child: &SchemaTypeChild,
   child_index: usize,
 ) -> String {
-  let base = parent_enum_name.trim_end_matches("Choice");
+  let base = compact_anonymous_suffix_chain(parent_enum_name.trim_end_matches("Choice"));
   let stem = if child.property_name.is_empty() {
     format!("Choice{}", child_index + 1)
   } else {
@@ -1136,13 +1138,73 @@ fn recursive_choice_sequence_struct_name(
   child: &SchemaTypeChild,
   child_index: usize,
 ) -> String {
-  let base = parent_enum_name.trim_end_matches("Choice");
+  let base = compact_anonymous_suffix_chain(parent_enum_name.trim_end_matches("Choice"));
   let stem = if child.property_name.is_empty() {
     format!("Sequence{}", child_index + 1)
   } else {
     child.property_name.to_upper_camel_case()
   };
   format!("{base}{stem}")
+}
+
+#[derive(Clone, Copy)]
+enum AnonymousSuffixKind {
+  Choice,
+  Sequence,
+}
+
+fn split_trailing_anonymous_suffix(name: &str) -> Option<(&str, AnonymousSuffixKind, &str)> {
+  let digit_count = name
+    .chars()
+    .rev()
+    .take_while(|ch| ch.is_ascii_digit())
+    .count();
+  if digit_count == 0 {
+    return None;
+  }
+
+  let digits_start = name.len() - digit_count;
+  let (stem, digits) = name.split_at(digits_start);
+  if let Some(prefix) = stem.strip_suffix("Choice") {
+    return Some((prefix, AnonymousSuffixKind::Choice, digits));
+  }
+  if let Some(prefix) = stem.strip_suffix("Sequence") {
+    return Some((prefix, AnonymousSuffixKind::Sequence, digits));
+  }
+
+  None
+}
+
+fn compact_anonymous_suffix_chain(name: &str) -> String {
+  let mut prefix = name;
+  let mut suffixes = Vec::new();
+
+  while let Some((next_prefix, kind, digits)) = split_trailing_anonymous_suffix(prefix) {
+    suffixes.push((kind, digits.to_string()));
+    prefix = next_prefix;
+  }
+
+  if suffixes.len() <= 3 {
+    return name.to_string();
+  }
+
+  let mut compact = prefix.to_string();
+  let mut suffixes = suffixes.into_iter().rev();
+  if let Some((kind, digits)) = suffixes.next() {
+    compact.push_str(match kind {
+      AnonymousSuffixKind::Choice => "Choice",
+      AnonymousSuffixKind::Sequence => "Sequence",
+    });
+    compact.push_str(&digits);
+  }
+  for (kind, digits) in suffixes {
+    compact.push(match kind {
+      AnonymousSuffixKind::Choice => 'c',
+      AnonymousSuffixKind::Sequence => 's',
+    });
+    compact.push_str(&digits);
+  }
+  compact
 }
 
 fn strip_group_prefix(property_name: &str) -> &str {
@@ -2326,7 +2388,7 @@ fn build_structured_one_sequence_sequence_variant_decl(
         .collect::<Vec<_>>(),
     )
     .to_string(),
-    wire: VariantWireDecl::Child {
+    wire: VariantWireDecl::Sequence {
       qnames: sequence_variant
         .fields
         .iter()
@@ -5872,6 +5934,7 @@ mod tests {
     assert_eq!(variants.len(), 2);
     assert_eq!(variants[0].rust_name, "TA");
     assert_eq!(variants[1].rust_name, "Sequence2");
+    assert!(matches!(variants[1].wire, VariantWireDecl::Sequence { .. }));
 
     let helper_struct = ir
       .types
@@ -6067,6 +6130,26 @@ mod tests {
           values: vec!["foo".to_string(), "bar".to_string(), "baz".to_string()],
         },
       }
+    );
+  }
+
+  #[test]
+  fn compacts_recursive_anonymous_suffix_chains() {
+    assert_eq!(
+      compact_anonymous_suffix_chain("ParagraphChoice2Choice2"),
+      "ParagraphChoice2Choice2"
+    );
+    assert_eq!(
+      compact_anonymous_suffix_chain("ParagraphChoice2Sequence5Choice3"),
+      "ParagraphChoice2Sequence5Choice3"
+    );
+    assert_eq!(
+      compact_anonymous_suffix_chain("ParagraphChoice2"),
+      "ParagraphChoice2"
+    );
+    assert_eq!(
+      compact_anonymous_suffix_chain("ParagraphChoice2Choice2Choice3Choice4"),
+      "ParagraphChoice2c2c3c4"
     );
   }
 

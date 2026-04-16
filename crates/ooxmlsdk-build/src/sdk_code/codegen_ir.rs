@@ -209,6 +209,10 @@ pub enum VariantWireDecl {
     #[serde(rename = "QNames")]
     qnames: Vec<String>,
   },
+  Sequence {
+    #[serde(rename = "QNames")]
+    qnames: Vec<String>,
+  },
   TextChild {
     #[serde(rename = "QNames")]
     qnames: Vec<String>,

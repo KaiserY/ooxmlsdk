@@ -396,6 +396,7 @@ fn expand_sequence_helper_struct(
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
+  let mut matcher_checks = Vec::new();
 
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
 
@@ -441,6 +442,11 @@ fn expand_sequence_helper_struct(
           );
           quote! { #tag_qname_lit | #local_name_lit }
         };
+        matcher_checks.push(quote! {
+          if matches!(name, #match_target) {
+            return true;
+          }
+        });
 
         if contains_vec_type(&field.ty) {
           child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -536,6 +542,11 @@ fn expand_sequence_helper_struct(
           is_option_type(&field.ty),
         ));
         let match_target = text_child_match_target(&qname);
+        matcher_checks.push(quote! {
+          if matches!(name, #match_target) {
+            return true;
+          }
+        });
         let parse_arm = build_text_child_parse_arm(
           ident,
           field_ident,
@@ -566,6 +577,12 @@ fn expand_sequence_helper_struct(
   Ok(sdk_type_impl_tokens(
     ident,
     quote! {
+      #[inline(always)]
+      pub(crate) fn matches_start_qname(name: &[u8]) -> bool {
+        #( #matcher_checks )*
+        false
+      }
+
       pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
         xml_reader: &mut R,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,

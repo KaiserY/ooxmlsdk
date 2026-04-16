@@ -91,6 +91,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             children.extend(gen_one_choice_children(ty, &raw_child_map, &type_map));
           } else if ty.particle.kind == "All" {
             children.extend(ty.children.iter().map(|child| SchemaTypeChild {
+              particle_id: String::new(),
               name: child.name.clone(),
               property_name: child.property_name.clone(),
               property_comments: child.property_comments.clone(),
@@ -106,6 +107,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                 .children
                 .iter()
                 .map(|child| SchemaTypeChild {
+                  particle_id: String::new(),
                   name: child.name.clone(),
                   property_name: child.property_name.clone(),
                   property_comments: child.property_comments.clone(),
@@ -119,6 +121,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
 
               if !variants.is_empty() {
                 children.push(SchemaTypeChild {
+                  particle_id: String::new(),
                   name: String::new(),
                   property_name: "children".to_string(),
                   property_comments: String::new(),
@@ -131,6 +134,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               }
             } else {
               children.extend(ty.children.iter().map(|child| SchemaTypeChild {
+                particle_id: String::new(),
                 name: child.name.clone(),
                 property_name: child.property_name.clone(),
                 property_comments: child.property_comments.clone(),
@@ -159,6 +163,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           assign_stable_group_names(&mut children, &stable_group_signatures);
           mark_sequence_collection_children_repeated(ty, &mut children);
           mark_mixed_sequence_direct_children_optional(&mut children);
+          assign_particle_ids(&mut children);
 
           let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
             SchemaTypeXmlHeader::Standalone
@@ -250,6 +255,14 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .collect();
 
   schemas
+}
+
+pub(crate) fn assign_schema_particle_ids(schemas: &mut [Schema]) {
+  for schema in schemas {
+    for schema_type in &mut schema.types {
+      assign_particle_ids(&mut schema_type.children);
+    }
+  }
 }
 
 fn load_stable_group_signatures(gen_context: &Context) -> Vec<StableGroupSignature> {
@@ -422,6 +435,7 @@ fn factor_stable_group_wrappers(child: &mut SchemaTypeChild, signatures: &[Stabl
         effective_initial_version(version.as_str(), nested.initial_version.as_str()).to_string()
       });
     let wrapper = SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: signature.property_name.clone(),
       property_comments: String::new(),
@@ -573,6 +587,7 @@ fn gen_one_choice_children(
 
   if schema_type.particle.kind.is_empty() {
     variants.extend(schema_type.children.iter().map(|child| SchemaTypeChild {
+      particle_id: String::new(),
       name: child.name.clone(),
       property_name: child.property_name.clone(),
       property_comments: child.property_comments.clone(),
@@ -598,6 +613,7 @@ fn gen_one_choice_children(
   let (optional, repeated, initial_version) = particle_cardinality(&schema_type.particle);
 
   vec![SchemaTypeChild {
+    particle_id: String::new(),
     name: String::new(),
     property_name: "children".to_string(),
     property_comments: String::new(),
@@ -649,6 +665,7 @@ fn collect_choice_children(
   match particle.kind.as_str() {
     "Any" => {
       out.push(SchemaTypeChild {
+        particle_id: String::new(),
         name: String::new(),
         property_name: "UnknownXml".to_string(),
         property_comments: String::new(),
@@ -662,6 +679,7 @@ fn collect_choice_children(
     "" => {
       if let Some(child) = schema_child_from_particle(particle, raw_child_map, type_map) {
         out.push(SchemaTypeChild {
+          particle_id: String::new(),
           optional: optional || child.optional,
           repeated: repeated || child.repeated,
           ..child
@@ -683,6 +701,7 @@ fn collect_choice_children(
       }
       if !variants.is_empty() {
         out.push(SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: "children".to_string(),
           property_comments: String::new(),
@@ -710,6 +729,7 @@ fn collect_choice_children(
         }
         if !sequence_children.is_empty() {
           out.push(SchemaTypeChild {
+            particle_id: String::new(),
             name: String::new(),
             property_name: String::new(),
             property_comments: String::new(),
@@ -754,6 +774,7 @@ fn collect_choice_variant_children(
   match particle.kind.as_str() {
     "Any" => {
       out.push(SchemaTypeChild {
+        particle_id: String::new(),
         name: String::new(),
         property_name: "UnknownXml".to_string(),
         property_comments: String::new(),
@@ -767,6 +788,7 @@ fn collect_choice_variant_children(
     "" => {
       if let Some(child) = schema_child_from_particle(particle, raw_child_map, type_map) {
         out.push(SchemaTypeChild {
+          particle_id: String::new(),
           optional: optional || child.optional,
           repeated: repeated || child.repeated,
           ..child
@@ -789,6 +811,7 @@ fn collect_choice_variant_children(
       normalize_choice_children(&mut variants, !preserve_nested_choice_wrappers);
       if !variants.is_empty() {
         out.push(SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: String::new(),
           property_comments: String::new(),
@@ -826,6 +849,7 @@ fn collect_choice_variant_children(
           return;
         }
         out.push(SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: String::new(),
           property_comments: String::new(),
@@ -961,6 +985,7 @@ fn schema_child_from_particle(
   if particle.name.is_empty() {
     if particle.kind == "Any" {
       return Some(SchemaTypeChild {
+        particle_id: String::new(),
         name: String::new(),
         property_name: "UnknownXml".to_string(),
         property_comments: String::new(),
@@ -999,6 +1024,7 @@ fn schema_child_from_particle(
     && particle.items.len() == 1;
 
   Some(SchemaTypeChild {
+    particle_id: String::new(),
     name: particle.name.clone(),
     property_name,
     property_comments,
@@ -1070,6 +1096,51 @@ fn mark_mixed_sequence_direct_children_optional(children: &mut [SchemaTypeChild]
     {
       child.optional = true;
     }
+  }
+}
+
+fn assign_particle_ids(children: &mut [SchemaTypeChild]) {
+  assign_particle_ids_with_prefix(children, "");
+}
+
+fn assign_particle_ids_with_prefix(children: &mut [SchemaTypeChild], prefix: &str) {
+  let mut child_index = 0;
+  let mut text_child_index = 0;
+  let mut any_index = 0;
+  let mut choice_index = 0;
+  let mut sequence_index = 0;
+
+  for child in children {
+    let segment = match child.kind {
+      SchemaTypeChildKind::Child => {
+        child_index += 1;
+        format!("child_{child_index}")
+      }
+      SchemaTypeChildKind::TextChild => {
+        text_child_index += 1;
+        format!("text_child_{text_child_index}")
+      }
+      SchemaTypeChildKind::Any => {
+        any_index += 1;
+        format!("any_{any_index}")
+      }
+      SchemaTypeChildKind::Choice => {
+        choice_index += 1;
+        format!("choice_{choice_index}")
+      }
+      SchemaTypeChildKind::Sequence => {
+        sequence_index += 1;
+        format!("sequence_{sequence_index}")
+      }
+    };
+
+    child.particle_id = if prefix.is_empty() {
+      segment
+    } else {
+      format!("{prefix}/{segment}")
+    };
+
+    assign_particle_ids_with_prefix(&mut child.children, &child.particle_id);
   }
 }
 
@@ -1237,6 +1308,7 @@ mod tests {
 
   fn child(name: &str) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: name.to_string(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -1250,6 +1322,7 @@ mod tests {
 
   fn child_with_flags(name: &str, optional: bool, repeated: bool) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       optional,
       repeated,
       ..child(name)
@@ -1261,6 +1334,7 @@ mod tests {
     children: Vec<SchemaTypeChild>,
   ) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -1296,6 +1370,7 @@ mod tests {
   #[test]
   fn preserves_named_choice_wrappers() {
     let mut children = vec![SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: "eg_p_content".to_string(),
       property_comments: String::new(),
@@ -1316,6 +1391,7 @@ mod tests {
   #[test]
   fn recursively_flattens_anonymous_choice_wrappers_inside_named_choices() {
     let mut children = vec![SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: "eg_p_content".to_string(),
       property_comments: String::new(),
@@ -1370,6 +1446,7 @@ mod tests {
   #[test]
   fn preserves_anonymous_choice_wrappers_when_requested() {
     let mut children = vec![SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: "eg_p_content".to_string(),
       property_comments: String::new(),
@@ -1401,6 +1478,7 @@ mod tests {
   #[test]
   fn flattened_anonymous_choice_preserves_wrapper_cardinality() {
     let mut children = vec![SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -1424,6 +1502,36 @@ mod tests {
         .iter()
         .all(|child| child.initial_version == "Office2010")
     );
+  }
+
+  #[test]
+  fn assigns_particle_ids_by_kind_and_path() {
+    let mut children = vec![
+      child("w:CT_R/w:r"),
+      anonymous_wrapper(
+        SchemaTypeChildKind::Choice,
+        vec![
+          child("w:CT_Br/w:br"),
+          anonymous_wrapper(
+            SchemaTypeChildKind::Sequence,
+            vec![child("w:CT_Text/w:t"), child("w:CT_TabStop/w:tab")],
+          ),
+        ],
+      ),
+      anonymous_wrapper(SchemaTypeChildKind::Choice, vec![child("w:CT_Cr/w:cr")]),
+    ];
+
+    assign_particle_ids(&mut children);
+
+    assert_eq!(children[0].particle_id, "child_1");
+    assert_eq!(children[1].particle_id, "choice_1");
+    assert_eq!(children[1].children[0].particle_id, "choice_1/child_1");
+    assert_eq!(children[1].children[1].particle_id, "choice_1/sequence_1");
+    assert_eq!(
+      children[1].children[1].children[1].particle_id,
+      "choice_1/sequence_1/child_2"
+    );
+    assert_eq!(children[2].particle_id, "choice_2");
   }
 
   #[test]

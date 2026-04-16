@@ -87,6 +87,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
         api_kind: SchemaTypeApiKind::Struct,
         attributes: Vec::new(),
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           name: "CT_Relationship/Relationship".to_string(),
           property_name: "relationship".to_string(),
           property_comments: "Relationship".to_string(),
@@ -191,6 +192,7 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
         api_kind: SchemaTypeApiKind::Struct,
         attributes: Vec::new(),
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: "children".to_string(),
           property_comments: String::new(),
@@ -202,6 +204,7 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
             .children
             .iter()
             .map(|child| SchemaTypeChild {
+              particle_id: String::new(),
               name: content_types_child_type_name(child.q_name.as_str()),
               property_name: String::new(),
               property_comments: String::new(),
@@ -278,6 +281,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
       .children
       .iter()
       .map(|child| SchemaTypeChild {
+        particle_id: String::new(),
         name: core_property_child_type_name(child),
         property_name: core_property_field_name(child.q_name.as_str()).to_string(),
         property_comments: child.q_name.clone(),
@@ -317,6 +321,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
       .children
       .iter()
       .map(|child| SchemaTypeChild {
+        particle_id: String::new(),
         name: "cp:CT_Keyword/cp:value".to_string(),
         property_name: "value".to_string(),
         property_comments: child.q_name.clone(),

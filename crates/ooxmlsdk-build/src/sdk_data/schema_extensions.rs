@@ -332,6 +332,7 @@ fn choice_child_contains_qname(child: &SchemaTypeChild, child_qname: &str) -> bo
 
 fn runtime_schema_type_child(extension: &SchemaTypeChildExtension) -> SchemaTypeChild {
   SchemaTypeChild {
+    particle_id: String::new(),
     name: extension.name.clone(),
     property_name: extension.property_name.clone(),
     property_comments: String::new(),
@@ -357,6 +358,7 @@ mod tests {
 
   fn anonymous_choice(children: Vec<SchemaTypeChild>) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -370,6 +372,7 @@ mod tests {
 
   fn leaf(name: &str) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: name.to_string(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -461,6 +464,7 @@ mod tests {
       types: vec![SchemaType {
         class_name: "Body".to_string(),
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: String::new(),
           property_comments: String::new(),
@@ -592,6 +596,7 @@ mod tests {
       types: vec![SchemaType {
         class_name: "Body".to_string(),
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: String::new(),
           property_comments: String::new(),
@@ -670,6 +675,7 @@ mod tests {
       types: vec![SchemaType {
         class_name: "Drawing".to_string(),
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: "children".to_string(),
           property_comments: String::new(),
@@ -738,6 +744,7 @@ mod tests {
       types: vec![SchemaType {
         class_name: "Drawing".to_string(),
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           name: String::new(),
           property_name: "children".to_string(),
           property_comments: String::new(),

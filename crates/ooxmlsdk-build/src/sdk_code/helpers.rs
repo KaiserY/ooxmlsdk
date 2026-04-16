@@ -498,6 +498,7 @@ mod tests {
 
   fn child(name: &str, optional: bool, repeated: bool, version: &'static str) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: name.to_string(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -516,6 +517,7 @@ mod tests {
     version: &'static str,
   ) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -534,6 +536,7 @@ mod tests {
     version: &'static str,
   ) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: String::new(),
       property_comments: String::new(),
@@ -547,6 +550,7 @@ mod tests {
 
   fn any(optional: bool, repeated: bool, version: &'static str) -> SchemaTypeChild {
     SchemaTypeChild {
+      particle_id: String::new(),
       name: String::new(),
       property_name: "UnknownXml".to_string(),
       property_comments: String::new(),

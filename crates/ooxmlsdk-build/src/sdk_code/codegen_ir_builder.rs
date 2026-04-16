@@ -201,8 +201,34 @@ fn build_content_structure_from_schema_type(
       )
     })
   {
-    return Some(normalize_content_particle_decl(ContentParticleDecl {
-      kind: ContentParticleKind::All,
+    return Some(assign_content_particle_ids(
+      normalize_content_particle_decl(ContentParticleDecl {
+        particle_id: Some("root".to_string()),
+        kind: ContentParticleKind::All,
+        qname: None,
+        version: String::new(),
+        cardinality: Cardinality::One,
+        children: content_children
+          .iter()
+          .map(|child| build_content_particle_from_schema_child(child, context))
+          .collect(),
+      }),
+    ));
+  }
+
+  if content_children.len() == 1 {
+    return Some(assign_content_particle_ids(
+      normalize_content_particle_decl(build_content_particle_from_schema_child(
+        &content_children[0],
+        context,
+      )),
+    ));
+  }
+
+  Some(assign_content_particle_ids(
+    normalize_content_particle_decl(ContentParticleDecl {
+      particle_id: Some("root".to_string()),
+      kind: ContentParticleKind::Sequence,
       qname: None,
       version: String::new(),
       cardinality: Cardinality::One,
@@ -210,25 +236,8 @@ fn build_content_structure_from_schema_type(
         .iter()
         .map(|child| build_content_particle_from_schema_child(child, context))
         .collect(),
-    }));
-  }
-
-  if content_children.len() == 1 {
-    return Some(normalize_content_particle_decl(
-      build_content_particle_from_schema_child(&content_children[0], context),
-    ));
-  }
-
-  Some(normalize_content_particle_decl(ContentParticleDecl {
-    kind: ContentParticleKind::Sequence,
-    qname: None,
-    version: String::new(),
-    cardinality: Cardinality::One,
-    children: content_children
-      .iter()
-      .map(|child| build_content_particle_from_schema_child(child, context))
-      .collect(),
-  }))
+    }),
+  ))
 }
 
 fn build_content_particle_from_schema_child(
@@ -248,6 +257,7 @@ fn build_content_particle_from_schema_child(
       };
 
       ContentParticleDecl {
+        particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
         kind: match effective_kind {
           SchemaTypeChildKind::TextChild => {
             if child.name.is_empty() {
@@ -265,6 +275,7 @@ fn build_content_particle_from_schema_child(
       }
     }
     SchemaTypeChildKind::Any => ContentParticleDecl {
+      particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
       kind: ContentParticleKind::Any,
       qname: None,
       version: child.initial_version.clone(),
@@ -272,6 +283,7 @@ fn build_content_particle_from_schema_child(
       children: Vec::new(),
     },
     SchemaTypeChildKind::Choice => ContentParticleDecl {
+      particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
       kind: ContentParticleKind::Choice,
       qname: None,
       version: child.initial_version.clone(),
@@ -283,6 +295,7 @@ fn build_content_particle_from_schema_child(
         .collect(),
     },
     SchemaTypeChildKind::Sequence => ContentParticleDecl {
+      particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
       kind: ContentParticleKind::Sequence,
       qname: None,
       version: child.initial_version.clone(),
@@ -354,6 +367,68 @@ fn normalize_content_particle_decl(mut node: ContentParticleDecl) -> ContentPart
   }
 
   node
+}
+
+fn assign_content_particle_ids(mut root: ContentParticleDecl) -> ContentParticleDecl {
+  if root.particle_id.is_none() {
+    root.particle_id = Some("root".to_string());
+  }
+  assign_content_particle_child_ids(&mut root);
+  root
+}
+
+fn assign_content_particle_child_ids(node: &mut ContentParticleDecl) {
+  let mut child_index = 0;
+  let mut text_child_index = 0;
+  let mut text_index = 0;
+  let mut any_index = 0;
+  let mut choice_index = 0;
+  let mut sequence_index = 0;
+  let mut all_index = 0;
+
+  let parent_id = node
+    .particle_id
+    .clone()
+    .unwrap_or_else(|| "root".to_string());
+
+  for child in &mut node.children {
+    let segment = match child.kind {
+      ContentParticleKind::Child => {
+        child_index += 1;
+        format!("child_{child_index}")
+      }
+      ContentParticleKind::TextChild => {
+        text_child_index += 1;
+        format!("text_child_{text_child_index}")
+      }
+      ContentParticleKind::Text => {
+        text_index += 1;
+        format!("text_{text_index}")
+      }
+      ContentParticleKind::Any => {
+        any_index += 1;
+        format!("any_{any_index}")
+      }
+      ContentParticleKind::Choice => {
+        choice_index += 1;
+        format!("choice_{choice_index}")
+      }
+      ContentParticleKind::Sequence => {
+        sequence_index += 1;
+        format!("sequence_{sequence_index}")
+      }
+      ContentParticleKind::All => {
+        all_index += 1;
+        format!("all_{all_index}")
+      }
+    };
+
+    if child.particle_id.is_none() {
+      child.particle_id = Some(format!("{parent_id}/{segment}"));
+    }
+
+    assign_content_particle_child_ids(child);
+  }
 }
 
 fn merge_content_cardinality(left: Cardinality, right: Cardinality) -> Cardinality {
@@ -3339,8 +3414,34 @@ mod tests {
         )
       })
     {
-      return Some(normalize_content_particle_decl(ContentParticleDecl {
-        kind: ContentParticleKind::All,
+      return Some(assign_content_particle_ids(
+        normalize_content_particle_decl(ContentParticleDecl {
+          particle_id: Some("root".to_string()),
+          kind: ContentParticleKind::All,
+          qname: None,
+          version: String::new(),
+          cardinality: Cardinality::One,
+          children: content_children
+            .iter()
+            .map(|child| expected_content_particle_from_schema_child(child, context))
+            .collect(),
+        }),
+      ));
+    }
+
+    if content_children.len() == 1 {
+      return Some(assign_content_particle_ids(
+        normalize_content_particle_decl(expected_content_particle_from_schema_child(
+          &content_children[0],
+          context,
+        )),
+      ));
+    }
+
+    Some(assign_content_particle_ids(
+      normalize_content_particle_decl(ContentParticleDecl {
+        particle_id: Some("root".to_string()),
+        kind: ContentParticleKind::Sequence,
         qname: None,
         version: String::new(),
         cardinality: Cardinality::One,
@@ -3348,25 +3449,8 @@ mod tests {
           .iter()
           .map(|child| expected_content_particle_from_schema_child(child, context))
           .collect(),
-      }));
-    }
-
-    if content_children.len() == 1 {
-      return Some(normalize_content_particle_decl(
-        expected_content_particle_from_schema_child(&content_children[0], context),
-      ));
-    }
-
-    Some(normalize_content_particle_decl(ContentParticleDecl {
-      kind: ContentParticleKind::Sequence,
-      qname: None,
-      version: String::new(),
-      cardinality: Cardinality::One,
-      children: content_children
-        .iter()
-        .map(|child| expected_content_particle_from_schema_child(child, context))
-        .collect(),
-    }))
+      }),
+    ))
   }
 
   fn expected_content_particle_from_schema_child(
@@ -3387,6 +3471,7 @@ mod tests {
         };
 
         ContentParticleDecl {
+          particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
           kind: match effective_kind {
             SchemaTypeChildKind::TextChild => {
               if child.name.is_empty() {
@@ -3404,6 +3489,7 @@ mod tests {
         }
       }
       SchemaTypeChildKind::Any => ContentParticleDecl {
+        particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
         kind: ContentParticleKind::Any,
         qname: None,
         version: child.initial_version.clone(),
@@ -3411,6 +3497,7 @@ mod tests {
         children: Vec::new(),
       },
       SchemaTypeChildKind::Choice => ContentParticleDecl {
+        particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
         kind: ContentParticleKind::Choice,
         qname: None,
         version: child.initial_version.clone(),
@@ -3422,6 +3509,7 @@ mod tests {
           .collect(),
       },
       SchemaTypeChildKind::Sequence => ContentParticleDecl {
+        particle_id: (!child.particle_id.is_empty()).then(|| child.particle_id.clone()),
         kind: ContentParticleKind::Sequence,
         qname: None,
         version: child.initial_version.clone(),
@@ -3626,6 +3714,7 @@ mod tests {
           class_name: "Paragraph".to_string(),
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Leaf/t:leaf".to_string(),
               property_name: "LeafChild".to_string(),
               property_comments: "Leaf child".to_string(),
@@ -3634,6 +3723,7 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Text/t:text".to_string(),
               property_name: "TextChild".to_string(),
               property_comments: "Text child".to_string(),
@@ -3714,10 +3804,12 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneChoice,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             initial_version: "Office2010".to_string(),
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Leaf/t:leaf".to_string(),
               property_name: "LeafChild".to_string(),
               property_comments: "Leaf child".to_string(),
@@ -3788,15 +3880,18 @@ mod tests {
           class_name: "ChoiceHolder".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_A/t:a".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_B/t:b".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -3858,23 +3953,28 @@ mod tests {
             ..Default::default()
           }],
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_A/t:a".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Sequence,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_B/t:b".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_C/t:c".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
@@ -3942,23 +4042,28 @@ mod tests {
           class_name: "NestedChoiceHolder".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_A/t:a".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Sequence,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_B/t:b".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_C/t:c".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
@@ -4061,6 +4166,7 @@ mod tests {
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "w:CT_PPr/w:pPr".to_string(),
               property_name: "paragraph_properties".to_string(),
               kind: SchemaTypeChildKind::Child,
@@ -4068,27 +4174,33 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Choice,
               property_name: "eg_p_content".to_string(),
               repeated: true,
               children: vec![
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   kind: SchemaTypeChildKind::Choice,
                   property_name: "eg_content_run_content".to_string(),
                   children: vec![
                     SchemaTypeChild {
+                      particle_id: String::new(),
                       kind: SchemaTypeChildKind::Choice,
                       property_name: "eg_run_level_elts".to_string(),
                       children: vec![
                         SchemaTypeChild {
+                          particle_id: String::new(),
                           name: "w:CT_ProofErr/w:proofErr".to_string(),
                           kind: SchemaTypeChildKind::Child,
                           ..Default::default()
                         },
                         SchemaTypeChild {
+                          particle_id: String::new(),
                           kind: SchemaTypeChildKind::Choice,
                           property_name: "eg_range_markup_elements".to_string(),
                           children: vec![SchemaTypeChild {
+                            particle_id: String::new(),
                             name: "w:CT_Bookmark/w:bookmarkStart".to_string(),
                             kind: SchemaTypeChildKind::Child,
                             ..Default::default()
@@ -4096,17 +4208,20 @@ mod tests {
                           ..Default::default()
                         },
                         SchemaTypeChild {
+                          particle_id: String::new(),
                           kind: SchemaTypeChildKind::Sequence,
                           property_name: "sequence1".to_string(),
                           initial_version: "Office2010".to_string(),
                           children: vec![
                             SchemaTypeChild {
+                              particle_id: String::new(),
                               name: "w:CT_RunTrackChange/w14:conflictIns".to_string(),
                               kind: SchemaTypeChildKind::Child,
                               initial_version: "Office2010".to_string(),
                               ..Default::default()
                             },
                             SchemaTypeChild {
+                              particle_id: String::new(),
                               name: "w:CT_RunTrackChange/w14:conflictDel".to_string(),
                               kind: SchemaTypeChildKind::Child,
                               initial_version: "Office2010".to_string(),
@@ -4116,21 +4231,26 @@ mod tests {
                           ..Default::default()
                         },
                         SchemaTypeChild {
+                          particle_id: String::new(),
                           kind: SchemaTypeChildKind::Choice,
                           property_name: "eg_math_content".to_string(),
                           children: vec![
                             SchemaTypeChild {
+                              particle_id: String::new(),
                               name: "m:CT_OMathPara/m:oMathPara".to_string(),
                               kind: SchemaTypeChildKind::Child,
                               ..Default::default()
                             },
                             SchemaTypeChild {
+                              particle_id: String::new(),
                               kind: SchemaTypeChildKind::Choice,
                               property_name: "eg_omath_math_elements".to_string(),
                               children: vec![SchemaTypeChild {
+                                particle_id: String::new(),
                                 kind: SchemaTypeChildKind::Choice,
                                 property_name: "choice1".to_string(),
                                 children: vec![SchemaTypeChild {
+                                  particle_id: String::new(),
                                   name: "m:CT_R/m:r".to_string(),
                                   kind: SchemaTypeChildKind::Child,
                                   ..Default::default()
@@ -4146,6 +4266,7 @@ mod tests {
                       ..Default::default()
                     },
                     SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "w:CT_R/w:r".to_string(),
                       kind: SchemaTypeChildKind::Child,
                       ..Default::default()
@@ -4154,16 +4275,19 @@ mod tests {
                   ..Default::default()
                 },
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "w:CT_SimpleField/w:fldSimple".to_string(),
                   kind: SchemaTypeChildKind::Child,
                   ..Default::default()
                 },
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "w:CT_Hyperlink/w:hyperlink".to_string(),
                   kind: SchemaTypeChildKind::Child,
                   ..Default::default()
                 },
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "w:CT_Rel/w:subDoc".to_string(),
                   kind: SchemaTypeChildKind::Child,
                   ..Default::default()
@@ -4336,6 +4460,7 @@ mod tests {
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Prefix/t:prefix".to_string(),
               property_name: "prefix".to_string(),
               kind: SchemaTypeChildKind::Child,
@@ -4343,28 +4468,34 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Choice,
               property_name: "eg_content".to_string(),
               repeated: true,
               children: vec![SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Choice,
                 property_name: "eg_nested".to_string(),
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_A/t:a".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     kind: SchemaTypeChildKind::Sequence,
                     property_name: "sequence1".to_string(),
                     children: vec![
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_B/t:b".to_string(),
                         kind: SchemaTypeChildKind::Child,
                         ..Default::default()
                       },
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_C/t:c".to_string(),
                         kind: SchemaTypeChildKind::Child,
                         ..Default::default()
@@ -4459,6 +4590,7 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Prefix/t:prefix".to_string(),
               property_name: "prefix".to_string(),
               kind: SchemaTypeChildKind::Child,
@@ -4466,28 +4598,34 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Choice,
               property_name: "eg_content".to_string(),
               repeated: true,
               children: vec![SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Choice,
                 property_name: "eg_nested".to_string(),
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_A/t:a".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     kind: SchemaTypeChildKind::Sequence,
                     property_name: "sequence1".to_string(),
                     children: vec![
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_B/t:b".to_string(),
                         kind: SchemaTypeChildKind::Child,
                         ..Default::default()
                       },
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_C/t:c".to_string(),
                         kind: SchemaTypeChildKind::Child,
                         ..Default::default()
@@ -4557,6 +4695,7 @@ mod tests {
             ..Default::default()
           }],
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             name: "t:CT_Row/t:row".to_string(),
             kind: SchemaTypeChildKind::Child,
             repeated: true,
@@ -4600,11 +4739,14 @@ mod tests {
           class_name: "SdtEndCharProperties".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Sequence,
               children: vec![SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_RPr/t:rPr".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -4679,6 +4821,7 @@ mod tests {
           text_value_type: "StringValue".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             name: "t:CT_Value/t:value".to_string(),
             kind: SchemaTypeChildKind::Child,
             property_name: "Value".to_string(),
@@ -4742,11 +4885,14 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             optional: true,
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Sequence,
               children: vec![SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_RPr/t:rPr".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -4823,9 +4969,11 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Color/t:color".to_string(),
               kind: SchemaTypeChildKind::Child,
               property_name: "Color".to_string(),
@@ -4908,11 +5056,14 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Sequence,
                 children: vec![SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "t:CT_Leaf/t:leaf".to_string(),
                   kind: SchemaTypeChildKind::Child,
                   ..Default::default()
@@ -4920,6 +5071,7 @@ mod tests {
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_Other/t:other".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -4982,9 +5134,11 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneChoice,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Value/t:value".to_string(),
               kind: SchemaTypeChildKind::Child,
               property_name: "Value".to_string(),
@@ -5076,17 +5230,21 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Sequence,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_A/t:a".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_B/t:b".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
@@ -5095,6 +5253,7 @@ mod tests {
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_C/t:c".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -5110,17 +5269,21 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Sequence,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_A/t:a".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_B/t:b".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
@@ -5129,6 +5292,7 @@ mod tests {
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_D/t:d".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -5198,15 +5362,18 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: SchemaTypeCompositeKind::OneChoice,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_A/t:a".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_B/t:b".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -5258,11 +5425,14 @@ mod tests {
           class_name: "SdtEndCharProperties".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Sequence,
               children: vec![SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_RPr/t:rPr".to_string(),
                 kind: SchemaTypeChildKind::Child,
                 ..Default::default()
@@ -5325,6 +5495,7 @@ mod tests {
           composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneSequence,
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_Leaf/t:leaf".to_string(),
               property_name: "LeafChild".to_string(),
               property_comments: "Leaf child".to_string(),
@@ -5332,12 +5503,15 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "wrapper".to_string(),
               kind: SchemaTypeChildKind::Sequence,
               optional: true,
               children: vec![SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Choice,
                 children: vec![SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "t:CT_Text/t:text".to_string(),
                   property_name: "TextChild".to_string(),
                   property_comments: "Text child".to_string(),
@@ -5350,6 +5524,7 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               kind: SchemaTypeChildKind::Any,
               property_name: "UnknownXml".to_string(),
               property_comments: "Unknown xml".to_string(),
@@ -5434,10 +5609,12 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             name: "wrapper".to_string(),
             kind: SchemaTypeChildKind::Sequence,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "t:CT_A/t:a".to_string(),
                 property_name: "LeafA".to_string(),
                 property_comments: "Leaf A".to_string(),
@@ -5445,10 +5622,12 @@ mod tests {
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 name: "choice_wrapper".to_string(),
                 kind: SchemaTypeChildKind::Choice,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_B/t:b".to_string(),
                     property_name: "LeafB".to_string(),
                     property_comments: "Leaf B".to_string(),
@@ -5456,10 +5635,12 @@ mod tests {
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "seq_variant".to_string(),
                     kind: SchemaTypeChildKind::Sequence,
                     children: vec![
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_C/t:c".to_string(),
                         property_name: "LeafC".to_string(),
                         property_comments: "Leaf C".to_string(),
@@ -5467,6 +5648,7 @@ mod tests {
                         ..Default::default()
                       },
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_D/t:d".to_string(),
                         property_name: "LeafD".to_string(),
                         property_comments: "Leaf D".to_string(),
@@ -5575,6 +5757,7 @@ mod tests {
           composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneSequence,
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_A/t:a".to_string(),
               property_name: "LeafA".to_string(),
               property_comments: "Leaf A".to_string(),
@@ -5582,10 +5765,12 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "choice_wrapper".to_string(),
               kind: SchemaTypeChildKind::Choice,
               children: vec![
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "t:CT_B/t:b".to_string(),
                   property_name: "LeafB".to_string(),
                   property_comments: "Leaf B".to_string(),
@@ -5593,10 +5778,12 @@ mod tests {
                   ..Default::default()
                 },
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "seq_variant".to_string(),
                   kind: SchemaTypeChildKind::Sequence,
                   children: vec![
                     SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "t:CT_C/t:c".to_string(),
                       property_name: "LeafC".to_string(),
                       property_comments: "Leaf C".to_string(),
@@ -5604,6 +5791,7 @@ mod tests {
                       ..Default::default()
                     },
                     SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "t:CT_D/t:d".to_string(),
                       property_name: "LeafD".to_string(),
                       property_comments: "Leaf D".to_string(),
@@ -5617,6 +5805,7 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_D/t:d".to_string(),
               property_name: "TrailingLeaf".to_string(),
               property_comments: "Trailing leaf".to_string(),
@@ -5708,6 +5897,7 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_A/t:a".to_string(),
               property_name: "LeafA".to_string(),
               property_comments: "Leaf A".to_string(),
@@ -5715,10 +5905,12 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "choice_wrapper".to_string(),
               kind: SchemaTypeChildKind::Choice,
               children: vec![
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "t:CT_B/t:b".to_string(),
                   property_name: "LeafB".to_string(),
                   property_comments: "Leaf B".to_string(),
@@ -5726,10 +5918,12 @@ mod tests {
                   ..Default::default()
                 },
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "seq_variant".to_string(),
                   kind: SchemaTypeChildKind::Sequence,
                   children: vec![
                     SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "t:CT_C/t:c".to_string(),
                       property_name: "LeafC".to_string(),
                       property_comments: "Leaf C".to_string(),
@@ -5737,6 +5931,7 @@ mod tests {
                       ..Default::default()
                     },
                     SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "t:CT_D/t:d".to_string(),
                       property_name: "LeafD".to_string(),
                       property_comments: "Leaf D".to_string(),
@@ -5750,6 +5945,7 @@ mod tests {
               ..Default::default()
             },
             SchemaTypeChild {
+              particle_id: String::new(),
               name: "t:CT_D/t:d".to_string(),
               property_name: "TrailingLeaf".to_string(),
               property_comments: "Trailing leaf".to_string(),
@@ -5801,6 +5997,7 @@ mod tests {
         class_name: "AnyHolder".to_string(),
         kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
         children: vec![SchemaTypeChild {
+          particle_id: String::new(),
           kind: SchemaTypeChildKind::Any,
           property_name: "UnknownXml".to_string(),
           ..Default::default()
@@ -5860,13 +6057,16 @@ mod tests {
           class_name: "FallbackHolder".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             name: "wrapper".to_string(),
             kind: SchemaTypeChildKind::Sequence,
             children: vec![SchemaTypeChild {
+              particle_id: String::new(),
               name: "choice".to_string(),
               kind: SchemaTypeChildKind::Choice,
               children: vec![
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "t:CT_A/t:a".to_string(),
                   property_name: "LeafA".to_string(),
                   property_comments: "Leaf A".to_string(),
@@ -5874,9 +6074,11 @@ mod tests {
                   ..Default::default()
                 },
                 SchemaTypeChild {
+                  particle_id: String::new(),
                   name: "inner".to_string(),
                   kind: SchemaTypeChildKind::Sequence,
                   children: vec![SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_B/t:b".to_string(),
                     property_name: "LeafB".to_string(),
                     property_comments: "Leaf B".to_string(),
@@ -6259,20 +6461,25 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::SdkSequence,
           children: vec![SchemaTypeChild {
+            particle_id: String::new(),
             kind: SchemaTypeChildKind::Sequence,
             children: vec![
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Choice,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     kind: SchemaTypeChildKind::Choice,
                     children: vec![
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_A/t:a".to_string(),
                         kind: SchemaTypeChildKind::Child,
                         ..Default::default()
                       },
                       SchemaTypeChild {
+                        particle_id: String::new(),
                         name: "t:CT_B/t:b".to_string(),
                         kind: SchemaTypeChildKind::Child,
                         ..Default::default()
@@ -6281,8 +6488,10 @@ mod tests {
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     kind: SchemaTypeChildKind::Choice,
                     children: vec![SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "t:CT_C/t:c".to_string(),
                       kind: SchemaTypeChildKind::Child,
                       ..Default::default()
@@ -6293,16 +6502,20 @@ mod tests {
                 ..Default::default()
               },
               SchemaTypeChild {
+                particle_id: String::new(),
                 kind: SchemaTypeChildKind::Sequence,
                 children: vec![
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     name: "t:CT_D/t:d".to_string(),
                     kind: SchemaTypeChildKind::Child,
                     ..Default::default()
                   },
                   SchemaTypeChild {
+                    particle_id: String::new(),
                     kind: SchemaTypeChildKind::Choice,
                     children: vec![SchemaTypeChild {
+                      particle_id: String::new(),
                       name: "t:CT_E/t:e".to_string(),
                       kind: SchemaTypeChildKind::Child,
                       ..Default::default()

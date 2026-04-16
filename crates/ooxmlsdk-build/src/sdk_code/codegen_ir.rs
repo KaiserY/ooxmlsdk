@@ -105,6 +105,8 @@ pub enum ContentModelDecl {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct ContentParticleDecl {
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub particle_id: Option<String>,
   pub kind: ContentParticleKind,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub qname: Option<String>,
@@ -427,17 +429,20 @@ mod tests {
         xml_content: None,
         support: SystemSupportDecl::default(),
         content_structure: Some(ContentParticleDecl {
+          particle_id: Some("root".to_string()),
           kind: ContentParticleKind::Sequence,
           qname: None,
           version: String::new(),
           cardinality: Cardinality::One,
           children: vec![ContentParticleDecl {
+            particle_id: Some("root/choice_1".to_string()),
             kind: ContentParticleKind::Choice,
             qname: None,
             version: "Office2010".to_string(),
             cardinality: Cardinality::Optional,
             children: vec![
               ContentParticleDecl {
+                particle_id: Some("root/choice_1/text_child_1".to_string()),
                 kind: ContentParticleKind::TextChild,
                 qname: Some("w:t".to_string()),
                 version: String::new(),
@@ -445,6 +450,7 @@ mod tests {
                 children: vec![],
               },
               ContentParticleDecl {
+                particle_id: Some("root/choice_1/any_1".to_string()),
                 kind: ContentParticleKind::Any,
                 qname: None,
                 version: "Office2010".to_string(),

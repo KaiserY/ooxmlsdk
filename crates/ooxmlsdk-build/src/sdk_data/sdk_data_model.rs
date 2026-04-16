@@ -179,6 +179,8 @@ pub struct SchemaTypeAttributeValidatorArgument {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeChild {
+  #[serde(default, skip_serializing_if = "String::is_empty")]
+  pub particle_id: String,
   pub name: String,
   pub property_name: String,
   pub property_comments: String,

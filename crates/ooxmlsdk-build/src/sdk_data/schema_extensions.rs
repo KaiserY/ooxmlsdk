@@ -36,6 +36,7 @@ pub struct SchemaTypeExtension {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeChildExtension {
   pub kind: SchemaTypeChildKind,
+  pub match_particle_id: String,
   pub name: String,
   pub property_name: String,
   #[serde(default)]
@@ -153,6 +154,7 @@ fn expand_mc_alternate_content_insert_before(
     .iter()
     .map(|insert_before| SchemaTypeChildExtension {
       kind: SchemaTypeChildKind::Child,
+      match_particle_id: String::new(),
       name: "mc:CT_AlternateContent/mc:AlternateContent".to_string(),
       property_name: "mc_alternate_content".to_string(),
       optional: true,
@@ -282,6 +284,21 @@ fn find_merge_target<'a>(
   target: &'a mut [SchemaTypeChild],
   extension: &SchemaTypeChildExtension,
 ) -> Option<&'a mut SchemaTypeChild> {
+  if !extension.match_particle_id.is_empty()
+    && let Some(index) = target
+      .iter()
+      .position(|child| child.particle_id == extension.match_particle_id)
+  {
+    return target.get_mut(index);
+  }
+
+  find_merge_target_legacy(target, extension)
+}
+
+fn find_merge_target_legacy<'a>(
+  target: &'a mut [SchemaTypeChild],
+  extension: &SchemaTypeChildExtension,
+) -> Option<&'a mut SchemaTypeChild> {
   if !extension.name.is_empty()
     && let Some(index) = target.iter().position(|child| child.name == extension.name)
   {
@@ -351,6 +368,8 @@ fn runtime_schema_type_child(extension: &SchemaTypeChildExtension) -> SchemaType
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::sdk_data::context::Context;
+  use crate::sdk_data::schemas::{assign_schema_particle_ids, gen_schemas};
   use crate::sdk_data::sdk_data_model::{
     SchemaType, SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
     SchemaTypeKind, SchemaTypeXmlHeader,
@@ -422,6 +441,7 @@ mod tests {
           class_name: "Paragraph".to_string(),
           children: vec![SchemaTypeChildExtension {
             kind: SchemaTypeChildKind::Choice,
+            match_particle_id: String::new(),
             name: String::new(),
             property_name: "eg_p_content".to_string(),
             optional: false,
@@ -505,6 +525,7 @@ mod tests {
           class_name: "Body".to_string(),
           children: vec![SchemaTypeChildExtension {
             kind: SchemaTypeChildKind::Choice,
+            match_particle_id: String::new(),
             name: String::new(),
             property_name: "eg_block_level_elts".to_string(),
             optional: false,
@@ -638,6 +659,7 @@ mod tests {
           mc_alternate_content_insert_before: vec!["w:CT_P/w:p".to_string()],
           children: vec![SchemaTypeChildExtension {
             kind: SchemaTypeChildKind::Choice,
+            match_particle_id: String::new(),
             name: String::new(),
             property_name: "eg_block_level_elts".to_string(),
             optional: false,
@@ -716,6 +738,7 @@ mod tests {
           class_name: "Drawing".to_string(),
           children: vec![SchemaTypeChildExtension {
             kind: SchemaTypeChildKind::Choice,
+            match_particle_id: String::new(),
             name: String::new(),
             property_name: "drawing_choice".to_string(),
             optional: false,
@@ -785,6 +808,7 @@ mod tests {
           class_name: "Drawing".to_string(),
           children: vec![SchemaTypeChildExtension {
             kind: SchemaTypeChildKind::Choice,
+            match_particle_id: String::new(),
             name: String::new(),
             property_name: String::new(),
             optional: false,
@@ -803,5 +827,227 @@ mod tests {
     let drawing = &schemas[0].types[0];
     assert_eq!(drawing.children.len(), 1);
     assert!(drawing.children[0].repeated);
+  }
+
+  #[test]
+  fn match_particle_id_targets_non_unique_choice() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "TableCellProperties".to_string(),
+        children: vec![SchemaTypeChild {
+          particle_id: String::new(),
+          name: String::new(),
+          property_name: String::new(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Sequence,
+          optional: false,
+          repeated: false,
+          initial_version: String::new(),
+          children: vec![
+            anonymous_choice(vec![leaf("w:CT_Cnf/w:cnfStyle")]),
+            anonymous_choice(vec![leaf("w:CT_TrackChange/w:cellIns")]),
+          ],
+        }],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    assign_schema_particle_ids(&mut schemas);
+    let target_particle_id = schemas[0].types[0].children[0].children[1]
+      .particle_id
+      .clone();
+
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "TableCellProperties".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            match_particle_id: target_particle_id,
+            name: String::new(),
+            property_name: "eg_cell_markup_elements".to_string(),
+            optional: false,
+            repeated: None,
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let table_cell_properties = &schemas[0].types[0];
+    assert_eq!(table_cell_properties.children.len(), 1);
+    assert_eq!(
+      table_cell_properties.children[0].kind,
+      SchemaTypeChildKind::Sequence
+    );
+    assert_eq!(table_cell_properties.children[0].children.len(), 2);
+    assert!(
+      table_cell_properties.children[0].children[0]
+        .property_name
+        .is_empty()
+    );
+    assert_eq!(
+      table_cell_properties.children[0].children[1].property_name,
+      "eg_cell_markup_elements"
+    );
+  }
+
+  #[test]
+  fn legacy_choice_matching_still_works_without_match_particle_id() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Paragraph".to_string(),
+        children: vec![anonymous_choice(vec![leaf("w:CT_R/w:r")])],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneChoice,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+        }
+      }],
+      ..Schema::default()
+    }];
+
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Paragraph".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            match_particle_id: String::new(),
+            name: String::new(),
+            property_name: "eg_p_content".to_string(),
+            optional: false,
+            repeated: None,
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let paragraph = &schemas[0].types[0];
+    assert_eq!(paragraph.children[0].property_name, "eg_p_content");
+  }
+
+  #[test]
+  fn current_choice_extensions_match_declared_particle_ids() {
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root");
+    let context = Context::new(&workspace_root.join("data")).expect("context");
+    let schemas = gen_schemas(&context);
+    let schema_extensions =
+      read_schema_extensions(&workspace_root.join("sdk_data/schema_extensions"))
+        .expect("schema extensions");
+
+    let mut missing_match_particle_id = Vec::new();
+    let mut unresolved = Vec::new();
+
+    for (module_name, extensions) in schema_extensions {
+      let schema = schemas
+        .iter()
+        .find(|schema| schema.module_name == module_name)
+        .expect("schema");
+      for extension in extensions.types {
+        let schema_type = schema
+          .types
+          .iter()
+          .find(|schema_type| schema_type.class_name == extension.class_name)
+          .expect("schema type");
+        let top_level_children = if schema_type.children.len() == 1
+          && schema_type.children[0].kind == SchemaTypeChildKind::Sequence
+        {
+          &schema_type.children[0].children
+        } else {
+          &schema_type.children
+        };
+
+        for child in extension.children {
+          if !matches!(
+            child.kind,
+            SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence
+          ) {
+            continue;
+          }
+
+          if child.match_particle_id.is_empty() {
+            missing_match_particle_id.push(format!(
+              "{}.{}:{}",
+              module_name, extension.class_name, child.property_name
+            ));
+            continue;
+          }
+
+          let matched = find_merge_target(&mut top_level_children.to_vec(), &child)
+            .map(|target| target.particle_id.clone());
+          if matched.as_deref() != Some(child.match_particle_id.as_str()) {
+            unresolved.push(format!(
+              "{}.{}:{} -> declared={} actual={}",
+              module_name,
+              extension.class_name,
+              child.property_name,
+              child.match_particle_id,
+              matched.unwrap_or_else(|| "<unmatched>".to_string())
+            ));
+          }
+        }
+      }
+    }
+
+    assert!(
+      missing_match_particle_id.is_empty(),
+      "choice/sequence extensions missing MatchParticleId:\n{}",
+      missing_match_particle_id.join("\n")
+    );
+    assert!(
+      unresolved.is_empty(),
+      "choice/sequence extensions with unresolved MatchParticleId:\n{}",
+      unresolved.join("\n")
+    );
   }
 }

@@ -60,7 +60,24 @@ fn supports_extended_sequence_strategy(schema_type: &SchemaType) -> bool {
   matches!(
     schema_type.composite_kind,
     SchemaTypeCompositeKind::OneSequence | SchemaTypeCompositeKind::SdkSequence
-  )
+  ) || has_unambiguous_extended_sequence_topology(schema_type)
+}
+
+fn has_unambiguous_extended_sequence_topology(schema_type: &SchemaType) -> bool {
+  if schema_type.children.is_empty() {
+    return false;
+  }
+
+  schema_type.children.len() == 1
+    && schema_type.children[0].kind == SchemaTypeChildKind::Sequence
+    && !contains_choice_descendant(&schema_type.children[0])
+}
+
+fn contains_choice_descendant(child: &SchemaTypeChild) -> bool {
+  child
+    .children
+    .iter()
+    .any(|nested| nested.kind == SchemaTypeChildKind::Choice || contains_choice_descendant(nested))
 }
 
 pub fn is_one_sequence_flatten(schema_type: &SchemaType) -> bool {
@@ -257,9 +274,21 @@ fn can_structure_sequence_variant_child(child: &SchemaTypeChild) -> bool {
 }
 
 pub fn is_any_only_composite_type(schema_type: &SchemaType) -> bool {
-  schema_type.composite_kind == SchemaTypeCompositeKind::SdkSequence
-    && schema_type.children.len() == 1
-    && schema_type.children[0].kind == SchemaTypeChildKind::Any
+  is_any_only_children(&schema_type.children)
+}
+
+fn is_any_only_children(children: &[SchemaTypeChild]) -> bool {
+  if children.len() != 1 {
+    return false;
+  }
+
+  match children[0].kind {
+    SchemaTypeChildKind::Any => true,
+    SchemaTypeChildKind::Sequence => is_any_only_children(&children[0].children),
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Choice => {
+      false
+    }
+  }
 }
 
 pub fn has_any_child(schema_type: &SchemaType) -> bool {
@@ -878,6 +907,70 @@ mod tests {
     };
     assert_eq!(second.name, "w:CT_RunTrackChange/w14:conflictDel");
     assert_eq!(conflict_sequence[1].initial_version, "Office2010");
+  }
+
+  #[test]
+  fn infers_flattened_one_sequence_from_single_sequence_wrapper_without_source_metadata() {
+    let schema_type = composite_schema(
+      SchemaTypeCompositeKind::None,
+      vec![sequence(
+        vec![
+          child("a:CT_Test/a:first", false, false, ""),
+          child("a:CT_Test/a:second", true, false, "Office2021"),
+        ],
+        false,
+        false,
+        "",
+      )],
+    );
+
+    assert!(is_one_sequence_flatten(&schema_type));
+
+    let flat = flatten_one_sequence_particles(&schema_type);
+    assert_eq!(flat.len(), 2);
+    let FlatParticleKind::Leaf(first) = flat[0].kind else {
+      panic!("expected leaf");
+    };
+    assert_eq!(first.name, "a:CT_Test/a:first");
+    let FlatParticleKind::Leaf(second) = flat[1].kind else {
+      panic!("expected leaf");
+    };
+    assert_eq!(second.name, "a:CT_Test/a:second");
+    assert!(flat[1].optional);
+    assert_eq!(flat[1].initial_version, "Office2021");
+  }
+
+  #[test]
+  fn detects_any_only_without_source_composite_kind() {
+    let schema_type = composite_schema(
+      SchemaTypeCompositeKind::None,
+      vec![SchemaTypeChild {
+        kind: SchemaTypeChildKind::Any,
+        property_name: "UnknownXml".to_string(),
+        ..Default::default()
+      }],
+    );
+
+    assert!(is_any_only_composite_type(&schema_type));
+  }
+
+  #[test]
+  fn detects_any_only_through_single_sequence_wrapper_without_source_metadata() {
+    let schema_type = composite_schema(
+      SchemaTypeCompositeKind::None,
+      vec![sequence(
+        vec![SchemaTypeChild {
+          kind: SchemaTypeChildKind::Any,
+          property_name: "UnknownXml".to_string(),
+          ..Default::default()
+        }],
+        false,
+        false,
+        "",
+      )],
+    );
+
+    assert!(is_any_only_composite_type(&schema_type));
   }
 
   #[test]

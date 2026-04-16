@@ -102,8 +102,6 @@ pub struct SchemaType {
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
-  #[serde(skip)]
-  pub particle: SchemaTypeParticle,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -201,24 +199,6 @@ pub enum SchemaTypeChildKind {
   Choice,
   Sequence,
   Any,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct SchemaTypeParticle {
-  pub kind: String,
-  pub name: String,
-  pub occurs: Vec<SchemaTypeParticleOccur>,
-  pub items: Vec<SchemaTypeParticle>,
-  pub initial_version: String,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct SchemaTypeParticleOccur {
-  pub max: Option<u64>,
-  pub min: Option<u64>,
-  pub version: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

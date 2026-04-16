@@ -122,6 +122,16 @@ pub struct ResolvedOneChoice<'a> {
   pub variants: Vec<ResolvedOneSequenceChild<'a>>,
 }
 
+fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
+  if schema_type.children.len() == 1
+    && schema_type.children[0].kind == SchemaTypeChildKind::Sequence
+  {
+    schema_type.children[0].children.as_slice()
+  } else {
+    schema_type.children.as_slice()
+  }
+}
+
 impl<'a> CodegenContext<'a> {
   pub fn new(schemas: &'a [Schema]) -> Self {
     let mut enum_type_map = HashMap::new();
@@ -214,8 +224,7 @@ impl<'a> CodegenContext<'a> {
     schema_type: &'a SchemaType,
     particle_name: &'a str,
   ) -> Result<ResolvedOneSequenceChild<'a>> {
-    if let Some(child) = schema_type
-      .children
+    if let Some(child) = top_level_content_children(schema_type)
       .iter()
       .find(|child| child.name == particle_name)
     {
@@ -648,8 +657,7 @@ pub(crate) fn one_sequence_choice_field_name(
   slot_index: usize,
 ) -> String {
   if choice_slot_count <= 1
-    && let Some(property_name) = schema_type
-      .children
+    && let Some(property_name) = top_level_content_children(schema_type)
       .iter()
       .filter(|child| child.kind == SchemaTypeChildKind::Choice)
       .nth(slot_index)
@@ -2238,7 +2246,6 @@ fn gen_structured_one_sequence_fields(
   item_cfg: VersionCfgContext,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
   let mut fields: Vec<TokenStream> = vec![];
-  let mut paragraph_prefix_fields: Vec<TokenStream> = vec![];
   let mut items: Vec<TokenStream> = vec![];
   let mut field_name_set = std::collections::HashSet::new();
   let structured_particles = structure_one_sequence_particles(schema_type);
@@ -2266,19 +2273,14 @@ fn gen_structured_one_sequence_fields(
           field_cfg,
         );
         if particle.repeated {
-          let field_tokens = quote! {
+          fields.push(quote! {
             #( #field_attrs )*
             #[doc = #property_comments]
             #sdk_field_attrs
             pub #child_name_ident: Vec<#child_variant_type>,
-          };
-          if schema_type.class_name == "Paragraph" && child.field_name == "paragraph_properties" {
-            paragraph_prefix_fields.push(field_tokens);
-          } else {
-            fields.push(field_tokens);
-          }
+          });
         } else if particle.optional {
-          let field_tokens = if wrap_box {
+          fields.push(if wrap_box {
             quote! {
               #( #field_attrs )*
               #[doc = #property_comments]
@@ -2292,14 +2294,9 @@ fn gen_structured_one_sequence_fields(
               #sdk_field_attrs
               pub #child_name_ident: Option<#child_variant_type>,
             }
-          };
-          if schema_type.class_name == "Paragraph" && child.field_name == "paragraph_properties" {
-            paragraph_prefix_fields.push(field_tokens);
-          } else {
-            fields.push(field_tokens);
-          }
+          });
         } else {
-          let field_tokens = if wrap_box {
+          fields.push(if wrap_box {
             quote! {
               #( #field_attrs )*
               #[doc = #property_comments]
@@ -2313,12 +2310,7 @@ fn gen_structured_one_sequence_fields(
               #sdk_field_attrs
               pub #child_name_ident: #child_variant_type,
             }
-          };
-          if schema_type.class_name == "Paragraph" && child.field_name == "paragraph_properties" {
-            paragraph_prefix_fields.push(field_tokens);
-          } else {
-            fields.push(field_tokens);
-          }
+          });
         }
       }
       StructuredParticleKind::Choice(choice) => {
@@ -2495,11 +2487,6 @@ fn gen_structured_one_sequence_fields(
         }
       }
     }
-  }
-
-  if !paragraph_prefix_fields.is_empty() {
-    paragraph_prefix_fields.extend(fields);
-    fields = paragraph_prefix_fields;
   }
 
   Ok((fields, items))
@@ -3271,5 +3258,36 @@ mod tests {
       "# [sdk (number_range (source = 3u32 , min = \"0\" , max = \"10\" , min_inclusive = true , max_inclusive = false))]"
     ));
     assert!(generated.contains("# [sdk (number_sign (source = 4u32 , kind = \"non_negative\"))]"));
+  }
+
+  #[test]
+  fn generates_sequence_any_only_without_source_composite_kind() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![SchemaType {
+        name: "t:CT_Any/t:any".to_string(),
+        class_name: "AnyHolder".to_string(),
+        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+        children: vec![SchemaTypeChild {
+          kind: SchemaTypeChildKind::Any,
+          property_name: "UnknownXml".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let generated = gen_schema(&schema, None, &context, false)
+      .unwrap()
+      .to_string();
+
+    assert!(generated.contains("pub children : Vec < AnyHolderChoice >"));
+    assert!(generated.contains("pub enum AnyHolderChoice"));
+    assert!(generated.contains("UnknownXml (String)"));
   }
 }

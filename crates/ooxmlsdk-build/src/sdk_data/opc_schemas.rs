@@ -6,7 +6,7 @@ use crate::Result;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute,
   SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
-  SchemaTypeParticle, SchemaTypeParticleOccur, SchemaTypeXmlHeader,
+  SchemaTypeXmlHeader,
 };
 use crate::sdk_data::xsd::{ParsedAttribute, ParsedChildElement, parse_xsd};
 
@@ -96,23 +96,6 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           initial_version: String::new(),
           children: Vec::new(),
         }],
-        particle: SchemaTypeParticle {
-          kind: "Sequence".to_string(),
-          name: String::new(),
-          occurs: Vec::new(),
-          items: vec![SchemaTypeParticle {
-            kind: String::new(),
-            name: "CT_Relationship/Relationship".to_string(),
-            occurs: vec![SchemaTypeParticleOccur {
-              min: Some(0),
-              max: Some(u64::MAX),
-              version: String::new(),
-            }],
-            items: Vec::new(),
-            initial_version: String::new(),
-          }],
-          initial_version: String::new(),
-        },
       },
       SchemaType {
         name: "CT_Relationship/Relationship".to_string(),
@@ -147,7 +130,6 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           })
           .collect(),
         children: Vec::new(),
-        particle: SchemaTypeParticle::default(),
       },
     ],
     enums: vec![SchemaEnum {
@@ -231,31 +213,6 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
             })
             .collect(),
         }],
-        particle: SchemaTypeParticle {
-          kind: "Choice".to_string(),
-          name: String::new(),
-          occurs: vec![SchemaTypeParticleOccur {
-            min: Some(0),
-            max: Some(u64::MAX),
-            version: String::new(),
-          }],
-          items: types
-            .children
-            .iter()
-            .map(|child| SchemaTypeParticle {
-              kind: String::new(),
-              name: content_types_child_type_name(child.q_name.as_str()),
-              occurs: vec![SchemaTypeParticleOccur {
-                min: Some(1),
-                max: Some(1),
-                version: String::new(),
-              }],
-              items: Vec::new(),
-              initial_version: String::new(),
-            })
-            .collect(),
-          initial_version: String::new(),
-        },
       },
       simple_leaf_type(
         "CT_Default/Default",
@@ -331,27 +288,6 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         children: Vec::new(),
       })
       .collect(),
-    particle: SchemaTypeParticle {
-      kind: "All".to_string(),
-      name: String::new(),
-      occurs: Vec::new(),
-      items: core_properties
-        .children
-        .iter()
-        .map(|child| SchemaTypeParticle {
-          kind: String::new(),
-          name: core_property_child_type_name(child),
-          occurs: vec![SchemaTypeParticleOccur {
-            min: Some(child.min_occurs),
-            max: Some(child.max_occurs),
-            version: String::new(),
-          }],
-          items: Vec::new(),
-          initial_version: String::new(),
-        })
-        .collect(),
-      initial_version: String::new(),
-    },
   }];
 
   for child in &core_properties.children {
@@ -385,33 +321,12 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         property_name: "value".to_string(),
         property_comments: child.q_name.clone(),
         kind: SchemaTypeChildKind::Child,
-        optional: false,
-        repeated: false,
+        optional: child.min_occurs == 0,
+        repeated: child.max_occurs != 1,
         initial_version: String::new(),
         children: Vec::new(),
       })
       .collect(),
-    particle: SchemaTypeParticle {
-      kind: "Sequence".to_string(),
-      name: String::new(),
-      occurs: Vec::new(),
-      items: keywords
-        .children
-        .iter()
-        .map(|child| SchemaTypeParticle {
-          kind: String::new(),
-          name: "cp:CT_Keyword/cp:value".to_string(),
-          occurs: vec![SchemaTypeParticleOccur {
-            min: Some(child.min_occurs),
-            max: Some(child.max_occurs),
-            version: String::new(),
-          }],
-          items: Vec::new(),
-          initial_version: String::new(),
-        })
-        .collect(),
-      initial_version: String::new(),
-    },
   });
 
   types.push(SchemaType {
@@ -431,7 +346,6 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     api_kind: SchemaTypeApiKind::Struct,
     attributes: keyword_attributes(&keyword.attributes),
     children: Vec::new(),
-    particle: SchemaTypeParticle::default(),
   });
 
   Ok(Schema {
@@ -477,7 +391,6 @@ fn simple_leaf_type(
     api_kind: SchemaTypeApiKind::Struct,
     attributes: attributes_to_schema(attributes),
     children: Vec::new(),
-    particle: SchemaTypeParticle::default(),
   }
 }
 
@@ -516,7 +429,6 @@ fn core_property_text_type(child: &ParsedChildElement) -> SchemaType {
     api_kind: SchemaTypeApiKind::LeafTextWrapper,
     attributes,
     children: Vec::new(),
-    particle: SchemaTypeParticle::default(),
   }
 }
 

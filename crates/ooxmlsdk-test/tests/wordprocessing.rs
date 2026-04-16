@@ -1,12 +1,15 @@
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChoice, Justification,
+  Body, BodyChoice, BodyChoice2Choice, BodyChoice2Choice1Choice, BodyChoice2Choice2Choice,
+  BodyChoice2Choice2Choice2Choice, BodyChoice2Choice2Choice2RangeMarkupElementsChoice,
+  BodyChoice2Choice2Choice2RangeMarkupElementsChoice1Choice, CommentChoice, CommentChoice2Choice,
+  CommentChoice2Choice1Choice, Comments, Document, Hyperlink, HyperlinkChoice, Justification,
   Paragraph, ParagraphChoice, ParagraphChoice2Choice, ParagraphChoice2Choice1Choice,
   ParagraphChoice2Choice1RunLevelEltsChoice, ParagraphChoice2Choice1RunLevelEltsChoice1Choice,
-  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice,
-  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice,
-  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice2Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice,
   ParagraphPContentBaseChoice, Run, RunChoice, SdtBlock, SdtPropertiesChoice, TabStop,
   TableJustification, Text, TextDirection,
 };
@@ -20,10 +23,7 @@ fn first_paragraph(body: &Body) -> &Paragraph {
   body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .find_map(body_choice_paragraph)
     .expect("expected body paragraph")
 }
 
@@ -58,10 +58,7 @@ fn first_sdt_block(body: &Body) -> &SdtBlock {
   body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
-      _ => None,
-    })
+    .find_map(body_choice_sdt_block)
     .expect("expected body sdt block")
 }
 
@@ -184,7 +181,7 @@ fn comment_text(
   let mut text = String::new();
 
   for child in &comment.eg_block_level_elts {
-    if let CommentChoice::WP(paragraph) = child {
+    if let Some(paragraph) = comment_choice_paragraph(child) {
       for paragraph_child in &paragraph.eg_p_content {
         if let Some(run) = paragraph_choice_run(paragraph_child) {
           append_run_text(run, &mut text);
@@ -200,8 +197,93 @@ fn body_paragraph_count(body: &Body) -> usize {
   body
     .eg_block_level_elts
     .iter()
-    .filter(|child| matches!(child, BodyChoice::WP(_)))
+    .filter(|child| body_choice_paragraph(child).is_some())
     .count()
+}
+
+fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
+  let BodyChoice::Choice2(choice) = choice else {
+    return None;
+  };
+  let BodyChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return None;
+  };
+
+  match choice.as_ref() {
+    BodyChoice2Choice1Choice::WP(paragraph) => Some(paragraph.as_ref()),
+    _ => None,
+  }
+}
+
+fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
+  let BodyChoice::Choice2(choice) = choice else {
+    return None;
+  };
+  let BodyChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return None;
+  };
+
+  match choice.as_ref() {
+    BodyChoice2Choice1Choice::WSdt(sdt) => Some(sdt.as_ref()),
+    _ => None,
+  }
+}
+
+#[allow(unreachable_patterns)]
+fn body_choice_has_range_markup(
+  choice: &BodyChoice,
+  predicate: impl Fn(&BodyChoice2Choice2Choice2RangeMarkupElementsChoice1Choice) -> bool,
+) -> bool {
+  let BodyChoice::Choice2(choice) = choice else {
+    return false;
+  };
+  let BodyChoice2Choice::Choice2(choice) = choice.as_ref() else {
+    return false;
+  };
+  let BodyChoice2Choice2Choice::Choice2(choice) = choice.as_ref() else {
+    return false;
+  };
+  let choice = match choice.as_ref() {
+    BodyChoice2Choice2Choice2Choice::EgRangeMarkupElements(choice) => choice,
+    _ => return false,
+  };
+  let BodyChoice2Choice2Choice2RangeMarkupElementsChoice::Choice1(choice) = choice.as_ref() else {
+    return false;
+  };
+
+  predicate(choice.as_ref())
+}
+
+fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
+  body_choice_has_range_markup(choice, |choice| {
+    matches!(
+      choice,
+      BodyChoice2Choice2Choice2RangeMarkupElementsChoice1Choice::WBookmarkStart(_)
+    )
+  })
+}
+
+fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
+  body_choice_has_range_markup(choice, |choice| {
+    matches!(
+      choice,
+      BodyChoice2Choice2Choice2RangeMarkupElementsChoice1Choice::WBookmarkEnd(_)
+    )
+  })
+}
+
+fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {
+  let CommentChoice::Choice2(choice) = choice else {
+    return None;
+  };
+  let CommentChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return None;
+  };
+
+  match choice.as_ref() {
+    CommentChoice2Choice1Choice::WP(paragraph) => Some(paragraph.as_ref()),
+    _ => None,
+  }
 }
 
 fn paragraph_choice_run(choice: &ParagraphChoice) -> Option<&Run> {
@@ -240,7 +322,7 @@ fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WBookmarkStart(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WBookmarkStart(_)
     )
   })
 }
@@ -249,7 +331,7 @@ fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WBookmarkEnd(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WBookmarkEnd(_)
     )
   })
 }
@@ -258,7 +340,7 @@ fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WCommentRangeStart(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WCommentRangeStart(_)
     )
   })
 }
@@ -267,7 +349,7 @@ fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WCommentRangeEnd(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WCommentRangeEnd(_)
     )
   })
 }
@@ -275,7 +357,7 @@ fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
 fn paragraph_choice_has_range_markup(
   choice: &ParagraphChoice,
   predicate: impl Fn(
-    &ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice,
+    &ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice,
   ) -> bool,
 ) -> bool {
   let ParagraphChoice::Choice2(choice) = choice else {
@@ -290,20 +372,20 @@ fn paragraph_choice_has_range_markup(
   let ParagraphChoice2Choice1RunLevelEltsChoice::Choice1(choice) = choice.as_ref() else {
     return false;
   };
-  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice::Choice1(choice) = choice.as_ref() else {
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice::Choice2(choice) = choice.as_ref() else {
     return false;
   };
   #[cfg(feature = "microsoft365")]
   let choice = match choice.as_ref() {
-    ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice::EgRangeMarkupElements(choice) => {
+    ParagraphChoice2Choice1RunLevelEltsChoice1Choice2Choice::EgRangeMarkupElements(choice) => {
       choice
     }
     _ => return false,
   };
   #[cfg(not(feature = "microsoft365"))]
-  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice::EgRangeMarkupElements(choice) =
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice2Choice::EgRangeMarkupElements(choice) =
     choice.as_ref();
-  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice::Choice1(choice) =
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice::Choice1(choice) =
     choice.as_ref()
   else {
     return false;
@@ -425,8 +507,8 @@ fn document_round_trip_with_two_paragraphs_from_openxml_reader_test() {
 
   let body = first_body(&parsed);
   assert_eq!(body.eg_block_level_elts.len(), 2);
-  assert!(matches!(body.eg_block_level_elts[0], BodyChoice::WP(_)));
-  assert!(matches!(body.eg_block_level_elts[1], BodyChoice::WP(_)));
+  assert!(body_choice_paragraph(&body.eg_block_level_elts[0]).is_some());
+  assert!(body_choice_paragraph(&body.eg_block_level_elts[1]).is_some());
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );
@@ -505,10 +587,7 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
   let hyperlink_paragraph = body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
     .find(|paragraph| {
       paragraph
         .eg_p_content
@@ -533,10 +612,7 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
   let reparsed_hyperlink_paragraph = reparsed_body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
     .find(|paragraph| {
       paragraph
         .eg_p_content
@@ -629,10 +705,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
   let paragraph = body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
     .find(|paragraph| paragraph_text(paragraph).contains("Hello O14"))
     .expect("expected paragraph with Hello O14");
   assert_eq!(paragraph_bookmark_start_count(paragraph), 1);
@@ -646,10 +719,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
   let reparsed_paragraph = reparsed_body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
     .find(|paragraph| paragraph_text(paragraph).contains("Hello O14"))
     .expect("expected paragraph with Hello O14");
   assert_eq!(paragraph_bookmark_start_count(reparsed_paragraph), 1);
@@ -717,25 +787,25 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
     body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WSdt(_)))
+      .any(|child| body_choice_sdt_block(child).is_some())
   );
   assert!(
     body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WBookmarkStart(_)))
+      .any(body_choice_has_bookmark_start)
   );
   assert!(
     body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WBookmarkEnd(_)))
+      .any(body_choice_has_bookmark_end)
   );
   assert!(
     body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WP(_)))
+      .any(|child| body_choice_paragraph(child).is_some())
   );
 
   let sdt = first_sdt_block(body);
@@ -750,10 +820,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   let hyperlink = body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
     .find_map(|paragraph| {
       paragraph.eg_p_content.iter().find_map(|child| {
         let hyperlink = paragraph_choice_hyperlink(child)?;
@@ -787,19 +854,19 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
     reparsed_body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WSdt(_)))
+      .any(|child| body_choice_sdt_block(child).is_some())
   );
   assert!(
     reparsed_body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WBookmarkStart(_)))
+      .any(body_choice_has_bookmark_start)
   );
   assert!(
     reparsed_body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WBookmarkEnd(_)))
+      .any(body_choice_has_bookmark_end)
   );
 }
 

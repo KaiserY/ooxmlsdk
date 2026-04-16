@@ -216,6 +216,7 @@ fn merge_schema_type_children(
   target: &mut Vec<SchemaTypeChild>,
   extensions: &[SchemaTypeChildExtension],
 ) {
+  let target = top_level_extension_children(target);
   for extension in extensions {
     if let Some(target_child) = find_merge_target(target, extension) {
       merge_schema_type_child(target_child, extension);
@@ -228,6 +229,14 @@ fn merge_schema_type_children(
     } else {
       target.push(runtime_schema_type_child(extension));
     }
+  }
+}
+
+fn top_level_extension_children(target: &mut Vec<SchemaTypeChild>) -> &mut Vec<SchemaTypeChild> {
+  if target.len() == 1 && target[0].kind == SchemaTypeChildKind::Sequence {
+    &mut target[0].children
+  } else {
+    target
   }
 }
 
@@ -321,7 +330,7 @@ mod tests {
   use super::*;
   use crate::sdk_data::sdk_data_model::{
     SchemaType, SchemaTypeApiKind, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
-    SchemaTypeKind, SchemaTypeParticle, SchemaTypeXmlHeader,
+    SchemaTypeKind, SchemaTypeXmlHeader,
   };
 
   fn anonymous_choice(children: Vec<SchemaTypeChild>) -> SchemaTypeChild {
@@ -377,7 +386,6 @@ mod tests {
           api_kind: SchemaTypeApiKind::Struct,
           attributes: Vec::new(),
           children: Vec::new(),
-          particle: SchemaTypeParticle::default(),
         }
       }],
       ..Schema::default()
@@ -407,9 +415,94 @@ mod tests {
     let paragraph = &schemas[0].types[0];
     assert_eq!(paragraph.children.len(), 1);
     assert_eq!(paragraph.children[0].property_name, "eg_p_content");
-    assert_eq!(paragraph.children[0].children.len(), 2);
-    assert_eq!(paragraph.children[0].children[0].name, "w:CT_R/w:r");
-    assert_eq!(paragraph.children[0].children[1].name, "m:CT_OMath/m:oMath");
+    assert_eq!(paragraph.children[0].children.len(), 1);
+    assert_eq!(
+      paragraph.children[0].children[0].kind,
+      SchemaTypeChildKind::Choice
+    );
+    assert!(paragraph.children[0].children[0].property_name.is_empty());
+    assert_eq!(paragraph.children[0].children[0].children.len(), 2);
+    assert_eq!(
+      paragraph.children[0].children[0].children[0].name,
+      "w:CT_R/w:r"
+    );
+    assert_eq!(
+      paragraph.children[0].children[0].children[1].name,
+      "m:CT_OMath/m:oMath"
+    );
+  }
+
+  #[test]
+  fn applies_choice_extension_inside_top_level_sequence_wrapper() {
+    let mut schemas = vec![Schema {
+      module_name: "test".to_string(),
+      types: vec![SchemaType {
+        class_name: "Body".to_string(),
+        children: vec![SchemaTypeChild {
+          name: String::new(),
+          property_name: String::new(),
+          property_comments: String::new(),
+          kind: SchemaTypeChildKind::Sequence,
+          optional: false,
+          repeated: false,
+          initial_version: String::new(),
+          children: vec![
+            anonymous_choice(vec![leaf("w:CT_P/w:p"), leaf("w:CT_Tbl/w:tbl")]),
+            leaf("w:CT_SectPr/w:sectPr"),
+          ],
+        }],
+        ..SchemaType {
+          name: String::new(),
+          class_name: String::new(),
+          summary: String::new(),
+          version: None,
+          part: String::new(),
+          base_class: String::new(),
+          kind: SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          xml_header: SchemaTypeXmlHeader::None,
+          is_abstract: false,
+          has_xmlns_fields: false,
+          has_mc_ignorable_field: false,
+          text_value_type: String::new(),
+          api_kind: SchemaTypeApiKind::Struct,
+          attributes: Vec::new(),
+          children: Vec::new(),
+        }
+      }],
+      ..Schema::default()
+    }];
+    let schema_extensions = vec![(
+      "test".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Body".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            name: String::new(),
+            property_name: "eg_block_level_elts".to_string(),
+            optional: false,
+            repeated: None,
+            insert_before: None,
+            children: Vec::new(),
+          }],
+          ..SchemaTypeExtension::default()
+        }],
+        enums: Vec::new(),
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).expect("apply schema extensions");
+
+    let body = &schemas[0].types[0];
+    assert_eq!(body.children.len(), 1);
+    assert_eq!(body.children[0].kind, SchemaTypeChildKind::Sequence);
+    assert_eq!(body.children[0].children.len(), 2);
+    assert_eq!(
+      body.children[0].children[0].property_name,
+      "eg_block_level_elts"
+    );
+    assert_eq!(body.children[0].children[1].name, "w:CT_SectPr/w:sectPr");
   }
 
   #[test]
@@ -448,7 +541,6 @@ mod tests {
           api_kind: SchemaTypeApiKind::Struct,
           attributes: Vec::new(),
           children: Vec::new(),
-          particle: SchemaTypeParticle::default(),
         }
       }],
       ..Schema::default()
@@ -517,7 +609,6 @@ mod tests {
           api_kind: SchemaTypeApiKind::Struct,
           attributes: Vec::new(),
           children: Vec::new(),
-          particle: SchemaTypeParticle::default(),
         }
       }],
       ..Schema::default()

@@ -7,8 +7,8 @@ use crate::sdk_code::codegen_ir::{
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticle, StructuredParticleKind, classify_attr_type,
-  flatten_one_sequence_particles, is_one_sequence_flatten, is_one_sequence_structurable,
-  structure_one_sequence_particles,
+  flatten_one_sequence_particles, is_any_only_composite_type, is_one_sequence_flatten,
+  is_one_sequence_structurable, structure_one_sequence_particles,
 };
 use crate::sdk_code::schemas::{
   CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild,
@@ -19,7 +19,7 @@ use crate::sdk_code::schemas::{
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute, SchemaTypeAttributeValidator,
-  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeXmlHeader,
+  SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeXmlHeader,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::escape_snake_case;
@@ -221,10 +221,10 @@ fn build_type_decl(
     .map(|attr| build_attr_member_decl(attr, schema, context))
     .collect::<Result<Vec<_>>>()?;
   let mut source_content_model = build_content_model_decl(schema_type);
-  let extra_types = if should_build_recursive_paragraph_choices(schema_type) {
+  let extra_types = if should_build_recursive_one_sequence_choices(schema_type) {
     source_content_model = Some(ContentModelDecl::OneSequenceStructured);
-    build_recursive_paragraph_choice_members(schema_type, schema, context, &mut members)
-      .map_err(|err| format!("recursive paragraph choices: {err}"))?
+    build_recursive_one_sequence_choice_members(schema_type, schema, context, &mut members)
+      .map_err(|err| format!("recursive one-sequence choices: {err}"))?
   } else if has_mixed_choice_children_pattern(schema_type) {
     build_mixed_choice_children_members(schema_type, schema, context, &mut members)
       .map_err(|err| format!("mixed choice children: {err}"))?
@@ -319,40 +319,72 @@ fn build_type_decl(
   ))
 }
 
-fn should_build_recursive_paragraph_choices(schema_type: &SchemaType) -> bool {
-  schema_type.name == "w:CT_P/w:p"
-    && schema_type.children.iter().any(|child| {
-      child.kind == SchemaTypeChildKind::Choice
-        && child.property_name == "eg_p_content"
-        && child
-          .children
-          .iter()
-          .any(|nested| nested.kind == SchemaTypeChildKind::Choice)
-    })
+fn should_build_recursive_one_sequence_choices(schema_type: &SchemaType) -> bool {
+  supports_unambiguous_sequence_choice_patterns(schema_type)
+    && find_recursive_one_sequence_choice_child(schema_type).is_some()
 }
 
-fn build_recursive_paragraph_choice_members(
+fn find_recursive_one_sequence_choice_child(
+  schema_type: &SchemaType,
+) -> Option<(usize, usize, &SchemaTypeChild)> {
+  let content_children = top_level_content_children(schema_type);
+  let choice_children = content_children
+    .iter()
+    .enumerate()
+    .filter(|(_, child)| child.kind == SchemaTypeChildKind::Choice)
+    .collect::<Vec<_>>();
+
+  if choice_children.len() != 1 {
+    return None;
+  }
+
+  let (child_index, choice_child) = choice_children[0];
+  if !content_children
+    .iter()
+    .enumerate()
+    .filter(|(index, _)| *index != child_index)
+    .all(|(_, child)| {
+      matches!(
+        child.kind,
+        SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any
+      )
+    })
+  {
+    return None;
+  }
+
+  contains_nested_choice_wrapper(choice_child).then_some((
+    choice_children.len(),
+    child_index,
+    choice_child,
+  ))
+}
+
+fn contains_nested_choice_wrapper(child: &SchemaTypeChild) -> bool {
+  child.children.iter().any(|nested| match nested.kind {
+    SchemaTypeChildKind::Choice => true,
+    SchemaTypeChildKind::Sequence => contains_nested_choice_wrapper(nested),
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => false,
+  })
+}
+
+fn build_recursive_one_sequence_choice_members(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
   members: &mut Vec<MemberDecl>,
 ) -> Result<Vec<TypeDecl>> {
-  members.extend(build_direct_child_member_decls(
-    schema_type,
-    schema,
-    context,
-  )?);
-
-  let choice_child = schema_type
-    .children
+  let content_children = top_level_content_children(schema_type);
+  let (choice_slot_count, choice_child_index, choice_child) =
+    find_recursive_one_sequence_choice_child(schema_type)
+      .ok_or_else(|| format!("{} missing recursive one-sequence choice", schema_type.name))?;
+  let choice_slot_index = content_children[..choice_child_index]
     .iter()
-    .find(|child| {
-      child.kind == SchemaTypeChildKind::Choice && child.property_name == "eg_p_content"
-    })
-    .ok_or_else(|| format!("{} missing eg_p_content choice", schema_type.name))?;
-
-  let field_name = one_sequence_choice_field_name(schema_type, 1, 0);
-  let enum_name = one_sequence_choice_enum_name(schema_type, 1, 0);
+    .filter(|child| child.kind == SchemaTypeChildKind::Choice)
+    .count();
+  let field_name =
+    one_sequence_choice_field_name(schema_type, choice_slot_count, choice_slot_index);
+  let enum_name = one_sequence_choice_enum_name(schema_type, choice_slot_count, choice_slot_index);
   let mut extra_types = Vec::new();
   let top_choice = build_recursive_choice_enum_decl(
     schema_type,
@@ -365,28 +397,101 @@ fn build_recursive_paragraph_choice_members(
   let leaf_versions = collect_choice_leaf_versions(choice_child, context);
   let choice_version =
     common_choice_version_ir(choice_child.initial_version.as_str(), &leaf_versions).to_string();
-
-  members.push(MemberDecl::Field(FieldDecl {
-    rust_name: field_name,
-    docs: build_recursive_choice_docs(choice_child),
-    version: choice_version,
-    wire: FieldWireDecl::Choice,
-    cardinality: if choice_child.repeated {
-      Cardinality::Many
-    } else if choice_child.optional {
-      Cardinality::Optional
-    } else {
-      Cardinality::One
-    },
-    type_ref: TypeRefDecl {
-      rust_type: enum_name,
-      module_path: None,
-    },
-    validators: Vec::new(),
-  }));
   extra_types.push(top_choice);
 
+  let mut field_name_set = std::collections::HashSet::new();
+
+  for (index, child) in content_children.iter().enumerate() {
+    match child.kind {
+      SchemaTypeChildKind::Choice if index == choice_child_index => {
+        if field_name_set.insert(field_name.clone()) {
+          members.push(MemberDecl::Field(FieldDecl {
+            rust_name: field_name.clone(),
+            docs: build_recursive_choice_docs(choice_child),
+            version: choice_version.clone(),
+            wire: FieldWireDecl::Choice,
+            cardinality: if choice_child.repeated {
+              Cardinality::Many
+            } else if choice_child.optional {
+              Cardinality::Optional
+            } else {
+              Cardinality::One
+            },
+            type_ref: TypeRefDecl {
+              rust_type: enum_name.clone(),
+              module_path: None,
+            },
+            validators: Vec::new(),
+          }));
+        }
+      }
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+        let resolved_child = if child.kind == SchemaTypeChildKind::Any {
+          ResolvedOneSequenceChild {
+            name: "",
+            field_name: std::borrow::Cow::Borrowed(if child.property_name.is_empty() {
+              "unknown_xml"
+            } else {
+              child.property_name.as_str()
+            }),
+            property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
+              " _"
+            } else {
+              child.property_comments.as_str()
+            }),
+            version: child.initial_version.as_str(),
+            kind: child.kind,
+          }
+        } else {
+          context.resolve_one_sequence_child(schema_type, child.name.as_str())?
+        };
+
+        if !field_name_set.insert(resolved_child.field_name.to_string()) {
+          continue;
+        }
+
+        members.push(MemberDecl::Field(build_one_sequence_leaf_field_decl(
+          &resolved_child,
+          effective_version(resolved_child.version, child.initial_version.as_str()).to_string(),
+          child.optional,
+          child.repeated,
+          schema,
+          context,
+        )?));
+      }
+      SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {}
+    }
+  }
+
   Ok(extra_types)
+}
+
+fn supports_unambiguous_sequence_choice_patterns(schema_type: &SchemaType) -> bool {
+  matches!(
+    schema_type.composite_kind,
+    SchemaTypeCompositeKind::OneSequence | SchemaTypeCompositeKind::SdkSequence
+  ) || has_unambiguous_sequence_topology(schema_type)
+}
+
+fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
+  if schema_type.children.len() != 1
+    || schema_type.children[0].kind != SchemaTypeChildKind::Sequence
+  {
+    return schema_type.children.as_slice();
+  }
+
+  schema_type.children[0].children.as_slice()
+}
+
+fn has_unambiguous_sequence_topology(schema_type: &SchemaType) -> bool {
+  if schema_type.children.len() > 1 {
+    return true;
+  }
+
+  schema_type
+    .children
+    .first()
+    .is_some_and(|child| child.kind == SchemaTypeChildKind::Sequence)
 }
 
 fn build_recursive_choice_enum_decl(
@@ -1149,19 +1254,6 @@ struct FlattenedSingleSchemaChild<'a> {
   repeated: bool,
 }
 
-fn particle_occurs_flags(
-  occurs: &[crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur],
-) -> (bool, bool) {
-  (
-    occurs
-      .first()
-      .is_some_and(|occur| occur.min.is_none() || occur.min == Some(0)),
-    occurs
-      .first()
-      .is_some_and(|occur| occur.max.is_none() || occur.max.is_some_and(|max| max > 1)),
-  )
-}
-
 fn cardinality_from_flags(optional: bool, repeated: bool) -> Cardinality {
   if repeated {
     Cardinality::Many
@@ -1169,77 +1261,6 @@ fn cardinality_from_flags(optional: bool, repeated: bool) -> Cardinality {
     Cardinality::Optional
   } else {
     Cardinality::One
-  }
-}
-
-fn cardinality_to_flags(cardinality: Cardinality) -> (bool, bool) {
-  match cardinality {
-    Cardinality::One => (false, false),
-    Cardinality::Optional => (true, false),
-    Cardinality::Many => (false, true),
-  }
-}
-
-fn merged_cardinality(
-  particle_cardinality: Option<Cardinality>,
-  child_optional: bool,
-  child_repeated: bool,
-) -> Cardinality {
-  let (particle_optional, particle_repeated) = particle_cardinality
-    .map(cardinality_to_flags)
-    .unwrap_or((false, false));
-  cardinality_from_flags(
-    particle_optional || child_optional,
-    particle_repeated || child_repeated,
-  )
-}
-
-fn resolve_single_nested_particle_cardinality(
-  particle: &crate::sdk_data::sdk_data_model::SchemaTypeParticle,
-  optional: bool,
-  repeated: bool,
-) -> Option<Cardinality> {
-  let (particle_optional, particle_repeated) = particle_occurs_flags(&particle.occurs);
-  let optional = optional || particle_optional;
-  let repeated = repeated || particle_repeated;
-
-  if !particle.name.is_empty() || particle.kind == "Any" {
-    return Some(cardinality_from_flags(optional, repeated));
-  }
-
-  if particle.items.len() != 1 {
-    return None;
-  }
-
-  resolve_single_nested_particle_cardinality(&particle.items[0], optional, repeated)
-}
-
-fn resolve_choice_particle_cardinality(schema_type: &SchemaType) -> Option<Cardinality> {
-  let mut particle = &schema_type.particle;
-  let mut optional = false;
-  let mut repeated = false;
-
-  loop {
-    let (particle_optional, particle_repeated) = particle_occurs_flags(&particle.occurs);
-    optional |= particle_optional;
-    repeated |= particle_repeated;
-
-    if particle.kind == "Choice" {
-      if particle.items.len() == 1 {
-        let (item_optional, item_repeated) = particle_occurs_flags(&particle.items[0].occurs);
-        optional |= item_optional;
-        repeated |= item_repeated;
-      }
-
-      return Some(cardinality_from_flags(optional, repeated));
-    }
-
-    if particle.name.is_empty() && particle.items.len() == 1 {
-      particle = &particle.items[0];
-      continue;
-    }
-
-    return None;
   }
 }
 
@@ -1338,11 +1359,7 @@ fn build_single_nested_child_member_decl(
       },
       _ => unreachable!(),
     },
-    cardinality: merged_cardinality(
-      resolve_single_nested_particle_cardinality(&schema_type.particle, false, false),
-      flattened_child.optional,
-      flattened_child.repeated,
-    ),
+    cardinality: cardinality_from_flags(flattened_child.optional, flattened_child.repeated),
     type_ref: build_child_type_ref_from_name(child.name.as_str(), effective_kind, schema, context)?,
     validators: Vec::new(),
   }))
@@ -1419,11 +1436,7 @@ fn build_simple_one_choice_members(
   }
 
   let choice_version = choice_child.initial_version.clone();
-  let choice_cardinality = merged_cardinality(
-    resolve_choice_particle_cardinality(schema_type),
-    choice_child.optional,
-    choice_child.repeated,
-  );
+  let choice_cardinality = cardinality_from_flags(choice_child.optional, choice_child.repeated);
 
   if resolved_variants.len() == 1 {
     let variant = &resolved_variants[0];
@@ -1586,7 +1599,6 @@ fn build_flatten_one_sequence_members(
 ) -> Result<Vec<TypeDecl>> {
   let mut extra_types = Vec::new();
   let mut field_name_set = std::collections::HashSet::new();
-  let mut paragraph_prefix_members = Vec::new();
   let flat_particles = flatten_one_sequence_particles(schema_type);
   let choice_slot_count = flat_particles
     .iter()
@@ -1637,11 +1649,7 @@ fn build_flatten_one_sequence_members(
           },
           validators: Vec::new(),
         };
-        if schema_type.class_name == "Paragraph" && field.rust_name == "paragraph_properties" {
-          paragraph_prefix_members.push(MemberDecl::Field(field));
-        } else {
-          members.push(MemberDecl::Field(field));
-        }
+        members.push(MemberDecl::Field(field));
       }
       FlatParticleKind::Choice(choice_particle) => {
         let choice = context.resolve_one_sequence_choice(
@@ -1725,11 +1733,6 @@ fn build_flatten_one_sequence_members(
     }
   }
 
-  if !paragraph_prefix_members.is_empty() {
-    paragraph_prefix_members.append(members);
-    *members = paragraph_prefix_members;
-  }
-
   Ok(extra_types)
 }
 
@@ -1790,7 +1793,6 @@ fn build_structured_one_sequence_members(
 ) -> Result<Vec<TypeDecl>> {
   let mut extra_types = Vec::new();
   let mut field_name_set = std::collections::HashSet::new();
-  let mut paragraph_prefix_members = Vec::new();
   let structured_particles = structure_one_sequence_particles(schema_type);
   let choice_slot_count = structured_particles
     .iter()
@@ -1814,11 +1816,7 @@ fn build_structured_one_sequence_members(
           schema,
           context,
         )?;
-        if schema_type.class_name == "Paragraph" && field.rust_name == "paragraph_properties" {
-          paragraph_prefix_members.push(MemberDecl::Field(field));
-        } else {
-          members.push(MemberDecl::Field(field));
-        }
+        members.push(MemberDecl::Field(field));
       }
       StructuredParticleKind::Choice(ref choice) => {
         let choice = context.resolve_one_sequence_structured_choice(
@@ -1927,11 +1925,6 @@ fn build_structured_one_sequence_members(
         });
       }
     }
-  }
-
-  if !paragraph_prefix_members.is_empty() {
-    paragraph_prefix_members.append(members);
-    *members = paragraph_prefix_members;
   }
 
   Ok(extra_types)
@@ -2326,16 +2319,13 @@ fn build_direct_child_member_decl_from_schema_child(
 }
 
 fn has_mixed_choice_children_pattern(schema_type: &SchemaType) -> bool {
-  matches!(
-    schema_type.composite_kind,
-    crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::SdkSequence
-      | crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneSequence
-  ) && schema_type
-    .children
-    .iter()
-    .filter(|child| child.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Choice)
-    .count()
-    == 1
+  supports_unambiguous_sequence_choice_patterns(schema_type)
+    && schema_type
+      .children
+      .iter()
+      .filter(|child| child.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Choice)
+      .count()
+      == 1
     && count_uncovered_direct_children_ir(schema_type) > 0
 }
 
@@ -2705,9 +2695,10 @@ fn build_content_model_decl(schema_type: &SchemaType) -> Option<ContentModelDecl
     return None;
   }
 
+  let content_children = top_level_content_children(schema_type);
   let value = if schema_type.composite_kind == SchemaTypeCompositeKind::OneAll
-    && !schema_type.children.is_empty()
-    && schema_type.children.iter().all(|child| {
+    && !content_children.is_empty()
+    && content_children.iter().all(|child| {
       matches!(
         child.kind,
         SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
@@ -2715,32 +2706,28 @@ fn build_content_model_decl(schema_type: &SchemaType) -> Option<ContentModelDecl
     }) {
     ContentModelDecl::OneAllDirectChildren
   } else if schema_type.composite_kind == SchemaTypeCompositeKind::OneChoice
-    && schema_type.children.len() == 1
-    && schema_type.children[0].kind == SchemaTypeChildKind::Choice
+    && content_children.len() == 1
+    && content_children[0].kind == SchemaTypeChildKind::Choice
   {
     ContentModelDecl::OneChoiceSingle
   } else if has_resolvable_single_choice_child(schema_type) {
     ContentModelDecl::SequenceSingleChoice
   } else if has_mixed_choice_children_pattern(schema_type) {
     ContentModelDecl::MixedChoiceChildren
-  } else if matches!(
-    schema_type.composite_kind,
-    SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
-  ) && schema_type.children.len() == 1
-    && schema_type.children[0].kind == SchemaTypeChildKind::Any
-  {
+  } else if is_any_only_composite_type(schema_type) {
     ContentModelDecl::SequenceAnyOnly
-  } else if matches!(
+  } else if (matches!(
     schema_type.composite_kind,
     SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
-  ) && schema_type.children.len() == 1
-    && schema_type.children[0].kind == SchemaTypeChildKind::Choice
+  ) && content_children.len() == 1
+    && content_children[0].kind == SchemaTypeChildKind::Choice)
+    || has_unambiguous_sequence_single_choice_shape(schema_type)
   {
     ContentModelDecl::SequenceSingleChoice
   } else if matches!(
     schema_type.composite_kind,
     SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
-  ) && schema_type.children.iter().all(|child| {
+  ) && content_children.iter().all(|child| {
     matches!(
       child.kind,
       SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
@@ -2758,12 +2745,25 @@ fn build_content_model_decl(schema_type: &SchemaType) -> Option<ContentModelDecl
   Some(value)
 }
 
+fn has_unambiguous_sequence_single_choice_shape(schema_type: &SchemaType) -> bool {
+  let content_children = top_level_content_children(schema_type);
+  content_children.len() == 1
+    && content_children[0].kind == SchemaTypeChildKind::Choice
+    && content_children[0].children.len() > 1
+    && schema_type.attributes.is_empty()
+    && !matches!(
+      schema_type.composite_kind,
+      SchemaTypeCompositeKind::SdkSequence | SchemaTypeCompositeKind::OneSequence
+    )
+}
+
 fn has_resolvable_single_choice_child(schema_type: &SchemaType) -> bool {
   use crate::sdk_data::sdk_data_model::SchemaTypeChildKind;
 
-  schema_type.children.len() == 1
-    && schema_type.children[0].kind == SchemaTypeChildKind::Choice
-    && schema_type.children[0].children.iter().all(|child| {
+  let content_children = top_level_content_children(schema_type);
+  content_children.len() == 1
+    && content_children[0].kind == SchemaTypeChildKind::Choice
+    && content_children[0].children.iter().all(|child| {
       matches!(
         child.kind,
         SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any
@@ -3312,6 +3312,7 @@ mod tests {
           composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneChoice,
           children: vec![SchemaTypeChild {
             kind: SchemaTypeChildKind::Choice,
+            repeated: true,
             initial_version: "Office2010".to_string(),
             children: vec![SchemaTypeChild {
               name: "t:CT_Leaf/t:leaf".to_string(),
@@ -3323,20 +3324,6 @@ mod tests {
             }],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Element".to_string(),
-              name: "t:CT_Leaf/t:leaf".to_string(),
-              occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-                min: Some(1),
-                max: Some(3),
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -3525,7 +3512,82 @@ mod tests {
   }
 
   #[test]
-  fn builds_recursive_paragraph_group_choices_into_codegen_ir() {
+  fn classifies_nested_single_choice_without_source_composite_type() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "A".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "B".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_C/t:c".to_string(),
+          class_name: "C".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "NestedChoiceHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![SchemaTypeChild {
+            kind: SchemaTypeChildKind::Choice,
+            repeated: true,
+            children: vec![
+              SchemaTypeChild {
+                name: "t:CT_A/t:a".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                kind: SchemaTypeChildKind::Sequence,
+                children: vec![
+                  SchemaTypeChild {
+                    name: "t:CT_B/t:b".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    name: "t:CT_C/t:c".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "NestedChoiceHolder")
+      .unwrap();
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::SequenceSingleChoice)
+    );
+  }
+
+  #[test]
+  fn builds_recursive_one_sequence_group_choices_into_codegen_ir() {
     let schema = Schema {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -3837,6 +3899,238 @@ mod tests {
   }
 
   #[test]
+  fn builds_recursive_one_sequence_group_choices_for_non_paragraph_types() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Prefix/t:prefix".to_string(),
+          class_name: "Prefix".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "ChildA".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "ChildB".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_C/t:c".to_string(),
+          class_name: "ChildC".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "GenericHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![
+            SchemaTypeChild {
+              name: "t:CT_Prefix/t:prefix".to_string(),
+              property_name: "prefix".to_string(),
+              kind: SchemaTypeChildKind::Child,
+              optional: true,
+              ..Default::default()
+            },
+            SchemaTypeChild {
+              kind: SchemaTypeChildKind::Choice,
+              property_name: "eg_content".to_string(),
+              repeated: true,
+              children: vec![SchemaTypeChild {
+                kind: SchemaTypeChildKind::Choice,
+                property_name: "eg_nested".to_string(),
+                children: vec![
+                  SchemaTypeChild {
+                    name: "t:CT_A/t:a".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    kind: SchemaTypeChildKind::Sequence,
+                    property_name: "sequence1".to_string(),
+                    children: vec![
+                      SchemaTypeChild {
+                        name: "t:CT_B/t:b".to_string(),
+                        kind: SchemaTypeChildKind::Child,
+                        ..Default::default()
+                      },
+                      SchemaTypeChild {
+                        name: "t:CT_C/t:c".to_string(),
+                        kind: SchemaTypeChildKind::Child,
+                        ..Default::default()
+                      },
+                    ],
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              }],
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "GenericHolder")
+      .unwrap();
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::OneSequenceStructured)
+    );
+    assert!(holder.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Field(field)
+        if field.rust_name == "prefix"
+          && matches!(field.wire, FieldWireDecl::Child { .. })
+          && field.cardinality == Cardinality::Optional
+    )));
+    assert!(holder.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Field(field)
+        if field.rust_name == "eg_content"
+          && matches!(field.wire, FieldWireDecl::Choice)
+          && field.cardinality == Cardinality::Many
+          && field.type_ref.rust_type == "GenericHolderChoice"
+    )));
+
+    let top_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "GenericHolderChoice")
+      .unwrap();
+    assert!(top_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "EgNested"
+          && variant.payload.rust_type == "GenericHolderNestedChoice"
+    )));
+  }
+
+  #[test]
+  fn builds_recursive_one_sequence_group_choices_without_source_composite_kind() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Prefix/t:prefix".to_string(),
+          class_name: "Prefix".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "ChildA".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "ChildB".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_C/t:c".to_string(),
+          class_name: "ChildC".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "GenericHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![
+            SchemaTypeChild {
+              name: "t:CT_Prefix/t:prefix".to_string(),
+              property_name: "prefix".to_string(),
+              kind: SchemaTypeChildKind::Child,
+              optional: true,
+              ..Default::default()
+            },
+            SchemaTypeChild {
+              kind: SchemaTypeChildKind::Choice,
+              property_name: "eg_content".to_string(),
+              repeated: true,
+              children: vec![SchemaTypeChild {
+                kind: SchemaTypeChildKind::Choice,
+                property_name: "eg_nested".to_string(),
+                children: vec![
+                  SchemaTypeChild {
+                    name: "t:CT_A/t:a".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    kind: SchemaTypeChildKind::Sequence,
+                    property_name: "sequence1".to_string(),
+                    children: vec![
+                      SchemaTypeChild {
+                        name: "t:CT_B/t:b".to_string(),
+                        kind: SchemaTypeChildKind::Child,
+                        ..Default::default()
+                      },
+                      SchemaTypeChild {
+                        name: "t:CT_C/t:c".to_string(),
+                        kind: SchemaTypeChildKind::Child,
+                        ..Default::default()
+                      },
+                    ],
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              }],
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "GenericHolder")
+      .unwrap();
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::OneSequenceStructured)
+    );
+    assert!(holder.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Field(field)
+        if field.rust_name == "prefix"
+          && matches!(field.wire, FieldWireDecl::Child { .. })
+    )));
+    assert!(holder.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Field(field)
+        if field.rust_name == "eg_content"
+          && matches!(field.wire, FieldWireDecl::Choice)
+    )));
+  }
+
+  #[test]
   fn classifies_direct_children_only_generic_fallback_from_members() {
     let schema = Schema {
       module_name: "test_module".to_string(),
@@ -3865,24 +4159,6 @@ mod tests {
             repeated: true,
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Sequence".to_string(),
-              items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_Row/t:row".to_string(),
-                occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-                  min: Some(1),
-                  max: Some(10),
-                  ..Default::default()
-                }],
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -3922,6 +4198,7 @@ mod tests {
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
             kind: SchemaTypeChildKind::Choice,
+            repeated: true,
             children: vec![SchemaTypeChild {
               kind: SchemaTypeChildKind::Sequence,
               children: vec![SchemaTypeChild {
@@ -3933,24 +4210,6 @@ mod tests {
             }],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Sequence".to_string(),
-              occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-                min: Some(1),
-                max: Some(2),
-                ..Default::default()
-              }],
-              items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_RPr/t:rPr".to_string(),
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -4023,20 +4282,6 @@ mod tests {
             repeated: true,
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Sequence".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Element".to_string(),
-              name: "t:CT_Value/t:value".to_string(),
-              occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-                min: Some(0),
-                max: Some(10),
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -4107,24 +4352,6 @@ mod tests {
             }],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-              min: Some(0),
-              max: Some(1),
-              ..Default::default()
-            }],
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Sequence".to_string(),
-              items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_RPr/t:rPr".to_string(),
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -4204,24 +4431,6 @@ mod tests {
             }],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Sequence".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Choice".to_string(),
-              items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_Color/t:color".to_string(),
-                occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-                  min: Some(1),
-                  max: Some(4),
-                  ..Default::default()
-                }],
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -4380,20 +4589,6 @@ mod tests {
             }],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Element".to_string(),
-              name: "t:CT_Value/t:value".to_string(),
-              occurs: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticleOccur {
-                min: Some(0),
-                max: Some(10),
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -4616,22 +4811,6 @@ mod tests {
             ],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            items: vec![
-              crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_A/t:a".to_string(),
-                ..Default::default()
-              },
-              crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_B/t:b".to_string(),
-                ..Default::default()
-              },
-            ],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -4689,19 +4868,6 @@ mod tests {
             }],
             ..Default::default()
           }],
-          particle: crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-            kind: "Choice".to_string(),
-            items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-              kind: "Sequence".to_string(),
-              items: vec![crate::sdk_data::sdk_data_model::SchemaTypeParticle {
-                kind: "Element".to_string(),
-                name: "t:CT_RPr/t:rPr".to_string(),
-                ..Default::default()
-              }],
-              ..Default::default()
-            }],
-            ..Default::default()
-          },
           ..Default::default()
         },
       ],
@@ -5102,6 +5268,171 @@ mod tests {
   }
 
   #[test]
+  fn carries_mixed_choice_children_without_source_composite_kind_into_codegen_ir() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "LeafA".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "LeafB".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_C/t:c".to_string(),
+          class_name: "LeafC".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_D/t:d".to_string(),
+          class_name: "LeafD".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Mixed/t:mixed".to_string(),
+          class_name: "MixedHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![
+            SchemaTypeChild {
+              name: "t:CT_A/t:a".to_string(),
+              property_name: "LeafA".to_string(),
+              property_comments: "Leaf A".to_string(),
+              kind: SchemaTypeChildKind::Child,
+              ..Default::default()
+            },
+            SchemaTypeChild {
+              name: "choice_wrapper".to_string(),
+              kind: SchemaTypeChildKind::Choice,
+              children: vec![
+                SchemaTypeChild {
+                  name: "t:CT_B/t:b".to_string(),
+                  property_name: "LeafB".to_string(),
+                  property_comments: "Leaf B".to_string(),
+                  kind: SchemaTypeChildKind::Child,
+                  ..Default::default()
+                },
+                SchemaTypeChild {
+                  name: "seq_variant".to_string(),
+                  kind: SchemaTypeChildKind::Sequence,
+                  children: vec![
+                    SchemaTypeChild {
+                      name: "t:CT_C/t:c".to_string(),
+                      property_name: "LeafC".to_string(),
+                      property_comments: "Leaf C".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      ..Default::default()
+                    },
+                    SchemaTypeChild {
+                      name: "t:CT_D/t:d".to_string(),
+                      property_name: "LeafD".to_string(),
+                      property_comments: "Leaf D".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      ..Default::default()
+                    },
+                  ],
+                  ..Default::default()
+                },
+              ],
+              ..Default::default()
+            },
+            SchemaTypeChild {
+              name: "t:CT_D/t:d".to_string(),
+              property_name: "TrailingLeaf".to_string(),
+              property_comments: "Trailing leaf".to_string(),
+              kind: SchemaTypeChildKind::Child,
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "MixedHolder")
+      .unwrap();
+    let fields: Vec<_> = holder
+      .members
+      .iter()
+      .filter_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        _ => None,
+      })
+      .collect();
+    assert_eq!(fields.len(), 3);
+    assert_eq!(fields[0].rust_name, "leaf_a");
+    assert_eq!(fields[1].rust_name, "mixed_holder_choice");
+    assert_eq!(fields[2].rust_name, "trailing_leaf");
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::MixedChoiceChildren)
+    );
+  }
+
+  #[test]
+  fn classifies_any_only_without_source_composite_kind() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![SchemaType {
+        name: "t:CT_Any/t:any".to_string(),
+        class_name: "AnyHolder".to_string(),
+        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+        children: vec![SchemaTypeChild {
+          kind: SchemaTypeChildKind::Any,
+          property_name: "UnknownXml".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "AnyHolder")
+      .unwrap();
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::SequenceAnyOnly)
+    );
+    let field = holder
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(field.cardinality, Cardinality::Many);
+    assert!(matches!(field.wire, FieldWireDecl::Choice));
+    assert_eq!(field.type_ref.rust_type, "AnyHolderChoice");
+  }
+
+  #[test]
   fn carries_generic_children_fallback_into_codegen_ir() {
     let schema = Schema {
       module_name: "test_module".to_string(),
@@ -5458,5 +5789,140 @@ mod tests {
         },
       }
     );
+  }
+
+  #[test]
+  fn preserves_trailing_sequence_after_nested_choice_prefix_in_sdk_sequence() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "LeafA".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "LeafB".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_C/t:c".to_string(),
+          class_name: "LeafC".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_D/t:d".to_string(),
+          class_name: "LeafD".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_E/t:e".to_string(),
+          class_name: "LeafE".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "StructuredSequenceHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::SdkSequence,
+          children: vec![SchemaTypeChild {
+            kind: SchemaTypeChildKind::Sequence,
+            children: vec![
+              SchemaTypeChild {
+                kind: SchemaTypeChildKind::Choice,
+                children: vec![
+                  SchemaTypeChild {
+                    kind: SchemaTypeChildKind::Choice,
+                    children: vec![
+                      SchemaTypeChild {
+                        name: "t:CT_A/t:a".to_string(),
+                        kind: SchemaTypeChildKind::Child,
+                        ..Default::default()
+                      },
+                      SchemaTypeChild {
+                        name: "t:CT_B/t:b".to_string(),
+                        kind: SchemaTypeChildKind::Child,
+                        ..Default::default()
+                      },
+                    ],
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    kind: SchemaTypeChildKind::Choice,
+                    children: vec![SchemaTypeChild {
+                      name: "t:CT_C/t:c".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      ..Default::default()
+                    }],
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                kind: SchemaTypeChildKind::Sequence,
+                children: vec![
+                  SchemaTypeChild {
+                    name: "t:CT_D/t:d".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    kind: SchemaTypeChildKind::Choice,
+                    children: vec![SchemaTypeChild {
+                      name: "t:CT_E/t:e".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      ..Default::default()
+                    }],
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "StructuredSequenceHolder")
+      .unwrap();
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::OneSequenceStructured)
+    );
+    let fields: Vec<_> = holder
+      .members
+      .iter()
+      .filter_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        _ => None,
+      })
+      .collect();
+    assert!(
+      fields
+        .iter()
+        .any(|field| field.rust_name == "structured_sequence_holder_choice1")
+    );
+    assert!(fields.iter().any(|field| field.rust_name == "leaf_d"));
+    assert!(fields.iter().any(|field| field.rust_name == "leaf_e"));
   }
 }

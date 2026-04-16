@@ -10,12 +10,13 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  AltChunk, Body, BodyChoice, CommentChoice, Document, Hyperlink, HyperlinkChoice, Paragraph,
-  ParagraphChoice, ParagraphChoice2Choice, ParagraphChoice2Choice1Choice,
+  AltChunk, Body, BodyChoice, BodyChoice2Choice, BodyChoice2Choice1Choice, CommentChoice,
+  CommentChoice2Choice, CommentChoice2Choice1Choice, Document, Hyperlink, HyperlinkChoice,
+  Paragraph, ParagraphChoice, ParagraphChoice2Choice, ParagraphChoice2Choice1Choice,
   ParagraphChoice2Choice1RunLevelEltsChoice, ParagraphChoice2Choice1RunLevelEltsChoice1Choice,
-  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice,
-  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice,
-  ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice2Choice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice,
+  ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice,
   ParagraphPContentBaseChoice, Run, RunChoice, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::fixtures;
@@ -135,18 +136,45 @@ fn first_paragraph(
   body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .find_map(body_choice_paragraph)
 }
 
 fn body_paragraph_count(body: &Body) -> usize {
   body
     .eg_block_level_elts
     .iter()
-    .filter(|child| matches!(child, BodyChoice::WP(_)))
+    .filter(|child| body_choice_paragraph(child).is_some())
     .count()
+}
+
+fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
+  let BodyChoice::Choice2(choice) = choice else {
+    return None;
+  };
+  let BodyChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return None;
+  };
+
+  match choice.as_ref() {
+    BodyChoice2Choice1Choice::WP(paragraph) => Some(paragraph.as_ref()),
+    _ => None,
+  }
+}
+
+fn body_choice_sdt_block(
+  choice: &BodyChoice,
+) -> Option<&ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtBlock> {
+  let BodyChoice::Choice2(choice) = choice else {
+    return None;
+  };
+  let BodyChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return None;
+  };
+
+  match choice.as_ref() {
+    BodyChoice2Choice1Choice::WSdt(sdt) => Some(sdt.as_ref()),
+    _ => None,
+  }
 }
 
 fn first_hyperlink(paragraph: &Paragraph) -> Option<&Hyperlink> {
@@ -280,7 +308,7 @@ fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WBookmarkStart(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WBookmarkStart(_)
     )
   })
 }
@@ -289,7 +317,7 @@ fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WBookmarkEnd(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WBookmarkEnd(_)
     )
   })
 }
@@ -298,7 +326,7 @@ fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WCommentRangeStart(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WCommentRangeStart(_)
     )
   })
 }
@@ -307,7 +335,7 @@ fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
     matches!(
       choice,
-      ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice::WCommentRangeEnd(_)
+      ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice::WCommentRangeEnd(_)
     )
   })
 }
@@ -315,7 +343,7 @@ fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
 fn paragraph_choice_has_range_markup(
   choice: &ParagraphChoice,
   predicate: impl Fn(
-    &ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice1Choice,
+    &ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice1Choice,
   ) -> bool,
 ) -> bool {
   let ParagraphChoice::Choice2(choice) = choice else {
@@ -330,20 +358,20 @@ fn paragraph_choice_has_range_markup(
   let ParagraphChoice2Choice1RunLevelEltsChoice::Choice1(choice) = choice.as_ref() else {
     return false;
   };
-  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice::Choice1(choice) = choice.as_ref() else {
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice::Choice2(choice) = choice.as_ref() else {
     return false;
   };
   #[cfg(feature = "microsoft365")]
   let choice = match choice.as_ref() {
-    ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice::EgRangeMarkupElements(choice) => {
+    ParagraphChoice2Choice1RunLevelEltsChoice1Choice2Choice::EgRangeMarkupElements(choice) => {
       choice
     }
     _ => return false,
   };
   #[cfg(not(feature = "microsoft365"))]
-  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice1Choice::EgRangeMarkupElements(choice) =
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice2Choice::EgRangeMarkupElements(choice) =
     choice.as_ref();
-  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice1RangeMarkupElementsChoice::Choice1(choice) =
+  let ParagraphChoice2Choice1RunLevelEltsChoice1Choice2RangeMarkupElementsChoice::Choice1(choice) =
     choice.as_ref()
   else {
     return false;
@@ -358,12 +386,26 @@ fn comment_text(
   let mut text = String::new();
 
   for child in &comment.eg_block_level_elts {
-    if let CommentChoice::WP(paragraph) = child {
-      text.push_str(&paragraph_text(paragraph.as_ref()));
+    if let Some(paragraph) = comment_choice_paragraph(child) {
+      text.push_str(&paragraph_text(paragraph));
     }
   }
 
   text
+}
+
+fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {
+  let CommentChoice::Choice2(choice) = choice else {
+    return None;
+  };
+  let CommentChoice2Choice::Choice1(choice) = choice.as_ref() else {
+    return None;
+  };
+
+  match choice.as_ref() {
+    CommentChoice2Choice1Choice::WP(paragraph) => Some(paragraph.as_ref()),
+    _ => None,
+  }
 }
 
 #[test]
@@ -773,7 +815,8 @@ fn open_simple_sdt_docx_asset_from_openxml_sdk() {
   let path = test_file_path("simpleSdt.docx");
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
 
-  let Some(BodyChoice::WSdt(sdt)) = first_body_child(&package.main_document_part.root_element)
+  let Some(sdt) =
+    first_body_child(&package.main_document_part.root_element).and_then(body_choice_sdt_block)
   else {
     panic!("expected first body child to be w:sdt");
   };
@@ -813,18 +856,13 @@ fn open_hyperlink_docx_asset_from_openxml_sdk() {
   let hyperlink_paragraph = body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph)
-        if paragraph
-          .eg_p_content
-          .iter()
-          .any(|choice| paragraph_choice_hyperlink(choice).is_some()) =>
-      {
-        Some(paragraph.as_ref())
-      }
-      _ => None,
+    .filter_map(body_choice_paragraph)
+    .find(|paragraph| {
+      paragraph
+        .eg_p_content
+        .iter()
+        .any(|choice| paragraph_choice_hyperlink(choice).is_some())
     })
-    .next()
     .expect("expected paragraph with hyperlink");
 
   let hyperlink = first_hyperlink(hyperlink_paragraph).expect("expected hyperlink");
@@ -1890,13 +1928,13 @@ fn round_trip_document_docx_asset_from_openxml_sdk() {
     original_body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WSdt(_)))
+      .any(|child| body_choice_sdt_block(child).is_some())
   );
   assert!(
     roundtripped_body
       .eg_block_level_elts
       .iter()
-      .any(|child| matches!(child, BodyChoice::WSdt(_)))
+      .any(|child| body_choice_sdt_block(child).is_some())
   );
   assert!(
     original
@@ -2006,22 +2044,14 @@ fn round_trip_hello_o14_docx_asset_from_openxml_sdk() {
   let original_paragraph = original_body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WP(paragraph) if paragraph_text(paragraph.as_ref()).contains("Hello O14") => {
-        Some(paragraph.as_ref())
-      }
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
+    .find(|paragraph| paragraph_text(paragraph).contains("Hello O14"))
     .expect("expected paragraph text");
   let roundtripped_paragraph = roundtripped_body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WP(paragraph) if paragraph_text(paragraph.as_ref()).contains("Hello O14") => {
-        Some(paragraph.as_ref())
-      }
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
+    .find(|paragraph| paragraph_text(paragraph).contains("Hello O14"))
     .expect("expected paragraph text");
 
   assert!(paragraph_text(original_paragraph).contains("Hello O14"));
@@ -2100,18 +2130,12 @@ fn round_trip_may_12_04_docx_asset_from_openxml_sdk() {
   let original_first_paragraph = original_body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .find_map(body_choice_paragraph)
     .expect("expected first paragraph");
   let roundtripped_first_paragraph = roundtripped_body
     .eg_block_level_elts
     .iter()
-    .find_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-      _ => None,
-    })
+    .find_map(body_choice_paragraph)
     .expect("expected first paragraph");
 
   assert!(
@@ -2128,18 +2152,14 @@ fn round_trip_may_12_04_docx_asset_from_openxml_sdk() {
   let original_paragraph_texts: Vec<String> = original_body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph_text(paragraph.as_ref())),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
+    .map(paragraph_text)
     .collect();
   let roundtripped_paragraph_texts: Vec<String> = roundtripped_body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph) => Some(paragraph_text(paragraph.as_ref())),
-      _ => None,
-    })
+    .filter_map(body_choice_paragraph)
+    .map(paragraph_text)
     .collect();
 
   assert!(
@@ -2283,34 +2303,24 @@ fn round_trip_hyperlink_docx_asset_from_openxml_sdk() {
   let original_hyperlink_paragraph = original_body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph)
-        if paragraph
-          .eg_p_content
-          .iter()
-          .any(|choice| paragraph_choice_hyperlink(choice).is_some()) =>
-      {
-        Some(paragraph.as_ref())
-      }
-      _ => None,
+    .filter_map(body_choice_paragraph)
+    .find(|paragraph| {
+      paragraph
+        .eg_p_content
+        .iter()
+        .any(|choice| paragraph_choice_hyperlink(choice).is_some())
     })
-    .next()
     .expect("expected paragraph with hyperlink");
   let roundtripped_hyperlink_paragraph = roundtripped_body
     .eg_block_level_elts
     .iter()
-    .filter_map(|child| match child {
-      BodyChoice::WP(paragraph)
-        if paragraph
-          .eg_p_content
-          .iter()
-          .any(|choice| paragraph_choice_hyperlink(choice).is_some()) =>
-      {
-        Some(paragraph.as_ref())
-      }
-      _ => None,
+    .filter_map(body_choice_paragraph)
+    .find(|paragraph| {
+      paragraph
+        .eg_p_content
+        .iter()
+        .any(|choice| paragraph_choice_hyperlink(choice).is_some())
     })
-    .next()
     .expect("expected paragraph with hyperlink");
 
   let original_hyperlink =
@@ -3145,13 +3155,13 @@ fn round_trip_simple_sdt_docx_asset_from_openxml_sdk() {
     main_document_body_child_count(&roundtripped.main_document_part.root_element)
   );
 
-  let Some(BodyChoice::WSdt(original_sdt)) =
-    first_body_child(&original.main_document_part.root_element)
+  let Some(original_sdt) =
+    first_body_child(&original.main_document_part.root_element).and_then(body_choice_sdt_block)
   else {
     panic!("expected first body child to be w:sdt");
   };
-  let Some(BodyChoice::WSdt(roundtripped_sdt)) =
-    first_body_child(&roundtripped.main_document_part.root_element)
+  let Some(roundtripped_sdt) =
+    first_body_child(&roundtripped.main_document_part.root_element).and_then(body_choice_sdt_block)
   else {
     panic!("expected first body child to be w:sdt");
   };

@@ -1881,25 +1881,21 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
   if support.xmlns_mode == crate::sdk_code::codegen_ir::XmlnsMode::MapOnly {
     fields.push(quote! {
-      #[sdk(xmlns)]
       pub xmlns: Option<String>,
     });
     fields.push(quote! {
-      #[sdk(xmlns)]
       pub xmlns_map: std::collections::HashMap<String, String>,
     });
   }
 
   if support.xml_header != crate::sdk_code::codegen_ir::XmlHeaderMode::None {
     fields.push(quote! {
-      #[sdk(xml_header)]
       pub xml_header: crate::common::XmlHeaderType,
     });
   }
 
   if support.has_mce {
     fields.push(quote! {
-      #[sdk(mce)]
       pub mc_ignorable: Option<String>,
     });
   }

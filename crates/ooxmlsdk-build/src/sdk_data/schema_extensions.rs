@@ -243,7 +243,11 @@ fn merge_schema_type_children(
   let target = top_level_extension_children(target);
   for extension in extensions {
     if let Some(target_child) = find_merge_target(target, extension) {
-      merge_schema_type_child(target_child, extension);
+      merge_schema_type_child(
+        target_child,
+        extension,
+        extension.match_particle_id.is_empty(),
+      );
     } else if let Some(insert_before) = &extension.insert_before {
       if let Some(index) = find_insert_before_index(target, insert_before) {
         target.insert(index, runtime_schema_type_child(extension));
@@ -264,11 +268,15 @@ fn top_level_extension_children(target: &mut Vec<SchemaTypeChild>) -> &mut Vec<S
   }
 }
 
-fn merge_schema_type_child(target: &mut SchemaTypeChild, extension: &SchemaTypeChildExtension) {
+fn merge_schema_type_child(
+  target: &mut SchemaTypeChild,
+  extension: &SchemaTypeChildExtension,
+  allow_property_name_override: bool,
+) {
   if !extension.name.is_empty() {
     target.name = extension.name.clone();
   }
-  if !extension.property_name.is_empty() {
+  if allow_property_name_override && !extension.property_name.is_empty() {
     target.property_name = extension.property_name.clone();
   }
   target.kind = extension.kind;
@@ -910,9 +918,10 @@ mod tests {
         .property_name
         .is_empty()
     );
-    assert_eq!(
-      table_cell_properties.children[0].children[1].property_name,
-      "eg_cell_markup_elements"
+    assert!(
+      table_cell_properties.children[0].children[1]
+        .property_name
+        .is_empty()
     );
   }
 

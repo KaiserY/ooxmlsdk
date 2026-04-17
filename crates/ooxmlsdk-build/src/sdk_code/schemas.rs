@@ -347,7 +347,7 @@ impl<'a> CodegenContext<'a> {
         let field_name = if child.property_name.is_empty() {
           Cow::Borrowed("unknown_xml")
         } else {
-          Cow::Owned(escape_snake_case(child.property_name.to_snake_case()))
+          Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
         };
         let property_comments = if child.property_comments.is_empty() {
           Cow::Borrowed(" _")
@@ -430,7 +430,7 @@ impl<'a> CodegenContext<'a> {
           field_name: if child.property_name.is_empty() {
             Cow::Borrowed("unknown_xml")
           } else {
-            Cow::Owned(escape_snake_case(child.property_name.to_snake_case()))
+            Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
           },
           property_comments: if child.property_comments.is_empty() {
             Cow::Borrowed(" _")
@@ -779,7 +779,7 @@ pub(crate) fn one_sequence_choice_field_name(
       .map(|child| child.property_name.as_str())
       .filter(|property_name| !property_name.is_empty())
   {
-    return escape_snake_case(property_name.to_snake_case());
+    return schema_child_field_rust_name(property_name);
   }
 
   if choice_slot_count <= 1 {
@@ -790,6 +790,15 @@ pub(crate) fn one_sequence_choice_field_name(
       schema_type.class_name.to_snake_case(),
       slot_index + 1
     )
+  }
+}
+
+pub(crate) fn schema_child_field_rust_name(raw_name: &str) -> String {
+  let rust_name = escape_snake_case(raw_name.to_snake_case());
+  if rust_name == "children" {
+    "xml_children".to_string()
+  } else {
+    rust_name
   }
 }
 
@@ -1162,7 +1171,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           fields.push(quote! {
             #( #field_attrs )*
             #[sdk(choice)]
-            pub children: Vec<#child_choice_enum_ident>,
+            pub xml_children: Vec<#child_choice_enum_ident>,
           });
 
           child_choice_enums.push(quote! {
@@ -1500,7 +1509,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           fields.push(quote! {
             #( #field_attrs )*
             #[sdk(choice)]
-            pub children: Vec<#child_choice_enum_ident>,
+            pub xml_children: Vec<#child_choice_enum_ident>,
           });
 
           child_choice_enums.push(quote! {
@@ -2331,7 +2340,7 @@ fn child_field_name(child: &SchemaTypeChild, _child_type: &SchemaType) -> String
     child.property_name.as_str()
   };
 
-  escape_snake_case(raw_name.to_snake_case())
+  schema_child_field_rust_name(raw_name)
 }
 
 fn choice_child_display_name<'a>(child: &'a ResolvedOneSequenceChild<'a>) -> &'a str {
@@ -3197,7 +3206,7 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub children : Vec < AnyHolderChoice >"));
+    assert!(generated.contains("pub xml_children : Vec < AnyHolderChoice >"));
     assert!(generated.contains("pub enum AnyHolderChoice"));
     assert!(generated.contains("UnknownXml (String)"));
   }

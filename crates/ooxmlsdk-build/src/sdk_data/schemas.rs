@@ -400,7 +400,7 @@ fn factor_stable_group_wrappers(child: &mut SchemaTypeChild, signatures: &[Stabl
     })
     .collect::<Vec<_>>();
 
-  exact_signatures.sort_by(|left, right| right.leaf_qnames.len().cmp(&left.leaf_qnames.len()));
+  exact_signatures.sort_by_key(|right| std::cmp::Reverse(right.leaf_qnames.len()));
 
   for signature in exact_signatures {
     let Some(selected_indices) = find_group_factor_indices(&child.children, &signature.leaf_qnames)
@@ -522,7 +522,7 @@ fn infer_stable_group_name(
     })
     .collect::<Vec<_>>();
 
-  compatible_matches.sort_by(|left, right| right.leaf_qnames.len().cmp(&left.leaf_qnames.len()));
+  compatible_matches.sort_by_key(|right| std::cmp::Reverse(right.leaf_qnames.len()));
 
   if compatible_matches.is_empty() {
     return None;

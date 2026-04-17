@@ -15,6 +15,7 @@ use crate::sdk_code::schemas::{
   ResolvedOneSequenceChoiceVariant, ResolvedOneSequenceSequenceVariant,
   ResolvedOneSequenceStructuredChoice, one_sequence_choice_enum_name,
   one_sequence_choice_field_name, one_sequence_choice_sequence_struct_name,
+  schema_child_field_rust_name,
 };
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
@@ -678,6 +679,7 @@ fn build_recursive_one_sequence_choice_members(
     one_sequence_choice_field_name(schema_type, choice_slot_count, choice_slot_index);
   let enum_name = one_sequence_choice_enum_name(schema_type, choice_slot_count, choice_slot_index);
   let mut extra_types = Vec::new();
+  let mut name_allocator = RecursiveChoiceNameAllocator::new(schema_type, [enum_name.as_str()]);
   let top_choice = build_recursive_choice_enum_decl(
     schema_type,
     schema,
@@ -685,6 +687,7 @@ fn build_recursive_one_sequence_choice_members(
     choice_child,
     &enum_name,
     &mut extra_types,
+    &mut name_allocator,
   )?;
   let leaf_versions = collect_choice_leaf_versions(choice_child, context);
   let choice_version =
@@ -721,11 +724,11 @@ fn build_recursive_one_sequence_choice_members(
         let resolved_child = if child.kind == SchemaTypeChildKind::Any {
           ResolvedOneSequenceChild {
             name: "",
-            field_name: std::borrow::Cow::Borrowed(if child.property_name.is_empty() {
-              "unknown_xml"
+            field_name: if child.property_name.is_empty() {
+              std::borrow::Cow::Borrowed("unknown_xml")
             } else {
-              child.property_name.as_str()
-            }),
+              std::borrow::Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
+            },
             property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
               " _"
             } else {
@@ -793,6 +796,7 @@ fn build_recursive_choice_enum_decl(
   choice_child: &SchemaTypeChild,
   enum_name: &str,
   extra_types: &mut Vec<TypeDecl>,
+  name_allocator: &mut RecursiveChoiceNameAllocator,
 ) -> Result<TypeDecl> {
   let mut members = Vec::new();
 
@@ -805,6 +809,7 @@ fn build_recursive_choice_enum_decl(
       child,
       index,
       extra_types,
+      name_allocator,
     )?);
   }
 
@@ -827,24 +832,27 @@ fn build_recursive_choice_enum_decl(
   })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_recursive_choice_member_decl(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
-  parent_enum_name: &str,
+  _parent_enum_name: &str,
   child: &SchemaTypeChild,
   child_index: usize,
   extra_types: &mut Vec<TypeDecl>,
+  name_allocator: &mut RecursiveChoiceNameAllocator,
 ) -> Result<MemberDecl> {
   if let Some(collapsed) = collapse_single_child_choice_wrapper(child) {
     let mut member = build_recursive_choice_member_decl(
       schema_type,
       schema,
       context,
-      parent_enum_name,
+      _parent_enum_name,
       collapsed.child,
       child_index,
       extra_types,
+      name_allocator,
     )?;
     apply_recursive_choice_member_version_override(&mut member, &collapsed.initial_version);
     return Ok(member);
@@ -858,19 +866,19 @@ fn build_recursive_choice_member_decl(
       schema_type,
       schema,
       context,
-      parent_enum_name,
       child,
       child_index,
       extra_types,
+      name_allocator,
     ),
     SchemaTypeChildKind::Choice => build_recursive_choice_nested_variant_decl(
       schema_type,
       schema,
       context,
-      parent_enum_name,
       child,
       child_index,
       extra_types,
+      name_allocator,
     ),
   }
 }
@@ -884,11 +892,11 @@ fn build_recursive_choice_leaf_variant_decl(
   let resolved_child = if child.kind == SchemaTypeChildKind::Any {
     ResolvedOneSequenceChild {
       name: "",
-      field_name: std::borrow::Cow::Borrowed(if child.property_name.is_empty() {
-        "unknown_xml"
+      field_name: if child.property_name.is_empty() {
+        std::borrow::Cow::Borrowed("unknown_xml")
       } else {
-        child.property_name.as_str()
-      }),
+        std::borrow::Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
+      },
       property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
         " _"
       } else {
@@ -908,13 +916,13 @@ fn build_recursive_choice_sequence_variant_decl(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
-  parent_enum_name: &str,
   child: &SchemaTypeChild,
   child_index: usize,
   extra_types: &mut Vec<TypeDecl>,
+  name_allocator: &mut RecursiveChoiceNameAllocator,
 ) -> Result<MemberDecl> {
   let sequence_leafs = collect_sequence_leaf_children(&child.children);
-  let struct_name = recursive_choice_sequence_struct_name(parent_enum_name, child, child_index);
+  let struct_name = name_allocator.allocate_sequence_name();
   let variant_name = recursive_choice_variant_name(child, child_index);
   let property_comments = format!(
     " Sequence of {}",
@@ -955,12 +963,12 @@ fn build_recursive_choice_nested_variant_decl(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
-  parent_enum_name: &str,
   child: &SchemaTypeChild,
   child_index: usize,
   extra_types: &mut Vec<TypeDecl>,
+  name_allocator: &mut RecursiveChoiceNameAllocator,
 ) -> Result<MemberDecl> {
-  let nested_enum_name = recursive_choice_nested_enum_name(parent_enum_name, child, child_index);
+  let nested_enum_name = name_allocator.allocate_choice_name();
   let nested_type = build_recursive_choice_enum_decl(
     schema_type,
     schema,
@@ -968,6 +976,7 @@ fn build_recursive_choice_nested_variant_decl(
     child,
     &nested_enum_name,
     extra_types,
+    name_allocator,
   )?;
   extra_types.push(nested_type);
 
@@ -1194,96 +1203,45 @@ fn recursive_choice_variant_name(child: &SchemaTypeChild, child_index: usize) ->
   }
 }
 
-fn recursive_choice_nested_enum_name(
-  parent_enum_name: &str,
-  child: &SchemaTypeChild,
-  child_index: usize,
-) -> String {
-  let base = compact_anonymous_suffix_chain(parent_enum_name.trim_end_matches("Choice"));
-  let stem = if child.property_name.is_empty() {
-    format!("Choice{}", child_index + 1)
-  } else {
-    strip_group_prefix(child.property_name.as_str()).to_upper_camel_case()
-  };
-  format!("{base}{stem}Choice")
+struct RecursiveChoiceNameAllocator {
+  root_name: String,
+  next_choice_index: usize,
+  next_sequence_index: usize,
+  used_names: std::collections::HashSet<String>,
 }
 
-fn recursive_choice_sequence_struct_name(
-  parent_enum_name: &str,
-  child: &SchemaTypeChild,
-  child_index: usize,
-) -> String {
-  let base = compact_anonymous_suffix_chain(parent_enum_name.trim_end_matches("Choice"));
-  let stem = if child.property_name.is_empty() {
-    format!("Sequence{}", child_index + 1)
-  } else {
-    child.property_name.to_upper_camel_case()
-  };
-  format!("{base}{stem}")
-}
+impl RecursiveChoiceNameAllocator {
+  fn new<'a>(schema_type: &SchemaType, reserved_names: impl IntoIterator<Item = &'a str>) -> Self {
+    let mut used_names = std::collections::HashSet::new();
+    used_names.extend(reserved_names.into_iter().map(ToOwned::to_owned));
 
-#[derive(Clone, Copy)]
-enum AnonymousSuffixKind {
-  Choice,
-  Sequence,
-}
-
-fn split_trailing_anonymous_suffix(name: &str) -> Option<(&str, AnonymousSuffixKind, &str)> {
-  let digit_count = name
-    .chars()
-    .rev()
-    .take_while(|ch| ch.is_ascii_digit())
-    .count();
-  if digit_count == 0 {
-    return None;
+    Self {
+      root_name: schema_type.class_name.to_upper_camel_case(),
+      next_choice_index: 1,
+      next_sequence_index: 1,
+      used_names,
+    }
   }
 
-  let digits_start = name.len() - digit_count;
-  let (stem, digits) = name.split_at(digits_start);
-  if let Some(prefix) = stem.strip_suffix("Choice") {
-    return Some((prefix, AnonymousSuffixKind::Choice, digits));
-  }
-  if let Some(prefix) = stem.strip_suffix("Sequence") {
-    return Some((prefix, AnonymousSuffixKind::Sequence, digits));
-  }
-
-  None
-}
-
-fn compact_anonymous_suffix_chain(name: &str) -> String {
-  let mut prefix = name;
-  let mut suffixes = Vec::new();
-
-  while let Some((next_prefix, kind, digits)) = split_trailing_anonymous_suffix(prefix) {
-    suffixes.push((kind, digits.to_string()));
-    prefix = next_prefix;
+  fn allocate_choice_name(&mut self) -> String {
+    loop {
+      let candidate = format!("{}Choice{}", self.root_name, self.next_choice_index);
+      self.next_choice_index += 1;
+      if self.used_names.insert(candidate.clone()) {
+        return candidate;
+      }
+    }
   }
 
-  if suffixes.len() <= 3 {
-    return name.to_string();
+  fn allocate_sequence_name(&mut self) -> String {
+    loop {
+      let candidate = format!("{}Sequence{}", self.root_name, self.next_sequence_index);
+      self.next_sequence_index += 1;
+      if self.used_names.insert(candidate.clone()) {
+        return candidate;
+      }
+    }
   }
-
-  let mut compact = prefix.to_string();
-  let mut suffixes = suffixes.into_iter().rev();
-  if let Some((kind, digits)) = suffixes.next() {
-    compact.push_str(match kind {
-      AnonymousSuffixKind::Choice => "Choice",
-      AnonymousSuffixKind::Sequence => "Sequence",
-    });
-    compact.push_str(&digits);
-  }
-  for (kind, digits) in suffixes {
-    compact.push(match kind {
-      AnonymousSuffixKind::Choice => 'c',
-      AnonymousSuffixKind::Sequence => 's',
-    });
-    compact.push_str(&digits);
-  }
-  compact
-}
-
-fn strip_group_prefix(property_name: &str) -> &str {
-  property_name.strip_prefix("eg_").unwrap_or(property_name)
 }
 
 fn refine_content_model_decl(
@@ -1544,7 +1502,7 @@ fn build_direct_child_member_decls(
           .to_snake_case(),
       )
     } else {
-      escape_snake_case(child.property_name.to_snake_case())
+      schema_child_field_rust_name(child.property_name.as_str())
     };
     if !field_name_set.insert(rust_name.clone()) {
       continue;
@@ -1688,7 +1646,7 @@ fn build_single_nested_child_member_decl(
         .to_snake_case(),
     )
   } else {
-    escape_snake_case(child.property_name.to_snake_case())
+    schema_child_field_rust_name(child.property_name.as_str())
   };
 
   Ok(Some(FieldDecl {
@@ -2635,7 +2593,7 @@ fn build_direct_child_member_decl_from_schema_child(
         .to_snake_case(),
     )
   } else {
-    escape_snake_case(child.property_name.to_snake_case())
+    schema_child_field_rust_name(child.property_name.as_str())
   };
   let version = if child.initial_version.is_empty() {
     context
@@ -4339,44 +4297,43 @@ mod tests {
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgContentRunContent"
-          && variant.payload.rust_type == "ParagraphContentRunContentChoice"
+          && variant.payload.rust_type == "ParagraphChoice1"
     )));
 
     let content_run_choice = ir
       .types
       .iter()
-      .find(|ty| ty.rust_name == "ParagraphContentRunContentChoice")
+      .find(|ty| ty.rust_name == "ParagraphChoice1")
       .unwrap();
     assert!(content_run_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgRunLevelElts"
-          && variant.payload.rust_type == "ParagraphContentRunContentRunLevelEltsChoice"
+          && variant.payload.rust_type == "ParagraphChoice2"
     )));
 
     let run_level_choice = ir
       .types
       .iter()
-      .find(|ty| ty.rust_name == "ParagraphContentRunContentRunLevelEltsChoice")
+      .find(|ty| ty.rust_name == "ParagraphChoice2")
       .unwrap();
     assert!(run_level_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgRangeMarkupElements"
-          && variant.payload.rust_type
-            == "ParagraphContentRunContentRunLevelEltsRangeMarkupElementsChoice"
+          && variant.payload.rust_type == "ParagraphChoice3"
     )));
     assert!(run_level_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "Sequence1"
-          && variant.payload.rust_type == "ParagraphContentRunContentRunLevelEltsSequence1"
+          && variant.payload.rust_type == "ParagraphSequence1"
     )));
 
     let conflict_sequence = ir
       .types
       .iter()
-      .find(|ty| ty.rust_name == "ParagraphContentRunContentRunLevelEltsSequence1")
+      .find(|ty| ty.rust_name == "ParagraphSequence1")
       .unwrap();
     let conflict_fields = conflict_sequence
       .members
@@ -4397,16 +4354,13 @@ mod tests {
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgMathContent"
-          && variant.payload.rust_type
-            == "ParagraphContentRunContentRunLevelEltsMathContentChoice"
+          && variant.payload.rust_type == "ParagraphChoice4"
     )));
 
     let omath_math_elements_choice = ir
       .types
       .iter()
-      .find(|ty| {
-        ty.rust_name == "ParagraphContentRunContentRunLevelEltsMathContentOmathMathElementsChoice"
-      })
+      .find(|ty| ty.rust_name == "ParagraphChoice5")
       .unwrap();
     assert!(
       omath_math_elements_choice
@@ -4419,10 +4373,11 @@ mod tests {
               && variant.payload.rust_type == "MathRun"
         ))
     );
-    assert!(ir.types.iter().all(|ty| {
-      ty.rust_name
-        != "ParagraphContentRunContentRunLevelEltsMathContentOmathMathElementsChoice1Choice"
-    }));
+    assert!(
+      ir.types
+        .iter()
+        .all(|ty| { ty.rust_name != "ParagraphChoice6" })
+    );
   }
 
   #[test]
@@ -4552,7 +4507,7 @@ mod tests {
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgNested"
-          && variant.payload.rust_type == "GenericHolderNestedChoice"
+          && variant.payload.rust_type == "GenericHolderChoice1"
     )));
   }
 
@@ -6336,23 +6291,17 @@ mod tests {
   }
 
   #[test]
-  fn compacts_recursive_anonymous_suffix_chains() {
-    assert_eq!(
-      compact_anonymous_suffix_chain("ParagraphChoice2Choice2"),
-      "ParagraphChoice2Choice2"
-    );
-    assert_eq!(
-      compact_anonymous_suffix_chain("ParagraphChoice2Sequence5Choice3"),
-      "ParagraphChoice2Sequence5Choice3"
-    );
-    assert_eq!(
-      compact_anonymous_suffix_chain("ParagraphChoice2"),
-      "ParagraphChoice2"
-    );
-    assert_eq!(
-      compact_anonymous_suffix_chain("ParagraphChoice2Choice2Choice3Choice4"),
-      "ParagraphChoice2c2c3c4"
-    );
+  fn allocates_recursive_choice_names_with_root_scoped_counters() {
+    let schema_type = SchemaType {
+      class_name: "Paragraph".to_string(),
+      ..Default::default()
+    };
+    let mut allocator = RecursiveChoiceNameAllocator::new(&schema_type, ["ParagraphChoice1"]);
+
+    assert_eq!(allocator.allocate_choice_name(), "ParagraphChoice2");
+    assert_eq!(allocator.allocate_sequence_name(), "ParagraphSequence1");
+    assert_eq!(allocator.allocate_choice_name(), "ParagraphChoice3");
+    assert_eq!(allocator.allocate_sequence_name(), "ParagraphSequence2");
   }
 
   #[test]

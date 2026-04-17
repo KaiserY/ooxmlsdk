@@ -123,6 +123,7 @@ pub(crate) fn parent_zip_path(path: &str) -> String {
     .unwrap_or_default()
 }
 
+#[allow(clippy::collapsible_match)]
 pub(crate) fn process_foreign_element_children<'de, R, F>(
   xml_reader: &mut R,
   empty_tag: bool,
@@ -196,15 +197,14 @@ where
         }
       },
       quick_xml::events::Event::Empty(e) => match e.name().as_ref() {
-        b"mc:Choice" | b"Choice" => {
-          if !selected_branch && markup_compatibility_choice_supported(&e, xml_reader.decoder())? {
-            selected_branch = true;
-          }
+        b"mc:Choice" | b"Choice"
+          if !selected_branch
+            && markup_compatibility_choice_supported(&e, xml_reader.decoder())? =>
+        {
+          selected_branch = true;
         }
-        b"mc:Fallback" | b"Fallback" => {
-          if !selected_branch {
-            selected_branch = true;
-          }
+        b"mc:Fallback" | b"Fallback" if !selected_branch => {
+          selected_branch = true;
         }
         _ => {}
       },

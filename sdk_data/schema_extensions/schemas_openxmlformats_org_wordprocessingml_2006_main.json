@@ -16,7 +16,6 @@
       "ClassName": "Run",
       "Children": [
         {
-          "PropertyName": "run_choice",
           "Kind": "Choice",
           "MatchParticleId": "sequence_1/choice_1",
           "Children": [
@@ -157,7 +156,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -170,7 +168,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -180,7 +177,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -190,7 +186,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_block_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -200,7 +195,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_row_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -210,7 +204,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_cell_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -220,7 +213,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -230,7 +222,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_cell_markup_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -240,7 +231,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_hdr_ftr_references",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -250,7 +240,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_cell_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -260,7 +249,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -270,7 +258,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -280,7 +267,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -290,7 +276,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -300,7 +285,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -310,7 +294,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -320,7 +303,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -330,7 +312,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_block_level_elts",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -340,7 +321,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -350,7 +330,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -370,7 +349,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -380,7 +358,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -390,7 +367,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -400,7 +376,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_ruby_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -410,7 +385,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_ruby_content",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -420,7 +394,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_ruby_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -430,7 +403,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_ruby_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -440,7 +412,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_ruby_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -450,7 +421,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_block_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -460,7 +430,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -470,7 +439,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_cell_content",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -480,7 +448,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_content_row_content",
           "MatchParticleId": "choice_1"
         }
       ]

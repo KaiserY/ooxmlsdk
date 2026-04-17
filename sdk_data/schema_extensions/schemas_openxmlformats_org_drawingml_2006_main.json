@@ -77,17 +77,14 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_geometry",
           "MatchParticleId": "sequence_1/choice_1"
         },
         {
           "Kind": "Choice",
-          "PropertyName": "eg_fill_properties",
           "MatchParticleId": "sequence_1/choice_2"
         },
         {
           "Kind": "Choice",
-          "PropertyName": "eg_effect_properties",
           "MatchParticleId": "sequence_1/choice_3"
         }
       ]
@@ -248,12 +245,10 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_fill_properties",
           "MatchParticleId": "sequence_1/choice_1"
         },
         {
           "Kind": "Choice",
-          "PropertyName": "eg_effect_properties",
           "MatchParticleId": "sequence_1/choice_2"
         }
       ]

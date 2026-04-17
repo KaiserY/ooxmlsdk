@@ -5,7 +5,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -15,7 +14,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_p_content_math",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -25,7 +23,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -35,7 +32,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "choice_1"
         }
       ]
@@ -45,7 +41,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -55,7 +50,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -65,7 +59,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -75,7 +68,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -85,7 +77,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -95,7 +86,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]
@@ -105,7 +95,6 @@
       "Children": [
         {
           "Kind": "Choice",
-          "PropertyName": "eg_o_math_elements",
           "MatchParticleId": "sequence_1/choice_1"
         }
       ]

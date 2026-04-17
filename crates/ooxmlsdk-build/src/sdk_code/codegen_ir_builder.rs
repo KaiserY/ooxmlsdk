@@ -2923,7 +2923,7 @@ fn build_generic_children_members(
     docs: "Choice of child elements.".to_string(),
     version: choice_version,
     wire: FieldWireDecl::Choice,
-    cardinality: Cardinality::Many,
+    cardinality: generic_children_choice_cardinality(schema_type),
     type_ref: TypeRefDecl {
       rust_type: choice_enum_name.clone(),
       module_path: None,
@@ -2995,6 +2995,18 @@ fn build_generic_children_members(
   });
 
   Ok(extra_types)
+}
+
+fn generic_children_choice_cardinality(schema_type: &SchemaType) -> Cardinality {
+  let content_children = top_level_content_children(schema_type);
+  if content_children.len() == 1
+    && content_children[0].kind == SchemaTypeChildKind::Choice
+    && !content_children[0].repeated
+  {
+    Cardinality::Optional
+  } else {
+    Cardinality::Many
+  }
 }
 
 fn build_content_model_decl(schema_type: &SchemaType) -> Option<ContentModelDecl> {
@@ -3970,6 +3982,116 @@ mod tests {
         .count(),
       1
     );
+  }
+
+  #[test]
+  fn preserves_overlapping_direct_and_sequence_choice_variants_in_generic_fallback() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "A".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "B".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "OverlappingChoiceHolder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![SchemaTypeChild {
+            particle_id: "root".to_string(),
+            kind: SchemaTypeChildKind::Sequence,
+            children: vec![SchemaTypeChild {
+              particle_id: "choice_1".to_string(),
+              kind: SchemaTypeChildKind::Choice,
+              children: vec![
+                SchemaTypeChild {
+                  particle_id: "choice_1/sequence_1".to_string(),
+                  kind: SchemaTypeChildKind::Sequence,
+                  children: vec![
+                    SchemaTypeChild {
+                      particle_id: "choice_1/sequence_1/element_1".to_string(),
+                      name: "t:CT_A/t:a".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      ..Default::default()
+                    },
+                    SchemaTypeChild {
+                      particle_id: "choice_1/sequence_1/element_2".to_string(),
+                      name: "t:CT_B/t:b".to_string(),
+                      kind: SchemaTypeChildKind::Child,
+                      optional: true,
+                      ..Default::default()
+                    },
+                  ],
+                  ..Default::default()
+                },
+                SchemaTypeChild {
+                  particle_id: "choice_1/element_1".to_string(),
+                  name: "t:CT_A/t:a".to_string(),
+                  kind: SchemaTypeChildKind::Child,
+                  ..Default::default()
+                },
+              ],
+              ..Default::default()
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "OverlappingChoiceHolder")
+      .unwrap();
+    assert_eq!(
+      holder.content_model,
+      Some(ContentModelDecl::SequenceSingleChoice)
+    );
+
+    let choice_field = holder
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(choice_field.cardinality, Cardinality::Optional);
+    assert_eq!(
+      choice_field.type_ref.rust_type,
+      "OverlappingChoiceHolderChoice"
+    );
+
+    let choice_enum = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "OverlappingChoiceHolderChoice")
+      .unwrap();
+    let variant_names = choice_enum
+      .members
+      .iter()
+      .filter_map(|member| match member {
+        MemberDecl::Variant(variant) => Some(variant.rust_name.as_str()),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(variant_names, vec!["Sequence1", "TA"]);
   }
 
   #[test]
@@ -6072,7 +6194,7 @@ mod tests {
     assert_eq!(fields.len(), 1);
     assert_eq!(fields[0].rust_name, "fallback_holder_choice");
     assert!(matches!(fields[0].wire, FieldWireDecl::Choice));
-    assert_eq!(fields[0].cardinality, Cardinality::Many);
+    assert_eq!(fields[0].cardinality, Cardinality::Optional);
 
     let choice_enum = ir
       .types

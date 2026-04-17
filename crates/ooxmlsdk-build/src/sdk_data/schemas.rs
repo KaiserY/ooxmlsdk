@@ -368,8 +368,6 @@ fn assign_stable_group_name(child: &mut SchemaTypeChild, signatures: &[StableGro
     assign_stable_group_name(nested, signatures);
   }
 
-  factor_stable_group_wrappers(child, signatures);
-
   if !child.property_name.is_empty()
     || !matches!(
       child.kind,
@@ -382,109 +380,6 @@ fn assign_stable_group_name(child: &mut SchemaTypeChild, signatures: &[StableGro
   if let Some(property_name) = infer_stable_group_name(child, signatures) {
     child.property_name = property_name;
   }
-}
-
-fn factor_stable_group_wrappers(child: &mut SchemaTypeChild, signatures: &[StableGroupSignature]) {
-  if child.kind != SchemaTypeChildKind::Choice {
-    return;
-  }
-
-  let parent_leaf_qnames = child_leaf_qnames(child);
-  let mut exact_signatures = signatures
-    .iter()
-    .filter(|signature| {
-      matches!(signature.match_kind, StableGroupMatchKind::Exact)
-        && signature.leaf_qnames.len() > 1
-        && signature.leaf_qnames.is_subset(&parent_leaf_qnames)
-        && signature.leaf_qnames != parent_leaf_qnames
-    })
-    .collect::<Vec<_>>();
-
-  exact_signatures.sort_by_key(|right| std::cmp::Reverse(right.leaf_qnames.len()));
-
-  for signature in exact_signatures {
-    let Some(selected_indices) = find_group_factor_indices(&child.children, &signature.leaf_qnames)
-    else {
-      continue;
-    };
-
-    let selected_index_set = selected_indices
-      .iter()
-      .copied()
-      .collect::<std::collections::BTreeSet<_>>();
-    let first_selected = selected_indices[0];
-    let old_children = std::mem::take(&mut child.children);
-    let mut wrapper_children = Vec::new();
-    let mut remaining_children = Vec::new();
-
-    for (index, nested) in old_children.into_iter().enumerate() {
-      if selected_index_set.contains(&index) {
-        wrapper_children.push(nested);
-      } else {
-        remaining_children.push((index, nested));
-      }
-    }
-
-    let insert_index = remaining_children
-      .iter()
-      .position(|(index, _)| *index > first_selected)
-      .unwrap_or(remaining_children.len());
-    let wrapper_initial_version = wrapper_children
-      .iter()
-      .fold(String::new(), |version, nested| {
-        effective_initial_version(version.as_str(), nested.initial_version.as_str()).to_string()
-      });
-    let wrapper = SchemaTypeChild {
-      particle_id: String::new(),
-      name: String::new(),
-      property_name: signature.property_name.clone(),
-      property_comments: String::new(),
-      kind: SchemaTypeChildKind::Choice,
-      optional: false,
-      repeated: false,
-      initial_version: wrapper_initial_version,
-      children: wrapper_children,
-    };
-
-    let mut new_children = remaining_children
-      .into_iter()
-      .map(|(_, nested)| nested)
-      .collect::<Vec<_>>();
-    new_children.insert(insert_index, wrapper);
-    child.children = new_children;
-  }
-}
-
-fn find_group_factor_indices(
-  children: &[SchemaTypeChild],
-  group_leaf_qnames: &BTreeSet<String>,
-) -> Option<Vec<usize>> {
-  let mut selected_indices = Vec::new();
-  let mut covered_leaf_qnames = BTreeSet::new();
-
-  for (index, child) in children.iter().enumerate() {
-    let child_leaf_qnames = child_leaf_qnames(child);
-    if child_leaf_qnames.is_empty() || !child_leaf_qnames.is_subset(group_leaf_qnames) {
-      continue;
-    }
-
-    if child_leaf_qnames
-      .iter()
-      .all(|leaf_qname| covered_leaf_qnames.contains(leaf_qname))
-    {
-      continue;
-    }
-
-    selected_indices.push(index);
-    covered_leaf_qnames.extend(child_leaf_qnames);
-
-    if covered_leaf_qnames == *group_leaf_qnames {
-      break;
-    }
-  }
-
-  (selected_indices.len() >= 2 && covered_leaf_qnames == *group_leaf_qnames)
-    .then_some(selected_indices)
 }
 
 fn infer_stable_group_name(

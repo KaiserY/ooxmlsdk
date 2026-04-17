@@ -1,11 +1,11 @@
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, BodyChoice1, BodyChoice2, BodyChoice3, BodyChoice5, BodyChoice6, BodyChoice7,
-  CommentChoice, CommentChoice1, CommentChoice2, Comments, Document, Hyperlink, HyperlinkChoice,
-  Justification, Paragraph, ParagraphChoice, ParagraphChoice1, ParagraphChoice2, ParagraphChoice3,
-  ParagraphChoice4, ParagraphChoice5, ParagraphChoice7, ParagraphChoice8, ParagraphChoice9, Run,
-  RunChoice, SdtBlock, SdtPropertiesChoice, TabStop, TableJustification, Text, TextDirection,
+  Body, BodyChoice, BodyChoice1, BodyChoice2, BodyChoice3, BodyChoice5, BodyChoice6, CommentChoice,
+  CommentChoice1, CommentChoice2, Comments, Document, Hyperlink, HyperlinkChoice, Justification,
+  Paragraph, ParagraphChoice, ParagraphChoice1, ParagraphChoice2, ParagraphChoice3,
+  ParagraphChoice4, ParagraphChoice5, ParagraphChoice7, ParagraphChoice8, Run, RunChoice, SdtBlock,
+  SdtPropertiesChoice, TabStop, TableJustification, Text, TextDirection,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -226,7 +226,7 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 #[allow(unreachable_patterns)]
 fn body_choice_has_range_markup(
   choice: &BodyChoice,
-  predicate: impl Fn(&BodyChoice7) -> bool,
+  predicate: impl Fn(&BodyChoice6) -> bool,
 ) -> bool {
   let BodyChoice::Choice2(choice) = choice else {
     return false;
@@ -237,11 +237,7 @@ fn body_choice_has_range_markup(
   let BodyChoice3::Choice2(choice) = choice.as_ref() else {
     return false;
   };
-  let choice = match choice.as_ref() {
-    BodyChoice5::EgRangeMarkupElements(choice) => choice,
-    _ => return false,
-  };
-  let BodyChoice6::Choice1(choice) = choice.as_ref() else {
+  let BodyChoice5::Choice1(choice) = choice.as_ref() else {
     return false;
   };
 
@@ -250,13 +246,13 @@ fn body_choice_has_range_markup(
 
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
   body_choice_has_range_markup(choice, |choice| {
-    matches!(choice, BodyChoice7::WBookmarkStart(_))
+    matches!(choice, BodyChoice6::WBookmarkStart(_))
   })
 }
 
 fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
   body_choice_has_range_markup(choice, |choice| {
-    matches!(choice, BodyChoice7::WBookmarkEnd(_))
+    matches!(choice, BodyChoice6::WBookmarkEnd(_))
   })
 }
 
@@ -308,31 +304,31 @@ fn paragraph_choice_is_sdt(choice: &ParagraphChoice) -> bool {
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice9::WBookmarkStart(_))
+    matches!(choice, ParagraphChoice8::WBookmarkStart(_))
   })
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice9::WBookmarkEnd(_))
+    matches!(choice, ParagraphChoice8::WBookmarkEnd(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice9::WCommentRangeStart(_))
+    matches!(choice, ParagraphChoice8::WCommentRangeStart(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice9::WCommentRangeEnd(_))
+    matches!(choice, ParagraphChoice8::WCommentRangeEnd(_))
   })
 }
 
 fn paragraph_choice_has_range_markup(
   choice: &ParagraphChoice,
-  predicate: impl Fn(&ParagraphChoice9) -> bool,
+  predicate: impl Fn(&ParagraphChoice8) -> bool,
 ) -> bool {
   let ParagraphChoice::Choice2(choice) = choice else {
     return false;
@@ -349,14 +345,7 @@ fn paragraph_choice_has_range_markup(
   let ParagraphChoice5::Choice2(choice) = choice.as_ref() else {
     return false;
   };
-  #[cfg(feature = "microsoft365")]
-  let choice = match choice.as_ref() {
-    ParagraphChoice7::EgRangeMarkupElements(choice) => choice,
-    _ => return false,
-  };
-  #[cfg(not(feature = "microsoft365"))]
-  let ParagraphChoice7::EgRangeMarkupElements(choice) = choice.as_ref();
-  let ParagraphChoice8::Choice1(choice) = choice.as_ref() else {
+  let ParagraphChoice7::Choice1(choice) = choice.as_ref() else {
     return false;
   };
 

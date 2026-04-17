@@ -629,11 +629,12 @@ impl<'a> CodegenContext<'a> {
         SchemaTypeChildKind::Sequence => {
           if preserve_sequences {
             let mut sequence_children = Vec::new();
+            let mut sequence_resolved_names = std::collections::HashSet::new();
             self.collect_resolved_children(
               _schema_type,
               &child.children,
               &mut sequence_children,
-              resolved_names,
+              &mut sequence_resolved_names,
               true,
             )?;
 
@@ -3087,7 +3088,7 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub fallback_holder_choice : Vec < FallbackHolderChoice >"));
+    assert!(generated.contains("pub fallback_holder_choice : Option < FallbackHolderChoice >"));
     assert!(generated.contains("pub enum FallbackHolderChoice"));
     assert!(generated.contains("TA (std :: boxed :: Box < LeafA >)"));
     assert!(

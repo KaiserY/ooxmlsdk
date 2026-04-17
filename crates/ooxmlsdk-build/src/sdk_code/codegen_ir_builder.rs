@@ -2521,8 +2521,8 @@ fn build_mixed_choice_children_members(
                 let resolved_child = context.resolve_one_sequence_child(schema_type, field.name)?;
                 Ok(crate::sdk_code::schemas::ResolvedOneSequenceSequenceField {
                   child: resolved_child,
-                  optional: true,
-                  repeated: false,
+                  optional: field.optional,
+                  repeated: field.repeated,
                   initial_version: field.version,
                 })
               })
@@ -2757,6 +2757,7 @@ fn collect_mixed_choice_variants_inner<'a>(
             version: sequence_version,
             is_any: false,
             kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Sequence,
+            optional: child.optional,
             repeated: child.repeated,
             children: sequence_children,
           });
@@ -2794,6 +2795,7 @@ fn push_mixed_resolved_child<'a>(
       version: child.initial_version.as_str(),
       is_any: false,
       kind: child.kind,
+      optional: child.optional,
       repeated: child.repeated,
       children: Vec::new(),
     });
@@ -2827,6 +2829,7 @@ fn push_mixed_resolved_child<'a>(
       .unwrap_or_default(),
     is_any,
     kind: child.kind,
+    optional: child.optional,
     repeated: child.repeated,
     children: Vec::new(),
   });
@@ -2954,7 +2957,7 @@ fn build_generic_children_members(
               let resolved_child = context.resolve_one_sequence_child(schema_type, field.name)?;
               Ok(crate::sdk_code::schemas::ResolvedOneSequenceSequenceField {
                 child: resolved_child,
-                optional: true,
+                optional: field.optional,
                 repeated: field.repeated,
                 initial_version: field.version,
               })
@@ -6221,6 +6224,17 @@ mod tests {
       .find(|ty| ty.rust_name == "FallbackHolderChoiceSequence2")
       .unwrap();
     assert_eq!(helper_struct.kind, TypeKind::HelperStruct);
+    let helper_fields: Vec<_> = helper_struct
+      .members
+      .iter()
+      .filter_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        _ => None,
+      })
+      .collect();
+    assert_eq!(helper_fields.len(), 1);
+    assert_eq!(helper_fields[0].rust_name, "leaf_b");
+    assert_eq!(helper_fields[0].cardinality, Cardinality::One);
   }
 
   #[test]

@@ -111,6 +111,7 @@ pub struct ResolvedCompositeChild<'a> {
   pub version: &'a str,
   pub is_any: bool,
   pub kind: SchemaTypeChildKind,
+  pub optional: bool,
   pub repeated: bool,
   pub children: Vec<ResolvedCompositeChild<'a>>,
 }
@@ -654,6 +655,7 @@ impl<'a> CodegenContext<'a> {
               version: sequence_version,
               is_any: false,
               kind: SchemaTypeChildKind::Sequence,
+              optional: child.optional,
               repeated: child.repeated,
               children: sequence_children,
             });
@@ -690,6 +692,7 @@ impl<'a> CodegenContext<'a> {
         version: child.initial_version.as_str(),
         is_any: false,
         kind: child.kind,
+        optional: child.optional,
         repeated: child.repeated,
         children: Vec::new(),
       });
@@ -728,6 +731,7 @@ impl<'a> CodegenContext<'a> {
         .unwrap_or_default(),
       is_any,
       kind: child.kind,
+      optional: child.optional,
       repeated: child.repeated,
       children: Vec::new(),
     });
@@ -3098,6 +3102,7 @@ mod tests {
     assert!(generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(generated.contains("FallbackHolderChoiceSequence2"));
     assert!(generated.contains("leaf_b"));
+    assert!(!generated.contains("pub leaf_b : Option <"));
   }
 
   #[test]

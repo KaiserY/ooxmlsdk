@@ -1,19 +1,6 @@
 {
   "Types": [
     {
-      "ClassName": "ShowProperties",
-      "Children": [
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_1"
-        },
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_2"
-        }
-      ]
-    },
-    {
       "ClassName": "ShapeTree",
       "McAlternateContentInsertBefore": [
         "p:CT_GraphicalObjectFrame/p:graphicFrame"

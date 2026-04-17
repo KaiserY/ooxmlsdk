@@ -73,23 +73,6 @@
       "HasXmlnsFields": true
     },
     {
-      "ClassName": "ShapeProperties",
-      "Children": [
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_1"
-        },
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_2"
-        },
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_3"
-        }
-      ]
-    },
-    {
       "ClassName": "PresetGeometry",
       "HasXmlnsFields": true
     },
@@ -237,19 +220,6 @@
           "QName": ":pos",
           "PropertyName": "Position",
           "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "VisualGroupShapeProperties",
-      "Children": [
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_1"
-        },
-        {
-          "Kind": "Choice",
-          "MatchParticleId": "sequence_1/choice_2"
         }
       ]
     }

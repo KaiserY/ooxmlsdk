@@ -11,15 +11,13 @@ use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
-use crate::sdk_code::part_codegen_ir::{PartModuleDecl, build_part_codegen_ir};
+use crate::sdk_code::part_codegen_ir::PartModuleDecl;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{
   CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
 };
 use crate::sdk_code::versioning::version_cfg_attrs;
-use crate::sdk_data::sdk_data_model::{
-  Namespace as SdkDataNamespace, Part as SdkDataPart, Schema as SdkDataSchema,
-};
+use crate::sdk_data::sdk_data_model::{Namespace as SdkDataNamespace, Schema as SdkDataSchema};
 
 pub mod codegen_ir;
 pub mod codegen_ir_builder;
@@ -47,11 +45,6 @@ enum SchemaInputRecord {
 
 struct LoadedPart {
   ir: PartModuleDecl,
-}
-
-enum PartInputRecord {
-  Legacy(Box<SdkDataPart>),
-  Ir(Box<PartModuleDecl>),
 }
 
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
@@ -120,7 +113,7 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {
 }
 
 fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<LoadedPart>> {
-  let mut input_records = vec![];
+  let mut loaded_parts = vec![];
 
   if !sdk_data_parts_dir_path.exists() {
     return Ok(vec![]);
@@ -137,36 +130,22 @@ fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<LoadedPart>> {
     let file = File::open(&path)?;
     let reader = BufReader::new(file);
     let value: Value = serde_json::from_reader(reader)?;
-    if is_codegen_ir_part_json(&value) {
-      input_records.push(PartInputRecord::Ir(Box::new(serde_json::from_value(
-        value,
-      )?)));
-    } else {
-      input_records.push(PartInputRecord::Legacy(Box::new(serde_json::from_value(
-        value,
-      )?)));
+    if !is_codegen_ir_part_json(&value) {
+      return Err(
+        format!(
+          "expected part IR json in {}, found legacy/non-IR shape",
+          path.display()
+        )
+        .into(),
+      );
     }
+    loaded_parts.push(LoadedPart {
+      ir: serde_json::from_value(value)?,
+    });
   }
 
-  input_records.sort_by(|a, b| part_input_module_name(a).cmp(part_input_module_name(b)));
-
-  let legacy_parts: Vec<SdkDataPart> = input_records
-    .iter()
-    .filter_map(|record| match record {
-      PartInputRecord::Legacy(part) => Some((**part).clone()),
-      PartInputRecord::Ir(_) => None,
-    })
-    .collect();
-
-  input_records
-    .into_iter()
-    .map(|record| match record {
-      PartInputRecord::Legacy(part) => Ok(LoadedPart {
-        ir: build_part_codegen_ir(&part, &legacy_parts),
-      }),
-      PartInputRecord::Ir(ir) => Ok(LoadedPart { ir: *ir }),
-    })
-    .collect()
+  loaded_parts.sort_by(|a, b| a.ir.module_name.cmp(&b.ir.module_name));
+  Ok(loaded_parts)
 }
 
 fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
@@ -387,13 +366,6 @@ fn schema_input_module_name(record: &SchemaInputRecord) -> &str {
   match record {
     SchemaInputRecord::Legacy(schema) => &schema.module_name,
     SchemaInputRecord::Ir(schema) => &schema.module_name,
-  }
-}
-
-fn part_input_module_name(record: &PartInputRecord) -> &str {
-  match record {
-    PartInputRecord::Legacy(part) => &part.module_name,
-    PartInputRecord::Ir(ir) => &ir.module_name,
   }
 }
 

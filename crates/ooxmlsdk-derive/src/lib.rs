@@ -81,25 +81,7 @@ struct PartChildInfo {
   field_ident: Ident,
   ty: Type,
   kind: PartChildKind,
-  relationship_type: Option<String>,
-}
-
-impl PartChildInfo {
-  fn module_ident(&self) -> syn::Result<Ident> {
-    let type_ident = type_last_ident(&self.ty).ok_or_else(|| {
-      syn::Error::new_spanned(&self.ty, "SdkPart child field must use a path type")
-    })?;
-    parse_str(&to_snake_case_local(&type_ident.to_string()))
-      .map_err(|err| syn::Error::new_spanned(&self.ty, err))
-  }
-
-  fn item_ident(&self) -> syn::Result<Ident> {
-    let type_ident = type_last_ident(&self.ty).ok_or_else(|| {
-      syn::Error::new_spanned(&self.ty, "SdkPart child field must use a path type")
-    })?;
-    parse_str(&to_snake_case_local(&type_ident.to_string()))
-      .map_err(|err| syn::Error::new_spanned(&self.ty, err))
-  }
+  relationship_type: String,
 }
 
 #[derive(Clone)]
@@ -236,35 +218,14 @@ struct QNameInfo {
 }
 
 fn is_system_part_field(field: &syn::Field) -> bool {
-  if let Ok(Some(_)) = parse_part_field_marker(&field.attrs) {
-    return true;
-  }
-  if let Ok(Some(_)) = parse_part_content_attr(&field.attrs) {
-    return true;
-  }
-  field
-    .ident
-    .as_ref()
-    .map(|ident| {
-      matches!(
-        ident.to_string().as_str(),
-        "content_types"
-          | "relationships"
-          | "rels_path"
-          | "inner_path"
-          | "root_element"
-          | "part_content"
-      )
-    })
-    .unwrap_or(false)
-}
-
-fn is_field_named(field: &syn::Field, expected: &str) -> bool {
-  field
-    .ident
-    .as_ref()
-    .map(|ident| ident == expected)
-    .unwrap_or(false)
+  parse_part_field_marker(&field.attrs)
+    .ok()
+    .flatten()
+    .is_some()
+    || parse_part_content_attr(&field.attrs)
+      .ok()
+      .flatten()
+      .is_some()
 }
 
 fn part_root_type_from_fields(fields: &syn::FieldsNamed) -> Option<Type> {
@@ -275,28 +236,16 @@ fn part_root_type_from_fields(fields: &syn::FieldsNamed) -> Option<Type> {
       matches!(
         parse_part_field_marker(&field.attrs),
         Ok(Some(PartFieldMarker::Root))
-      ) || is_field_named(field, "root_element")
+      )
     })
     .map(|field| field.ty.clone())
 }
 
 fn part_content_kind_from_fields(fields: &syn::FieldsNamed) -> Option<DerivedPartContentKind> {
-  let field = fields.named.iter().find(|field| {
-    parse_part_content_attr(&field.attrs)
-      .ok()
-      .flatten()
-      .is_some()
-      || is_field_named(field, "part_content")
-  })?;
-  if let Some(kind) = parse_part_content_attr(&field.attrs).ok().flatten() {
-    return Some(kind);
-  }
-  let kind_name = type_last_ident(&field.ty)?.to_string();
-  match kind_name.as_str() {
-    "String" => Some(DerivedPartContentKind::Text),
-    "Vec" => Some(DerivedPartContentKind::Binary),
-    _ => None,
-  }
+  fields
+    .named
+    .iter()
+    .find_map(|field| parse_part_content_attr(&field.attrs).ok().flatten())
 }
 
 fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInfo>> {
@@ -321,34 +270,7 @@ fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInf
       field_ident,
       ty: inner_ty,
       kind: explicit.kind,
-      relationship_type: Some(explicit.relationship_type),
-    }));
-  }
-
-  if let Some(inner_ty) = unwrap_vec_inner(&field.ty) {
-    return Ok(Some(PartChildInfo {
-      field_ident,
-      ty: inner_ty,
-      kind: PartChildKind::Repeated,
-      relationship_type: None,
-    }));
-  }
-
-  if let Some(inner_ty) = unwrap_box_inner(&field.ty) {
-    return Ok(Some(PartChildInfo {
-      field_ident,
-      ty: inner_ty,
-      kind: PartChildKind::Required,
-      relationship_type: None,
-    }));
-  }
-
-  if let Some(inner_ty) = unwrap_optional_box_inner(&field.ty) {
-    return Ok(Some(PartChildInfo {
-      field_ident,
-      ty: inner_ty,
-      kind: PartChildKind::Optional,
-      relationship_type: None,
+      relationship_type: explicit.relationship_type,
     }));
   }
 
@@ -522,38 +444,6 @@ fn unwrap_optional_box_inner(ty: &Type) -> Option<Type> {
   unwrap_box_inner(&inner)
 }
 
-fn type_last_ident(ty: &Type) -> Option<&Ident> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  path.segments.last().map(|segment| &segment.ident)
-}
-
-fn to_snake_case_local(value: &str) -> String {
-  let mut out = String::with_capacity(value.len());
-  let mut chars = value.chars().peekable();
-  let mut prev_is_lower_or_digit = false;
-  let mut prev_is_upper = false;
-  while let Some(ch) = chars.next() {
-    let next_is_lower = chars
-      .peek()
-      .map(|next| next.is_ascii_lowercase())
-      .unwrap_or(false);
-    if ch.is_ascii_uppercase() {
-      if prev_is_lower_or_digit || (prev_is_upper && next_is_lower) {
-        out.push('_');
-      }
-      out.push(ch.to_ascii_lowercase());
-      prev_is_lower_or_digit = false;
-      prev_is_upper = true;
-    } else {
-      prev_is_lower_or_digit = ch.is_ascii_lowercase() || ch.is_ascii_digit();
-      prev_is_upper = false;
-      out.push(ch);
-    }
-  }
-  out
-}
 fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
   for attr in attrs {
     if !attr.path().is_ident("sdk") {

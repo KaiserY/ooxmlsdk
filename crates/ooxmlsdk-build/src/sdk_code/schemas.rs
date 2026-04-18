@@ -8,7 +8,7 @@ use syn::{Attribute, Ident, Type, Variant, parse_str, parse2};
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, FieldDecl, FieldWireDecl, MemberDecl,
-  SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind,
+  SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind, VariantDecl,
 };
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::helpers::{
@@ -904,6 +904,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .map(|ty| ty.rust_name.as_str())
     .collect();
+  let fully_inlined_helper_names = fully_inlined_sequence_helper_names(ir);
 
   for schema_enum in &ir.enums {
     token_stream_list.push(
@@ -983,6 +984,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       let qualified_str = &qname[qname.find('/').unwrap() + 1..];
       format!(" When the object is serialized out as xml, it's qualified name is {qualified_str}.")
     };
+    let sdk_type_derive = sdk_type_derive_tokens();
 
     if type_decl.kind == TypeKind::LeafTextAlias {
       let xml_content_type = type_from_decl_ref(
@@ -1031,12 +1033,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         #[doc = #version_doc]
         #[doc = ""]
         #[doc = #qualified_doc]
-        #[derive(
-          Clone,
-          Debug,
-          Default,
-          ooxmlsdk_derive::SdkType
-        )]
+        #sdk_type_derive
         #sdk_type_attrs
         pub struct #struct_name_ident {
           #( #fields )*
@@ -1570,12 +1567,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       #[doc = #version_doc]
       #[doc = ""]
       #[doc = #qualified_doc]
-      #[derive(
-        Clone,
-        Debug,
-        Default,
-        ooxmlsdk_derive::SdkType
-      )]
+      #sdk_type_derive
       #sdk_type_attrs
       pub struct #struct_name_ident {
         #( #fields )*
@@ -1591,15 +1583,22 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .filter(|type_decl| !schema_type_names.contains(type_decl.rust_name.as_str()))
   {
     match type_decl.kind {
-      TypeKind::ChoiceEnum => {
-        token_stream_list.push(gen_choice_type_decl(type_decl, ir, version_cfg)?)
-      }
-      TypeKind::HelperStruct => token_stream_list.push(gen_helper_struct_type_decl(
+      TypeKind::ChoiceEnum => token_stream_list.push(gen_choice_type_decl(
         type_decl,
         ir,
         type_graph,
         version_cfg,
       )?),
+      TypeKind::HelperStruct => {
+        if !fully_inlined_helper_names.contains(type_decl.rust_name.as_str()) {
+          token_stream_list.push(gen_helper_struct_type_decl(
+            type_decl,
+            ir,
+            type_graph,
+            version_cfg,
+          )?);
+        }
+      }
       _ => {}
     }
   }
@@ -1619,6 +1618,17 @@ fn common_choice_version<'a>(container_version: &'a str, variant_versions: &[&st
     "Microsoft365"
   } else {
     ""
+  }
+}
+
+fn sdk_type_derive_tokens() -> TokenStream {
+  quote! {
+    #[derive(
+      Clone,
+      Debug,
+      Default,
+      ooxmlsdk_derive::SdkType
+    )]
   }
 }
 
@@ -1672,6 +1682,7 @@ fn gen_schema_enum_from_decl(
 fn gen_choice_type_decl(
   type_decl: &TypeDecl,
   module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
   let enum_ident: Ident = parse_str(&type_decl.rust_name.to_upper_camel_case())?;
@@ -1692,6 +1703,7 @@ fn gen_choice_type_decl(
     VersionCfgContext::new(true)
   };
   let mut variants = Vec::new();
+  let mut has_inline_sequence_variant = false;
 
   for member in &type_decl.members {
     let MemberDecl::Variant(variant) = member else {
@@ -1699,9 +1711,9 @@ fn gen_choice_type_decl(
     };
     let variant_ident: Ident = parse_str(&variant.rust_name)?;
     let variant_attrs = module_version_cfg_attrs(&variant.version, variant_cfg);
-    let payload_type = type_from_decl_ref(&variant.payload)?;
     match &variant.wire {
       crate::sdk_code::codegen_ir::VariantWireDecl::Any => {
+        let payload_type = type_from_decl_ref(&variant.payload)?;
         variants.push(quote! {
           #( #variant_attrs )*
           #[sdk(any)]
@@ -1709,13 +1721,41 @@ fn gen_choice_type_decl(
         });
       }
       crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => {
-        variants.push(quote! {
-          #( #variant_attrs )*
-          #[sdk(sequence)]
-          #variant_ident(std::boxed::Box<#payload_type>),
-        });
+        if let Some(helper_type_decl) = inline_sequence_helper_type_decl(variant, module) {
+          has_inline_sequence_variant = true;
+          let helper_fields: Vec<&FieldDecl> = helper_type_decl
+            .members
+            .iter()
+            .filter_map(|member| match member {
+              MemberDecl::Field(field) => Some(field),
+              _ => None,
+            })
+            .collect();
+          let inline_fields = gen_inline_sequence_variant_fields_from_decl(
+            &helper_fields,
+            &helper_type_decl.rust_name,
+            module,
+            type_graph,
+            VersionCfgContext::new(true),
+          )?;
+          variants.push(quote! {
+            #( #variant_attrs )*
+            #[sdk(sequence)]
+            #variant_ident {
+              #( #inline_fields )*
+            },
+          });
+        } else {
+          let payload_type = type_from_decl_ref(&variant.payload)?;
+          variants.push(quote! {
+            #( #variant_attrs )*
+            #[sdk(sequence)]
+            #variant_ident(std::boxed::Box<#payload_type>),
+          });
+        }
       }
       crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { qnames } => {
+        let payload_type = type_from_decl_ref(&variant.payload)?;
         if qnames.is_empty() {
           return Err(variant.rust_name.clone().into());
         }
@@ -1730,6 +1770,7 @@ fn gen_choice_type_decl(
         });
       }
       crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
+        let payload_type = type_from_decl_ref(&variant.payload)?;
         let is_nested_choice = module
           .types
           .iter()
@@ -1756,6 +1797,7 @@ fn gen_choice_type_decl(
         }
       }
       crate::sdk_code::codegen_ir::VariantWireDecl::Text => {
+        let payload_type = type_from_decl_ref(&variant.payload)?;
         variants.push(quote! {
           #( #variant_attrs )*
           #[sdk(text)]
@@ -1765,13 +1807,92 @@ fn gen_choice_type_decl(
     }
   }
 
+  let large_enum_variant_allow = has_inline_sequence_variant.then(|| {
+    quote! {
+      #[allow(clippy::large_enum_variant)]
+    }
+  });
+
   Ok(quote! {
     #( #enum_attrs )*
+    #large_enum_variant_allow
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
     pub enum #enum_ident {
       #( #variants )*
     }
   })
+}
+
+fn helper_struct_is_inline_sequence_candidate(type_decl: &TypeDecl) -> bool {
+  type_decl.kind == TypeKind::HelperStruct
+    && matches!(type_decl.members.len(), 1 | 2)
+    && type_decl.members.iter().all(|member| {
+      matches!(
+        member,
+        MemberDecl::Field(FieldDecl {
+          wire: FieldWireDecl::Child { .. },
+          ..
+        })
+      )
+    })
+}
+
+fn inline_sequence_helper_type_decl<'a>(
+  variant: &VariantDecl,
+  module: &'a SchemaModuleDecl,
+) -> Option<&'a TypeDecl> {
+  if !matches!(
+    variant.wire,
+    crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. }
+  ) {
+    return None;
+  }
+
+  if variant.payload.module_path.is_some() {
+    return None;
+  }
+
+  module
+    .types
+    .iter()
+    .find(|type_decl| type_decl.rust_name == variant.payload.rust_type)
+    .filter(|type_decl| helper_struct_is_inline_sequence_candidate(type_decl))
+}
+
+fn fully_inlined_sequence_helper_names(module: &SchemaModuleDecl) -> HashSet<&str> {
+  let mut fully_inlined = HashSet::new();
+
+  for helper in module
+    .types
+    .iter()
+    .filter(|type_decl| helper_struct_is_inline_sequence_candidate(type_decl))
+  {
+    let total_refs = module
+      .types
+      .iter()
+      .flat_map(|type_decl| type_decl.members.iter())
+      .filter(|member| match member {
+        MemberDecl::Variant(variant) => variant.payload.rust_type == helper.rust_name,
+        _ => false,
+      })
+      .count();
+    let inline_refs = module
+      .types
+      .iter()
+      .flat_map(|type_decl| type_decl.members.iter())
+      .filter(|member| match member {
+        MemberDecl::Variant(variant) => inline_sequence_helper_type_decl(variant, module)
+          .is_some_and(|type_decl| type_decl.rust_name == helper.rust_name),
+        _ => false,
+      })
+      .count();
+
+    if total_refs > 0 && total_refs == inline_refs {
+      fully_inlined.insert(helper.rust_name.as_str());
+    }
+  }
+
+  fully_inlined
 }
 
 fn gen_helper_struct_type_decl(
@@ -1810,15 +1931,11 @@ fn gen_helper_struct_type_decl(
     type_graph,
     nested_cfg,
   )?;
+  let sdk_type_derive = sdk_type_derive_tokens();
 
   Ok(quote! {
     #( #type_attrs )*
-    #[derive(
-      Clone,
-      Debug,
-      Default,
-      ooxmlsdk_derive::SdkType
-    )]
+    #sdk_type_derive
     pub struct #struct_ident {
       #( #fields )*
     }
@@ -2221,6 +2338,71 @@ fn gen_direct_child_fields_from_decl(
   Ok(tokens)
 }
 
+fn gen_inline_sequence_variant_fields_from_decl(
+  fields: &[&FieldDecl],
+  owner_rust_name: &str,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+  field_cfg: VersionCfgContext,
+) -> Result<Vec<TokenStream>> {
+  let mut tokens = Vec::new();
+
+  for field in fields {
+    let attr = module_version_cfg_attrs(&field.version, field_cfg);
+    let field_name_ident: Ident = parse_str(&field.rust_name)?;
+    let field_type = type_from_decl_ref(&field.type_ref)?;
+    let property_comments = field.docs.as_str();
+    let FieldWireDecl::Child { qname } = &field.wire else {
+      return Err(
+        format!(
+          "expected inline sequence direct child field, got {:?}",
+          field.wire
+        )
+        .into(),
+      );
+    };
+    let sdk_field_attrs = quote! { #[sdk(child(qname = #qname))] };
+    let wrap_box = direct_child_field_needs_box(owner_rust_name, field, module, type_graph, false);
+
+    let field_tokens = match field.cardinality {
+      Cardinality::Many => quote! {
+        #( #attr )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        #field_name_ident: Vec<#field_type>,
+      },
+      Cardinality::Optional if wrap_box => quote! {
+        #( #attr )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        #field_name_ident: Option<std::boxed::Box<#field_type>>,
+      },
+      Cardinality::Optional => quote! {
+        #( #attr )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        #field_name_ident: Option<#field_type>,
+      },
+      Cardinality::One if wrap_box => quote! {
+        #( #attr )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        #field_name_ident: std::boxed::Box<#field_type>,
+      },
+      Cardinality::One => quote! {
+        #( #attr )*
+        #[doc = #property_comments]
+        #sdk_field_attrs
+        #field_name_ident: #field_type,
+      },
+    };
+
+    tokens.push(field_tokens);
+  }
+
+  Ok(tokens)
+}
+
 fn gen_flatten_one_sequence_fields_from_decl(
   fields: &[&FieldDecl],
   owner_rust_name: &str,
@@ -2589,6 +2771,103 @@ mod tests {
   }
 
   #[test]
+  fn inlines_small_sequence_helper_variants() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "First".to_string(),
+          xml_qname: Some("t:CT_First/t:first".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Second".to_string(),
+          xml_qname: Some("t:CT_Second/t:second".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![MemberDecl::Variant(
+            crate::sdk_code::codegen_ir::VariantDecl {
+              rust_name: "Sequence1".to_string(),
+              docs: " Sequence of t:first, t:second".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Sequence {
+                qnames: vec![
+                  "t:CT_First/t:first".to_string(),
+                  "t:CT_Second/t:second".to_string(),
+                ],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoiceSequence1".to_string(),
+                module_path: None,
+              },
+            },
+          )],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoiceSequence1".to_string(),
+          kind: TypeKind::HelperStruct,
+          members: vec![
+            MemberDecl::Field(FieldDecl {
+              rust_name: "first".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: FieldWireDecl::Child {
+                qname: "t:CT_First/t:first".to_string(),
+              },
+              cardinality: Cardinality::Optional,
+              type_ref: TypeRefDecl {
+                rust_type: "First".to_string(),
+                module_path: None,
+              },
+              validators: vec![],
+            }),
+            MemberDecl::Field(FieldDecl {
+              rust_name: "second".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: FieldWireDecl::Child {
+                qname: "t:CT_Second/t:second".to_string(),
+              },
+              cardinality: Cardinality::Optional,
+              type_ref: TypeRefDecl {
+                rust_type: "Second".to_string(),
+                module_path: None,
+              },
+              validators: vec![],
+            }),
+          ],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("# [sdk (sequence)] Sequence1 {"));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:CT_First/t:first\"))] first : Option < First >")
+    );
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:CT_Second/t:second\"))] second : Option < Second >")
+    );
+    assert!(!generated.contains("pub struct HolderChoiceSequence1"));
+  }
+
+  #[test]
   fn prebuilt_ir_generation_ignores_schema_particle_shape() {
     let (schemas, context) = load_workspace_codegen_inputs();
     let schema = schemas
@@ -2909,13 +3188,19 @@ mod tests {
     assert!(generated.contains("pub leaf_a : std :: boxed :: Box < LeafA >"));
     assert!(generated.contains("pub structured_holder_choice : Option < StructuredHolderChoice >"));
     assert!(generated.contains("pub enum StructuredHolderChoice"));
-    assert!(
-      generated.contains("Sequence2 (std :: boxed :: Box < StructuredHolderChoiceSequence2 >)")
-    );
     assert!(generated.contains("# [sdk (sequence)] Sequence2"));
-    assert!(generated.contains("pub struct StructuredHolderChoiceSequence2"));
-    assert!(generated.contains("pub leaf_c : std :: boxed :: Box < LeafC >"));
-    assert!(generated.contains("pub leaf_d : std :: boxed :: Box < LeafD >"));
+    assert!(generated.contains("Sequence2 {"));
+    assert!(
+      generated.contains(
+        "# [sdk (child (qname = \"t:CT_C/t:c\"))] leaf_c : std :: boxed :: Box < LeafC >"
+      )
+    );
+    assert!(
+      generated.contains(
+        "# [sdk (child (qname = \"t:CT_D/t:d\"))] leaf_d : std :: boxed :: Box < LeafD >"
+      )
+    );
+    assert!(!generated.contains("pub struct StructuredHolderChoiceSequence2"));
   }
 
   #[test]
@@ -3095,12 +3380,9 @@ mod tests {
     assert!(generated.contains("pub fallback_holder_choice : Option < FallbackHolderChoice >"));
     assert!(generated.contains("pub enum FallbackHolderChoice"));
     assert!(generated.contains("TA (std :: boxed :: Box < LeafA >)"));
-    assert!(
-      generated.contains("Sequence2 (std :: boxed :: Box < FallbackHolderChoiceSequence2 >)")
-    );
     assert!(generated.contains("# [sdk (sequence)] Sequence2"));
-    assert!(generated.contains("pub struct FallbackHolderChoiceSequence2"));
-    assert!(generated.contains("FallbackHolderChoiceSequence2"));
+    assert!(generated.contains("Sequence2 {"));
+    assert!(!generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(generated.contains("leaf_b"));
     assert!(!generated.contains("pub leaf_b : Option <"));
   }

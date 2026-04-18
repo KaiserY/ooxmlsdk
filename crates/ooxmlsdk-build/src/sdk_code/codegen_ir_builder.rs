@@ -3002,14 +3002,15 @@ fn build_generic_children_members(
 
 fn generic_children_choice_cardinality(schema_type: &SchemaType) -> Cardinality {
   let content_children = top_level_content_children(schema_type);
-  if content_children.len() == 1
-    && content_children[0].kind == SchemaTypeChildKind::Choice
-    && !content_children[0].repeated
-  {
-    Cardinality::Optional
-  } else {
-    Cardinality::Many
+  if content_children.len() == 1 && content_children[0].kind == SchemaTypeChildKind::Choice {
+    return if content_children[0].repeated {
+      Cardinality::Many
+    } else {
+      Cardinality::Optional
+    };
   }
+
+  Cardinality::Many
 }
 
 fn build_content_model_decl(schema_type: &SchemaType) -> Option<ContentModelDecl> {
@@ -3985,6 +3986,15 @@ mod tests {
         .count(),
       1
     );
+    let choice_field = holder
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(choice_field.cardinality, Cardinality::Many);
   }
 
   #[test]

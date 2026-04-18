@@ -21,6 +21,7 @@ pub struct SchemaExtensions {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeExtension {
   pub class_name: String,
+  pub name: String,
   pub has_xmlns_fields: Option<bool>,
   pub has_mc_ignorable_field: Option<bool>,
   pub text_value_type: Option<String>,
@@ -105,6 +106,10 @@ pub fn apply_schema_extensions(
         );
       };
 
+      if !extension.name.is_empty() {
+        schema_type.name = extension.name.clone();
+      }
+
       if let Some(has_xmlns_fields) = extension.has_xmlns_fields {
         schema_type.has_xmlns_fields = has_xmlns_fields;
       }
@@ -174,12 +179,20 @@ fn merge_schema_type_attributes(
       existing.q_name == attribute.q_name
         || (!attribute.property_name.is_empty()
           && existing.property_name == attribute.property_name)
+        || (attribute.q_name.contains(':')
+          && attribute.property_name.is_empty()
+          && attribute_local_name(existing.q_name.as_str())
+            == attribute_local_name(attribute.q_name.as_str()))
     }) {
       merge_schema_type_attribute(existing, attribute);
     } else {
       target.push(attribute.clone());
     }
   }
+}
+
+fn attribute_local_name(qname: &str) -> &str {
+  qname.rsplit(':').next().unwrap_or(qname)
 }
 
 fn merge_schema_type_attribute(target: &mut SchemaTypeAttribute, extension: &SchemaTypeAttribute) {
@@ -370,5 +383,128 @@ fn runtime_schema_type_child(extension: &SchemaTypeChildExtension) -> SchemaType
       .iter()
       .map(runtime_schema_type_child)
       .collect(),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::sdk_data::sdk_data_model::{
+    Schema, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
+  };
+
+  #[test]
+  fn apply_schema_extensions_overrides_type_name_and_attribute_qname_by_local_name() {
+    let mut schemas = vec![Schema {
+      module_name: "test_module".to_string(),
+      types: vec![SchemaType {
+        class_name: "SymEx".to_string(),
+        name: "w16se:CT_SymEx/w16se:symEx".to_string(),
+        attributes: vec![
+          SchemaTypeAttribute {
+            q_name: "w16se:font".to_string(),
+            property_name: "w16se_font".to_string(),
+            r#type: "StringValue".to_string(),
+            ..Default::default()
+          },
+          SchemaTypeAttribute {
+            q_name: "w16se:char".to_string(),
+            property_name: "w16se_char".to_string(),
+            r#type: "HexBinaryValue".to_string(),
+            ..Default::default()
+          },
+        ],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let schema_extensions = vec![(
+      "test_module".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "SymEx".to_string(),
+          name: "w16se:CT_SymEx/w16se:sym".to_string(),
+          attributes: vec![
+            SchemaTypeAttribute {
+              q_name: "w:font".to_string(),
+              ..Default::default()
+            },
+            SchemaTypeAttribute {
+              q_name: "w:char".to_string(),
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).unwrap();
+
+    let sym_ex = &schemas[0].types[0];
+    assert_eq!(sym_ex.name, "w16se:CT_SymEx/w16se:sym");
+    assert_eq!(sym_ex.attributes.len(), 2);
+    assert_eq!(sym_ex.attributes[0].q_name, "w:font");
+    assert_eq!(sym_ex.attributes[0].property_name, "w16se_font");
+    assert_eq!(sym_ex.attributes[0].r#type, "StringValue");
+    assert_eq!(sym_ex.attributes[1].q_name, "w:char");
+    assert_eq!(sym_ex.attributes[1].property_name, "w16se_char");
+    assert_eq!(sym_ex.attributes[1].r#type, "HexBinaryValue");
+  }
+
+  #[test]
+  fn apply_schema_extensions_can_append_child_inside_existing_choice() {
+    let mut schemas = vec![Schema {
+      module_name: "test_module".to_string(),
+      types: vec![SchemaType {
+        class_name: "Run".to_string(),
+        children: vec![SchemaTypeChild {
+          particle_id: "sequence_1/choice_1".to_string(),
+          kind: SchemaTypeChildKind::Choice,
+          children: vec![SchemaTypeChild {
+            particle_id: "sequence_1/choice_1/text_child_1".to_string(),
+            kind: SchemaTypeChildKind::TextChild,
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let schema_extensions = vec![(
+      "test_module".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Run".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            kind: SchemaTypeChildKind::Choice,
+            match_particle_id: "sequence_1/choice_1".to_string(),
+            children: vec![SchemaTypeChildExtension {
+              kind: SchemaTypeChildKind::Child,
+              name: "w16se:CT_SymEx/w16se:sym".to_string(),
+              ..Default::default()
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).unwrap();
+
+    let run = &schemas[0].types[0];
+    assert_eq!(run.children.len(), 1);
+    assert_eq!(run.children[0].kind, SchemaTypeChildKind::Choice);
+    assert_eq!(run.children[0].children.len(), 2);
+    assert!(
+      run.children[0]
+        .children
+        .iter()
+        .any(|child| child.name == "w16se:CT_SymEx/w16se:sym")
+    );
   }
 }

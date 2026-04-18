@@ -61,7 +61,27 @@
       ]
     },
     {
+      "ClassName": "WorkbookView",
+      "Attributes": [
+        {
+          "QName": "xr2:uid",
+          "PropertyName": "xr2:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision UID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
       "ClassName": "Workbook",
+      "Children": [
+        {
+          "Name": "xr:CT_RevisionPtr/xr:revisionPtr",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "x:CT_BookViews/x:bookViews"
+        }
+      ],
       "McAlternateContentInsertBefore": [
         "x15ac:CT_AbsolutePath/x15ac:absPath"
       ]

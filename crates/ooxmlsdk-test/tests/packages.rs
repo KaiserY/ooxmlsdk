@@ -1,5 +1,7 @@
 #![cfg(feature = "parts")]
 
+#[cfg(feature = "microsoft365")]
+use std::fs;
 use std::io::Cursor;
 
 use ooxmlsdk::common::SdkError;
@@ -16,6 +18,10 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   ParagraphChoice7, ParagraphChoice8, Run, RunChoice, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::fixtures;
+#[cfg(feature = "microsoft365")]
+use std::io::Read;
+#[cfg(feature = "microsoft365")]
+use zip::ZipArchive;
 
 const ALT_CHUNK_ID: &str = "XmlAltChunkId-1";
 const ALT_CHUNK_TARGET: &str = "afchunk.xml";
@@ -42,6 +48,21 @@ fn roundtrip_wordprocessing_document(
   let roundtripped = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
 
   (original, roundtripped)
+}
+
+#[cfg(feature = "microsoft365")]
+fn zip_entry_text(bytes: &[u8], package_name: &str, entry_name: &str) -> String {
+  let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap_or_else(|err| {
+    panic!("failed to open zip for {package_name}: {err}");
+  });
+  let mut file = archive.by_name(entry_name).unwrap_or_else(|err| {
+    panic!("failed to read {entry_name} from {package_name}: {err}");
+  });
+  let mut xml = String::new();
+  file.read_to_string(&mut xml).unwrap_or_else(|err| {
+    panic!("failed to read {entry_name} text from {package_name}: {err}");
+  });
+  xml
 }
 
 fn roundtrip_spreadsheet_document(
@@ -1673,6 +1694,40 @@ fn round_trip_of16_08_docx_asset_from_openxml_sdk() {
   );
   assert!(!original_body.body_choice.is_empty());
   assert!(!roundtripped_body.body_choice.is_empty());
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn round_trip_of16_10_symex_docx_asset_from_openxml_sdk() {
+  let path = test_file_path("Of16-10-SymEx.docx");
+  #[cfg(feature = "microsoft365")]
+  let original_bytes = fs::read(&path).unwrap();
+  let original = WordprocessingDocument::new_from_file(&path).unwrap();
+  let mut buffer = Cursor::new(Vec::new());
+
+  original.save(&mut buffer).unwrap();
+
+  let roundtripped_bytes = buffer.into_inner();
+  let reopened = WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+  let original_xml = zip_entry_text(&original_bytes, "Of16-10-SymEx.docx", "word/document.xml");
+  let roundtripped_xml = zip_entry_text(
+    &roundtripped_bytes,
+    "Of16-10-SymEx.docx",
+    "word/document.xml",
+  );
+
+  assert_eq!(
+    original.main_document_part.inner_path,
+    reopened.main_document_part.inner_path
+  );
+  assert!(original_xml.contains("<w16se:sym "));
+  assert!(original_xml.contains("w:font=\"Webdings\""));
+  assert!(original_xml.contains("w:char=\"F04E\""));
+  assert!(!original_xml.contains("<w16se:symEx"));
+  assert!(roundtripped_xml.contains("<w16se:sym "));
+  assert!(roundtripped_xml.contains("w:font=\"Webdings\""));
+  assert!(roundtripped_xml.contains("w:char=\"F04E\""));
+  assert!(!roundtripped_xml.contains("<w16se:symEx"));
 }
 
 #[test]
@@ -3323,7 +3378,27 @@ fn round_trip_malformed_uri_xlsx_asset_from_openxml_sdk() {
 #[test]
 fn round_trip_malformed_uri_long_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("malformed_uri_long.xlsx");
-  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+  #[cfg(feature = "microsoft365")]
+  let original_bytes = fs::read(&path).unwrap();
+  let original = SpreadsheetDocument::new_from_file(&path).unwrap();
+  let mut buffer = Cursor::new(Vec::new());
+
+  original.save(&mut buffer).unwrap();
+
+  let roundtripped_bytes = buffer.into_inner();
+  let roundtripped = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+  #[cfg(feature = "microsoft365")]
+  let original_workbook_xml = zip_entry_text(
+    &original_bytes,
+    "malformed_uri_long.xlsx",
+    "xl/workbook.xml",
+  );
+  #[cfg(feature = "microsoft365")]
+  let roundtripped_workbook_xml = zip_entry_text(
+    &roundtripped_bytes,
+    "malformed_uri_long.xlsx",
+    "xl/workbook.xml",
+  );
 
   let original_worksheet_part = &original.workbook_part.worksheet_parts[0];
   let roundtripped_worksheet_part = &roundtripped.workbook_part.worksheet_parts[0];
@@ -3346,13 +3421,48 @@ fn round_trip_malformed_uri_long_xlsx_asset_from_openxml_sdk() {
     roundtripped_relationship.target.as_str(),
     "mailto:test@test.com;%20test2@test.com;%252test3@test.com;%20test3@test.com;%20test4@test.com;%20test5@test.com?subject=Unsubscribe%20Request&body=Please%20unsubscribe%20me%20from%20all%20future%20communications"
   );
+  #[cfg(feature = "microsoft365")]
+  assert!(original_workbook_xml.contains("<xr:revisionPtr "));
+  #[cfg(feature = "microsoft365")]
+  assert!(original_workbook_xml.contains("xr6:coauthVersionLast=\"46\""));
+  #[cfg(feature = "microsoft365")]
+  assert!(original_workbook_xml.contains("xr6:coauthVersionMax=\"46\""));
+  #[cfg(feature = "microsoft365")]
+  assert!(
+    original_workbook_xml.contains("xr10:uidLastSave=\"{00000000-0000-0000-0000-000000000000}\"")
+  );
+  #[cfg(feature = "microsoft365")]
+  assert!(original_workbook_xml.contains("xr2:uid=\"{00000000-000D-0000-FFFF-FFFF00000000}\""));
+  #[cfg(feature = "microsoft365")]
+  assert!(roundtripped_workbook_xml.contains("<xr:revisionPtr "));
+  #[cfg(feature = "microsoft365")]
+  assert!(roundtripped_workbook_xml.contains("xr6:coauthVersionLast=\"46\""));
+  #[cfg(feature = "microsoft365")]
+  assert!(roundtripped_workbook_xml.contains("xr6:coauthVersionMax=\"46\""));
+  #[cfg(feature = "microsoft365")]
+  assert!(
+    roundtripped_workbook_xml
+      .contains("xr10:uidLastSave=\"{00000000-0000-0000-0000-000000000000}\"")
+  );
+  #[cfg(feature = "microsoft365")]
+  assert!(roundtripped_workbook_xml.contains("xr2:uid=\"{00000000-000D-0000-FFFF-FFFF00000000}\""));
 }
 
 #[cfg(feature = "microsoft365")]
 #[test]
 fn round_trip_youtube_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Youtube.xlsx");
-  let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+  let original_bytes = fs::read(&path).unwrap();
+  let original = SpreadsheetDocument::new_from_file(&path).unwrap();
+  let mut buffer = Cursor::new(Vec::new());
+
+  original.save(&mut buffer).unwrap();
+
+  let roundtripped_bytes = buffer.into_inner();
+  let roundtripped = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+  let original_workbook_xml = zip_entry_text(&original_bytes, "Youtube.xlsx", "xl/workbook.xml");
+  let roundtripped_workbook_xml =
+    zip_entry_text(&roundtripped_bytes, "Youtube.xlsx", "xl/workbook.xml");
 
   let original_drawings_part = original.workbook_part.worksheet_parts[0]
     .drawings_part
@@ -3367,6 +3477,10 @@ fn round_trip_youtube_xlsx_asset_from_openxml_sdk() {
   assert_eq!(roundtripped_drawings_part.web_extension_parts.len(), 1);
   assert_eq!(original_drawings_part.image_parts.len(), 1);
   assert_eq!(roundtripped_drawings_part.image_parts.len(), 1);
+  assert!(original_workbook_xml.contains("<x15:absPath "));
+  assert!(!original_workbook_xml.contains("<x15ac:absPath"));
+  assert!(roundtripped_workbook_xml.contains("<x15:absPath "));
+  assert!(!roundtripped_workbook_xml.contains("<x15ac:absPath"));
 }
 
 #[test]

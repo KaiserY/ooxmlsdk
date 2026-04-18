@@ -1,5 +1,13 @@
 use super::*;
 
+#[derive(Clone)]
+struct NamedSequenceVariantField {
+  ident: Ident,
+  optional: bool,
+  repeated: bool,
+  boxed: bool,
+}
+
 fn choice_qname_patterns(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
   let mut patterns = Vec::with_capacity(qnames.len());
   for qname in qnames {
@@ -21,6 +29,105 @@ fn choice_qname_patterns(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
   patterns
 }
 
+fn named_sequence_helper_ident(enum_ident: &Ident, variant_ident: &Ident) -> syn::Result<Ident> {
+  parse_str(&format!("__{}{}SequenceHelper", enum_ident, variant_ident))
+}
+
+fn parse_named_sequence_variant_fields(
+  _variant: &syn::Variant,
+  fields: &syn::FieldsNamed,
+) -> syn::Result<Vec<NamedSequenceVariantField>> {
+  if fields.named.is_empty() || fields.named.len() > 2 {
+    return Err(syn::Error::new_spanned(
+      fields,
+      "SdkChoice named #[sdk(sequence)] variants currently support 1 or 2 #[sdk(child(...))] fields",
+    ));
+  }
+
+  let mut parsed = Vec::with_capacity(fields.named.len());
+  for field in &fields.named {
+    let field_ident = field
+      .ident
+      .clone()
+      .ok_or_else(|| syn::Error::new_spanned(field, "named field ident"))?;
+    let Some(field_kind) = parse_sdk_type_field_kind(&field.attrs)? else {
+      return Err(syn::Error::new_spanned(
+        field,
+        "named #[sdk(sequence)] variants require #[sdk(child(...))] fields",
+      ));
+    };
+    let SdkTypeFieldKind::Child { .. } = field_kind else {
+      return Err(syn::Error::new_spanned(
+        field,
+        "named #[sdk(sequence)] variants currently support only #[sdk(child(...))] fields",
+      ));
+    };
+
+    parsed.push(NamedSequenceVariantField {
+      ident: field_ident,
+      optional: is_option_type(&field.ty),
+      repeated: contains_vec_type(&field.ty),
+      boxed: box_inner_type(&unwrap_option_vec_type(&field.ty)).is_some(),
+    });
+  }
+
+  Ok(parsed)
+}
+
+fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2::TokenStream {
+  let field_ident = &field.ident;
+
+  if field.repeated {
+    quote! {
+      for child in #field_ident {
+        child.write_xml(writer, xmlns_prefix)?;
+      }
+    }
+  } else if field.optional {
+    quote! {
+      if let Some(child) = #field_ident {
+        child.write_xml(writer, xmlns_prefix)?;
+      }
+    }
+  } else {
+    quote! {
+      #field_ident.write_xml(writer, xmlns_prefix)?;
+    }
+  }
+}
+
+fn named_sequence_validate_tokens(field: &NamedSequenceVariantField) -> proc_macro2::TokenStream {
+  let field_ident = &field.ident;
+  let validate_expr = if field.boxed {
+    quote! { child.as_ref() }
+  } else {
+    quote! { child }
+  };
+  let validate_self_expr = if field.boxed {
+    quote! { #field_ident.as_ref() }
+  } else {
+    quote! { #field_ident }
+  };
+
+  if field.repeated {
+    quote! {
+      for child in #field_ident {
+        crate::validator::SdkValidator::validate(#validate_expr)?;
+      }
+    }
+  } else if field.optional {
+    quote! {
+      if let Some(child) = #field_ident {
+        crate::validator::SdkValidator::validate(#validate_expr)?;
+      }
+    }
+  } else {
+    quote! {
+      crate::validator::SdkValidator::validate(#validate_self_expr)?;
+    }
+  }
+}
+
 pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Enum(DataEnum { variants, .. }) = &input.data else {
@@ -37,15 +144,9 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   let mut text_from_string_tokens = Vec::new();
   let mut validate_arms = Vec::new();
   let mut has_any_variant = false;
+  let mut helper_items = Vec::new();
 
   for variant in variants {
-    if variant.fields.len() != 1 {
-      return Err(syn::Error::new_spanned(
-        &variant.ident,
-        "SdkChoice only supports single-field tuple variants",
-      ));
-    }
-
     let variant_ident = &variant.ident;
     let cfg_attrs = cfg_attrs(&variant.attrs);
     let kind = parse_sdk_choice_variant_kind(&variant.attrs)?.ok_or_else(|| {
@@ -54,11 +155,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         "missing #[sdk(child(...))], #[sdk(text_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
       )
     })?;
-    let payload_ty = choice_variant_payload_type(variant)?;
-    let inner_ty = choice_variant_inner_type(&payload_ty);
-
-    match kind {
-      SdkChoiceVariantKind::Child { qnames } => {
+    match (&variant.fields, kind) {
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::Child { qnames })
+        if fields.unnamed.len() == 1 =>
+      {
+        let payload_ty = choice_variant_payload_type(variant)?;
+        let inner_ty = choice_variant_inner_type(&payload_ty);
         let constructor = if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
         } else {
@@ -97,7 +199,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         validate_arms.push(validate_arm);
       }
-      SdkChoiceVariantKind::Choice | SdkChoiceVariantKind::Sequence => {
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::Choice | SdkChoiceVariantKind::Sequence)
+        if fields.unnamed.len() == 1 =>
+      {
+        let payload_ty = choice_variant_payload_type(variant)?;
+        let inner_ty = choice_variant_inner_type(&payload_ty);
         let constructor = if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
         } else {
@@ -134,7 +240,63 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         validate_arms.push(validate_arm);
       }
-      SdkChoiceVariantKind::TextChild { qnames } => {
+      (Fields::Named(fields), SdkChoiceVariantKind::Sequence) => {
+        let helper_ident = named_sequence_helper_ident(ident, variant_ident)?;
+        let named_fields = parse_named_sequence_variant_fields(variant, fields)?;
+        let field_idents: Vec<_> = named_fields
+          .iter()
+          .map(|field| field.ident.clone())
+          .collect();
+        let helper_fields = fields.named.iter().collect::<Vec<_>>();
+        let write_tokens = named_fields
+          .iter()
+          .map(named_sequence_write_tokens)
+          .collect::<Vec<_>>();
+        let validate_tokens = named_fields
+          .iter()
+          .map(named_sequence_validate_tokens)
+          .collect::<Vec<_>>();
+
+        helper_items.push(quote! {
+          #( #cfg_attrs )*
+          #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+          struct #helper_ident {
+            #( #helper_fields, )*
+          }
+        });
+        matcher_checks.push(quote! {
+          #(#cfg_attrs)*
+          if #helper_ident::matches_start_qname(name) {
+            return true;
+          }
+        });
+        child_dispatch_tokens.push(quote! {
+          #(#cfg_attrs)*
+          if #helper_ident::matches_start_qname(e.name().as_ref()) {
+            let parsed_child = #helper_ident::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
+            let #helper_ident { #( #field_idents ),* } = parsed_child;
+            return Ok(Self::#variant_ident { #( #field_idents ),* });
+          }
+        });
+        write_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident { #( #field_idents ),* } => {
+            #( #write_tokens )*
+            Ok(())
+          },
+        });
+        validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident { #( #field_idents ),* } => {
+            #( #validate_tokens )*
+            Ok(())
+          },
+        });
+      }
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::TextChild { qnames })
+        if fields.unnamed.len() == 1 =>
+      {
+        let payload_ty = choice_variant_payload_type(variant)?;
         let qname_patterns = choice_qname_patterns(&qnames);
         let QNameInfo {
           tag_prefix,
@@ -227,7 +389,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(_) => Ok(()),
         });
       }
-      SdkChoiceVariantKind::Any => {
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
+        let payload_ty = choice_variant_payload_type(variant)?;
         has_any_variant = true;
         matcher_checks.push(quote! {
           #(#cfg_attrs)*
@@ -257,7 +420,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         });
       }
-      SdkChoiceVariantKind::Text => {
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::Text) if fields.unnamed.len() == 1 => {
         let write_arm = quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(value) => crate::common::write_escaped_text(writer, value),
@@ -271,6 +434,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           parsed = Some(Self::#variant_ident(value.to_owned().into()));
         });
+      }
+      _ => {
+        return Err(syn::Error::new_spanned(
+          variant,
+          "SdkChoice supports single-field tuple variants, plus named #[sdk(sequence)] variants with 1 or 2 #[sdk(child(...))] fields",
+        ));
       }
     }
   }
@@ -317,6 +486,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   };
 
   Ok(quote! {
+    #( #helper_items )*
+
     impl crate::sdk::SdkChoice for #ident {}
     #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {

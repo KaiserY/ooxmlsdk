@@ -1,8 +1,15 @@
 use super::*;
 
 #[derive(Clone)]
+enum NamedSequenceVariantFieldKind {
+  Child,
+  TextChild { qname: String },
+}
+
+#[derive(Clone)]
 struct NamedSequenceVariantField {
   ident: Ident,
+  kind: NamedSequenceVariantFieldKind,
   optional: bool,
   repeated: bool,
   boxed: bool,
@@ -40,7 +47,7 @@ fn parse_named_sequence_variant_fields(
   if fields.named.is_empty() || fields.named.len() > 2 {
     return Err(syn::Error::new_spanned(
       fields,
-      "SdkChoice named #[sdk(sequence)] variants currently support 1 or 2 #[sdk(child(...))] fields",
+      "SdkChoice named #[sdk(sequence)] variants currently support 1 or 2 #[sdk(child(...))] or #[sdk(text_child(...))] fields",
     ));
   }
 
@@ -56,15 +63,20 @@ fn parse_named_sequence_variant_fields(
         "named #[sdk(sequence)] variants require #[sdk(child(...))] fields",
       ));
     };
-    let SdkTypeFieldKind::Child { .. } = field_kind else {
-      return Err(syn::Error::new_spanned(
-        field,
-        "named #[sdk(sequence)] variants currently support only #[sdk(child(...))] fields",
-      ));
+    let kind = match field_kind {
+      SdkTypeFieldKind::Child { .. } => NamedSequenceVariantFieldKind::Child,
+      SdkTypeFieldKind::TextChild { qname } => NamedSequenceVariantFieldKind::TextChild { qname },
+      _ => {
+        return Err(syn::Error::new_spanned(
+          field,
+          "named #[sdk(sequence)] variants currently support only #[sdk(child(...))] or #[sdk(text_child(...))] fields",
+        ));
+      }
     };
 
     parsed.push(NamedSequenceVariantField {
       ident: field_ident,
+      kind,
       optional: is_option_type(&field.ty),
       repeated: contains_vec_type(&field.ty),
       boxed: box_inner_type(&unwrap_option_vec_type(&field.ty)).is_some(),
@@ -77,27 +89,66 @@ fn parse_named_sequence_variant_fields(
 fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2::TokenStream {
   let field_ident = &field.ident;
 
-  if field.repeated {
-    quote! {
-      for child in #field_ident {
-        child.write_xml(writer, xmlns_prefix)?;
+  match &field.kind {
+    NamedSequenceVariantFieldKind::Child => {
+      if field.repeated {
+        quote! {
+          for child in #field_ident {
+            child.write_xml(writer, xmlns_prefix)?;
+          }
+        }
+      } else if field.optional {
+        quote! {
+          if let Some(child) = #field_ident {
+            child.write_xml(writer, xmlns_prefix)?;
+          }
+        }
+      } else {
+        quote! {
+          #field_ident.write_xml(writer, xmlns_prefix)?;
+        }
       }
     }
-  } else if field.optional {
-    quote! {
-      if let Some(child) = #field_ident {
-        child.write_xml(writer, xmlns_prefix)?;
+    NamedSequenceVariantFieldKind::TextChild { qname } => {
+      let QNameInfo {
+        tag_prefix,
+        local_name,
+      } = parse_qname_info(qname);
+      let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
+        quote! {
+          crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+          writer.write_char('>')?;
+          crate::common::write_escaped_text(writer, #value_expr)?;
+          crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+        }
+      };
+
+      if field.repeated {
+        let write_child_tokens = write_value_tokens(quote! { child });
+        quote! {
+          for child in #field_ident {
+            #write_child_tokens
+          }
+        }
+      } else if field.optional {
+        let write_child_tokens = write_value_tokens(quote! { value });
+        quote! {
+          if let Some(value) = #field_ident {
+            #write_child_tokens
+          }
+        }
+      } else {
+        write_value_tokens(quote! { #field_ident })
       }
-    }
-  } else {
-    quote! {
-      #field_ident.write_xml(writer, xmlns_prefix)?;
     }
   }
 }
 
 fn named_sequence_validate_tokens(field: &NamedSequenceVariantField) -> proc_macro2::TokenStream {
   let field_ident = &field.ident;
+  if matches!(field.kind, NamedSequenceVariantFieldKind::TextChild { .. }) {
+    return quote! {};
+  }
   let validate_expr = if field.boxed {
     quote! { child.as_ref() }
   } else {
@@ -438,7 +489,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       _ => {
         return Err(syn::Error::new_spanned(
           variant,
-          "SdkChoice supports single-field tuple variants, plus named #[sdk(sequence)] variants with 1 or 2 #[sdk(child(...))] fields",
+          "SdkChoice supports single-field tuple variants, plus named #[sdk(sequence)] variants with 1 or 2 #[sdk(child(...))] or #[sdk(text_child(...))] fields",
         ));
       }
     }

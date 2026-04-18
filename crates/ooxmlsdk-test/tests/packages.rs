@@ -12,10 +12,8 @@ use ooxmlsdk::parts::{
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  AltChunk, Body, BodyChoice, BodyChoice1, BodyChoice2, CommentChoice, CommentChoice1,
-  CommentChoice2, Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice,
-  ParagraphChoice1, ParagraphChoice2, ParagraphChoice3, ParagraphChoice4, ParagraphChoice5,
-  ParagraphChoice7, ParagraphChoice8, Run, RunChoice, SdtPropertiesChoice,
+  AltChunk, Body, BodyChoice, CommentChoice, Document, Hyperlink, HyperlinkChoice, Paragraph,
+  ParagraphChoice, ParagraphChoice4, Run, RunChoice, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::fixtures;
 #[cfg(feature = "microsoft365")]
@@ -162,15 +160,8 @@ fn body_paragraph_count(body: &Body) -> usize {
 }
 
 fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
-  let BodyChoice::Choice2(choice) = choice else {
-    return None;
-  };
-  let BodyChoice1::Choice1(choice) = choice.as_ref() else {
-    return None;
-  };
-
-  match choice.as_ref() {
-    BodyChoice2::WP(paragraph) => Some(paragraph.as_ref()),
+  match choice {
+    BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
     _ => None,
   }
 }
@@ -178,15 +169,8 @@ fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
 fn body_choice_sdt_block(
   choice: &BodyChoice,
 ) -> Option<&ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtBlock> {
-  let BodyChoice::Choice2(choice) = choice else {
-    return None;
-  };
-  let BodyChoice1::Choice1(choice) = choice.as_ref() else {
-    return None;
-  };
-
-  match choice.as_ref() {
-    BodyChoice2::WSdt(sdt) => Some(sdt.as_ref()),
+  match choice {
+    BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
     _ => None,
   }
 }
@@ -300,71 +284,49 @@ fn paragraph_text(paragraph: &Paragraph) -> String {
 
 fn paragraph_choice_run(choice: &ParagraphChoice) -> Option<&Run> {
   match choice {
-    ParagraphChoice::Choice2(choice) => match choice.as_ref() {
-      ParagraphChoice2::WR(run) => Some(run.as_ref()),
-      _ => None,
-    },
+    ParagraphChoice::WR(run) => Some(run.as_ref()),
     _ => None,
   }
 }
 
 fn paragraph_choice_hyperlink(choice: &ParagraphChoice) -> Option<&Hyperlink> {
   match choice {
-    ParagraphChoice::EgPContentBase(choice) => match choice.as_ref() {
-      ParagraphChoice1::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
-      _ => None,
-    },
+    ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
     _ => None,
   }
 }
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice8::WBookmarkStart(_))
+    matches!(choice, ParagraphChoice4::WBookmarkStart(_))
   })
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice8::WBookmarkEnd(_))
+    matches!(choice, ParagraphChoice4::WBookmarkEnd(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice8::WCommentRangeStart(_))
+    matches!(choice, ParagraphChoice4::WCommentRangeStart(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice8::WCommentRangeEnd(_))
+    matches!(choice, ParagraphChoice4::WCommentRangeEnd(_))
   })
 }
 
 fn paragraph_choice_has_range_markup(
   choice: &ParagraphChoice,
-  predicate: impl Fn(&ParagraphChoice8) -> bool,
+  predicate: impl Fn(&ParagraphChoice4) -> bool,
 ) -> bool {
-  let ParagraphChoice::Choice2(choice) = choice else {
+  let ParagraphChoice::EgRunLevelElts(choice) = choice else {
     return false;
   };
-  let ParagraphChoice2::Choice1(choice) = choice.as_ref() else {
-    return false;
-  };
-  let ParagraphChoice3::EgRunLevelElts(choice) = choice.as_ref() else {
-    return false;
-  };
-  let ParagraphChoice4::Choice1(choice) = choice.as_ref() else {
-    return false;
-  };
-  let ParagraphChoice5::Choice2(choice) = choice.as_ref() else {
-    return false;
-  };
-  let ParagraphChoice7::Choice1(choice) = choice.as_ref() else {
-    return false;
-  };
-
   predicate(choice.as_ref())
 }
 
@@ -383,15 +345,8 @@ fn comment_text(
 }
 
 fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {
-  let CommentChoice::Choice2(choice) = choice else {
-    return None;
-  };
-  let CommentChoice1::Choice1(choice) = choice.as_ref() else {
-    return None;
-  };
-
-  match choice.as_ref() {
-    CommentChoice2::WP(paragraph) => Some(paragraph.as_ref()),
+  match choice {
+    CommentChoice::WP(paragraph) => Some(paragraph.as_ref()),
     _ => None,
   }
 }

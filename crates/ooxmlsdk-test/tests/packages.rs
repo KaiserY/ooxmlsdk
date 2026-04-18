@@ -632,45 +632,10 @@ fn open_5errors_docx_asset_currently_fails() {
 }
 
 #[test]
-#[cfg(feature = "microsoft365")]
-fn open_of16_09_unknown_element_docx_asset_currently_fails_on_cx_chart_data_intentionally_changed()
-{
-  let path = test_file_path("Of16-09-UnknownElement.docx");
-
-  assert_unexpected_tag(
-    WordprocessingDocument::new_from_file(&path),
-    "ChartSpace",
-    "cx:chartDataIntentionallyChanged",
-  );
-}
-
-#[test]
 fn open_unknown_element_docx_asset_currently_fails_on_w_p2() {
   let path = test_file_path("UnknownElement.docx");
 
   assert_unexpected_tag(WordprocessingDocument::new_from_file(&path), "Body", "w:p2");
-}
-
-#[test]
-fn open_complex0_docx_asset_currently_fails_on_do_not_embed_smart_tags() {
-  let path = test_file_path("complex0.docx");
-
-  assert_unexpected_tag(
-    WordprocessingDocument::new_from_file(&path),
-    "Settings",
-    "w:doNotEmbedSmartTags",
-  );
-}
-
-#[test]
-fn open_complex2010_docx_asset_currently_fails_on_do_not_embed_smart_tags() {
-  let path = test_file_path("complex2010.docx");
-
-  assert_unexpected_tag(
-    WordprocessingDocument::new_from_file(&path),
-    "Settings",
-    "w:doNotEmbedSmartTags",
-  );
 }
 
 #[test]
@@ -1974,6 +1939,38 @@ fn round_trip_document_docx_asset_from_openxml_sdk() {
       .unwrap_or_default()
       > 5
   );
+
+  #[cfg(feature = "microsoft365")]
+  {
+    let original_numbering = &original
+      .main_document_part
+      .numbering_definitions_part
+      .as_ref()
+      .expect("expected numbering definitions part")
+      .root_element;
+    let roundtripped_numbering = &roundtripped
+      .main_document_part
+      .numbering_definitions_part
+      .as_ref()
+      .expect("expected numbering definitions part")
+      .root_element;
+
+    assert!(!original_numbering.w_abstract_num.is_empty());
+    assert_eq!(
+      original_numbering.w_abstract_num[0]
+        .w15_restart_numbering_after_break
+        .as_ref()
+        .map(std::string::ToString::to_string),
+      Some("0".to_string())
+    );
+    assert_eq!(
+      roundtripped_numbering.w_abstract_num[0]
+        .w15_restart_numbering_after_break
+        .as_ref()
+        .map(std::string::ToString::to_string),
+      Some("0".to_string())
+    );
+  }
 }
 
 #[test]

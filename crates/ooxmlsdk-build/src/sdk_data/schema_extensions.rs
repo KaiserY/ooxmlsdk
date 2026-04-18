@@ -21,6 +21,7 @@ pub struct SchemaExtensions {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeExtension {
   pub class_name: String,
+  pub clone_from_class_name: String,
   pub name: String,
   pub has_xmlns_fields: Option<bool>,
   pub has_mc_ignorable_field: Option<bool>,
@@ -92,11 +93,36 @@ pub fn apply_schema_extensions(
     };
 
     for extension in &extensions.types {
-      let Some(schema_type) = schema
+      let schema_type_index = if let Some(index) = schema
         .types
-        .iter_mut()
-        .find(|schema_type| schema_type.class_name == extension.class_name)
-      else {
+        .iter()
+        .position(|schema_type| schema_type.class_name == extension.class_name)
+      {
+        index
+      } else if !extension.clone_from_class_name.is_empty() {
+        let Some(source_index) = schema
+          .types
+          .iter()
+          .position(|schema_type| schema_type.class_name == extension.clone_from_class_name)
+        else {
+          return Err(
+            format!(
+              "schema extension source type {}.{} not found",
+              module_name, extension.clone_from_class_name
+            )
+            .into(),
+          );
+        };
+
+        let mut cloned = schema.types[source_index].clone();
+        cloned.class_name = extension.class_name.clone();
+        if !extension.name.is_empty() {
+          cloned.name = extension.name.clone();
+        }
+
+        schema.types.insert(source_index + 1, cloned);
+        source_index + 1
+      } else {
         return Err(
           format!(
             "schema extension type {}.{} not found",
@@ -105,6 +131,8 @@ pub fn apply_schema_extensions(
           .into(),
         );
       };
+
+      let schema_type = &mut schema.types[schema_type_index];
 
       if !extension.name.is_empty() {
         schema_type.name = extension.name.clone();
@@ -506,5 +534,86 @@ mod tests {
         .iter()
         .any(|child| child.name == "w16se:CT_SymEx/w16se:sym")
     );
+  }
+
+  #[test]
+  fn apply_schema_extensions_can_clone_existing_type_and_insert_child() {
+    let mut schemas = vec![Schema {
+      module_name: "test_module".to_string(),
+      types: vec![
+        SchemaType {
+          class_name: "OnOffType".to_string(),
+          name: "w:CT_OnOff/".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          attributes: vec![SchemaTypeAttribute {
+            q_name: "w:val".to_string(),
+            property_name: "val".to_string(),
+            r#type: "OnOffValue".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+        SchemaType {
+          class_name: "Settings".to_string(),
+          children: vec![SchemaTypeChild {
+            name: "w:CT_String/w:decimalSymbol".to_string(),
+            property_name: "w_decimal_symbol".to_string(),
+            kind: SchemaTypeChildKind::Child,
+            optional: true,
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    }];
+    let schema_extensions = vec![(
+      "test_module".to_string(),
+      SchemaExtensions {
+        types: vec![
+          SchemaTypeExtension {
+            class_name: "DoNotEmbedSmartTags".to_string(),
+            clone_from_class_name: "OnOffType".to_string(),
+            name: "w:CT_OnOff/w:doNotEmbedSmartTags".to_string(),
+            ..Default::default()
+          },
+          SchemaTypeExtension {
+            class_name: "Settings".to_string(),
+            children: vec![SchemaTypeChildExtension {
+              kind: SchemaTypeChildKind::Child,
+              name: "w:CT_OnOff/w:doNotEmbedSmartTags".to_string(),
+              property_name: "w_do_not_embed_smart_tags".to_string(),
+              optional: true,
+              insert_before: Some("w:CT_String/w:decimalSymbol".to_string()),
+              ..Default::default()
+            }],
+            ..Default::default()
+          },
+        ],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &schema_extensions).unwrap();
+
+    assert_eq!(schemas[0].types[1].class_name, "DoNotEmbedSmartTags");
+    assert_eq!(schemas[0].types[1].name, "w:CT_OnOff/w:doNotEmbedSmartTags");
+    assert_eq!(schemas[0].types[1].attributes.len(), 1);
+
+    let settings = schemas[0]
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "Settings")
+      .unwrap();
+    assert_eq!(settings.children.len(), 2);
+    assert_eq!(
+      settings.children[0].name,
+      "w:CT_OnOff/w:doNotEmbedSmartTags"
+    );
+    assert_eq!(
+      settings.children[0].property_name,
+      "w_do_not_embed_smart_tags"
+    );
+    assert_eq!(settings.children[1].name, "w:CT_String/w:decimalSymbol");
   }
 }

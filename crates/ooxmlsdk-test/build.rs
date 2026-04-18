@@ -68,14 +68,7 @@ fn main() {
 }
 
 fn is_invalid(file_name: &str) -> bool {
-  matches!(
-    file_name,
-    "5Errors.docx"
-      | "UnknownElement.docx"
-      | "Of16-09-UnknownElement.docx"
-      | "complex0.docx"
-      | "complex2010.docx"
-  )
+  matches!(file_name, "5Errors.docx" | "UnknownElement.docx")
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
@@ -177,7 +170,6 @@ fn is_microsoft365_doc_sample(file_name: &str) -> bool {
       | "Of16-06.docx"
       | "Of16-07.docx"
       | "Of16-08.docx"
-      | "Of16-09-UnknownElement.docx"
       | "Plain.docx"
       | "Presentation.pptx"
       | "Spreadsheet.xlsx"

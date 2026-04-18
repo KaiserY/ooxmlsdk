@@ -59,8 +59,20 @@
           "Kind": "Child",
           "Optional": true,
           "Repeated": true
+        },
+        {
+          "Name": "w:CT_OnOff/w:doNotEmbedSmartTags",
+          "PropertyName": "w_do_not_embed_smart_tags",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "w:CT_String/w:decimalSymbol"
         }
       ]
+    },
+    {
+      "ClassName": "DoNotEmbedSmartTags",
+      "CloneFromClassName": "OnOffType",
+      "Name": "w:CT_OnOff/w:doNotEmbedSmartTags"
     },
     {
       "ClassName": "TableIndentation",
@@ -248,6 +260,17 @@
         {
           "QName": "w:lastRowLastColumn",
           "Bit": 1
+        }
+      ]
+    },
+    {
+      "ClassName": "AbstractNum",
+      "Attributes": [
+        {
+          "QName": "w15:restartNumberingAfterBreak",
+          "PropertyName": "w15_restart_numbering_after_break",
+          "Type": "StringValue",
+          "Version": "Office2013"
         }
       ]
     }

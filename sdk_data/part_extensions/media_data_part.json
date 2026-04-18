@@ -1,0 +1,17 @@
+{
+  "Parts": [
+    {
+      "Name": "MediaDataPart",
+      "Base": "OpenXmlPart",
+      "Target": "mediadata",
+      "Extension": ".bin",
+      "Features": [
+        "parts"
+      ],
+      "ContentKind": "Binary",
+      "Paths": {
+        "General": "../media"
+      }
+    }
+  ]
+}

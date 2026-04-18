@@ -6,6 +6,7 @@ pub mod context;
 pub mod mce;
 pub mod opc_schemas;
 pub mod open_xml;
+pub mod part_extensions;
 pub mod parts;
 pub mod schema_extensions;
 pub mod schemas;
@@ -20,6 +21,7 @@ use crate::sdk_data::{
   context::Context,
   mce::gen_mc_schema_from_xsd,
   opc_schemas::read_opc_schemas,
+  part_extensions::{apply_part_extensions, read_part_extensions},
   parts::gen_parts,
   schema_extensions::{apply_schema_extensions, read_schema_extensions},
   schemas::{assign_schema_particle_ids, gen_schemas},
@@ -77,7 +79,9 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
     )?;
   }
 
-  let parts = gen_parts(&gen_context);
+  let mut parts = gen_parts(&gen_context);
+  let part_extensions = read_part_extensions(&out_dir.join("part_extensions"))?;
+  apply_part_extensions(&mut parts, &part_extensions)?;
   for part in &parts {
     let ir = build_part_codegen_ir(part, &parts);
     write_json(

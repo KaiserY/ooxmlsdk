@@ -1,0 +1,15 @@
+{
+  "Parts": [
+    {
+      "Name": "DrawingsPart",
+      "Children": [
+        {
+          "MaxOccursGreatThanOne": true,
+          "ApiName": "HdPhotoParts",
+          "Name": "HdPhotoPart",
+          "InsertBefore": "ImageParts"
+        }
+      ]
+    }
+  ]
+}

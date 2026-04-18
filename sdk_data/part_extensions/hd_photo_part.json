@@ -1,0 +1,18 @@
+{
+  "Parts": [
+    {
+      "Name": "HdPhotoPart",
+      "Base": "OpenXmlPart",
+      "RelationshipType": "http://schemas.microsoft.com/office/2007/relationships/hdphoto",
+      "Target": "hdphoto",
+      "Extension": ".bin",
+      "Features": [
+        "parts"
+      ],
+      "ContentKind": "Binary",
+      "Paths": {
+        "General": "../media"
+      }
+    }
+  ]
+}

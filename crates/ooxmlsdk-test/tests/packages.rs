@@ -1269,6 +1269,18 @@ fn open_mcdoc_docx_asset_from_openxml_sdk() {
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
 
   assert_eq!(package.main_document_part.custom_xml_parts.len(), 1);
+  assert_eq!(
+    package
+      .main_document_part
+      .wordprocessing_text_box_parts
+      .len(),
+    1
+  );
+  assert!(
+    package.main_document_part.wordprocessing_text_box_parts[0]
+      .part_content
+      .contains("<w14:txbx")
+  );
   assert!(package.main_document_part.style_definitions_part.is_some());
   #[cfg(feature = "microsoft365")]
   assert!(
@@ -1303,13 +1315,43 @@ fn open_autosave_pptx_asset_from_openxml_sdk() {
 fn open_mediareference_pptx_asset_from_openxml_sdk() {
   let path = test_file_path("mediareference.pptx");
   let package = PresentationDocument::new_from_file(&path).unwrap();
+  let audio_inner_paths: Vec<&str> = package
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .audio_reference_relationships
+        .iter()
+        .map(|part| part.inner_path.as_str())
+    })
+    .collect();
+  let media_inner_paths: Vec<&str> = package
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .media_reference_relationships
+        .iter()
+        .map(|part| part.inner_path.as_str())
+    })
+    .collect();
+  let image_count: usize = package
+    .presentation_part
+    .slide_parts
+    .iter()
+    .map(|slide| slide.image_parts.len())
+    .sum();
 
   assert_eq!(package.presentation_part.slide_parts.len(), 2);
   assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
+  assert_eq!(audio_inner_paths, vec!["ppt/media/media1.wav"]);
   assert_eq!(
-    package.presentation_part.slide_parts[0].image_parts.len(),
-    1
+    media_inner_paths,
+    vec!["ppt/media/media1.wav", "ppt/media/media1.wav"]
   );
+  assert_eq!(image_count, 2);
   assert!(package.presentation_part.theme_part.is_some());
 }
 
@@ -1654,6 +1696,10 @@ fn round_trip_of16_10_symex_docx_asset_from_openxml_sdk() {
 fn open_complex01_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Complex01.xlsx");
   let package = SpreadsheetDocument::new_from_file(&path).unwrap();
+  let drawings_part = package.workbook_part.worksheet_parts[0]
+    .drawings_part
+    .as_ref()
+    .expect("expected worksheet drawings part");
 
   let workbook = &package.workbook_part.root_element;
   assert_eq!(workbook.mc_ignorable.as_deref(), Some("x15"));
@@ -1669,6 +1715,12 @@ fn open_complex01_xlsx_asset_from_openxml_sdk() {
   assert_eq!(workbook.sheets.x_sheet[1].name.as_str(), "Sheet2");
   assert_eq!(package.workbook_part.worksheet_parts.len(), 2);
   assert!(workbook.calculation_properties.is_some());
+  assert_eq!(drawings_part.hd_photo_parts.len(), 1);
+  assert_eq!(drawings_part.image_parts.len(), 1);
+  assert_eq!(
+    drawings_part.hd_photo_parts[0].inner_path,
+    "xl/media/hdphoto1.wdp"
+  );
 
   let style_extensions = stylesheet_extensions(&package);
   assert_eq!(style_extensions.len(), 2);
@@ -2545,6 +2597,23 @@ fn round_trip_mcdoc_docx_asset_from_openxml_sdk() {
   assert!(roundtripped.main_document_part.theme_part.is_some());
   assert!(original.main_document_part.web_settings_part.is_some());
   assert!(roundtripped.main_document_part.web_settings_part.is_some());
+  assert_eq!(
+    original
+      .main_document_part
+      .wordprocessing_text_box_parts
+      .len(),
+    roundtripped
+      .main_document_part
+      .wordprocessing_text_box_parts
+      .len()
+  );
+  assert_eq!(
+    original.main_document_part.wordprocessing_text_box_parts[0].part_content,
+    roundtripped
+      .main_document_part
+      .wordprocessing_text_box_parts[0]
+      .part_content
+  );
 }
 
 #[test]
@@ -2669,6 +2738,62 @@ fn round_trip_autosave_pptx_asset_from_openxml_sdk() {
 fn round_trip_mediareference_pptx_asset_from_openxml_sdk() {
   let path = test_file_path("mediareference.pptx");
   let (original, roundtripped) = roundtrip_presentation_document(&path);
+  let original_audio_parts: Vec<(&str, &Vec<u8>)> = original
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .audio_reference_relationships
+        .iter()
+        .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
+  let roundtripped_audio_parts: Vec<(&str, &Vec<u8>)> = roundtripped
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .audio_reference_relationships
+        .iter()
+        .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
+  let original_media_parts: Vec<(&str, &Vec<u8>)> = original
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .media_reference_relationships
+        .iter()
+        .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
+  let roundtripped_media_parts: Vec<(&str, &Vec<u8>)> = roundtripped
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .media_reference_relationships
+        .iter()
+        .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
+  let original_image_count: usize = original
+    .presentation_part
+    .slide_parts
+    .iter()
+    .map(|slide| slide.image_parts.len())
+    .sum();
+  let roundtripped_image_count: usize = roundtripped
+    .presentation_part
+    .slide_parts
+    .iter()
+    .map(|slide| slide.image_parts.len())
+    .sum();
 
   assert_eq!(
     original.presentation_part.slide_parts.len(),
@@ -2678,16 +2803,9 @@ fn round_trip_mediareference_pptx_asset_from_openxml_sdk() {
     original.presentation_part.slide_master_parts.len(),
     roundtripped.presentation_part.slide_master_parts.len()
   );
-  assert_eq!(
-    original.presentation_part.slide_parts[0].image_parts.len(),
-    1
-  );
-  assert_eq!(
-    roundtripped.presentation_part.slide_parts[0]
-      .image_parts
-      .len(),
-    1
-  );
+  assert_eq!(original_audio_parts, roundtripped_audio_parts);
+  assert_eq!(original_media_parts, roundtripped_media_parts);
+  assert_eq!(original_image_count, roundtripped_image_count);
 }
 
 #[test]
@@ -3439,6 +3557,14 @@ fn round_trip_youtube_xlsx_asset_from_openxml_sdk() {
 fn round_trip_complex01_xlsx_asset_from_openxml_sdk() {
   let path = test_file_path("Complex01.xlsx");
   let (original, roundtripped) = roundtrip_spreadsheet_document(&path);
+  let original_drawings_part = original.workbook_part.worksheet_parts[0]
+    .drawings_part
+    .as_ref()
+    .expect("expected original worksheet drawings part");
+  let roundtripped_drawings_part = roundtripped.workbook_part.worksheet_parts[0]
+    .drawings_part
+    .as_ref()
+    .expect("expected roundtripped worksheet drawings part");
 
   let original_workbook = &original.workbook_part.root_element;
   let roundtripped_workbook = &roundtripped.workbook_part.root_element;
@@ -3492,6 +3618,18 @@ fn round_trip_complex01_xlsx_asset_from_openxml_sdk() {
   );
   assert_eq!(original.workbook_part.worksheet_parts.len(), 2);
   assert_eq!(roundtripped.workbook_part.worksheet_parts.len(), 2);
+  assert_eq!(
+    original_drawings_part.hd_photo_parts.len(),
+    roundtripped_drawings_part.hd_photo_parts.len()
+  );
+  assert_eq!(
+    original_drawings_part.hd_photo_parts[0].inner_path,
+    roundtripped_drawings_part.hd_photo_parts[0].inner_path
+  );
+  assert_eq!(
+    original_drawings_part.hd_photo_parts[0].part_content,
+    roundtripped_drawings_part.hd_photo_parts[0].part_content
+  );
 }
 
 #[test]
@@ -3546,6 +3684,17 @@ fn round_trip_mcppt_pptx_asset_from_openxml_sdk() {
 fn open_o09_performance_typical_pptx_asset_from_openxml_sdk() {
   let path = test_file_path("o09_Performance_typical.pptx");
   let package = PresentationDocument::new_from_file(&path).unwrap();
+  let audio_inner_paths: Vec<&str> = package
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .audio_reference_relationships
+        .iter()
+        .map(|part| part.inner_path.as_str())
+    })
+    .collect();
 
   assert_eq!(package.presentation_part.slide_parts.len(), 11);
   assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
@@ -3565,12 +3714,35 @@ fn open_o09_performance_typical_pptx_asset_from_openxml_sdk() {
       .iter()
       .any(|slide| slide.notes_slide_part.is_some())
   );
+  assert_eq!(audio_inner_paths, vec!["ppt/media/audio1.wav"]);
 }
 
 #[test]
 fn round_trip_o09_performance_typical_pptx_asset_from_openxml_sdk() {
   let path = test_file_path("o09_Performance_typical.pptx");
   let (original, roundtripped) = roundtrip_presentation_document(&path);
+  let original_audio_parts: Vec<(&str, &Vec<u8>)> = original
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .audio_reference_relationships
+        .iter()
+        .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
+  let roundtripped_audio_parts: Vec<(&str, &Vec<u8>)> = roundtripped
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide
+        .audio_reference_relationships
+        .iter()
+        .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
 
   assert_eq!(
     original.presentation_part.slide_parts.len(),
@@ -3601,4 +3773,5 @@ fn round_trip_o09_performance_typical_pptx_asset_from_openxml_sdk() {
       .view_properties_part
       .is_some()
   );
+  assert_eq!(original_audio_parts, roundtripped_audio_parts);
 }

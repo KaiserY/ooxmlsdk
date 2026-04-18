@@ -64,6 +64,7 @@ pub struct PartChild {
   pub max_occurs_great_than_one: bool,
   pub api_name: String,
   pub name: String,
+  pub relationship_type: String,
   pub version: String,
   pub features: Vec<String>,
   pub has_fixed_content: bool,

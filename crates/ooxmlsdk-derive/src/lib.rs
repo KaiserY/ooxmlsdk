@@ -47,7 +47,7 @@ pub fn sdk_part(input: TokenStream) -> TokenStream {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum PartChildKind {
   Repeated,
   Required,
@@ -60,11 +60,28 @@ enum DerivedPartContentKind {
   Binary,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PartFieldMarker {
+  Rid,
+  ContentTypes,
+  Relationships,
+  RelsPath,
+  InnerPath,
+  Root,
+}
+
+#[derive(Clone)]
+struct PartChildAttr {
+  relationship_type: String,
+  kind: PartChildKind,
+}
+
 #[derive(Clone)]
 struct PartChildInfo {
   field_ident: Ident,
   ty: Type,
   kind: PartChildKind,
+  relationship_type: Option<String>,
 }
 
 impl PartChildInfo {
@@ -219,6 +236,12 @@ struct QNameInfo {
 }
 
 fn is_system_part_field(field: &syn::Field) -> bool {
+  if let Ok(Some(_)) = parse_part_field_marker(&field.attrs) {
+    return true;
+  }
+  if let Ok(Some(_)) = parse_part_content_attr(&field.attrs) {
+    return true;
+  }
   field
     .ident
     .as_ref()
@@ -248,15 +271,26 @@ fn part_root_type_from_fields(fields: &syn::FieldsNamed) -> Option<Type> {
   fields
     .named
     .iter()
-    .find(|field| is_field_named(field, "root_element"))
+    .find(|field| {
+      matches!(
+        parse_part_field_marker(&field.attrs),
+        Ok(Some(PartFieldMarker::Root))
+      ) || is_field_named(field, "root_element")
+    })
     .map(|field| field.ty.clone())
 }
 
 fn part_content_kind_from_fields(fields: &syn::FieldsNamed) -> Option<DerivedPartContentKind> {
-  let field = fields
-    .named
-    .iter()
-    .find(|field| is_field_named(field, "part_content"))?;
+  let field = fields.named.iter().find(|field| {
+    parse_part_content_attr(&field.attrs)
+      .ok()
+      .flatten()
+      .is_some()
+      || is_field_named(field, "part_content")
+  })?;
+  if let Some(kind) = parse_part_content_attr(&field.attrs).ok().flatten() {
+    return Some(kind);
+  }
   let kind_name = type_last_ident(&field.ty)?.to_string();
   match kind_name.as_str() {
     "String" => Some(DerivedPartContentKind::Text),
@@ -270,11 +304,33 @@ fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInf
     return Ok(None);
   };
 
+  if let Some(explicit) = parse_part_child_attr(&field.attrs)? {
+    let inner_ty = match explicit.kind {
+      PartChildKind::Repeated => unwrap_vec_inner(&field.ty),
+      PartChildKind::Required => unwrap_box_inner(&field.ty),
+      PartChildKind::Optional => unwrap_optional_box_inner(&field.ty),
+    }
+    .ok_or_else(|| {
+      syn::Error::new_spanned(
+        &field.ty,
+        "part_child field type does not match declared kind",
+      )
+    })?;
+
+    return Ok(Some(PartChildInfo {
+      field_ident,
+      ty: inner_ty,
+      kind: explicit.kind,
+      relationship_type: Some(explicit.relationship_type),
+    }));
+  }
+
   if let Some(inner_ty) = unwrap_vec_inner(&field.ty) {
     return Ok(Some(PartChildInfo {
       field_ident,
       ty: inner_ty,
       kind: PartChildKind::Repeated,
+      relationship_type: None,
     }));
   }
 
@@ -283,6 +339,7 @@ fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInf
       field_ident,
       ty: inner_ty,
       kind: PartChildKind::Required,
+      relationship_type: None,
     }));
   }
 
@@ -291,9 +348,125 @@ fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInf
       field_ident,
       ty: inner_ty,
       kind: PartChildKind::Optional,
+      relationship_type: None,
     }));
   }
 
+  Ok(None)
+}
+
+fn parse_part_field_marker(attrs: &[Attribute]) -> syn::Result<Option<PartFieldMarker>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      match meta {
+        Meta::Path(path) if path.is_ident("part_rid") => return Ok(Some(PartFieldMarker::Rid)),
+        Meta::Path(path) if path.is_ident("part_content_types") => {
+          return Ok(Some(PartFieldMarker::ContentTypes));
+        }
+        Meta::Path(path) if path.is_ident("part_relationships") => {
+          return Ok(Some(PartFieldMarker::Relationships));
+        }
+        Meta::Path(path) if path.is_ident("part_rels_path") => {
+          return Ok(Some(PartFieldMarker::RelsPath));
+        }
+        Meta::Path(path) if path.is_ident("part_inner_path") => {
+          return Ok(Some(PartFieldMarker::InnerPath));
+        }
+        Meta::Path(path) if path.is_ident("part_root") => return Ok(Some(PartFieldMarker::Root)),
+        _ => {}
+      }
+    }
+  }
+  Ok(None)
+}
+
+fn parse_part_content_attr(attrs: &[Attribute]) -> syn::Result<Option<DerivedPartContentKind>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::List(meta) = meta
+        && meta.path.is_ident("part_content")
+      {
+        let mut kind = None;
+        meta.parse_nested_meta(|nested| {
+          if nested.path.is_ident("kind") {
+            let value: LitStr = nested.value()?.parse()?;
+            kind = Some(match value.value().as_str() {
+              "text" => DerivedPartContentKind::Text,
+              "binary" => DerivedPartContentKind::Binary,
+              _ => return Err(nested.error("unsupported sdk part_content kind")),
+            });
+            Ok(())
+          } else {
+            Err(nested.error("unsupported sdk part_content attribute"))
+          }
+        })?;
+        return Ok(kind);
+      }
+    }
+  }
+  Ok(None)
+}
+
+fn parse_part_child_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildAttr>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::List(meta) = meta
+        && meta.path.is_ident("part_child")
+      {
+        let mut relationship_type = None;
+        let mut kind = None;
+        meta.parse_nested_meta(|nested| {
+          if nested.path.is_ident("relationship_type") {
+            let value: LitStr = nested.value()?.parse()?;
+            relationship_type = Some(value.value());
+            Ok(())
+          } else if nested.path.is_ident("kind") {
+            let value: LitStr = nested.value()?.parse()?;
+            kind = Some(match value.value().as_str() {
+              "optional" => PartChildKind::Optional,
+              "required" => PartChildKind::Required,
+              "repeated" => PartChildKind::Repeated,
+              _ => return Err(nested.error("unsupported sdk part_child kind")),
+            });
+            Ok(())
+          } else {
+            Err(nested.error("unsupported sdk part_child attribute"))
+          }
+        })?;
+        let Some(relationship_type) = relationship_type else {
+          return Err(syn::Error::new_spanned(
+            meta,
+            "sdk part_child requires relationship_type",
+          ));
+        };
+        let Some(kind) = kind else {
+          return Err(syn::Error::new_spanned(
+            meta,
+            "sdk part_child requires kind",
+          ));
+        };
+        return Ok(Some(PartChildAttr {
+          relationship_type,
+          kind,
+        }));
+      }
+    }
+  }
   Ok(None)
 }
 

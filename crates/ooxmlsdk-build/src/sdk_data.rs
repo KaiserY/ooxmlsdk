@@ -14,6 +14,7 @@ pub mod xsd;
 
 use crate::Result;
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
+use crate::sdk_code::part_codegen_ir::build_part_codegen_ir;
 use crate::sdk_code::schemas::CodegenContext;
 use crate::sdk_data::{
   context::Context,
@@ -76,10 +77,12 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
     )?;
   }
 
-  for part in gen_parts(&gen_context) {
+  let parts = gen_parts(&gen_context);
+  for part in &parts {
+    let ir = build_part_codegen_ir(part, &parts);
     write_json(
       out_parts_dir_path.join(format!("{}.json", part.module_name)),
-      &part,
+      &ir,
     )?;
   }
 

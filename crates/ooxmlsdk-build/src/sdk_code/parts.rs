@@ -1,79 +1,27 @@
-use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, ItemMod, ItemStruct, Stmt, Type, parse_str, parse2};
 
 use crate::Result;
+use crate::sdk_code::part_codegen_ir::{PartChildCardinality, PartFieldKind, PartModuleDecl};
 use crate::sdk_code::versioning::{features_cfg_attrs, versioned_tokens};
-use crate::sdk_data::sdk_data_model::{Part, PartChild, PartContentKind};
 
-pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
+pub fn gen_part_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let relationship_type_str = part.relationship_type.as_str();
   let relationship_type_stmt: Stmt = parse2(quote! {
     pub const RELATIONSHIP_TYPE: &str = #relationship_type_str;
   })?;
 
-  let path_prefix_str = if part.paths.general.is_empty() {
-    ""
-  } else {
-    part.paths.general.as_str()
-  };
+  let path_prefix_str = part.path_prefix.as_str();
   let path_prefix_stmt: Stmt = parse2(quote! {
     pub const PATH_PREFIX: &str = #path_prefix_str;
   })?;
 
-  let struct_name_ident: Ident = parse_str(&part.name.to_upper_camel_case())?;
+  let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let mut fields: Vec<TokenStream> = vec![];
 
-  if part.base == "OpenXmlPackage" {
-    fields.push(quote! {
-      pub content_types: crate::schemas::opc_content_types::Types,
-    });
-  } else {
-    fields.push(quote! {
-      pub r_id: String,
-    });
-  }
-
-  if !part.children.is_empty() {
-    fields.push(quote! {
-      pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-    });
-    fields.push(quote! {
-      pub rels_path: String,
-    });
-  }
-
-  fields.push(quote! {
-    pub inner_path: String,
-  });
-
-  match part.content_kind {
-    PartContentKind::Xml => {
-      let root_type = part_root_type_tokens(part)?;
-      fields.push(quote! {
-        pub root_element: #root_type,
-      });
-    }
-    PartContentKind::Text => {
-      fields.push(quote! {
-        pub part_content: String,
-      });
-    }
-    PartContentKind::Binary => {
-      fields.push(quote! {
-        pub part_content: Vec<u8>,
-      });
-    }
-    PartContentKind::None => {}
-  }
-
-  for child in &part.children {
-    if child.is_data_part_reference {
-      continue;
-    }
-
-    fields.push(child_field_tokens(child)?);
+  for field in &part.fields {
+    fields.push(field_tokens(field)?);
   }
 
   let part_struct: ItemStruct = parse2(quote! {
@@ -90,7 +38,7 @@ pub fn gen_part_module(part: &Part) -> Result<TokenStream> {
   })
 }
 
-pub fn gen_parts_mod(parts: &[Part]) -> Result<TokenStream> {
+pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut mod_list: Vec<ItemMod> = vec![];
 
   for part in parts {
@@ -107,7 +55,7 @@ pub fn gen_parts_mod(parts: &[Part]) -> Result<TokenStream> {
   })
 }
 
-fn part_module_attrs(part: &Part) -> Vec<syn::Attribute> {
+fn part_module_attrs(part: &PartModuleDecl) -> Vec<syn::Attribute> {
   let filtered_features: Vec<String> = part
     .features
     .iter()
@@ -118,52 +66,103 @@ fn part_module_attrs(part: &Part) -> Vec<syn::Attribute> {
   features_cfg_attrs(&filtered_features)
 }
 
-fn part_root_type_tokens(part: &Part) -> Result<Type> {
-  if part.name == "CoreFilePropertiesPart" {
-    return parse_str("crate::schemas::opc_core_properties::CoreProperties").map_err(Into::into);
+fn field_tokens(field: &crate::sdk_code::part_codegen_ir::PartFieldDecl) -> Result<TokenStream> {
+  let field_ident: Ident = parse_str(&field.rust_name)?;
+  let field_type: Type = parse_str(&field.rust_type)?;
+  let sdk_attr = field_sdk_attr(&field.kind);
+  let versioned = match &field.kind {
+    PartFieldKind::Child { cardinality, .. } => {
+      let rendered_ty = match cardinality {
+        PartChildCardinality::Repeated => quote! { Vec<#field_type> },
+        PartChildCardinality::Required => quote! { std::boxed::Box<#field_type> },
+        PartChildCardinality::Optional => quote! { Option<std::boxed::Box<#field_type>> },
+      };
+      versioned_tokens(
+        &field.version,
+        quote! {
+          #sdk_attr
+          pub #field_ident: #rendered_ty,
+        },
+      )
+    }
+    _ => versioned_tokens(
+      &field.version,
+      quote! {
+        #sdk_attr
+        pub #field_ident: #field_type,
+      },
+    ),
+  };
+
+  Ok(versioned)
+}
+
+fn field_sdk_attr(kind: &PartFieldKind) -> TokenStream {
+  match kind {
+    PartFieldKind::Rid => quote! { #[sdk(part_rid)] },
+    PartFieldKind::ContentTypes => quote! { #[sdk(part_content_types)] },
+    PartFieldKind::Relationships => quote! { #[sdk(part_relationships)] },
+    PartFieldKind::RelsPath => quote! { #[sdk(part_rels_path)] },
+    PartFieldKind::InnerPath => quote! { #[sdk(part_inner_path)] },
+    PartFieldKind::RootElement => quote! { #[sdk(part_root)] },
+    PartFieldKind::TextContent => quote! { #[sdk(part_content(kind = "text"))] },
+    PartFieldKind::BinaryContent => quote! { #[sdk(part_content(kind = "binary"))] },
+    PartFieldKind::Child {
+      relationship_type,
+      cardinality,
+    } => {
+      let kind = match cardinality {
+        PartChildCardinality::Optional => "optional",
+        PartChildCardinality::Required => "required",
+        PartChildCardinality::Repeated => "repeated",
+      };
+      quote! {
+        #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
+      }
+    }
   }
-
-  parse_str(&format!(
-    "crate::schemas::{}::{}",
-    part.schema_module,
-    part.root_class_name.to_upper_camel_case()
-  ))
-  .map_err(Into::into)
 }
 
-fn child_type_tokens(child: &PartChild) -> Result<Type> {
-  parse_str(&format!(
-    "crate::parts::{}::{}",
-    child.name.to_snake_case(),
-    child.name.to_upper_camel_case(),
-  ))
-  .map_err(Into::into)
-}
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::sdk_code::part_codegen_ir::{
+    PartChildCardinality, PartFieldDecl, PartFieldKind, PartModuleDecl,
+  };
 
-fn child_field_tokens(child: &PartChild) -> Result<TokenStream> {
-  let field_ident: Ident = parse_str(&child.api_name.to_snake_case())?;
-  let child_type = child_type_tokens(child)?;
+  #[test]
+  fn generates_part_child_attrs_from_codegen_ir() {
+    let part = PartModuleDecl {
+      module_name: "main_document_part".to_string(),
+      struct_name: "MainDocumentPart".to_string(),
+      relationship_type: "rel".to_string(),
+      path_prefix: "word".to_string(),
+      fields: vec![
+        PartFieldDecl {
+          rust_name: "r_id".to_string(),
+          rust_type: "String".to_string(),
+          kind: PartFieldKind::Rid,
+          ..Default::default()
+        },
+        PartFieldDecl {
+          rust_name: "theme_part".to_string(),
+          rust_type: "crate::parts::theme_part::ThemePart".to_string(),
+          kind: PartFieldKind::Child {
+            relationship_type: "theme-rel".to_string(),
+            cardinality: PartChildCardinality::Optional,
+          },
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
 
-  if child.max_occurs_great_than_one {
-    Ok(versioned_tokens(
-      &child.version,
-      quote! {
-        pub #field_ident: Vec<#child_type>,
-      },
-    ))
-  } else if child.min_occurs_is_non_zero {
-    Ok(versioned_tokens(
-      &child.version,
-      quote! {
-        pub #field_ident: std::boxed::Box<#child_type>,
-      },
-    ))
-  } else {
-    Ok(versioned_tokens(
-      &child.version,
-      quote! {
-        pub #field_ident: Option<std::boxed::Box<#child_type>>,
-      },
-    ))
+    let rendered = gen_part_module(&part).unwrap().to_string();
+    assert!(rendered.contains("# [sdk (part_rid)] pub r_id : String"));
+    assert!(
+      rendered.contains(
+        "# [sdk (part_child (relationship_type = \"theme-rel\" , kind = \"optional\"))] pub theme_part : Option < std :: boxed :: Box < crate :: parts :: theme_part :: ThemePart > >"
+      )
+    );
   }
 }

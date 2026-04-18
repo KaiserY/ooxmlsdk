@@ -16,14 +16,18 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     ));
   };
 
-  let has_content_types = fields
-    .named
-    .iter()
-    .any(|field| is_field_named(field, "content_types"));
-  let has_relationships = fields
-    .named
-    .iter()
-    .any(|field| is_field_named(field, "relationships"));
+  let has_content_types = fields.named.iter().any(|field| {
+    matches!(
+      parse_part_field_marker(&field.attrs),
+      Ok(Some(PartFieldMarker::ContentTypes))
+    ) || is_field_named(field, "content_types")
+  });
+  let has_relationships = fields.named.iter().any(|field| {
+    matches!(
+      parse_part_field_marker(&field.attrs),
+      Ok(Some(PartFieldMarker::Relationships))
+    ) || is_field_named(field, "relationships")
+  });
 
   let mut child_infos = Vec::new();
   for field in &fields.named {
@@ -125,8 +129,12 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   for child in &child_infos {
     let child_type = &child.ty;
-    let child_module_ident = child.module_ident()?;
-    let relationship_type = quote! { crate::parts::#child_module_ident::RELATIONSHIP_TYPE };
+    let relationship_type = if let Some(explicit) = &child.relationship_type {
+      quote! { #explicit }
+    } else {
+      let child_module_ident = child.module_ident()?;
+      quote! { crate::parts::#child_module_ident::RELATIONSHIP_TYPE }
+    };
     let child_field_ident = &child.field_ident;
     let child_item_ident = child.item_ident()?;
     let child_load_ident: Ident = parse_str(&format!("loaded_{}", child_item_ident))?;

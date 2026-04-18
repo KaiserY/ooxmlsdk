@@ -74,6 +74,12 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
             max_occurs_great_than_one: child.max_occurs_great_than_one,
             api_name: child.api_name.clone(),
             name: child.name.clone(),
+            relationship_type: gen_context
+              .parts
+              .iter()
+              .find(|part| part.name == child.name)
+              .map(|part| part.relationship_type.clone())
+              .unwrap_or_default(),
             version: part_version_map
               .get(child.name.as_str())
               .copied()

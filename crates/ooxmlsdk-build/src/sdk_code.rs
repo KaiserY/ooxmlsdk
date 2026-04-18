@@ -11,6 +11,7 @@ use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
+use crate::sdk_code::part_codegen_ir::{PartModuleDecl, build_part_codegen_ir};
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{
   CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
@@ -23,6 +24,7 @@ use crate::sdk_data::sdk_data_model::{
 pub mod codegen_ir;
 pub mod codegen_ir_builder;
 pub mod helpers;
+pub mod part_codegen_ir;
 pub mod parts;
 pub mod schemas;
 pub mod versioning;
@@ -43,16 +45,25 @@ enum SchemaInputRecord {
   Ir(SchemaModuleDecl),
 }
 
+struct LoadedPart {
+  ir: PartModuleDecl,
+}
+
+enum PartInputRecord {
+  Legacy(Box<SdkDataPart>),
+  Ir(Box<PartModuleDecl>),
+}
+
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let loaded_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
-  let sdk_data_parts = read_parts(&sdk_data_parts_dir_path)?;
+  let loaded_parts = read_parts(&sdk_data_parts_dir_path)?;
   let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
 
   write_schemas(&loaded_schemas, out_dir_path)?;
-  write_parts(&sdk_data_parts, out_dir_path)?;
+  write_parts(&loaded_parts, out_dir_path)?;
   write_namespaces(&sdk_data_namespaces, out_dir_path)?;
 
   Ok(())
@@ -108,11 +119,11 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {
     .collect()
 }
 
-fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<SdkDataPart>> {
-  let mut sdk_data_parts = vec![];
+fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<LoadedPart>> {
+  let mut input_records = vec![];
 
   if !sdk_data_parts_dir_path.exists() {
-    return Ok(sdk_data_parts);
+    return Ok(vec![]);
   }
 
   for entry in fs::read_dir(sdk_data_parts_dir_path)? {
@@ -125,12 +136,37 @@ fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<SdkDataPart>> {
 
     let file = File::open(&path)?;
     let reader = BufReader::new(file);
-    let sdk_data_part: SdkDataPart = serde_json::from_reader(reader)?;
-    sdk_data_parts.push(sdk_data_part);
+    let value: Value = serde_json::from_reader(reader)?;
+    if is_codegen_ir_part_json(&value) {
+      input_records.push(PartInputRecord::Ir(Box::new(serde_json::from_value(
+        value,
+      )?)));
+    } else {
+      input_records.push(PartInputRecord::Legacy(Box::new(serde_json::from_value(
+        value,
+      )?)));
+    }
   }
 
-  sdk_data_parts.sort_by(|a, b| a.module_name.cmp(&b.module_name));
-  Ok(sdk_data_parts)
+  input_records.sort_by(|a, b| part_input_module_name(a).cmp(part_input_module_name(b)));
+
+  let legacy_parts: Vec<SdkDataPart> = input_records
+    .iter()
+    .filter_map(|record| match record {
+      PartInputRecord::Legacy(part) => Some((**part).clone()),
+      PartInputRecord::Ir(_) => None,
+    })
+    .collect();
+
+  input_records
+    .into_iter()
+    .map(|record| match record {
+      PartInputRecord::Legacy(part) => Ok(LoadedPart {
+        ir: build_part_codegen_ir(&part, &legacy_parts),
+      }),
+      PartInputRecord::Ir(ir) => Ok(LoadedPart { ir: *ir }),
+    })
+    .collect()
 }
 
 fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
@@ -192,20 +228,20 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
   Ok(())
 }
 
-fn write_parts(sdk_data_parts: &[SdkDataPart], out_dir_path: &Path) -> Result<()> {
+fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
   let out_parts_dir_path = out_dir_path.join("parts");
   fs::create_dir_all(&out_parts_dir_path)?;
   clear_generated_rs_files(&out_parts_dir_path)?;
   write_generated_module(&out_parts_dir_path.join("mod.rs"), quote! {})?;
 
-  for sdk_data_part in sdk_data_parts {
-    let part_path = out_parts_dir_path.join(format!("{}.rs", sdk_data_part.module_name));
+  for loaded_part in loaded_parts {
+    let part_path = out_parts_dir_path.join(format!("{}.rs", loaded_part.ir.module_name));
     write_generated_module(
       &part_path,
-      gen_part_module(sdk_data_part).map_err(|err| {
+      gen_part_module(&loaded_part.ir).map_err(|err| {
         format!(
           "failed to generate part {}: {err}",
-          sdk_data_part.module_name
+          loaded_part.ir.module_name
         )
       })?,
     )?;
@@ -213,7 +249,12 @@ fn write_parts(sdk_data_parts: &[SdkDataPart], out_dir_path: &Path) -> Result<()
 
   write_generated_module(
     &out_parts_dir_path.join("mod.rs"),
-    gen_parts_mod(sdk_data_parts)?,
+    gen_parts_mod(
+      &loaded_parts
+        .iter()
+        .map(|loaded| &loaded.ir)
+        .collect::<Vec<_>>(),
+    )?,
   )?;
 
   Ok(())
@@ -349,6 +390,13 @@ fn schema_input_module_name(record: &SchemaInputRecord) -> &str {
   }
 }
 
+fn part_input_module_name(record: &PartInputRecord) -> &str {
+  match record {
+    PartInputRecord::Legacy(part) => &part.module_name,
+    PartInputRecord::Ir(ir) => &ir.module_name,
+  }
+}
+
 fn is_codegen_ir_schema_json(value: &Value) -> bool {
   value
     .get("Types")
@@ -362,4 +410,8 @@ fn is_codegen_ir_schema_json(value: &Value) -> bool {
       .and_then(|enums| enums.first())
       .and_then(Value::as_object)
       .is_some_and(|en| en.contains_key("RustName"))
+}
+
+fn is_codegen_ir_part_json(value: &Value) -> bool {
+  value.get("StructName").is_some() && value.get("Fields").is_some()
 }

@@ -1705,6 +1705,7 @@ fn gen_choice_type_decl(
   } else {
     VersionCfgContext::new(true)
   };
+  let rendered_variant_name_map = anonymous_variant_render_name_map(type_decl, module);
   let mut variants = Vec::new();
   let mut has_inline_sequence_variant = false;
 
@@ -1760,6 +1761,7 @@ fn gen_choice_type_decl(
             variant_cfg,
             true,
             inline_prefix_attrs.clone(),
+            &rendered_variant_name_map,
             &mut reserved_variant_names,
             &mut has_inline_sequence_variant,
           )?);
@@ -1801,6 +1803,7 @@ fn gen_choice_type_decl(
       variant_cfg,
       true,
       quote! {},
+      &rendered_variant_name_map,
       &mut reserved_variant_names,
       &mut has_inline_sequence_variant,
     )?);
@@ -1872,10 +1875,15 @@ fn gen_choice_variant_tokens(
   variant_cfg: VersionCfgContext,
   flatten_anonymous_choice_wrappers: bool,
   prefix_attrs: TokenStream,
+  rendered_variant_name_map: &HashMap<String, String>,
   reserved_variant_names: &mut HashSet<String>,
   has_inline_sequence_variant: &mut bool,
 ) -> Result<Vec<TokenStream>> {
-  let variant_ident: Ident = parse_str(&variant.rust_name)?;
+  let rendered_variant_name = rendered_variant_name_map
+    .get(&variant.rust_name)
+    .map(String::as_str)
+    .unwrap_or(&variant.rust_name);
+  let variant_ident: Ident = parse_str(rendered_variant_name)?;
   let variant_attrs = module_version_cfg_attrs(&variant.version, variant_cfg);
 
   match &variant.wire {
@@ -1992,6 +2000,7 @@ fn gen_choice_variant_tokens(
               variant_cfg,
               true,
               helper_prefix_attrs.clone(),
+              rendered_variant_name_map,
               reserved_variant_names,
               has_inline_sequence_variant,
             )?);
@@ -2199,6 +2208,65 @@ fn choice_variant_rendered_names(
       }
     }
   }
+}
+
+fn is_generated_anonymous_variant_name_of_kind(name: &str, kind: &str) -> bool {
+  name
+    .strip_prefix(kind)
+    .is_some_and(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()))
+}
+
+fn anonymous_variant_render_name_map(
+  type_decl: &TypeDecl,
+  module: &SchemaModuleDecl,
+) -> HashMap<String, String> {
+  let Some(rendered_names) = choice_enum_rendered_variant_names(type_decl, module) else {
+    return HashMap::new();
+  };
+
+  let non_anonymous_names: HashSet<String> = rendered_names
+    .iter()
+    .filter(|name| !is_generated_anonymous_type_name(name))
+    .cloned()
+    .collect();
+  let mut result = HashMap::new();
+
+  for kind in ["Choice", "Sequence"] {
+    let anonymous_names: Vec<String> = rendered_names
+      .iter()
+      .filter(|name| is_generated_anonymous_variant_name_of_kind(name, kind))
+      .cloned()
+      .collect();
+
+    if anonymous_names.is_empty() {
+      continue;
+    }
+
+    let normalized_names: Vec<String> = if anonymous_names.len() == 1 {
+      vec![kind.to_string()]
+    } else {
+      (1..=anonymous_names.len())
+        .map(|index| format!("{kind}{index}"))
+        .collect()
+    };
+
+    let mut occupied_names = non_anonymous_names.clone();
+    let mut can_normalize = true;
+    for normalized_name in &normalized_names {
+      if !occupied_names.insert(normalized_name.clone()) {
+        can_normalize = false;
+        break;
+      }
+    }
+
+    if can_normalize {
+      for (raw_name, normalized_name) in anonymous_names.into_iter().zip(normalized_names) {
+        result.insert(raw_name, normalized_name);
+      }
+    }
+  }
+
+  result
 }
 
 fn choice_enum_rendered_variant_names(
@@ -3422,7 +3490,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (sequence)] Sequence1 {"));
+    assert!(generated.contains("# [sdk (sequence)] Sequence {"));
     assert!(
       generated
         .contains("# [sdk (child (qname = \"t:CT_First/t:first\"))] first : Option < First >")
@@ -3572,7 +3640,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (sequence)] Sequence1 {"));
+    assert!(generated.contains("# [sdk (sequence)] Sequence {"));
     assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_Formula/t:f\"))] formula : std :: boxed :: Box < Formula >"
     ));
@@ -3903,72 +3971,13 @@ mod tests {
       "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
     ));
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence1 (std :: boxed :: Box < Second >)"
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence (std :: boxed :: Box < Second >)"
     ));
     assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_Third/t:third\"))] TThird (std :: boxed :: Box < Third >)"
     ));
     assert!(!generated.contains("# [sdk (choice)] Choice1"));
     assert!(!generated.contains("# [sdk (choice)] Choice2"));
-  }
-
-  #[test]
-  fn drops_unreferenced_anonymous_choice_helpers_after_flattening() {
-    let schema = SchemaModuleDecl {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![
-        TypeDecl {
-          rust_name: "Leaf".to_string(),
-          xml_qname: Some("t:CT_Leaf/t:leaf".to_string()),
-          kind: TypeKind::ElementStruct,
-          element_kind: Some(ElementKind::Leaf),
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "RootChoice".to_string(),
-          kind: TypeKind::ChoiceEnum,
-          members: vec![MemberDecl::Variant(VariantDecl {
-            rust_name: "Choice1".to_string(),
-            docs: " Wrapper".to_string(),
-            version: String::new(),
-            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-              qnames: vec!["wrapper".to_string()],
-            },
-            payload: TypeRefDecl {
-              rust_type: "RootChoice1".to_string(),
-              module_path: None,
-            },
-          })],
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "RootChoice1".to_string(),
-          kind: TypeKind::ChoiceEnum,
-          members: vec![MemberDecl::Variant(VariantDecl {
-            rust_name: "TLeaf".to_string(),
-            docs: " _".to_string(),
-            version: String::new(),
-            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-              qnames: vec!["t:CT_Leaf/t:leaf".to_string()],
-            },
-            payload: TypeRefDecl {
-              rust_type: "Leaf".to_string(),
-              module_path: None,
-            },
-          })],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-
-    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
-
-    assert!(generated.contains("pub enum RootChoice"));
-    assert!(!generated.contains("pub enum RootChoice1"));
   }
 
   #[test]
@@ -4067,135 +4076,6 @@ mod tests {
     assert!(generated.contains("pub enum HolderChoice"));
     assert!(!generated.contains("pub enum HolderChoice1"));
     assert!(!generated.contains("pub enum HolderChoice2"));
-  }
-
-  #[test]
-  fn flattens_single_anonymous_choice_wrapper_inside_mixed_parent() {
-    let schema = SchemaModuleDecl {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![
-        TypeDecl {
-          rust_name: "First".to_string(),
-          xml_qname: Some("t:CT_First/t:first".to_string()),
-          kind: TypeKind::ElementStruct,
-          element_kind: Some(ElementKind::Leaf),
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "Second".to_string(),
-          xml_qname: Some("t:CT_Second/t:second".to_string()),
-          kind: TypeKind::ElementStruct,
-          element_kind: Some(ElementKind::Leaf),
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "Third".to_string(),
-          xml_qname: Some("t:CT_Third/t:third".to_string()),
-          kind: TypeKind::ElementStruct,
-          element_kind: Some(ElementKind::Leaf),
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "RootChoice".to_string(),
-          kind: TypeKind::ChoiceEnum,
-          members: vec![
-            MemberDecl::Variant(VariantDecl {
-              rust_name: "Choice1".to_string(),
-              docs: " Wrapper".to_string(),
-              version: String::new(),
-              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-                qnames: vec!["wrapper".to_string()],
-              },
-              payload: TypeRefDecl {
-                rust_type: "RootChoice1".to_string(),
-                module_path: None,
-              },
-            }),
-            MemberDecl::Variant(VariantDecl {
-              rust_name: "TThird".to_string(),
-              docs: " Direct".to_string(),
-              version: String::new(),
-              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-                qnames: vec!["t:CT_Third/t:third".to_string()],
-              },
-              payload: TypeRefDecl {
-                rust_type: "Third".to_string(),
-                module_path: None,
-              },
-            }),
-          ],
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "RootChoice1".to_string(),
-          kind: TypeKind::ChoiceEnum,
-          members: vec![
-            MemberDecl::Variant(VariantDecl {
-              rust_name: "TFirst".to_string(),
-              docs: " _".to_string(),
-              version: String::new(),
-              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-                qnames: vec!["t:CT_First/t:first".to_string()],
-              },
-              payload: TypeRefDecl {
-                rust_type: "First".to_string(),
-                module_path: None,
-              },
-            }),
-            MemberDecl::Variant(VariantDecl {
-              rust_name: "Choice2".to_string(),
-              docs: " _".to_string(),
-              version: String::new(),
-              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-                qnames: vec!["wrapper2".to_string()],
-              },
-              payload: TypeRefDecl {
-                rust_type: "RootChoice2".to_string(),
-                module_path: None,
-              },
-            }),
-          ],
-          ..Default::default()
-        },
-        TypeDecl {
-          rust_name: "RootChoice2".to_string(),
-          kind: TypeKind::ChoiceEnum,
-          members: vec![MemberDecl::Variant(VariantDecl {
-            rust_name: "TSecond".to_string(),
-            docs: " _".to_string(),
-            version: String::new(),
-            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
-              qnames: vec!["t:CT_Second/t:second".to_string()],
-            },
-            payload: TypeRefDecl {
-              rust_type: "Second".to_string(),
-              module_path: None,
-            },
-          })],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-
-    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
-
-    assert!(generated.contains("pub enum RootChoice"));
-    assert!(!generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < RootChoice1 >)"));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Third/t:third\"))] TThird (std :: boxed :: Box < Third >)"
-    ));
-    assert!(!generated.contains("pub enum RootChoice1"));
-    assert!(!generated.contains("pub enum RootChoice2"));
   }
 
   #[test]
@@ -4318,7 +4198,7 @@ mod tests {
       "# [sdk (child (qname = \"t:CT_ProofErr/t:proofErr\"))] WProofErr (std :: boxed :: Box < ProofErr >)"
     ));
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_PermStart/t:permStart\"))] Choice2 (std :: boxed :: Box < PermStart >)"
+      "# [sdk (child (qname = \"t:CT_PermStart/t:permStart\"))] Choice (std :: boxed :: Box < PermStart >)"
     ));
     assert!(!generated.contains("pub enum RootChoice1"));
     assert!(!generated.contains("pub enum RootChoice2"));
@@ -4558,7 +4438,7 @@ mod tests {
       "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
     ));
     assert!(
-      !generated.contains("# [sdk (choice)] Choice2 (std :: boxed :: Box < RangeMarkupChoice >)")
+      !generated.contains("# [sdk (choice)] Choice (std :: boxed :: Box < RangeMarkupChoice >)")
     );
     assert!(generated.contains("pub enum RangeMarkupChoice"));
   }
@@ -4648,8 +4528,492 @@ mod tests {
 
     assert!(generated.contains("pub enum RangeMarkupChoice"));
     assert!(
-      generated.contains("# [sdk (choice)] Choice2 (std :: boxed :: Box < RangeMarkupChoice >)")
+      generated.contains("# [sdk (choice)] Choice (std :: boxed :: Box < RangeMarkupChoice >)")
     );
+  }
+
+  #[test]
+  fn renames_single_anonymous_sequence_variant_without_numeric_suffix() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "First".to_string(),
+          xml_qname: Some("t:CT_First/t:first".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Second".to_string(),
+          xml_qname: Some("t:CT_Second/t:second".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TFirst".to_string(),
+              docs: " Direct".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+                qnames: vec!["t:CT_First/t:first".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "First".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Sequence32".to_string(),
+              docs: " Anonymous sequence".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Sequence {
+                qnames: vec!["t:CT_Second/t:second".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoiceSequence32".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoiceSequence32".to_string(),
+          kind: TypeKind::HelperStruct,
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "second".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Child {
+              qname: "t:CT_Second/t:second".to_string(),
+            },
+            cardinality: Cardinality::One,
+            type_ref: TypeRefDecl {
+              rust_type: "Second".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence (std :: boxed :: Box < Second >)"
+    ));
+    assert!(!generated.contains("Sequence32"));
+  }
+
+  #[test]
+  fn renumbers_multiple_anonymous_sequence_variants_by_render_order() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "First".to_string(),
+          xml_qname: Some("t:CT_First/t:first".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Second".to_string(),
+          xml_qname: Some("t:CT_Second/t:second".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Sequence32".to_string(),
+              docs: " first".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Sequence {
+                qnames: vec!["t:CT_First/t:first".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoiceSequence32".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Sequence8".to_string(),
+              docs: " second".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Sequence {
+                qnames: vec!["t:CT_Second/t:second".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoiceSequence8".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoiceSequence32".to_string(),
+          kind: TypeKind::HelperStruct,
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "first".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Child {
+              qname: "t:CT_First/t:first".to_string(),
+            },
+            cardinality: Cardinality::One,
+            type_ref: TypeRefDecl {
+              rust_type: "First".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoiceSequence8".to_string(),
+          kind: TypeKind::HelperStruct,
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "second".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Child {
+              qname: "t:CT_Second/t:second".to_string(),
+            },
+            cardinality: Cardinality::One,
+            type_ref: TypeRefDecl {
+              rust_type: "Second".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence1 (std :: boxed :: Box < First >)"
+    ));
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence2 (std :: boxed :: Box < Second >)"
+    ));
+    assert!(!generated.contains("Sequence32"));
+    assert!(!generated.contains("Sequence8"));
+  }
+
+  #[test]
+  fn keeps_anonymous_sequence_suffix_when_plain_name_would_collide() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "First".to_string(),
+          xml_qname: Some("t:CT_First/t:first".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Second".to_string(),
+          xml_qname: Some("t:CT_Second/t:second".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Sequence".to_string(),
+              docs: " Named".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+                qnames: vec!["t:CT_First/t:first".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "First".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Sequence32".to_string(),
+              docs: " Anonymous".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Sequence {
+                qnames: vec!["t:CT_Second/t:second".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoiceSequence32".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoiceSequence32".to_string(),
+          kind: TypeKind::HelperStruct,
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "second".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Child {
+              qname: "t:CT_Second/t:second".to_string(),
+            },
+            cardinality: Cardinality::One,
+            type_ref: TypeRefDecl {
+              rust_type: "Second".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence (std :: boxed :: Box < First >)"
+    ));
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence32 (std :: boxed :: Box < Second >)"
+    ));
+  }
+
+  #[test]
+  fn keeps_repeated_choice_segments_split_by_fixed_children() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "BookmarkStart".to_string(),
+          xml_qname: Some("t:CT_Bookmark/t:bookmarkStart".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "BookmarkEnd".to_string(),
+          xml_qname: Some("t:CT_MarkupRange/t:bookmarkEnd".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "TableProperties".to_string(),
+          xml_qname: Some("t:CT_TblPr/t:tblPr".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "TableGrid".to_string(),
+          xml_qname: Some("t:CT_TblGrid/t:tblGrid".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "TableRow".to_string(),
+          xml_qname: Some("t:CT_Row/t:tr".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "BodyLike".to_string(),
+          xml_qname: Some("t:CT_BodyLike/t:bodyLike".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Composite),
+          content_model: Some(ContentModelDecl::MixedChoiceChildren),
+          members: vec![
+            MemberDecl::Field(FieldDecl {
+              rust_name: "before_choice".to_string(),
+              docs: " before".to_string(),
+              version: String::new(),
+              wire: FieldWireDecl::Choice,
+              cardinality: Cardinality::Many,
+              type_ref: TypeRefDecl {
+                rust_type: "BodyLikeChoice1".to_string(),
+                module_path: None,
+              },
+              validators: vec![],
+            }),
+            MemberDecl::Field(FieldDecl {
+              rust_name: "table_properties".to_string(),
+              docs: " tblPr".to_string(),
+              version: String::new(),
+              wire: FieldWireDecl::Child {
+                qname: "t:CT_TblPr/t:tblPr".to_string(),
+              },
+              cardinality: Cardinality::One,
+              type_ref: TypeRefDecl {
+                rust_type: "TableProperties".to_string(),
+                module_path: None,
+              },
+              validators: vec![],
+            }),
+            MemberDecl::Field(FieldDecl {
+              rust_name: "table_grid".to_string(),
+              docs: " tblGrid".to_string(),
+              version: String::new(),
+              wire: FieldWireDecl::Child {
+                qname: "t:CT_TblGrid/t:tblGrid".to_string(),
+              },
+              cardinality: Cardinality::One,
+              type_ref: TypeRefDecl {
+                rust_type: "TableGrid".to_string(),
+                module_path: None,
+              },
+              validators: vec![],
+            }),
+            MemberDecl::Field(FieldDecl {
+              rust_name: "after_choice".to_string(),
+              docs: " after".to_string(),
+              version: String::new(),
+              wire: FieldWireDecl::Choice,
+              cardinality: Cardinality::Many,
+              type_ref: TypeRefDecl {
+                rust_type: "BodyLikeChoice2".to_string(),
+                module_path: None,
+              },
+              validators: vec![],
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "BodyLikeChoice1".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![MemberDecl::Variant(VariantDecl {
+            rust_name: "Choice1".to_string(),
+            docs: " wrapper".to_string(),
+            version: String::new(),
+            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+              qnames: vec!["wrapper".to_string()],
+            },
+            payload: TypeRefDecl {
+              rust_type: "RangeMarkupChoice".to_string(),
+              module_path: None,
+            },
+          })],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "RangeMarkupChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TBookmarkStart".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+                qnames: vec!["t:CT_Bookmark/t:bookmarkStart".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "BookmarkStart".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TBookmarkEnd".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+                qnames: vec!["t:CT_MarkupRange/t:bookmarkEnd".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "BookmarkEnd".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "BodyLikeChoice2".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![MemberDecl::Variant(VariantDecl {
+            rust_name: "TRow".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+              qnames: vec!["t:CT_Row/t:tr".to_string()],
+            },
+            payload: TypeRefDecl {
+              rust_type: "TableRow".to_string(),
+              module_path: None,
+            },
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("pub struct BodyLike"));
+    assert!(generated.contains("pub before_choice : Vec < BodyLikeChoice1 >"));
+    assert!(generated.contains("pub table_properties : std :: boxed :: Box < TableProperties >"));
+    assert!(generated.contains("pub table_grid : std :: boxed :: Box < TableGrid >"));
+    assert!(generated.contains("pub after_choice : Vec < BodyLikeChoice2 >"));
+    assert!(generated.contains("pub enum BodyLikeChoice1"));
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_Bookmark/t:bookmarkStart\"))] TBookmarkStart (std :: boxed :: Box < BookmarkStart >)"
+    ));
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_MarkupRange/t:bookmarkEnd\"))] TBookmarkEnd (std :: boxed :: Box < BookmarkEnd >)"
+    ));
+
+    let before_idx = generated
+      .find("pub before_choice : Vec < BodyLikeChoice1 >")
+      .unwrap();
+    let tbl_pr_idx = generated
+      .find("pub table_properties : std :: boxed :: Box < TableProperties >")
+      .unwrap();
+    let tbl_grid_idx = generated
+      .find("pub table_grid : std :: boxed :: Box < TableGrid >")
+      .unwrap();
+    let after_idx = generated
+      .find("pub after_choice : Vec < BodyLikeChoice2 >")
+      .unwrap();
+
+    assert!(before_idx < tbl_pr_idx);
+    assert!(tbl_pr_idx < tbl_grid_idx);
+    assert!(tbl_grid_idx < after_idx);
   }
 
   #[test]
@@ -4973,8 +5337,8 @@ mod tests {
     assert!(generated.contains("pub leaf_a : std :: boxed :: Box < LeafA >"));
     assert!(generated.contains("pub structured_holder_choice : Option < StructuredHolderChoice >"));
     assert!(generated.contains("pub enum StructuredHolderChoice"));
-    assert!(generated.contains("# [sdk (sequence)] Sequence2"));
-    assert!(generated.contains("Sequence2 {"));
+    assert!(generated.contains("# [sdk (sequence)] Sequence"));
+    assert!(generated.contains("Sequence {"));
     assert!(
       generated.contains(
         "# [sdk (child (qname = \"t:CT_C/t:c\"))] leaf_c : std :: boxed :: Box < LeafC >"
@@ -5166,7 +5530,7 @@ mod tests {
     assert!(generated.contains("pub enum FallbackHolderChoice"));
     assert!(generated.contains("TA (std :: boxed :: Box < LeafA >)"));
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_B/t:b\"))] Sequence2 (std :: boxed :: Box < LeafB >)"
+      "# [sdk (child (qname = \"t:CT_B/t:b\"))] Sequence (std :: boxed :: Box < LeafB >)"
     ));
     assert!(!generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(!generated.contains("leaf_b"));

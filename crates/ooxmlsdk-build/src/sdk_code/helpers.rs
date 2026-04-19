@@ -459,12 +459,14 @@ fn structure_sequence_variant_child<'a>(
 pub fn classify_simple_type(simple_type: &str) -> Option<SimpleValueKind> {
   match simple_type {
     "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue" | "IntegerValue"
-    | "SByteValue" | "StringValue" => Some(SimpleValueKind::StringLike),
+    | "StringValue" => Some(SimpleValueKind::StringLike),
     "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => {
       Some(SimpleValueKind::BoolLike)
     }
-    "ByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value" | "UInt32Value"
-    | "UInt64Value" | "DoubleValue" | "SingleValue" => Some(SimpleValueKind::NumericLike),
+    "ByteValue" | "SByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "UInt16Value"
+    | "UInt32Value" | "UInt64Value" | "DoubleValue" | "SingleValue" => {
+      Some(SimpleValueKind::NumericLike)
+    }
     _ => None,
   }
 }

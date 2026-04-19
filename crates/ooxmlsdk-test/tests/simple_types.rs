@@ -94,7 +94,9 @@ fn on_off_value_round_trip_test() {
 
 #[test]
 fn sbyte_value_round_trip_test() {
-  assert_round_trip::<SByteValue>("abc");
+  assert_round_trip::<SByteValue>("-128");
+  assert_round_trip::<SByteValue>("0");
+  assert_round_trip::<SByteValue>("127");
 }
 
 #[test]

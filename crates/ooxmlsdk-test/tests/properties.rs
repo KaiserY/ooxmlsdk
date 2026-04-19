@@ -198,3 +198,20 @@ fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
   assert!(parsed.is_infinite());
   assert!(parsed.is_sign_positive());
 }
+
+#[test]
+fn variant_sbyte_text_child_round_trips_as_numeric_value() {
+  let value = Variant {
+    xml_children: Some(VariantChoice::VtI1(-12)),
+  };
+
+  let xml = value.to_xml().unwrap();
+  let serialized = trim_xml_declaration(&xml);
+  assert!(serialized.contains("<vt:i1>-12</vt:i1>"));
+
+  let reparsed = serialized.parse::<Variant>().unwrap();
+  let Some(VariantChoice::VtI1(parsed)) = reparsed.xml_children else {
+    panic!("expected vt:i1");
+  };
+  assert_eq!(parsed, -12);
+}

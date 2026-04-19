@@ -673,8 +673,8 @@ fn should_normalize_bool_attr(
   let (element_ns, element_local) = split_expanded_name(element_name);
   let (attr_ns, attr_local) = split_expanded_name(attr_name);
 
-  if element_ns == "http://schemas.openxmlformats.org/spreadsheetml/2006/main" {
-    if (element_local == "sheetView" && attr_local == "tabSelected")
+  if element_ns == "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    && ((element_local == "sheetView" && attr_local == "tabSelected")
       || (element_local == "col" && attr_local == "customWidth")
       || (element_local == "col" && attr_local == "bestFit")
       || (element_local == "c" && attr_local == "l")
@@ -766,10 +766,9 @@ fn should_normalize_bool_attr(
       ) && attr_local == "val")
       || (element_local == "workbookPr" && attr_local == "filterPrivacy")
       || (element_local == "customWorkbookView"
-        && matches!(attr_local, "maximized" | "personalView"))
-    {
-      return true;
-    }
+        && matches!(attr_local, "maximized" | "personalView")))
+  {
+    return true;
   }
 
   if element_ns == "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"

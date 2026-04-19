@@ -116,20 +116,16 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "basicspreadsheet.xlsx"
       | "simpleSdt.docx"
       | "Spreadsheet.xlsx"
+      | "malformed_uri_long.xlsx"
+      | "missingcalcchainpart.xlsx"
+      | "o09_Performance_typical.pptx"
   )
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {
   matches!(
     file_name,
-    "Complex01.docx"
-      | "Complex01.xlsx"
-      | "o09_Performance_typical.pptx"
-      | "May_12_04.docx"
-      | "malformed_uri_long.xlsx"
-      | "MCExecl.xlsx"
-      | "mcdoc.docx"
-      | "missingcalcchainpart.xlsx"
+    "Complex01.docx" | "Complex01.xlsx" | "May_12_04.docx" | "MCExecl.xlsx" | "mcdoc.docx"
   )
 }
 
@@ -149,6 +145,7 @@ fn is_microsoft365_doc_sample(file_name: &str) -> bool {
       | "AnnotationRef.docx"
       | "BadDocProps.docx"
       | "Comments.docx"
+      | "Complex01.xlsx"
       | "Document.dotx"
       | "DocProps.docx"
       | "EmptyRelationshipElement.docx"
@@ -157,6 +154,8 @@ fn is_microsoft365_doc_sample(file_name: &str) -> bool {
       | "Hyperlink.docx"
       | "InvalidDocPropsct.docx"
       | "malformed_uri.xlsx"
+      | "malformed_uri_long.xlsx"
+      | "missingcalcchainpart.xlsx"
       | "MoreDocProps.docx"
       | "NoDocProps.docx"
       | "Notes.docx"

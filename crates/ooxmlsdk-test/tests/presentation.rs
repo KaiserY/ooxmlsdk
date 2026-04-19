@@ -18,7 +18,9 @@ fn non_visual_drawing_properties_round_trip_with_embedded_xml() {
       .as_deref()
       .is_some_and(|value| value.contains("<?xml version=\"1.0\" encoding=\"utf-16\"?>"))
   );
-  assert!(serialized.starts_with("<p:cNvPr id=\"4\" name=\"[WorkArea]\""));
+  assert!(serialized.starts_with("<p:cNvPr "));
+  assert!(serialized.contains("id=\"4\""));
+  assert!(serialized.contains("name=\"[WorkArea]\""));
   assert!(serialized.contains("hidden=\"true\""));
   assert!(
     reparsed

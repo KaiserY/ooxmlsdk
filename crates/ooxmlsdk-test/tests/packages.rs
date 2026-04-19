@@ -3011,6 +3011,60 @@ fn round_trip_missingcalcchainpart_xlsx_asset_from_openxml_sdk() {
       .shared_string_table_part
       .is_some()
   );
+
+  fn find_cell<'a>(
+    package: &'a SpreadsheetDocument,
+    sheet_path: &str,
+    cell_ref: &str,
+  ) -> &'a ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Cell {
+    package
+      .workbook_part
+      .worksheet_parts
+      .iter()
+      .find(|part| part.inner_path == sheet_path)
+      .and_then(|part| {
+        part
+          .root_element
+          .x_sheet_data
+          .x_row
+          .iter()
+          .flat_map(|row| row.x_c.iter())
+          .find(|cell| cell.cell_reference.as_deref() == Some(cell_ref))
+      })
+      .unwrap_or_else(|| panic!("expected {sheet_path} {cell_ref}"))
+  }
+
+  let original_c21 = find_cell(&original, "xl/worksheets/sheet5.xml", "C21");
+  let roundtripped_c21 = find_cell(&roundtripped, "xl/worksheets/sheet5.xml", "C21");
+
+  assert_eq!(
+    original_c21
+      .cell_formula
+      .as_ref()
+      .and_then(|formula| formula.xml_content.as_deref()),
+    Some("IFERROR(C20*0.15,\" \")")
+  );
+  assert_eq!(
+    roundtripped_c21
+      .cell_formula
+      .as_ref()
+      .and_then(|formula| formula.xml_content.as_deref()),
+    Some("IFERROR(C20*0.15,\" \")")
+  );
+  assert_eq!(
+    original_c21
+      .cell_value
+      .as_ref()
+      .and_then(|value| value.xml_content.as_deref()),
+    Some(" ")
+  );
+  assert_eq!(
+    roundtripped_c21
+      .cell_value
+      .as_ref()
+      .and_then(|value| value.xml_content.as_deref()),
+    Some(" ")
+  );
 }
 
 #[test]
@@ -3491,6 +3545,34 @@ fn round_trip_malformed_uri_long_xlsx_asset_from_openxml_sdk() {
     roundtripped_relationship.target.as_str(),
     "mailto:test@test.com;%20test2@test.com;%252test3@test.com;%20test3@test.com;%20test4@test.com;%20test5@test.com?subject=Unsubscribe%20Request&body=Please%20unsubscribe%20me%20from%20all%20future%20communications"
   );
+  assert_eq!(
+    original_worksheet_part.root_element.xr_uid.as_deref(),
+    Some("{00000000-0001-0000-0000-000000000000}")
+  );
+  assert_eq!(
+    roundtripped_worksheet_part.root_element.xr_uid.as_deref(),
+    Some("{00000000-0001-0000-0000-000000000000}")
+  );
+  let original_hyperlink = original_worksheet_part
+    .root_element
+    .x_hyperlinks
+    .as_ref()
+    .and_then(|hyperlinks| hyperlinks.x_hyperlink.first())
+    .expect("expected original hyperlink element");
+  let roundtripped_hyperlink = roundtripped_worksheet_part
+    .root_element
+    .x_hyperlinks
+    .as_ref()
+    .and_then(|hyperlinks| hyperlinks.x_hyperlink.first())
+    .expect("expected roundtripped hyperlink element");
+  assert_eq!(
+    original_hyperlink.xr_uid.as_deref(),
+    Some("{00000000-0004-0000-0000-000000000000}")
+  );
+  assert_eq!(
+    roundtripped_hyperlink.xr_uid.as_deref(),
+    Some("{00000000-0004-0000-0000-000000000000}")
+  );
   #[cfg(feature = "microsoft365")]
   assert!(original_workbook_xml.contains("<xr:revisionPtr "));
   #[cfg(feature = "microsoft365")]
@@ -3695,6 +3777,21 @@ fn open_o09_performance_typical_pptx_asset_from_openxml_sdk() {
         .map(|part| part.inner_path.as_str())
     })
     .collect();
+  let vml_image_inner_paths: Vec<&str> = package
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide.vml_drawing_parts.iter().flat_map(|part| {
+        part
+          .image_parts
+          .iter()
+          .map(|image| image.inner_path.as_str())
+      })
+    })
+    .collect();
+  let mut sorted_vml_image_inner_paths = vml_image_inner_paths.clone();
+  sorted_vml_image_inner_paths.sort_unstable();
 
   assert_eq!(package.presentation_part.slide_parts.len(), 11);
   assert_eq!(package.presentation_part.slide_master_parts.len(), 1);
@@ -3715,6 +3812,18 @@ fn open_o09_performance_typical_pptx_asset_from_openxml_sdk() {
       .any(|slide| slide.notes_slide_part.is_some())
   );
   assert_eq!(audio_inner_paths, vec!["ppt/media/audio1.wav"]);
+  assert_eq!(
+    sorted_vml_image_inner_paths,
+    vec![
+      "ppt/media/image1.emf",
+      "ppt/media/image2.emf",
+      "ppt/media/image3.wmf",
+      "ppt/media/image4.wmf",
+      "ppt/media/image5.wmf",
+      "ppt/media/image6.wmf",
+      "ppt/media/image7.wmf",
+    ]
+  );
 }
 
 #[test]
@@ -3730,6 +3839,32 @@ fn round_trip_o09_performance_typical_pptx_asset_from_openxml_sdk() {
         .audio_reference_relationships
         .iter()
         .map(|part| (part.inner_path.as_str(), &part.part_content))
+    })
+    .collect();
+  let original_vml_image_parts: Vec<(&str, &Vec<u8>)> = original
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide.vml_drawing_parts.iter().flat_map(|part| {
+        part
+          .image_parts
+          .iter()
+          .map(|image| (image.inner_path.as_str(), &image.part_content))
+      })
+    })
+    .collect();
+  let roundtripped_vml_image_parts: Vec<(&str, &Vec<u8>)> = roundtripped
+    .presentation_part
+    .slide_parts
+    .iter()
+    .flat_map(|slide| {
+      slide.vml_drawing_parts.iter().flat_map(|part| {
+        part
+          .image_parts
+          .iter()
+          .map(|image| (image.inner_path.as_str(), &image.part_content))
+      })
     })
     .collect();
   let roundtripped_audio_parts: Vec<(&str, &Vec<u8>)> = roundtripped
@@ -3774,4 +3909,5 @@ fn round_trip_o09_performance_typical_pptx_asset_from_openxml_sdk() {
       .is_some()
   );
   assert_eq!(original_audio_parts, roundtripped_audio_parts);
+  assert_eq!(original_vml_image_parts, roundtripped_vml_image_parts);
 }

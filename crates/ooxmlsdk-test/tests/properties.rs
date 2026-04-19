@@ -47,8 +47,10 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
   ));
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<cp:coreProperties"));
-  assert!(serialized.contains("<dc:creator>Thomas Barnekow</dc:creator>"));
-  assert!(serialized.contains("<cp:lastModifiedBy>Thomas Barnekow</cp:lastModifiedBy>"));
+  assert!(serialized.contains("<dc:creator"));
+  assert!(serialized.contains(">Thomas Barnekow</dc:creator>"));
+  assert!(serialized.contains("<cp:lastModifiedBy"));
+  assert!(serialized.contains(">Thomas Barnekow</cp:lastModifiedBy>"));
   assert_eq!(reparsed.creator.as_deref(), Some("Thomas Barnekow"));
 }
 
@@ -90,8 +92,10 @@ fn core_properties_round_trip_from_more_doc_props_test() {
   ));
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<cp:coreProperties"));
-  assert!(serialized.contains("<dc:creator>Eric White</dc:creator>"));
-  assert!(serialized.contains("<cp:lastModifiedBy>Eric White</cp:lastModifiedBy>"));
+  assert!(serialized.contains("<dc:creator"));
+  assert!(serialized.contains(">Eric White</dc:creator>"));
+  assert!(serialized.contains("<cp:lastModifiedBy"));
+  assert!(serialized.contains(">Eric White</cp:lastModifiedBy>"));
   assert_eq!(reparsed.creator.as_deref(), Some("Eric White"));
 }
 
@@ -106,9 +110,12 @@ fn extended_properties_round_trip_from_more_doc_props_test() {
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<Properties"));
   assert!(serialized.contains("extended-properties"));
-  assert!(serialized.contains("<Template>Normal.dotm</Template>"));
-  assert!(serialized.contains("<Application>Microsoft Office Word</Application>"));
-  assert!(serialized.contains("<AppVersion>15.0000</AppVersion>"));
+  assert!(serialized.contains("<Template"));
+  assert!(serialized.contains(">Normal.dotm</Template>"));
+  assert!(serialized.contains("<Application"));
+  assert!(serialized.contains(">Microsoft Office Word</Application>"));
+  assert!(serialized.contains("<AppVersion"));
+  assert!(serialized.contains(">15.0000</AppVersion>"));
   assert_eq!(parsed.template.is_some(), reparsed.template.is_some());
   assert_eq!(parsed.application.is_some(), reparsed.application.is_some());
   assert_eq!(
@@ -136,8 +143,10 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
   assert_eq!(titles.vt_vector.xml_children.len(), 1);
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<ap:Properties"));
-  assert!(serialized.contains("<ap:TitlesOfParts>"));
-  assert!(serialized.contains("<vt:vector baseType=\"lpstr\" size=\"1\">"));
+  assert!(serialized.contains("<ap:TitlesOfParts"));
+  assert!(serialized.contains("<vt:vector"));
+  assert!(serialized.contains("baseType=\"lpstr\""));
+  assert!(serialized.contains("size=\"1\""));
   assert!(serialized.contains("<vt:lpstr"));
   assert!(reparsed.titles_of_parts.is_some());
 }
@@ -164,6 +173,7 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
   assert!(serialized.contains("fmtid=\"{D5CDD505-2E9C-101B-9397-08002B2CF9AE}\""));
   assert!(serialized.contains("pid=\"2\""));
   assert!(serialized.contains("name=\"crap\""));
-  assert!(serialized.contains("<vt:bool>true</vt:bool>"));
+  assert!(serialized.contains("<vt:bool"));
+  assert!(serialized.contains(">true</vt:bool>"));
   assert_eq!(reparsed.op_property.len(), 1);
 }

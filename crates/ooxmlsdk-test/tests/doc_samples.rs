@@ -430,7 +430,7 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
             panic!("failed to decode xml text for {file_name}:{entry_name}: {err}");
           })
           .into_owned();
-        if raw.chars().all(|ch| ch.is_whitespace()) {
+        if raw.chars().all(|ch| ch.is_whitespace()) && should_skip_whitespace_text(&stack) {
           // Skip formatting-only whitespace.
         } else {
           let text = normalize_xml_text(&raw, relaxed_bool);
@@ -443,7 +443,7 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
             panic!("failed to decode xml cdata for {file_name}:{entry_name}: {err}");
           })
           .into_owned();
-        if !raw.chars().all(|ch| ch.is_whitespace()) {
+        if !raw.chars().all(|ch| ch.is_whitespace()) || !should_skip_whitespace_text(&stack) {
           let text = normalize_xml_text(&raw, relaxed_bool);
           push_xml_node(&mut roots, &mut stack, XmlNode::Text(text));
         }
@@ -534,15 +534,30 @@ fn parse_xml_node(
 
 fn expand_xml_name(name: &str, namespaces: &BTreeMap<String, String>, is_attr: bool) -> String {
   if let Some((prefix, local_name)) = name.split_once(':') {
-    let uri = namespaces.get(prefix).cloned().unwrap_or_default();
+    let uri = if prefix == "xml" {
+      "http://www.w3.org/XML/1998/namespace".to_string()
+    } else {
+      namespaces
+        .get(prefix)
+        .map(|uri| normalize_namespace_uri(uri))
+        .unwrap_or_default()
+    };
     format!("{{{uri}}}{local_name}")
   } else if is_attr {
     name.to_string()
   } else if let Some(uri) = namespaces.get("") {
-    format!("{{{uri}}}{name}")
+    format!("{{{}}}{name}", normalize_namespace_uri(uri))
   } else {
     name.to_string()
   }
+}
+
+fn should_skip_whitespace_text(stack: &[XmlFrame]) -> bool {
+  let Some(frame) = stack.last() else {
+    return true;
+  };
+
+  !matches!(frame.children.last(), Some(XmlNode::Text(_)))
 }
 
 fn push_xml_node(roots: &mut Vec<XmlNode>, stack: &mut [XmlFrame], node: XmlNode) {
@@ -680,6 +695,84 @@ fn normalize_relationship_type_uri(value: &str) -> String {
     "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument" => {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
         .to_string()
+    }
+    _ => value.to_string(),
+  }
+}
+
+fn normalize_namespace_uri(value: &str) -> String {
+  match value {
+    "http://purl.oclc.org/ooxml/descriptions/base" => {
+      "http://descriptions.openxmlformats.org/description/base".to_string()
+    }
+    "http://purl.oclc.org/ooxml/descriptions/full" => {
+      "http://descriptions.openxmlformats.org/description/full".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/chart" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/chart".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/chartDrawing" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/compatibility" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/compatibility".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/diagram" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/diagram".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/lockedCanvas" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/main" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/main".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/picture" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/picture".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing".to_string()
+    }
+    "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" => {
+      "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/bibliography" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/bibliography".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/customProperties" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/customXml" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/customXml".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/customXmlDataProps" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/customXmlDataProps".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/extendedProperties" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/math" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/math".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/relationships" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships".to_string()
+    }
+    "http://purl.oclc.org/ooxml/officeDocument/sharedTypes" => {
+      "http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes".to_string()
+    }
+    "http://purl.oclc.org/ooxml/presentationml/main" => {
+      "http://schemas.openxmlformats.org/presentationml/2006/main".to_string()
+    }
+    "http://purl.oclc.org/ooxml/schemaLibrary/main" => {
+      "http://schemas.openxmlformats.org/schemaLibrary/2006/main".to_string()
+    }
+    "http://purl.oclc.org/ooxml/spreadsheetml/main" => {
+      "http://schemas.openxmlformats.org/spreadsheetml/2006/main".to_string()
+    }
+    "http://purl.oclc.org/ooxml/wordprocessingml/main" => {
+      "http://schemas.openxmlformats.org/wordprocessingml/2006/main".to_string()
     }
     _ => value.to_string(),
   }

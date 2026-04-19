@@ -100,14 +100,10 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       let child_parent_path = crate::common::parent_zip_path(#path_ident);
     });
     field_declarations.push(quote! {
-      let part_target_str = if #path_ident.ends_with(".xml") {
-        &#path_ident[#path_ident
-          .rfind('/')
-          .ok_or_else(|| crate::common::SdkError::CommonError(#path_ident.to_string()))?
-          + 1..#path_ident.len()]
-      } else {
-        ""
-      };
+      let part_target_str = #path_ident
+        .rsplit('/')
+        .next()
+        .unwrap_or_default();
     });
     field_declarations.push(quote! {
       let rels_candidate_path = crate::common::resolve_zip_file_path(

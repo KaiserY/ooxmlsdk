@@ -207,24 +207,12 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
   }
 }
 
-#[allow(unreachable_patterns)]
-fn body_choice_has_range_markup(
-  choice: &BodyChoice,
-  predicate: impl Fn(&BodyChoice) -> bool,
-) -> bool {
-  predicate(choice)
-}
-
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
-  body_choice_has_range_markup(choice, |choice| {
-    matches!(choice, BodyChoice::WBookmarkStart(_))
-  })
+  matches!(choice, BodyChoice::WBookmarkStart(_))
 }
 
 fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
-  body_choice_has_range_markup(choice, |choice| {
-    matches!(choice, BodyChoice::WBookmarkEnd(_))
-  })
+  matches!(choice, BodyChoice::WBookmarkEnd(_))
 }
 
 fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {

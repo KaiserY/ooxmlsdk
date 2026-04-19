@@ -1723,8 +1723,13 @@ fn gen_choice_type_decl(
     VersionCfgContext::new(true)
   };
   let rendered_variant_name_map = anonymous_variant_render_name_map(type_decl, module);
+  let render_context = ChoiceVariantRenderContext {
+    module,
+    type_graph,
+    variant_cfg,
+    rendered_variant_name_map: &rendered_variant_name_map,
+  };
   let mut variants = Vec::new();
-  let mut has_inline_sequence_variant = false;
 
   if choice_enum_is_pure_choice_wrapper(type_decl, module) {
     let wrapper_payloads = pure_choice_wrapper_payload_types(type_decl, module);
@@ -1773,14 +1778,10 @@ fn gen_choice_type_decl(
         {
           variants.extend(gen_choice_variant_tokens(
             helper_variant,
-            module,
-            type_graph,
-            variant_cfg,
+            &render_context,
             true,
             inline_prefix_attrs.clone(),
-            &rendered_variant_name_map,
             &mut reserved_variant_names,
-            &mut has_inline_sequence_variant,
           )?);
           for helper_variant_name in choice_variant_rendered_names(helper_variant, module)
             .expect("pure choice wrapper variant rendered names")
@@ -1808,14 +1809,10 @@ fn gen_choice_type_decl(
     };
     variants.extend(gen_choice_variant_tokens(
       variant,
-      module,
-      type_graph,
-      variant_cfg,
+      &render_context,
       true,
       quote! {},
-      &rendered_variant_name_map,
       &mut reserved_variant_names,
-      &mut has_inline_sequence_variant,
     )?);
   }
 
@@ -1918,24 +1915,27 @@ fn inline_single_field_sequence_variant_tokens(
   }
 }
 
-#[allow(clippy::too_many_arguments)]
+struct ChoiceVariantRenderContext<'a> {
+  module: &'a SchemaModuleDecl,
+  type_graph: &'a TypeContainmentGraph,
+  variant_cfg: VersionCfgContext,
+  rendered_variant_name_map: &'a HashMap<String, String>,
+}
+
 fn gen_choice_variant_tokens(
   variant: &VariantDecl,
-  module: &SchemaModuleDecl,
-  type_graph: &TypeContainmentGraph,
-  variant_cfg: VersionCfgContext,
+  render_context: &ChoiceVariantRenderContext<'_>,
   flatten_anonymous_choice_wrappers: bool,
   prefix_attrs: TokenStream,
-  rendered_variant_name_map: &HashMap<String, String>,
   reserved_variant_names: &mut HashSet<String>,
-  has_inline_sequence_variant: &mut bool,
 ) -> Result<Vec<TokenStream>> {
-  let rendered_variant_name = rendered_variant_name_map
+  let rendered_variant_name = render_context
+    .rendered_variant_name_map
     .get(&variant.rust_name)
     .map(String::as_str)
     .unwrap_or(&variant.rust_name);
   let variant_ident: Ident = parse_str(rendered_variant_name)?;
-  let variant_attrs = module_version_cfg_attrs(&variant.version, variant_cfg);
+  let variant_attrs = module_version_cfg_attrs(&variant.version, render_context.variant_cfg);
 
   match &variant.wire {
     crate::sdk_code::codegen_ir::VariantWireDecl::Any => {
@@ -1948,7 +1948,9 @@ fn gen_choice_variant_tokens(
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => {
-      if let Some(helper_type_decl) = inline_sequence_helper_type_decl(variant, module) {
+      if let Some(helper_type_decl) =
+        inline_sequence_helper_type_decl(variant, render_context.module)
+      {
         let helper_fields: Vec<&FieldDecl> = helper_type_decl
           .members
           .iter()
@@ -1964,13 +1966,16 @@ fn gen_choice_variant_tokens(
             helper_fields[0],
           )?
         {
-          *has_inline_sequence_variant = true;
           return Ok(vec![quote! {
             #prefix_attrs
             #single_field_tokens
           }]);
         }
-        if !helper_struct_is_inline_sequence_clippy_safe(helper_type_decl, module, type_graph) {
+        if !helper_struct_is_inline_sequence_clippy_safe(
+          helper_type_decl,
+          render_context.module,
+          render_context.type_graph,
+        ) {
           let payload_type = type_from_decl_ref(&variant.payload)?;
           return Ok(vec![quote! {
             #prefix_attrs
@@ -1979,12 +1984,11 @@ fn gen_choice_variant_tokens(
             #variant_ident(std::boxed::Box<#payload_type>),
           }]);
         }
-        *has_inline_sequence_variant = true;
         let inline_fields = gen_inline_sequence_variant_fields_from_decl(
           &helper_fields,
           &helper_type_decl.rust_name,
-          module,
-          type_graph,
+          render_context.module,
+          render_context.type_graph,
           VersionCfgContext::new(true),
         )?;
         Ok(vec![quote! {
@@ -2023,7 +2027,8 @@ fn gen_choice_variant_tokens(
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
       if flatten_anonymous_choice_wrappers
-        && let Some(helper_type_decl) = anonymous_choice_wrapper_helper_type_decl(variant, module)
+        && let Some(helper_type_decl) =
+          anonymous_choice_wrapper_helper_type_decl(variant, render_context.module)
       {
         let helper_type_version = helper_type_decl.version.as_deref().unwrap_or_default();
         let helper_variant_versions: Vec<&str> = helper_type_decl
@@ -2036,8 +2041,13 @@ fn gen_choice_variant_tokens(
           .collect();
         let helper_enum_version =
           common_choice_version(helper_type_version, &helper_variant_versions);
-        let helper_enum_attrs = module_version_cfg_attrs(helper_enum_version, variant_cfg);
-        if choice_helper_names_are_inline_safe(helper_type_decl, module, reserved_variant_names) {
+        let helper_enum_attrs =
+          module_version_cfg_attrs(helper_enum_version, render_context.variant_cfg);
+        if choice_helper_names_are_inline_safe(
+          helper_type_decl,
+          render_context.module,
+          reserved_variant_names,
+        ) {
           let helper_variants: Vec<&VariantDecl> = helper_type_decl
             .members
             .iter()
@@ -2056,17 +2066,14 @@ fn gen_choice_variant_tokens(
           for helper_variant in &helper_variants {
             tokens.extend(gen_choice_variant_tokens(
               helper_variant,
-              module,
-              type_graph,
-              variant_cfg,
+              render_context,
               true,
               helper_prefix_attrs.clone(),
-              rendered_variant_name_map,
               reserved_variant_names,
-              has_inline_sequence_variant,
             )?);
-            for helper_variant_name in choice_variant_rendered_names(helper_variant, module)
-              .expect("choice helper variant rendered names")
+            for helper_variant_name in
+              choice_variant_rendered_names(helper_variant, render_context.module)
+                .expect("choice helper variant rendered names")
             {
               reserved_variant_names.insert(helper_variant_name);
             }
@@ -2083,7 +2090,8 @@ fn gen_choice_variant_tokens(
         }
       } else {
         let payload_type = type_from_decl_ref(&variant.payload)?;
-        let is_nested_choice = module
+        let is_nested_choice = render_context
+          .module
           .types
           .iter()
           .any(|ty| ty.rust_name == variant.payload.rust_type && ty.kind == TypeKind::ChoiceEnum);

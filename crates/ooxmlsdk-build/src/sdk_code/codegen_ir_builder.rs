@@ -805,7 +805,6 @@ fn build_recursive_choice_enum_decl(
       schema_type,
       schema,
       context,
-      enum_name,
       child,
       index,
       extra_types,
@@ -832,12 +831,10 @@ fn build_recursive_choice_enum_decl(
   })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_recursive_choice_member_decl(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
-  _parent_enum_name: &str,
   child: &SchemaTypeChild,
   child_index: usize,
   extra_types: &mut Vec<TypeDecl>,
@@ -848,7 +845,6 @@ fn build_recursive_choice_member_decl(
       schema_type,
       schema,
       context,
-      _parent_enum_name,
       collapsed.child,
       child_index,
       extra_types,

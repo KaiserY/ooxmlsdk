@@ -123,7 +123,6 @@ pub(crate) fn parent_zip_path(path: &str) -> String {
     .unwrap_or_default()
 }
 
-#[allow(clippy::collapsible_match)]
 pub(crate) fn process_foreign_element_children<'de, R, F>(
   xml_reader: &mut R,
   empty_tag: bool,
@@ -134,26 +133,26 @@ where
   F: FnMut(&mut R, quick_xml::events::BytesStart<'de>, bool) -> Result<bool, SdkError>,
 {
   if empty_tag {
-    Ok(())
-  } else {
-    loop {
-      match xml_reader.next()? {
-        quick_xml::events::Event::Start(e) => {
-          if !visitor(xml_reader, e, false)? {
-            process_foreign_element_children(xml_reader, false, visitor)?;
-          }
-        }
-        quick_xml::events::Event::Empty(e) => {
-          visitor(xml_reader, e, true)?;
-        }
-        quick_xml::events::Event::End(_) => break,
-        quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
-        _ => {}
-      }
-    }
-
-    Ok(())
+    return Ok(());
   }
+
+  loop {
+    match xml_reader.next()? {
+      quick_xml::events::Event::Start(e) => {
+        if !visitor(xml_reader, e, false)? {
+          process_foreign_element_children(xml_reader, false, visitor)?;
+        }
+      }
+      quick_xml::events::Event::Empty(e) => {
+        visitor(xml_reader, e, true)?;
+      }
+      quick_xml::events::Event::End(_) => break,
+      quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
+      _ => {}
+    }
+  }
+
+  Ok(())
 }
 
 pub(crate) fn process_markup_compatibility_children<'de, R, F>(

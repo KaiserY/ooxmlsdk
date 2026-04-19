@@ -9,6 +9,7 @@ enum NamedSequenceVariantFieldKind {
 #[derive(Clone)]
 struct NamedSequenceVariantField {
   ident: Ident,
+  ty: Type,
   kind: NamedSequenceVariantFieldKind,
   optional: bool,
   repeated: bool,
@@ -76,6 +77,7 @@ fn parse_named_sequence_variant_fields(
 
     parsed.push(NamedSequenceVariantField {
       ident: field_ident,
+      ty: field.ty.clone(),
       kind,
       optional: is_option_type(&field.ty),
       repeated: contains_vec_type(&field.ty),
@@ -88,6 +90,7 @@ fn parse_named_sequence_variant_fields(
 
 fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2::TokenStream {
   let field_ident = &field.ident;
+  let inner_ty = unwrap_wrapped_type(&field.ty);
 
   match &field.kind {
     NamedSequenceVariantFieldKind::Child => {
@@ -115,10 +118,19 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
         local_name,
       } = parse_qname_info(qname);
       let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
+        let value_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+          write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
+        } else if is_bool_type(&inner_ty) {
+          write_bool_tokens(value_expr.clone(), &inner_ty)
+        } else {
+          quote! {
+            crate::common::write_escaped_text(writer, #value_expr)?;
+          }
+        };
         quote! {
           crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
           writer.write_char('>')?;
-          crate::common::write_escaped_text(writer, #value_expr)?;
+          #value_write_tokens
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         }
       };
@@ -298,6 +310,24 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           .iter()
           .map(|field| field.ident.clone())
           .collect();
+        let write_pattern_fields = named_fields
+          .iter()
+          .map(|field| {
+            let ident = &field.ident;
+            quote! { #ident }
+          })
+          .collect::<Vec<_>>();
+        let validate_pattern_fields = named_fields
+          .iter()
+          .map(|field| {
+            let ident = &field.ident;
+            if matches!(field.kind, NamedSequenceVariantFieldKind::TextChild { .. }) {
+              quote! { #ident: _ }
+            } else {
+              quote! { #ident }
+            }
+          })
+          .collect::<Vec<_>>();
         let helper_fields = fields.named.iter().collect::<Vec<_>>();
         let write_tokens = named_fields
           .iter()
@@ -331,14 +361,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
         write_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident { #( #field_idents ),* } => {
+          Self::#variant_ident { #( #write_pattern_fields ),* } => {
             #( #write_tokens )*
             Ok(())
           },
         });
         validate_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident { #( #field_idents ),* } => {
+          Self::#variant_ident { #( #validate_pattern_fields ),* } => {
             #( #validate_tokens )*
             Ok(())
           },
@@ -360,6 +390,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         );
         let parse_from_text_tokens = if is_string_like_type(&payload_ty) {
           quote! { text.unwrap_or_default() }
+        } else if is_bool_type(&payload_ty) {
+          let parse_value_tokens = parse_bool_tokens(
+            quote! { &value },
+            &payload_ty,
+            quote! { stringify!(#ident) },
+            quote! { stringify!(#variant_ident) },
+          );
+          quote! {{
+            let value = text.unwrap_or_default();
+            #parse_value_tokens
+          }}
         } else {
           quote! {{
             let value = text.unwrap_or_default();
@@ -372,6 +413,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         let empty_value_tokens = if is_string_like_type(&payload_ty) {
           quote! { Default::default() }
+        } else if is_bool_type(&payload_ty) {
+          parse_bool_tokens(
+            quote! { "" },
+            &payload_ty,
+            quote! { stringify!(#ident) },
+            quote! { stringify!(#variant_ident) },
+          )
         } else {
           quote! {
             crate::common::parse_value::<#payload_ty>(
@@ -425,12 +473,21 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         };
         child_dispatch_tokens.push(quote! { #(#cfg_attrs)* #read_arm });
+        let value_write_tokens = if is_xml_schema_float_type(&payload_ty) {
+          write_xml_schema_float_tokens(quote! { value }, &payload_ty)
+        } else if is_bool_type(&payload_ty) {
+          write_bool_tokens(quote! { value }, &payload_ty)
+        } else {
+          quote! {
+            crate::common::write_escaped_text(writer, value)?;
+          }
+        };
         let write_arm = quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(value) => {
             crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
             writer.write_char('>')?;
-            crate::common::write_escaped_text(writer, value)?;
+            #value_write_tokens
             crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
           }
         };
@@ -472,9 +529,22 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Text) if fields.unnamed.len() == 1 => {
+        let payload_ty = choice_variant_payload_type(variant)?;
+        let value_write_tokens = if is_xml_schema_float_type(&payload_ty) {
+          write_xml_schema_float_tokens(quote! { value }, &payload_ty)
+        } else if is_bool_type(&payload_ty) {
+          write_bool_tokens(quote! { value }, &payload_ty)
+        } else {
+          quote! {
+            crate::common::write_escaped_text(writer, value)?;
+          }
+        };
         let write_arm = quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(value) => crate::common::write_escaped_text(writer, value),
+          Self::#variant_ident(value) => {
+            #value_write_tokens
+            Ok(())
+          },
         };
         write_arms.push(write_arm);
         validate_arms.push(quote! {

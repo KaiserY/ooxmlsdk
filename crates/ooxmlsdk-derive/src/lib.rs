@@ -1049,6 +1049,30 @@ fn is_bool_type(ty: &Type) -> bool {
   }))
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BoolTypeKind {
+  PlainBool,
+  BooleanValue,
+  OnOffValue,
+  TrueFalseBlankValue,
+  TrueFalseValue,
+}
+
+fn bool_type_kind(ty: &Type) -> Option<BoolTypeKind> {
+  let Type::Path(TypePath { path, .. }) = ty else {
+    return None;
+  };
+  let ident = path.segments.last()?.ident.to_string();
+  Some(match ident.as_str() {
+    "bool" => BoolTypeKind::PlainBool,
+    "BooleanValue" => BoolTypeKind::BooleanValue,
+    "OnOffValue" => BoolTypeKind::OnOffValue,
+    "TrueFalseBlankValue" => BoolTypeKind::TrueFalseBlankValue,
+    "TrueFalseValue" => BoolTypeKind::TrueFalseValue,
+    _ => return None,
+  })
+}
+
 fn is_string_like_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
     matches!(
@@ -1069,6 +1093,101 @@ fn is_xml_schema_float_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
     matches!(segment.ident.to_string().as_str(), "DoubleValue" | "SingleValue" | "f64" | "f32")
   }))
+}
+
+fn write_xml_schema_float_tokens(
+  value_expr: proc_macro2::TokenStream,
+  float_ty: &Type,
+) -> proc_macro2::TokenStream {
+  let (positive_infinity, negative_infinity) = if matches!(float_ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| matches!(segment.ident.to_string().as_str(), "SingleValue" | "f32")))
+  {
+    (quote! { f32::INFINITY }, quote! { f32::NEG_INFINITY })
+  } else {
+    (quote! { f64::INFINITY }, quote! { f64::NEG_INFINITY })
+  };
+
+  quote! {
+    {
+      let __ooxmlsdk_float_value = *#value_expr;
+      if __ooxmlsdk_float_value.is_nan() {
+        writer.write_str("NaN")?;
+      } else if __ooxmlsdk_float_value == #positive_infinity {
+        writer.write_str("INF")?;
+      } else if __ooxmlsdk_float_value == #negative_infinity {
+        writer.write_str("-INF")?;
+      } else {
+        crate::common::write_escaped_text(writer, #value_expr)?;
+      }
+    }
+  }
+}
+
+fn parse_bool_tokens(
+  value_expr: proc_macro2::TokenStream,
+  bool_ty: &Type,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match bool_type_kind(bool_ty) {
+    Some(BoolTypeKind::BooleanValue) => quote! {
+      crate::common::parse_boolean_value_str(#value_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::OnOffValue) => quote! {
+      crate::common::parse_on_off_str(#value_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::TrueFalseBlankValue) => quote! {
+      crate::common::parse_true_false_blank_str(#value_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::TrueFalseValue) => quote! {
+      crate::common::parse_true_false_str(#value_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::PlainBool) => quote! {
+      crate::common::parse_bool_str(#value_expr, #owner_expr, #field_expr)?
+    },
+    None => unreachable!("parse_bool_tokens requires a bool-like type"),
+  }
+}
+
+fn parse_bool_attr_tokens(
+  attr_expr: proc_macro2::TokenStream,
+  decoder_expr: proc_macro2::TokenStream,
+  bool_ty: &Type,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match bool_type_kind(bool_ty) {
+    Some(BoolTypeKind::BooleanValue) => quote! {
+      crate::common::parse_boolean_value_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::OnOffValue) => quote! {
+      crate::common::parse_on_off_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::TrueFalseBlankValue) => quote! {
+      crate::common::parse_true_false_blank_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::TrueFalseValue) => quote! {
+      crate::common::parse_true_false_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(BoolTypeKind::PlainBool) => quote! {
+      crate::common::parse_bool_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    None => unreachable!("parse_bool_attr_tokens requires a bool-like type"),
+  }
+}
+
+fn write_bool_tokens(
+  value_expr: proc_macro2::TokenStream,
+  bool_ty: &Type,
+) -> proc_macro2::TokenStream {
+  match bool_type_kind(bool_ty) {
+    Some(BoolTypeKind::BooleanValue) => quote! {
+      writer.write_str(if *#value_expr { "1" } else { "0" })?;
+    },
+    Some(_) => quote! {
+      crate::common::write_escaped_text(writer, #value_expr)?;
+    },
+    None => unreachable!("write_bool_tokens requires a bool-like type"),
+  }
 }
 
 fn is_hex_binary_type(ty: &Type) -> bool {

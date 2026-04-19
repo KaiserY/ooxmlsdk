@@ -274,6 +274,17 @@ fn build_text_child_parse_arm(
   let value_ty = unwrap_option_vec_type(field_ty);
   let parse_from_text_tokens = if is_string_like_type(&value_ty) {
     quote! { text.unwrap_or_default() }
+  } else if is_bool_type(&value_ty) {
+    let parse_value_tokens = parse_bool_tokens(
+      quote! { &value },
+      &value_ty,
+      quote! { stringify!(#owner_ident) },
+      quote! { stringify!(#field_ident) },
+    );
+    quote! {{
+      let value = text.unwrap_or_default();
+      #parse_value_tokens
+    }}
   } else {
     quote! {{
       let value = text.unwrap_or_default();
@@ -286,6 +297,13 @@ fn build_text_child_parse_arm(
   };
   let empty_value_tokens = if is_string_like_type(&value_ty) {
     quote! { Default::default() }
+  } else if is_bool_type(&value_ty) {
+    parse_bool_tokens(
+      quote! { "" },
+      &value_ty,
+      quote! { stringify!(#owner_ident) },
+      quote! { stringify!(#field_ident) },
+    )
   } else {
     quote! {
       crate::common::parse_value::<#value_ty>(
@@ -347,6 +365,7 @@ fn build_text_child_parse_arm(
 fn build_text_child_write_tokens(
   field_ident: &Ident,
   qname: &str,
+  field_ty: &Type,
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
@@ -354,11 +373,21 @@ fn build_text_child_write_tokens(
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
+  let inner_ty = unwrap_wrapped_type(field_ty);
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
+    let value_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+      write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
+    } else if is_bool_type(&inner_ty) {
+      write_bool_tokens(value_expr.clone(), &inner_ty)
+    } else {
+      quote! {
+        crate::common::write_escaped_text(writer, #value_expr)?;
+      }
+    };
     quote! {
       crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
       writer.write_char('>')?;
-      crate::common::write_escaped_text(writer, #value_expr)?;
+      #value_write_tokens
       crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
     }
   };
@@ -381,33 +410,6 @@ fn build_text_child_write_tokens(
     let write_child_tokens = write_value_tokens(quote! { &self.#field_ident });
     quote! {
       #write_child_tokens
-    }
-  }
-}
-
-fn write_xml_schema_float_tokens(
-  value_expr: proc_macro2::TokenStream,
-  float_ty: &Type,
-) -> proc_macro2::TokenStream {
-  let (positive_infinity, negative_infinity) = if matches!(float_ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| matches!(segment.ident.to_string().as_str(), "SingleValue" | "f32")))
-  {
-    (quote! { f32::INFINITY }, quote! { f32::NEG_INFINITY })
-  } else {
-    (quote! { f64::INFINITY }, quote! { f64::NEG_INFINITY })
-  };
-
-  quote! {
-    {
-      let __ooxmlsdk_float_value = *#value_expr;
-      if __ooxmlsdk_float_value.is_nan() {
-        writer.write_str("NaN")?;
-      } else if __ooxmlsdk_float_value == #positive_infinity {
-        writer.write_str("INF")?;
-      } else if __ooxmlsdk_float_value == #negative_infinity {
-        writer.write_str("-INF")?;
-      } else {
-        crate::common::write_escaped_text(writer, #value_expr)?;
-      }
     }
   }
 }
@@ -565,6 +567,7 @@ fn expand_sequence_helper_struct(
         child_write_tokens.push(build_text_child_write_tokens(
           field_ident,
           &qname,
+          &field.ty,
           contains_vec_type(&field.ty),
           is_option_type(&field.ty),
         ));
@@ -1044,6 +1047,7 @@ fn expand_helper_struct(
     child_write_tokens.push(build_text_child_write_tokens(
       field_ident,
       &field.qname,
+      &field.ty,
       field.repeated,
       field.optional,
     ));
@@ -1364,7 +1368,13 @@ fn expand_named_struct(
     let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
     let parse_ty = unwrap_wrapped_type(&field.ty);
     let parser = if is_bool_type(&parse_ty) {
-      quote! { crate::common::parse_bool_attr(&attr, xml_reader.decoder(), stringify!(#ident), #name_lit)? }
+      parse_bool_attr_tokens(
+        quote! { &attr },
+        quote! { xml_reader.decoder() },
+        &parse_ty,
+        quote! { stringify!(#ident) },
+        quote! { #name_lit },
+      )
     } else if is_string_like_type(&parse_ty) {
       quote! { crate::common::decode_attr_value(&attr, xml_reader.decoder())? }
     } else {
@@ -1394,6 +1404,15 @@ fn expand_named_struct(
     }
     let attr_write_value_tokens = if is_xml_schema_float_type(&parse_ty) {
       let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &parse_ty);
+      quote! {
+        writer.write_char(' ')?;
+        writer.write_str(#name_lit)?;
+        writer.write_str("=\"")?;
+        #write_value_tokens
+        writer.write_char('"')?;
+      }
+    } else if is_bool_type(&parse_ty) {
+      let write_value_tokens = write_bool_tokens(quote! { value }, &parse_ty);
       quote! {
         writer.write_char(' ')?;
         writer.write_str(#name_lit)?;
@@ -1763,6 +1782,7 @@ fn expand_named_struct(
     child_write_tokens.push(build_text_child_write_tokens(
       field_ident,
       &field.qname,
+      &field.ty,
       field.repeated,
       field.optional,
     ));
@@ -2170,6 +2190,7 @@ fn expand_named_struct(
         ordered_write_tokens.push(build_text_child_write_tokens(
           field_ident,
           &qname,
+          &field.ty,
           contains_vec_type(&field.ty),
           is_option_type(&field.ty),
         ));
@@ -2220,6 +2241,8 @@ fn expand_named_struct(
         let inner_ty = unwrap_wrapped_type(&field.ty);
         let optional_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { value }, &inner_ty)
+        } else if is_bool_type(&inner_ty) {
+          write_bool_tokens(quote! { value }, &inner_ty)
         } else {
           quote! {
             crate::common::write_escaped_text(writer, value)?;
@@ -2227,6 +2250,8 @@ fn expand_named_struct(
         };
         let required_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
+        } else if is_bool_type(&inner_ty) {
+          write_bool_tokens(quote! { &self.#field_ident }, &inner_ty)
         } else {
           quote! {
             crate::common::write_escaped_text(writer, &self.#field_ident)?;
@@ -2256,14 +2281,22 @@ fn expand_named_struct(
         #field_ident,
       }
     } else {
+      let parse_value_tokens = if is_bool_type(&inner_ty) {
+        parse_bool_tokens(
+          quote! { &value },
+          &inner_ty,
+          quote! { stringify!(#ident) },
+          quote! { #field_name_lit },
+        )
+      } else {
+        quote! {
+          crate::common::parse_value::<#inner_ty>(&value, stringify!(#ident), #field_name_lit)?
+        }
+      };
       if text_field.optional {
         quote! {
           #field_ident: match #field_ident {
-            Some(value) => Some(crate::common::parse_value::<#inner_ty>(
-              &value,
-              stringify!(#ident),
-              #field_name_lit,
-            )?),
+            Some(value) => Some(#parse_value_tokens),
             None => None,
           },
         }
@@ -2274,7 +2307,7 @@ fn expand_named_struct(
               stringify!(#ident),
               #field_name_lit,
             ))?;
-            crate::common::parse_value::<#inner_ty>(&value, stringify!(#ident), #field_name_lit)?
+            #parse_value_tokens
           },
         }
       }

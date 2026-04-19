@@ -1,3 +1,7 @@
+#[cfg(feature = "microsoft365")]
+use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::{
+  ArrayFeatureProperty, ArrayFeaturePropertyChoice, BoolFeatureProperty,
+};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
@@ -216,6 +220,44 @@ fn color_scale_round_trip_from_bug_regression_test() {
   assert!(serialized.contains("theme=\"4\""));
   assert!(serialized.contains("theme=\"6\""));
   assert_eq!(color_scale_colors(&reparsed).len(), 2);
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn array_feature_property_double_text_child_uses_xml_schema_float_lexical_form() {
+  let value = ArrayFeatureProperty {
+    k: "sample".to_string(),
+    xml_children: vec![ArrayFeaturePropertyChoice::XfpbD(f64::NAN)],
+  };
+
+  let xml = value.to_xml().unwrap();
+  let serialized = trim_xml_declaration(&xml);
+  assert!(serialized.contains("<xfpb:d>NaN</xfpb:d>"));
+
+  let reparsed = serialized.parse::<ArrayFeatureProperty>().unwrap();
+  let Some(ArrayFeaturePropertyChoice::XfpbD(parsed)) = reparsed.xml_children.first() else {
+    panic!("expected xfpb:d");
+  };
+  assert!(parsed.is_nan());
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn bool_feature_property_uses_boolean_value_lexical_form() {
+  let value = BoolFeatureProperty {
+    k: "flag".into(),
+    xml_content: Some(true),
+  };
+
+  let xml = value.to_xml().unwrap();
+  let serialized = trim_xml_declaration(&xml);
+  assert!(serialized.contains("<xfpb:b"));
+  assert!(serialized.contains("k=\"flag\""));
+  assert!(serialized.contains(">1</xfpb:b>"));
+
+  let reparsed = serialized.parse::<BoolFeatureProperty>().unwrap();
+  assert_eq!(reparsed.k.as_str(), "flag");
+  assert_eq!(reparsed.xml_content, Some(true));
 }
 
 #[test]

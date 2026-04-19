@@ -1,5 +1,4 @@
 #![cfg(feature = "validators")]
-#![allow(clippy::field_reassign_with_default)]
 
 use ooxmlsdk::schemas::schemas_microsoft_com_office_2006_01_customui::{
   Item, QuickAccessToolbarControlClone,
@@ -44,9 +43,10 @@ fn verify_token_from_token_restriction_tests() {
 
 #[test]
 fn positive_integer_attribute_validation_test() {
-  let mut element = TopBorder::default();
-
-  element.width = Some("1".to_string());
+  let mut element = TopBorder {
+    width: Some("1".to_string()),
+    ..Default::default()
+  };
   assert!(element.validate().is_ok());
 
   element.width = Some("2".to_string());
@@ -111,8 +111,10 @@ fn string_attribute_validation_test() {
   element.val = "invalid".to_string();
   assert!(element.validate().is_err());
 
-  let mut sources = Sources::default();
-  sources.style_name = Some(String::new());
+  let mut sources = Sources {
+    style_name: Some(String::new()),
+    ..Default::default()
+  };
   assert!(sources.validate().is_ok());
 
   sources.style_name = Some("Style1".to_string());
@@ -127,9 +129,9 @@ fn string_attribute_validation_test() {
 
 #[test]
 fn token_attribute_validation_test() {
-  let mut element = DocPartId::default();
-
-  element.val = Some("{6A9B8B6F-5BD2-4BC8-9F70-7020E1357FB2}".to_string());
+  let mut element = DocPartId {
+    val: Some("{6A9B8B6F-5BD2-4BC8-9F70-7020E1357FB2}".to_string()),
+  };
   assert!(element.validate().is_ok());
 
   element.val = Some(String::new());
@@ -189,9 +191,10 @@ fn any_uri_attribute_validation_test() {
 
 #[test]
 fn id_string_attribute_validation_test() {
-  let mut element = Item::default();
-
-  element.id = Some("A".to_string());
+  let mut element = Item {
+    id: Some("A".to_string()),
+    ..Default::default()
+  };
   assert!(element.validate().is_ok());
 
   element.id = Some("\u{4E00}".to_string());
@@ -224,9 +227,10 @@ fn id_string_attribute_validation_test() {
 
 #[test]
 fn qname_attribute_validation_test() {
-  let mut element = QuickAccessToolbarControlClone::default();
-
-  element.id_q = Some("A".to_string());
+  let mut element = QuickAccessToolbarControlClone {
+    id_q: Some("A".to_string()),
+    ..Default::default()
+  };
   assert!(element.validate().is_ok());
 
   element.id_q = Some("A:b".to_string());

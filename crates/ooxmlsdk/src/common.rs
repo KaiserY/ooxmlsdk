@@ -81,6 +81,82 @@ pub fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
 }
 
 #[inline(always)]
+pub fn parse_boolean_value_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_boolean_value_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_on_off_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_on_off_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_true_false_blank_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_true_false_blank_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_true_false_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_true_false_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_boolean_value_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_boolean_value_str(value, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_on_off_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_on_off_str(value, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_true_false_blank_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_true_false_blank_str(value, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_true_false_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  xml::parse_true_false_str(value, ty, field)
+}
+
+#[inline(always)]
 pub(crate) fn push_xml_text(
   value: &mut Option<String>,
   text: quick_xml::events::BytesText<'_>,

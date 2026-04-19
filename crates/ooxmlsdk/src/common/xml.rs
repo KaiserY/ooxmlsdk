@@ -178,6 +178,77 @@ pub(crate) fn parse_bool_attr(
 }
 
 #[inline(always)]
+pub(crate) fn parse_boolean_value_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  if let Some(value) = attr_raw_value(attr)
+    && let Ok(value) = parse_boolean_value_bytes(value)
+  {
+    Ok(value)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_boolean_value_str(value.as_ref(), ty, field)
+  }
+}
+
+#[inline(always)]
+pub(crate) fn parse_on_off_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  if let Some(value) = attr_raw_value(attr)
+    && let Ok(value) = std::str::from_utf8(value)
+    && let Ok(parsed) = parse_on_off_str(value, ty, field)
+  {
+    Ok(parsed)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_on_off_str(value.as_ref(), ty, field)
+  }
+}
+
+#[inline(always)]
+pub(crate) fn parse_true_false_blank_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  if let Some(value) = attr_raw_value(attr)
+    && let Ok(value) = std::str::from_utf8(value)
+    && let Ok(parsed) = parse_true_false_blank_str(value, ty, field)
+  {
+    Ok(parsed)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_true_false_blank_str(value.as_ref(), ty, field)
+  }
+}
+
+#[inline(always)]
+pub(crate) fn parse_true_false_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  if let Some(value) = attr_raw_value(attr)
+    && let Ok(value) = std::str::from_utf8(value)
+    && let Ok(parsed) = parse_true_false_str(value, ty, field)
+  {
+    Ok(parsed)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_true_false_str(value.as_ref(), ty, field)
+  }
+}
+
+#[inline(always)]
 pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -232,6 +303,19 @@ where
 }
 
 #[inline(always)]
+pub(crate) fn parse_boolean_value_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value.as_bytes() {
+    b"true" | b"1" => Ok(true),
+    b"false" | b"0" => Ok(false),
+    _ => Err(invalid_field_value(ty, field, value)),
+  }
+}
+
+#[inline(always)]
 pub(crate) fn parse_bool_str(
   value: &str,
   ty: &'static str,
@@ -245,10 +329,62 @@ pub(crate) fn parse_bool_str(
 }
 
 #[inline(always)]
+pub(crate) fn parse_on_off_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value.as_bytes() {
+    b"true" | b"1" | b"on" => Ok(true),
+    b"false" | b"0" | b"off" => Ok(false),
+    _ => Err(invalid_field_value(ty, field, value)),
+  }
+}
+
+#[inline(always)]
+pub(crate) fn parse_true_false_blank_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value.as_bytes() {
+    b"true" | b"t" => Ok(true),
+    b"false" | b"f" | b"" => Ok(false),
+    _ => Err(invalid_field_value(ty, field, value)),
+  }
+}
+
+#[inline(always)]
+pub(crate) fn parse_true_false_str(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value.as_bytes() {
+    b"true" | b"t" => Ok(true),
+    b"false" | b"f" => Ok(false),
+    _ => Err(invalid_field_value(ty, field, value)),
+  }
+}
+
+#[inline(always)]
 pub(crate) fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
   match b {
     b"true" | b"1" | b"True" | b"TRUE" | b"t" | b"Yes" | b"YES" | b"yes" | b"y" => Ok(true),
     b"false" | b"0" | b"False" | b"FALSE" | b"f" | b"No" | b"NO" | b"no" | b"n" | b"" => Ok(false),
+    other => Err(invalid_field_value(
+      "bool",
+      "value",
+      String::from_utf8_lossy(other).into_owned(),
+    )),
+  }
+}
+
+#[inline(always)]
+pub(crate) fn parse_boolean_value_bytes(b: &[u8]) -> Result<bool, SdkError> {
+  match b {
+    b"true" | b"1" => Ok(true),
+    b"false" | b"0" => Ok(false),
     other => Err(invalid_field_value(
       "bool",
       "value",

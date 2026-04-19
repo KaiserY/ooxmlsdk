@@ -21,7 +21,7 @@ fn non_visual_drawing_properties_round_trip_with_embedded_xml() {
   assert!(serialized.starts_with("<p:cNvPr "));
   assert!(serialized.contains("id=\"4\""));
   assert!(serialized.contains("name=\"[WorkArea]\""));
-  assert!(serialized.contains("hidden=\"true\""));
+  assert!(serialized.contains("hidden=\"1\""));
   assert!(
     reparsed
       .description

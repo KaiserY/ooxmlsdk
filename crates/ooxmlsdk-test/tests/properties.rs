@@ -4,6 +4,9 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_custom_pr
   CustomDocumentPropertyChoice, Properties as CustomProperties,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VectorBaseValues;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::{
+  Variant, VariantChoice,
+};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties as ExtendedProperties;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -174,6 +177,24 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
   assert!(serialized.contains("pid=\"2\""));
   assert!(serialized.contains("name=\"crap\""));
   assert!(serialized.contains("<vt:bool"));
-  assert!(serialized.contains(">true</vt:bool>"));
+  assert!(serialized.contains(">1</vt:bool>"));
   assert_eq!(reparsed.op_property.len(), 1);
+}
+
+#[test]
+fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
+  let value = Variant {
+    xml_children: Some(VariantChoice::VtR8(f64::INFINITY)),
+  };
+
+  let xml = value.to_xml().unwrap();
+  let serialized = trim_xml_declaration(&xml);
+  assert!(serialized.contains("<vt:r8>INF</vt:r8>"));
+
+  let reparsed = serialized.parse::<Variant>().unwrap();
+  let Some(VariantChoice::VtR8(parsed)) = reparsed.xml_children else {
+    panic!("expected vt:r8");
+  };
+  assert!(parsed.is_infinite());
+  assert!(parsed.is_sign_positive());
 }

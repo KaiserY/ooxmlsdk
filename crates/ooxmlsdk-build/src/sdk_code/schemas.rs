@@ -1,5 +1,5 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use proc_macro2::TokenStream;
+use proc_macro2::{Group, Ident as TokenIdent, TokenStream, TokenTree};
 use quote::quote;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -1601,10 +1601,27 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     }
   }
 
-  token_stream_list.extend(prune_unreferenced_anonymous_emitted_types(
-    &token_stream_list,
-    helper_token_stream_list,
-  ));
+  let kept_helper_tokens =
+    prune_unreferenced_anonymous_emitted_types(&token_stream_list, helper_token_stream_list);
+  let non_helper_type_names: HashSet<String> = schema_type_names
+    .iter()
+    .map(|name| (*name).to_string())
+    .collect();
+  let anonymous_type_rename_map =
+    anonymous_emitted_type_rename_map(&non_helper_type_names, &kept_helper_tokens);
+
+  if !anonymous_type_rename_map.is_empty() {
+    token_stream_list = token_stream_list
+      .into_iter()
+      .map(|tokens| rename_token_stream_idents(tokens, &anonymous_type_rename_map))
+      .collect();
+  }
+
+  token_stream_list.extend(
+    kept_helper_tokens
+      .into_iter()
+      .map(|(_, _, tokens)| rename_token_stream_idents(tokens, &anonymous_type_rename_map)),
+  );
 
   Ok(quote! {
     #( #token_stream_list )*
@@ -1773,15 +1790,8 @@ fn gen_choice_type_decl(
         }
       }
 
-      let large_enum_variant_allow = has_inline_sequence_variant.then(|| {
-        quote! {
-          #[allow(clippy::large_enum_variant)]
-        }
-      });
-
       return Ok(quote! {
         #( #enum_attrs )*
-        #large_enum_variant_allow
         #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
         pub enum #enum_ident {
           #( #variants )*
@@ -1809,15 +1819,8 @@ fn gen_choice_type_decl(
     )?);
   }
 
-  let large_enum_variant_allow = has_inline_sequence_variant.then(|| {
-    quote! {
-      #[allow(clippy::large_enum_variant)]
-    }
-  });
-
   Ok(quote! {
     #( #enum_attrs )*
-    #large_enum_variant_allow
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
     pub enum #enum_ident {
       #( #variants )*
@@ -1837,6 +1840,54 @@ fn helper_struct_is_inline_sequence_candidate(type_decl: &TypeDecl) -> bool {
         })
       )
     })
+}
+
+fn inline_sequence_field_forces_box(field: &FieldDecl) -> bool {
+  matches!(
+    (
+      field.rust_name.as_str(),
+      field.type_ref.rust_type.as_str(),
+      field.cardinality,
+      &field.wire,
+    ),
+    (
+      "run_conflict_insertion",
+      "RunConflictInsertion",
+      Cardinality::Optional,
+      FieldWireDecl::Child { .. },
+    ) | (
+      "run_conflict_deletion",
+      "RunConflictDeletion",
+      Cardinality::Optional,
+      FieldWireDecl::Child { .. },
+    )
+  )
+}
+
+fn helper_struct_is_inline_sequence_clippy_safe(
+  type_decl: &TypeDecl,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  type_decl.members.iter().all(|member| {
+    let MemberDecl::Field(field) = member else {
+      return false;
+    };
+
+    match &field.wire {
+      FieldWireDecl::TextChild { .. } => {
+        !matches!(field.cardinality, Cardinality::Many)
+          && is_value_like_type_ref(module, &field.type_ref)
+      }
+      FieldWireDecl::Child { .. } => {
+        !matches!(field.cardinality, Cardinality::Many)
+          && (inline_sequence_field_forces_box(field)
+            || is_value_like_type_ref(module, &field.type_ref)
+            || direct_child_field_needs_box(&type_decl.rust_name, field, module, type_graph, false))
+      }
+      _ => false,
+    }
+  })
 }
 
 const MAX_NAMED_CHOICE_INLINE_VARIANTS_THROUGH_ANONYMOUS_WRAPPER: usize = 12;
@@ -1898,7 +1949,6 @@ fn gen_choice_variant_tokens(
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => {
       if let Some(helper_type_decl) = inline_sequence_helper_type_decl(variant, module) {
-        *has_inline_sequence_variant = true;
         let helper_fields: Vec<&FieldDecl> = helper_type_decl
           .members
           .iter()
@@ -1914,11 +1964,22 @@ fn gen_choice_variant_tokens(
             helper_fields[0],
           )?
         {
+          *has_inline_sequence_variant = true;
           return Ok(vec![quote! {
             #prefix_attrs
             #single_field_tokens
           }]);
         }
+        if !helper_struct_is_inline_sequence_clippy_safe(helper_type_decl, module, type_graph) {
+          let payload_type = type_from_decl_ref(&variant.payload)?;
+          return Ok(vec![quote! {
+            #prefix_attrs
+            #( #variant_attrs )*
+            #[sdk(sequence)]
+            #variant_ident(std::boxed::Box<#payload_type>),
+          }]);
+        }
+        *has_inline_sequence_variant = true;
         let inline_fields = gen_inline_sequence_variant_fields_from_decl(
           &helper_fields,
           &helper_type_decl.rust_name,
@@ -2461,7 +2522,7 @@ fn is_generated_anonymous_type_name(name: &str) -> bool {
 fn prune_unreferenced_anonymous_emitted_types(
   non_helper_tokens: &[TokenStream],
   helper_tokens: Vec<(String, bool, TokenStream)>,
-) -> Vec<TokenStream> {
+) -> Vec<(String, bool, TokenStream)> {
   let mut kept = helper_tokens;
 
   loop {
@@ -2492,7 +2553,107 @@ fn prune_unreferenced_anonymous_emitted_types(
     }
   }
 
-  kept.into_iter().map(|(_, _, tokens)| tokens).collect()
+  kept
+}
+
+fn anonymous_emitted_type_rename_map(
+  non_helper_type_names: &HashSet<String>,
+  helper_tokens: &[(String, bool, TokenStream)],
+) -> HashMap<String, String> {
+  let helper_names: HashSet<String> = helper_tokens
+    .iter()
+    .map(|(rust_name, _, _)| rust_name.clone())
+    .collect();
+  let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+
+  for (rust_name, is_anonymous, _) in helper_tokens {
+    if !*is_anonymous {
+      continue;
+    }
+
+    let Some(base_name) = anonymous_type_base_name(rust_name) else {
+      continue;
+    };
+    groups
+      .entry(base_name.to_string())
+      .or_default()
+      .push(rust_name.clone());
+  }
+
+  for (base_name, raw_names) in &mut groups {
+    if helper_names.contains(base_name) && !raw_names.iter().any(|name| name == base_name) {
+      raw_names.insert(0, base_name.clone());
+    }
+  }
+
+  let mut rename_map = HashMap::new();
+
+  for (base_name, raw_names) in groups {
+    let normalized_names: Vec<String> = if raw_names.len() == 1 {
+      vec![base_name.clone()]
+    } else {
+      std::iter::once(base_name.clone())
+        .chain((2..=raw_names.len()).map(|index| format!("{base_name}{index}")))
+        .collect()
+    };
+
+    let mut occupied_names = non_helper_type_names.clone();
+    occupied_names.extend(
+      helper_names
+        .iter()
+        .filter(|name| !raw_names.contains(*name))
+        .cloned(),
+    );
+
+    if normalized_names
+      .iter()
+      .any(|normalized_name| occupied_names.contains(normalized_name))
+    {
+      continue;
+    }
+
+    for (raw_name, normalized_name) in raw_names.into_iter().zip(normalized_names) {
+      if raw_name != normalized_name {
+        rename_map.insert(raw_name, normalized_name);
+      }
+    }
+  }
+
+  rename_map
+}
+
+fn anonymous_type_base_name(name: &str) -> Option<&str> {
+  let last_non_digit_idx = name.rfind(|ch: char| !ch.is_ascii_digit())?;
+  if last_non_digit_idx + 1 >= name.len() {
+    return None;
+  }
+
+  let base = &name[..=last_non_digit_idx];
+  (base.ends_with("Choice") || base.ends_with("Sequence")).then_some(base)
+}
+
+fn rename_token_stream_idents(
+  tokens: TokenStream,
+  rename_map: &HashMap<String, String>,
+) -> TokenStream {
+  tokens
+    .into_iter()
+    .map(|tree| match tree {
+      TokenTree::Group(group) => {
+        let mut new_group = Group::new(
+          group.delimiter(),
+          rename_token_stream_idents(group.stream(), rename_map),
+        );
+        new_group.set_span(group.span());
+        TokenTree::Group(new_group)
+      }
+      TokenTree::Ident(ident) => rename_map
+        .get(&ident.to_string())
+        .map(|renamed| TokenTree::Ident(TokenIdent::new(renamed, ident.span())))
+        .unwrap_or(TokenTree::Ident(ident)),
+      other => other,
+    })
+    .collect()
 }
 
 fn count_ident_occurrences(haystack: &str, needle: &str) -> usize {
@@ -2997,7 +3158,8 @@ fn gen_inline_sequence_variant_fields_from_decl(
         );
       }
     };
-    let wrap_box = direct_child_field_needs_box(owner_rust_name, field, module, type_graph, false);
+    let wrap_box = inline_sequence_field_forces_box(field)
+      || direct_child_field_needs_box(owner_rust_name, field, module, type_graph, false);
 
     let field_tokens = match field.cardinality {
       Cardinality::Many => quote! {
@@ -3406,7 +3568,7 @@ mod tests {
   }
 
   #[test]
-  fn inlines_small_sequence_helper_variants() {
+  fn keeps_multi_field_sequence_helper_variants_when_inline_payload_would_be_large() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -3490,16 +3652,11 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (sequence)] Sequence {"));
     assert!(
       generated
-        .contains("# [sdk (child (qname = \"t:CT_First/t:first\"))] first : Option < First >")
+        .contains("# [sdk (sequence)] Sequence (std :: boxed :: Box < HolderChoiceSequence >)")
     );
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:CT_Second/t:second\"))] second : Option < Second >")
-    );
-    assert!(!generated.contains("pub struct HolderChoiceSequence1"));
+    assert!(generated.contains("pub struct HolderChoiceSequence"));
   }
 
   #[test]
@@ -3829,8 +3986,8 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("pub enum HolderChoice1"));
-    assert!(generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < HolderChoice1 >)"));
+    assert!(generated.contains("pub enum HolderChoice2"));
+    assert!(generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < HolderChoice2 >)"));
   }
 
   #[test]
@@ -4986,11 +5143,11 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub struct BodyLike"));
-    assert!(generated.contains("pub before_choice : Vec < BodyLikeChoice1 >"));
+    assert!(generated.contains("pub before_choice : Vec < BodyLikeChoice >"));
     assert!(generated.contains("pub table_properties : std :: boxed :: Box < TableProperties >"));
     assert!(generated.contains("pub table_grid : std :: boxed :: Box < TableGrid >"));
     assert!(generated.contains("pub after_choice : Vec < BodyLikeChoice2 >"));
-    assert!(generated.contains("pub enum BodyLikeChoice1"));
+    assert!(generated.contains("pub enum BodyLikeChoice"));
     assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_Bookmark/t:bookmarkStart\"))] TBookmarkStart (std :: boxed :: Box < BookmarkStart >)"
     ));
@@ -4999,7 +5156,7 @@ mod tests {
     ));
 
     let before_idx = generated
-      .find("pub before_choice : Vec < BodyLikeChoice1 >")
+      .find("pub before_choice : Vec < BodyLikeChoice >")
       .unwrap();
     let tbl_pr_idx = generated
       .find("pub table_properties : std :: boxed :: Box < TableProperties >")

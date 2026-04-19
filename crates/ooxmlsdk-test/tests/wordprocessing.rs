@@ -2,7 +2,7 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChoice, Justification,
-  Paragraph, ParagraphChoice, ParagraphChoice4, Run, RunChoice, SdtBlock, SdtPropertiesChoice,
+  Paragraph, ParagraphChoice, ParagraphChoice2, Run, RunChoice, SdtBlock, SdtPropertiesChoice,
   TabStop, TableJustification, Text, TextDirection,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
@@ -254,31 +254,31 @@ fn paragraph_choice_is_sdt(choice: &ParagraphChoice) -> bool {
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WBookmarkStart(_))
+    matches!(choice, ParagraphChoice2::WBookmarkStart(_))
   })
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WBookmarkEnd(_))
+    matches!(choice, ParagraphChoice2::WBookmarkEnd(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WCommentRangeStart(_))
+    matches!(choice, ParagraphChoice2::WCommentRangeStart(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WCommentRangeEnd(_))
+    matches!(choice, ParagraphChoice2::WCommentRangeEnd(_))
   })
 }
 
 fn paragraph_choice_has_range_markup(
   choice: &ParagraphChoice,
-  predicate: impl Fn(&ParagraphChoice4) -> bool,
+  predicate: impl Fn(&ParagraphChoice2) -> bool,
 ) -> bool {
   let ParagraphChoice::EgRunLevelElts(choice) = choice else {
     return false;

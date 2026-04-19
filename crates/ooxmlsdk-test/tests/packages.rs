@@ -13,7 +13,7 @@ use ooxmlsdk::parts::{
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   AltChunk, Body, BodyChoice, CommentChoice, Document, Hyperlink, HyperlinkChoice, Paragraph,
-  ParagraphChoice, ParagraphChoice4, Run, RunChoice, SdtPropertiesChoice,
+  ParagraphChoice, ParagraphChoice2, Run, RunChoice, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::fixtures;
 #[cfg(feature = "microsoft365")]
@@ -298,31 +298,31 @@ fn paragraph_choice_hyperlink(choice: &ParagraphChoice) -> Option<&Hyperlink> {
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WBookmarkStart(_))
+    matches!(choice, ParagraphChoice2::WBookmarkStart(_))
   })
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WBookmarkEnd(_))
+    matches!(choice, ParagraphChoice2::WBookmarkEnd(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WCommentRangeStart(_))
+    matches!(choice, ParagraphChoice2::WCommentRangeStart(_))
   })
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
   paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice4::WCommentRangeEnd(_))
+    matches!(choice, ParagraphChoice2::WCommentRangeEnd(_))
   })
 }
 
 fn paragraph_choice_has_range_markup(
   choice: &ParagraphChoice,
-  predicate: impl Fn(&ParagraphChoice4) -> bool,
+  predicate: impl Fn(&ParagraphChoice2) -> bool,
 ) -> bool {
   let ParagraphChoice::EgRunLevelElts(choice) = choice else {
     return false;

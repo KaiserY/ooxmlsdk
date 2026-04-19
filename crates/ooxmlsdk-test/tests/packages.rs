@@ -2696,6 +2696,22 @@ fn round_trip_complex01_docx_asset_from_openxml_sdk() {
       .embedded_package_part
       .is_some()
   );
+
+  let original_layout_xml = original.main_document_part.diagram_layout_definition_parts[0]
+    .root_element
+    .to_xml()
+    .unwrap();
+  let roundtripped_layout_xml = roundtripped
+    .main_document_part
+    .diagram_layout_definition_parts[0]
+    .root_element
+    .to_xml()
+    .unwrap();
+  for layout_xml in [&original_layout_xml, &roundtripped_layout_xml] {
+    assert!(layout_xml.contains("val=\"INF\""));
+    assert!(layout_xml.contains("fact=\"NaN\""));
+    assert!(layout_xml.contains("max=\"NaN\""));
+  }
 }
 
 #[test]

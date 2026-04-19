@@ -53,6 +53,14 @@
       "HasXmlnsFields": true
     },
     {
+      "ClassName": "Blip",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "HyperlinkOnClick",
+      "HasXmlnsFields": true
+    },
+    {
       "ClassName": "Offset",
       "HasXmlnsFields": true
     },

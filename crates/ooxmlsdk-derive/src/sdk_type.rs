@@ -385,6 +385,33 @@ fn build_text_child_write_tokens(
   }
 }
 
+fn write_xml_schema_float_tokens(
+  value_expr: proc_macro2::TokenStream,
+  float_ty: &Type,
+) -> proc_macro2::TokenStream {
+  let (positive_infinity, negative_infinity) = if matches!(float_ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| matches!(segment.ident.to_string().as_str(), "SingleValue" | "f32")))
+  {
+    (quote! { f32::INFINITY }, quote! { f32::NEG_INFINITY })
+  } else {
+    (quote! { f64::INFINITY }, quote! { f64::NEG_INFINITY })
+  };
+
+  quote! {
+    {
+      let __ooxmlsdk_float_value = *#value_expr;
+      if __ooxmlsdk_float_value.is_nan() {
+        writer.write_str("NaN")?;
+      } else if __ooxmlsdk_float_value == #positive_infinity {
+        writer.write_str("INF")?;
+      } else if __ooxmlsdk_float_value == #negative_infinity {
+        writer.write_str("-INF")?;
+      } else {
+        crate::common::write_escaped_text(writer, #value_expr)?;
+      }
+    }
+  }
+}
+
 fn expand_sequence_helper_struct(
   input: &DeriveInput,
   fields: &syn::FieldsNamed,
@@ -1365,15 +1392,30 @@ fn expand_named_struct(
         ))?
       });
     }
+    let attr_write_value_tokens = if is_xml_schema_float_type(&parse_ty) {
+      let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &parse_ty);
+      quote! {
+        writer.write_char(' ')?;
+        writer.write_str(#name_lit)?;
+        writer.write_str("=\"")?;
+        #write_value_tokens
+        writer.write_char('"')?;
+      }
+    } else {
+      quote! {
+        crate::common::write_attr_value(writer, #name_lit, value)?;
+      }
+    };
     if field.optional {
       attr_write_tokens.push(quote! {
         if let Some(value) = &self.#field_ident {
-          crate::common::write_attr_value(writer, #name_lit, value)?;
+          #attr_write_value_tokens
         }
       });
     } else {
       attr_write_tokens.push(quote! {
-        crate::common::write_attr_value(writer, #name_lit, &self.#field_ident)?;
+        let value = &self.#field_ident;
+        #attr_write_value_tokens
       });
     }
 
@@ -2175,15 +2217,30 @@ fn expand_named_struct(
         }
       }
       Some(SdkTypeFieldKind::Text) => {
+        let inner_ty = unwrap_wrapped_type(&field.ty);
+        let optional_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+          write_xml_schema_float_tokens(quote! { value }, &inner_ty)
+        } else {
+          quote! {
+            crate::common::write_escaped_text(writer, value)?;
+          }
+        };
+        let required_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+          write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
+        } else {
+          quote! {
+            crate::common::write_escaped_text(writer, &self.#field_ident)?;
+          }
+        };
         if is_option_type(&field.ty) {
           ordered_write_tokens.push(quote! {
             if let Some(value) = &self.#field_ident {
-              crate::common::write_escaped_text(writer, value)?;
+              #optional_text_write_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            crate::common::write_escaped_text(writer, &self.#field_ident)?;
+            #required_text_write_tokens
           });
         }
       }

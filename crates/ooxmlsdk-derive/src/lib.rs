@@ -1065,6 +1065,12 @@ fn is_string_like_type(ty: &Type) -> bool {
   }))
 }
 
+fn is_xml_schema_float_type(ty: &Type) -> bool {
+  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
+    matches!(segment.ident.to_string().as_str(), "DoubleValue" | "SingleValue" | "f64" | "f32")
+  }))
+}
+
 fn is_hex_binary_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "HexBinaryValue"))
 }

@@ -1,6 +1,32 @@
 {
   "Types": [
     {
+      "ClassName": "Paragraph",
+      "Attributes": [
+        {
+          "QName": "w14:editId",
+          "PropertyName": "w14:editId",
+          "Type": "HexBinaryValue",
+          "PropertyComments": "Word 2010 paragraph edit identifier.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "RunPropertiesDefault",
+      "HasXmlnsFields": true,
+      "HasMcIgnorableField": true,
+      "Attributes": [
+        {
+          "QName": "w14:attr",
+          "PropertyName": "w14:attr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
       "ClassName": "ParagraphProperties",
       "Attributes": [
         {
@@ -8,6 +34,13 @@
           "PropertyName": "mc_preserve_attributes",
           "Type": "StringValue",
           "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:myattr",
+          "PropertyName": "w14:myattr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
           "Version": "Office2007"
         }
       ]
@@ -36,6 +69,52 @@
           "Type": "StringValue",
           "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.",
           "Version": "Office2007"
+        },
+        {
+          "QName": "w14:myattr",
+          "PropertyName": "w14:myattr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "RunProperties",
+      "Children": [
+        {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "Shadow14",
+          "Kind": "Child",
+          "Optional": true
+        }
+      ],
+      "Attributes": [
+        {
+          "QName": "w14:myanotherAttr",
+          "PropertyName": "w14:myanotherAttr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "SpacingBetweenLines",
+      "Attributes": [
+        {
+          "QName": "w14:myattr",
+          "PropertyName": "w14:myattr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:myanotherAttr",
+          "PropertyName": "w14:myanotherAttr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
         }
       ]
     },
@@ -43,8 +122,25 @@
       "ClassName": "RunPropertiesBaseStyle",
       "Children": [
         {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "Shadow14",
+          "Kind": "Child",
+          "Optional": true
+        },
+        {
           "Name": "w14:CT_Ligatures/w14:ligatures",
           "PropertyName": "Ligatures",
+          "Kind": "Child",
+          "Optional": true
+        }
+      ]
+    },
+    {
+      "ClassName": "ParagraphMarkRunProperties",
+      "Children": [
+        {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "Shadow14",
           "Kind": "Child",
           "Optional": true
         }

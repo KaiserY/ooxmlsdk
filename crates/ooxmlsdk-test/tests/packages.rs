@@ -826,6 +826,29 @@ fn open_mcexecl_xlsx_asset_from_openxml_sdk() {
   assert_eq!(shared_string_table.x_si.len(), 1);
 
   let first_item = &shared_string_table.x_si[0];
+  assert_eq!(first_item.w14_attr.as_deref(), Some("value"));
+  assert_eq!(first_item.mc_ignorable.as_deref(), Some("w14"));
+  let placeholder = first_item
+    .w14_placeholder
+    .as_ref()
+    .expect("expected w14:placeholder");
+  assert_eq!(
+    placeholder.mc_process_content.as_deref(),
+    Some("w14:placeholder")
+  );
+  assert_eq!(
+    placeholder.mc_preserve_attributes.as_deref(),
+    Some("w14:a w14:b")
+  );
+  let placeholder_text = placeholder
+    .text
+    .as_ref()
+    .expect("expected placeholder text");
+  assert_eq!(placeholder_text.w14_a.as_deref(), Some("a"));
+  assert_eq!(placeholder_text.w14_b.as_deref(), Some("b"));
+  assert_eq!(placeholder_text.w14_c.as_deref(), Some("c"));
+  assert_eq!(placeholder_text.xml_content.as_deref(), Some("ddd"));
+  assert!(first_item.w14_no.is_some());
   assert!(first_item.text.is_some());
   assert_eq!(
     first_item
@@ -3380,19 +3403,33 @@ fn round_trip_mc_execl_xlsx_asset_from_openxml_sdk() {
 
   assert_eq!(original_shared_string_table.x_si.len(), 1);
   assert_eq!(roundtripped_shared_string_table.x_si.len(), 1);
+  let original_item = original_shared_string_table
+    .x_si
+    .first()
+    .expect("expected original si");
+  let roundtripped_item = roundtripped_shared_string_table
+    .x_si
+    .first()
+    .expect("expected roundtripped si");
+  assert_eq!(original_item.w14_attr.as_deref(), Some("value"));
+  assert_eq!(roundtripped_item.w14_attr.as_deref(), Some("value"));
+  assert_eq!(original_item.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(roundtripped_item.mc_ignorable.as_deref(), Some("w14"));
+  assert!(original_item.w14_placeholder.is_some());
+  assert!(roundtripped_item.w14_placeholder.is_some());
+  assert!(original_item.w14_no.is_some());
+  assert!(roundtripped_item.w14_no.is_some());
   assert_eq!(
-    original_shared_string_table
-      .x_si
-      .first()
-      .and_then(|item| item.text.as_ref())
+    original_item
+      .text
+      .as_ref()
       .and_then(|text| text.xml_content.as_deref()),
     Some("abc")
   );
   assert_eq!(
-    roundtripped_shared_string_table
-      .x_si
-      .first()
-      .and_then(|item| item.text.as_ref())
+    roundtripped_item
+      .text
+      .as_ref()
       .and_then(|text| text.xml_content.as_deref()),
     Some("abc")
   );

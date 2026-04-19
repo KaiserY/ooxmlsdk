@@ -118,14 +118,17 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "Spreadsheet.xlsx"
       | "malformed_uri_long.xlsx"
       | "missingcalcchainpart.xlsx"
+      | "MCExecl.xlsx"
       | "May_12_04.docx"
+      | "Complex01.docx"
+      | "mcdoc.docx"
       | "o09_Performance_typical.pptx"
       | "Complex01.xlsx"
   )
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {
-  matches!(file_name, "Complex01.docx" | "MCExecl.xlsx" | "mcdoc.docx")
+  matches!(file_name, "")
 }
 
 fn version_cfg_attr(file_name: &str) -> String {

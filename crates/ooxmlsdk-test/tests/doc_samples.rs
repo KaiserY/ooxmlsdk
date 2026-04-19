@@ -506,16 +506,18 @@ fn parse_xml_node(
 
   let mut attrs = Vec::new();
   for (key, value) in raw_attrs {
+    let expanded_key = expand_xml_name(&key, &ns, true);
     let value = if entry_name.ends_with(".rels") && key == "Type" {
       normalize_relationship_type_uri(&value)
     } else {
       value
     };
-    let value = if relaxed_bool {
-      normalize_bool_lexeme(&value)
-    } else {
-      value
-    };
+    let value =
+      if relaxed_bool && should_normalize_bool_attr(file_name, entry_name, &name, &expanded_key) {
+        normalize_bool_lexeme(&value)
+      } else {
+        value
+      };
     let value = if relaxed_bool {
       normalize_numeric_lexeme(&value)
     } else {
@@ -525,7 +527,7 @@ fn parse_xml_node(
       continue;
     }
 
-    attrs.push((expand_xml_name(&key, &ns, true), value));
+    attrs.push((expanded_key, value));
   }
 
   attrs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
@@ -651,11 +653,684 @@ fn escape_xml_text(value: &str) -> String {
 
 fn normalize_bool_lexeme(value: &str) -> String {
   match value {
+    "" => "false".to_string(),
     "1" | "true" => "true".to_string(),
     "0" | "false" => "false".to_string(),
     "t" | "T" => "true".to_string(),
     "f" | "F" => "false".to_string(),
     _ => value.to_string(),
+  }
+}
+
+fn should_normalize_bool_attr(
+  file_name: &str,
+  entry_name: &str,
+  element_name: &str,
+  attr_name: &str,
+) -> bool {
+  let _ = (file_name, entry_name);
+
+  let (element_ns, element_local) = split_expanded_name(element_name);
+  let (attr_ns, attr_local) = split_expanded_name(attr_name);
+
+  if element_ns == "http://schemas.openxmlformats.org/spreadsheetml/2006/main" {
+    if (element_local == "sheetView" && attr_local == "tabSelected")
+      || (element_local == "col" && attr_local == "customWidth")
+      || (element_local == "col" && attr_local == "bestFit")
+      || (element_local == "c" && attr_local == "l")
+      || (element_local == "brk" && attr_local == "man")
+      || (element_local == "pageSetUpPr" && attr_local == "fitToPage")
+      || (element_local == "sheetFormatPr" && attr_local == "customHeight")
+      || (element_local == "ignoredError" && attr_local == "emptyCellReference")
+      || (element_local == "border"
+        && matches!(attr_local, "diagonalDown" | "diagonalUp" | "outline"))
+      || (element_local == "row"
+        && matches!(
+          attr_local,
+          "thickBot" | "thickTop" | "customFormat" | "customHeight"
+        ))
+      || (element_local == "table" && attr_local == "totalsRowShown")
+      || (element_local == "cellStyle" && attr_local == "customBuiltin")
+      || (element_local == "pivotSelection" && attr_local == "showHeader")
+      || (element_local == "pivotArea" && matches!(attr_local, "dataOnly" | "outline"))
+      || (element_local == "sharedItems"
+        && matches!(
+          attr_local,
+          "containsBlank"
+            | "containsDate"
+            | "containsInteger"
+            | "containsMixedTypes"
+            | "containsNonDate"
+            | "containsNumber"
+            | "containsSemiMixedTypes"
+            | "containsString"
+            | "longText"
+        ))
+      || (element_local == "xf"
+        && matches!(
+          attr_local,
+          "applyAlignment"
+            | "applyBorder"
+            | "applyFill"
+            | "applyFont"
+            | "applyNumberFormat"
+            | "applyProtection"
+            | "pivotButton"
+            | "quotePrefix"
+        ))
+      || (element_local == "headers" && attr_local == "diskRevisions")
+      || (element_local == "pivotTableDefinition"
+        && matches!(
+          attr_local,
+          "applyAlignmentFormats"
+            | "applyBorderFormats"
+            | "applyFontFormats"
+            | "applyNumberFormats"
+            | "applyPatternFormats"
+            | "applyWidthHeightFormats"
+            | "itemPrintTitles"
+            | "multipleFieldFilters"
+            | "outline"
+            | "outlineData"
+            | "showCalcMbrs"
+            | "useAutoFormatting"
+        ))
+      || (element_local == "pivotField" && matches!(attr_local, "dataField" | "showAll"))
+      || (element_local == "dataValidation"
+        && matches!(
+          attr_local,
+          "allowBlank" | "showErrorMessage" | "showInputMessage"
+        ))
+      || (element_local == "filterColumn" && attr_local == "hiddenButton")
+      || (element_local == "pivotTableStyleInfo"
+        && matches!(
+          attr_local,
+          "showColHeaders"
+            | "showColStripes"
+            | "showLastColumn"
+            | "showRowHeaders"
+            | "showRowStripes"
+        ))
+      || (element_local == "tableStyleInfo"
+        && matches!(
+          attr_local,
+          "showColumnStripes" | "showFirstColumn" | "showLastColumn" | "showRowStripes"
+        ))
+      || (element_local == "tableStyle" && matches!(attr_local, "table" | "pivot"))
+      || (element_local == "alignment"
+        && matches!(attr_local, "wrapText" | "justifyLastLine" | "shrinkToFit"))
+      || (element_local == "f" && attr_local == "ca")
+      || (matches!(
+        element_local,
+        "b" | "i" | "strike" | "condense" | "extend" | "outline" | "shadow"
+      ) && attr_local == "val")
+      || (element_local == "workbookPr" && attr_local == "filterPrivacy")
+      || (element_local == "customWorkbookView"
+        && matches!(attr_local, "maximized" | "personalView"))
+    {
+      return true;
+    }
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+    && element_local == "fonts"
+    && attr_local == "knownFonts"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"
+    && element_local == "workbookPr"
+    && attr_local == "chartTrackingRefBase"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+    && element_local == "pivotTableDefinition"
+    && attr_local == "hideValuesRow"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.openxmlformats.org/presentationml/2006/main"
+    && ((element_local == "presentation"
+      && matches!(attr_local, "saveSubsetFonts" | "autoCompressPictures"))
+      || (element_local == "showPr" && attr_local == "showNarration")
+      || (element_local == "sldMaster" && attr_local == "preserve")
+      || (element_local == "sldLayout"
+        && matches!(attr_local, "preserve" | "showMasterSp" | "userDrawn"))
+      || (element_local == "sld" && attr_local == "showMasterPhAnim")
+      || (element_local == "normalViewPr" && attr_local == "showOutlineIcons")
+      || (element_local == "restoredLeft" && attr_local == "autoAdjust")
+      || (element_local == "cNvPr" && attr_local == "hidden")
+      || (element_local == "nvPr" && attr_local == "userDrawn")
+      || (element_local == "ph" && attr_local == "hasCustomPrompt")
+      || (element_local == "seq" && attr_local == "concurrent")
+      || (element_local == "cTn" && attr_local == "display")
+      || (element_local == "sndTgt" && attr_local == "builtIn")
+      || (element_local == "bldP" && matches!(attr_local, "animBg" | "autoUpdateAnimBg" | "rev"))
+      || (element_local == "blipFill" && attr_local == "rotWithShape")
+      || (element_local == "cNvSpPr" && attr_local == "txBox")
+      || (element_local == "cViewPr" && attr_local == "varScale")
+      || (element_local == "cSldViewPr" && matches!(attr_local, "snapToGrid" | "showGuides")))
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing"
+    && element_local == "cNvSpPr"
+    && attr_local == "txBox"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+    && element_local == "cNvSpPr"
+    && attr_local == "txBox"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/powerpoint/2010/main"
+    && element_local == "discardImageEditData"
+    && attr_local == "val"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/powerpoint/2012/main"
+    && element_local == "chartTrackingRefBased"
+    && attr_local == "val"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/2020/mipLabelMetadata"
+    && element_local == "label"
+    && matches!(attr_local, "enabled" | "removed")
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/drawing/2014/chartex"
+    && ((element_local == "externalData" && attr_local == "autoUpdate")
+      || (matches!(element_local, "title" | "legend") && attr_local == "overlay")
+      || (element_local == "visibility"
+        && matches!(
+          attr_local,
+          "categoryName"
+            | "connectorLines"
+            | "meanLine"
+            | "meanMarker"
+            | "nonoutliers"
+            | "outliers"
+            | "seriesName"
+            | "value"
+        )))
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/drawing/2007/8/2/chart"
+    && matches!(
+      element_local,
+      "dropZoneFilter"
+        | "dropZoneCategories"
+        | "dropZoneData"
+        | "dropZoneSeries"
+        | "dropZonesVisible"
+    )
+    && attr_local == "val"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.openxmlformats.org/drawingml/2006/main"
+    && ((matches!(
+      element_local,
+      "lvl1pPr"
+        | "lvl2pPr"
+        | "lvl3pPr"
+        | "lvl4pPr"
+        | "lvl5pPr"
+        | "lvl6pPr"
+        | "lvl7pPr"
+        | "lvl8pPr"
+        | "lvl9pPr"
+    ) && matches!(
+      attr_local,
+      "rtl" | "eaLnBrk" | "hangingPunct" | "latinLnBrk"
+    )) || (matches!(element_local, "defPPr" | "pPr")
+      && matches!(
+        attr_local,
+        "rtl" | "eaLnBrk" | "hangingPunct" | "latinLnBrk"
+      ))
+      || (matches!(element_local, "rPr" | "endParaRPr" | "defRPr")
+        && matches!(attr_local, "b" | "i"))
+      || (matches!(element_local, "rPr" | "endParaRPr" | "defRPr")
+        && matches!(attr_local, "dirty" | "smtClean" | "kumimoji" | "normalizeH"))
+      || (element_local == "blipFill" && attr_local == "rotWithShape")
+      || (element_local == "xfrm" && matches!(attr_local, "flipH" | "flipV"))
+      || (element_local == "bodyPr"
+        && matches!(
+          attr_local,
+          "anchorCtr"
+            | "spcFirstLastPara"
+            | "rtlCol"
+            | "fromWordArt"
+            | "forceAA"
+            | "compatLnSpc"
+            | "upright"
+        ))
+      || (matches!(
+        element_local,
+        "spLocks" | "picLocks" | "graphicFrameLocks" | "cxnSpLocks"
+      ) && matches!(
+        attr_local,
+        "noChangeAspect"
+          | "noChangeArrowheads"
+          | "noChangeShapeType"
+          | "noGrp"
+          | "noTextEdit"
+          | "noRot"
+      )))
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.microsoft.com/office/drawing/2012/chartStyle"
+    && ((element_local == "bodyPr"
+      && matches!(
+        attr_local,
+        "anchorCtr" | "spcFirstLastPara" | "rtlCol" | "fromWordArt" | "forceAA" | "compatLnSpc"
+      ))
+      || (element_local == "defRPr" && matches!(attr_local, "b" | "i")))
+  {
+    return true;
+  }
+
+  if element_ns == "urn:schemas-microsoft-com:vml"
+    && element_local == "rect"
+    && attr_local == "stroked"
+  {
+    return true;
+  }
+
+  if element_local == "rect" && matches!(attr_local, "hr" | "hrstd" | "hrnoshade") {
+    return true;
+  }
+
+  if element_ns == "urn:schemas-microsoft-com:vml"
+    && element_local == "shape"
+    && attr_ns == "urn:schemas-microsoft-com:office:office"
+    && attr_local == "bullet"
+  {
+    return true;
+  }
+
+  if element_ns == "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    && attr_ns == "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    && ((matches!(attr_local, "val")
+      && matches!(
+        element_local,
+        "b"
+          | "bCs"
+          | "i"
+          | "iCs"
+          | "adjustRightInd"
+          | "caps"
+          | "noProof"
+          | "pageBreakBefore"
+          | "snapToGrid"
+          | "widowControl"
+          | "autoSpaceDE"
+          | "autoSpaceDN"
+      ))
+      || (element_local == "spacing"
+        && matches!(attr_local, "afterAutospacing" | "beforeAutospacing")))
+  {
+    return true;
+  }
+
+  matches!(
+    (element_name, attr_name),
+    (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheetView",
+      "tabSelected"
+    ) | (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}col",
+      "customWidth"
+    ) | (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sharedItems",
+      "containsBlank"
+        | "containsDate"
+        | "containsInteger"
+        | "containsMixedTypes"
+        | "containsNonDate"
+        | "containsNumber"
+        | "containsSemiMixedTypes"
+        | "containsString"
+        | "longText"
+    ) | (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}xf",
+      "applyAlignment"
+        | "applyBorder"
+        | "applyFill"
+        | "applyFont"
+        | "applyNumberFormat"
+        | "applyProtection"
+        | "pivotButton"
+        | "quotePrefix"
+    ) | (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c",
+      "l"
+    ) | (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}brk",
+      "man"
+    ) | (
+      "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}fonts",
+      "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac}knownFonts"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}presentation",
+      "saveSubsetFonts"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}sld",
+      "showMasterPhAnim"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}ph",
+      "hasCustomPrompt"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}cTn",
+      "display"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}normalViewPr",
+      "showOutlineIcons"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}sndTgt",
+      "builtIn"
+    ) | (
+      "{http://schemas.openxmlformats.org/presentationml/2006/main}bldP",
+      "animBg" | "autoUpdateAnimBg" | "rev"
+    ) | (
+      "{http://schemas.microsoft.com/office/powerpoint/2010/main}discardImageEditData",
+      "val"
+    ) | (
+      "{http://schemas.microsoft.com/office/drawing/2014/chartex}externalData",
+      "{http://schemas.microsoft.com/office/drawing/2014/chartex}autoUpdate"
+    ) | (
+      "{http://schemas.microsoft.com/office/drawing/2014/chartex}title",
+      "overlay"
+    ) | (
+      "{http://schemas.microsoft.com/office/drawing/2014/chartex}legend",
+      "overlay"
+    ) | (
+      "{http://schemas.microsoft.com/office/drawing/2014/chartex}visibility",
+      "categoryName" | "seriesName" | "value"
+    ) | (
+      "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}i",
+      "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+    ) | (
+      "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}caps",
+      "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+    ) | (
+      "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}widowControl",
+      "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl1pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl2pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl3pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl4pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl5pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl6pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl7pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl8pPr"
+        | "{http://schemas.openxmlformats.org/drawingml/2006/main}lvl9pPr",
+      "rtl" | "eaLnBrk" | "hangingPunct" | "latinLnBrk"
+    ) | (
+      "{http://schemas.microsoft.com/office/drawing/2012/chartStyle}bodyPr",
+      "anchorCtr" | "spcFirstLastPara" | "rtlCol" | "fromWordArt" | "forceAA" | "compatLnSpc"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/main}rPr",
+      "smtClean" | "err" | "kumimoji" | "normalizeH"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/main}pPr",
+      "eaLnBrk" | "hangingPunct" | "latinLnBrk"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/main}defPPr",
+      "rtl" | "eaLnBrk" | "hangingPunct" | "latinLnBrk"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}anchor",
+      "simplePos" | "behindDoc" | "locked" | "layoutInCell" | "allowOverlap"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm",
+      "flipV"
+    ) | (
+      "{http://schemas.openxmlformats.org/drawingml/2006/main}graphicFrameLocks",
+      "noChangeAspect" | "noChangeArrowheads"
+    ) | (
+      "{urn:schemas-microsoft-com:vml}shapetype",
+      "filled"
+        | "stroked"
+        | "{urn:schemas-microsoft-com:office:office}oned"
+        | "{urn:schemas-microsoft-com:office:office}preferrelative"
+    ) | (
+      "{urn:schemas-microsoft-com:vml}path",
+      "arrowok"
+        | "fillok"
+        | "gradientshapeok"
+        | "textpathok"
+        | "{urn:schemas-microsoft-com:office:office}extrusionok"
+    ) | (
+      "{urn:schemas-microsoft-com:office:office}lock",
+      "shapetype" | "aspectratio" | "text"
+    ) | (
+      "{urn:schemas-microsoft-com:vml}shape",
+      "{urn:schemas-microsoft-com:office:office}ole"
+        | "{urn:schemas-microsoft-com:office:office}allowincell"
+        | "filled"
+        | "stroked"
+    ) | ("{urn:schemas-microsoft-com:vml}textpath", "fitshape" | "on")
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}latentStyles",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}defLockedState"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}defQFormat"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}defSemiHidden"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}defUnhideWhenUsed"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lsdException",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}locked"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}qFormat"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}semiHidden"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}unhideWhenUsed"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}style",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}default"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}customStyle"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}hyperlink",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}history"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}b",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bCs",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}noProof",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lvl",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tentative"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tblLook",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}firstRow"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lastRow"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}firstColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lastColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}noHBand"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}noVBand"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}cnfStyle",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}firstRow"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lastRow"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}firstColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lastColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}oddVBand"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}evenVBand"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}oddHBand"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}evenHBand"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}firstRowFirstColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}firstRowLastColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lastRowFirstColumn"
+          | "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}lastRowLastColumn"
+      )
+      | (
+        "{http://schemas.microsoft.com/office/word/2012/wordml}commentEx",
+        "{http://schemas.microsoft.com/office/word/2012/wordml}done"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}date1904",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}roundedCorners",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}overlay",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}autoTitleDeleted",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}varyColors",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}invertIfNegative",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}showLegendKey"
+          | "{http://schemas.openxmlformats.org/drawingml/2006/chart}showVal"
+          | "{http://schemas.openxmlformats.org/drawingml/2006/chart}showCatName"
+          | "{http://schemas.openxmlformats.org/drawingml/2006/chart}showSerName"
+          | "{http://schemas.openxmlformats.org/drawingml/2006/chart}showPercent"
+          | "{http://schemas.openxmlformats.org/drawingml/2006/chart}showBubbleSize",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}delete",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}numFmt",
+        "sourceLinked"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}auto",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}noMultiLvlLbl",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}plotVisOnly",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}showDLblsOverMax",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/chart}autoUpdate",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}bodyPr",
+        "anchorCtr" | "spcFirstLastPara" | "rtlCol" | "fromWordArt" | "forceAA" | "compatLnSpc"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}gradFill",
+        "rotWithShape"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}lin",
+        "scaled"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}outerShdw",
+        "rotWithShape"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}defRPr",
+        "b" | "i"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}picLocks",
+        "noChangeAspect" | "noChangeArrowheads"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}spLocks",
+        "noChangeArrowheads" | "noChangeShapeType"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/main}cxnSpLocks",
+        "noChangeShapeType"
+      )
+      | (
+        "{http://schemas.microsoft.com/office/word/2010/wordprocessingShape}bodyPr",
+        "anchor"
+          | "anchorCtr"
+          | "spcFirstLastPara"
+          | "rtlCol"
+          | "fromWordArt"
+          | "forceAA"
+          | "compatLnSpc"
+      )
+      | (
+        "{http://schemas.microsoft.com/office/word/2010/wordprocessingShape}cNvSpPr",
+        "txBox"
+      )
+      | (
+        "{http://schemas.microsoft.com/office/drawing/2010/main}useLocalDpi",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/diagram}prSet",
+        "phldr"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/diagram}bulletEnabled",
+        "val"
+      )
+      | (
+        "{http://schemas.openxmlformats.org/drawingml/2006/diagram}shape",
+        "hideGeom"
+      )
+  )
+}
+
+fn split_expanded_name(name: &str) -> (&str, &str) {
+  if let Some(rest) = name.strip_prefix('{')
+    && let Some((ns, local)) = rest.split_once('}')
+  {
+    (ns, local)
+  } else {
+    ("", name)
   }
 }
 

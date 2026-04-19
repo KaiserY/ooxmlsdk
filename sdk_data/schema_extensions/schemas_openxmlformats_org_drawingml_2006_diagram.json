@@ -1,10 +1,6 @@
 {
   "Types": [
     {
-      "ClassName": "RelationshipIds",
-      "HasXmlnsFields": true
-    },
-    {
       "ClassName": "Shape",
       "HasXmlnsFields": true
     }

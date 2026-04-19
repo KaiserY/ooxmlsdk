@@ -1,10 +1,6 @@
 {
   "Types": [
     {
-      "ClassName": "TableStyleId",
-      "HasXmlnsFields": true
-    },
-    {
       "ClassName": "PercentageType",
       "Attributes": [
         {

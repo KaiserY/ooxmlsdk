@@ -13,10 +13,6 @@
       "HasXmlnsFields": true
     },
     {
-      "ClassName": "ChartReference",
-      "HasXmlnsFields": true
-    },
-    {
       "ClassName": "ChartSpace",
       "McAlternateContentInsertBefore": [
         "c:CT_Style/c:style"

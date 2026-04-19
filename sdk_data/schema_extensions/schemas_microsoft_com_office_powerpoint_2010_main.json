@@ -1,14 +1,6 @@
 {
   "Types": [
     {
-      "ClassName": "LaserColor",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "ShowMediaControls",
-      "HasXmlnsFields": true
-    },
-    {
       "ClassName": "DefaultImageDpi",
       "HasXmlnsFields": true
     },

@@ -5,27 +5,7 @@
       "HasXmlnsFields": true
     },
     {
-      "ClassName": "AbsoluteAnchorSize",
-      "HasXmlnsFields": true
-    },
-    {
       "ClassName": "Shape",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "GroupShape",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "GraphicFrame",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "ConnectionShape",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "Picture",
       "HasXmlnsFields": true
     },
     {
@@ -45,55 +25,7 @@
       "HasXmlnsFields": true
     },
     {
-      "ClassName": "Style",
-      "HasXmlnsFields": true
-    },
-    {
       "ClassName": "TextBody",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualConnectionShapeProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualConnectorShapeDrawingProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualPictureDrawingProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualPictureProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "BlipFill",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualGraphicFrameDrawingProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualGraphicFrameProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "Transform",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualGroupShapeDrawingProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "XPosition",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "YPosition",
       "HasXmlnsFields": true
     },
     {
@@ -102,22 +34,6 @@
     },
     {
       "ClassName": "ToAnchor",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "MarkerType",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "Extent",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "NonVisualGroupShapeProperties",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "GroupShapeProperties",
       "HasXmlnsFields": true
     }
   ]

@@ -184,7 +184,7 @@ pub(crate) fn is_foreign_prefixed_child(name: &[u8], expected_prefix: &str) -> b
   prefix != b"mc" && prefix != expected_prefix.as_bytes()
 }
 
-#[inline(always)]
+#[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn parent_zip_path(path: &str) -> String {
   path

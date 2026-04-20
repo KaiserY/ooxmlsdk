@@ -124,14 +124,14 @@ pub fn resolve_relationship_target_path(parent_path: &str, target: &str) -> Stri
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> Result<IoReader<R>, SdkError> {
   let mut xml_reader = Reader::from_reader(reader);
   xml_reader.config_mut().check_end_names = false;
   Ok(IoReader::new(xml_reader))
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
   let mut xml_reader = Reader::from_str(s);
   xml_reader.config_mut().check_end_names = false;
@@ -148,7 +148,7 @@ pub(crate) fn attr_raw_value<'a>(attr: &'a Attribute<'a>) -> Option<&'a [u8]> {
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn decode_attr_value(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -160,7 +160,7 @@ pub(crate) fn decode_attr_value(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_bool_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -177,7 +177,7 @@ pub(crate) fn parse_bool_attr(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_boolean_value_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -194,7 +194,7 @@ pub(crate) fn parse_boolean_value_attr(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_on_off_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -212,7 +212,7 @@ pub(crate) fn parse_on_off_attr(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_true_false_blank_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -230,7 +230,7 @@ pub(crate) fn parse_true_false_blank_attr(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_true_false_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -248,7 +248,7 @@ pub(crate) fn parse_true_false_attr(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -269,7 +269,7 @@ where
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_enum_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -428,7 +428,7 @@ pub(crate) fn push_xml_general_ref(
   Ok(())
 }
 
-#[inline(always)]
+#[inline]
 fn resolve_general_ref_entity(entity: &str) -> Option<std::borrow::Cow<'_, str>> {
   if let Some(entity) = quick_xml::escape::resolve_predefined_entity(entity) {
     return Some(std::borrow::Cow::Borrowed(entity));
@@ -528,7 +528,7 @@ fn write_qualified_name<W: std::fmt::Write>(
   writer.write_str(local_name)
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn write_escaped_str<W: std::fmt::Write>(
   writer: &mut W,
   value: &str,
@@ -539,7 +539,7 @@ pub(crate) fn write_escaped_str<W: std::fmt::Write>(
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn write_escaped_text<W: std::fmt::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   value: &T,
@@ -547,7 +547,7 @@ pub(crate) fn write_escaped_text<W: std::fmt::Write, T: std::fmt::Display + ?Siz
   write_escaped_str(writer, &value.to_string())
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   attr_name: &str,
@@ -560,7 +560,7 @@ pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized
   writer.write_char('"')
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn write_attr_value_str<W: std::fmt::Write>(
   writer: &mut W,
   attr_name: &str,
@@ -573,7 +573,7 @@ pub(crate) fn write_attr_value_str<W: std::fmt::Write>(
   writer.write_char('"')
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn write_xmlns_attr<W: std::fmt::Write>(
   writer: &mut W,
   prefix: Option<&str>,

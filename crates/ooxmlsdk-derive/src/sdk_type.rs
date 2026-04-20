@@ -612,7 +612,7 @@ fn expand_sequence_helper_struct(
   Ok(sdk_type_impl_tokens(
     ident,
     quote! {
-      #[inline(always)]
+      #[inline]
       pub(crate) fn matches_start_qname(name: &[u8]) -> bool {
         #( #matcher_checks )*
         false
@@ -733,6 +733,9 @@ fn expand_helper_struct(
   }
 
   let mut child_decl_tokens = Vec::new();
+  let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_visit_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_parse_tokens = Vec::new();
   let mut child_visit_parse_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
@@ -768,67 +771,68 @@ fn expand_helper_struct(
     } else {
       quote! { parsed_child }
     };
-    let build_arm = |reader_ident: &Ident, as_result: bool| {
-      let target = if tag_prefix.is_empty() {
-        quote! { #local_name_lit }
-      } else {
-        let tag_qname_lit = LitByteStr::new(
-          format!("{tag_prefix}:{local_name}").as_bytes(),
-          Span::call_site(),
-        );
-        quote! { #tag_qname_lit | #local_name_lit }
-      };
+    let case_index = direct_child_dispatch_tokens.len() + 1;
+    let target = if tag_prefix.is_empty() {
+      quote! { #local_name_lit }
+    } else {
+      let tag_qname_lit = LitByteStr::new(
+        format!("{tag_prefix}:{local_name}").as_bytes(),
+        Span::call_site(),
+      );
+      quote! { #tag_qname_lit | #local_name_lit }
+    };
+    let build_dispatch = |reader_ident: &Ident, as_result: bool| {
       if field.repeated {
         if as_result {
           quote! {
-              #target => {
-                match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+              #case_index => {
+                return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
                     Ok(true)
                   },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              }
-            },
+                  Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+                  Err(err) => Err(err),
+                };
+              },
           }
         } else {
           quote! {
-              #target => {
-                match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+              #case_index => {
+                match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
-                    true
+                    continue;
                   },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
-                Err(err) => return Err(err),
-              }
-            },
+                  Err(crate::common::SdkError::MissingField { .. }) => continue,
+                  Err(err) => return Err(err),
+                }
+              },
           }
         }
       } else {
         if as_result {
           quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+            #case_index => {
+              return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   Ok(true)
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
                 Err(err) => Err(err),
-              }
+              };
             },
           }
         } else {
           quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+            #case_index => {
+              match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
-                  true
+                  continue;
                 },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
+                Err(crate::common::SdkError::MissingField { .. }) => continue,
                 Err(err) => return Err(err),
               }
             },
@@ -836,6 +840,7 @@ fn expand_helper_struct(
         }
       }
     };
+    direct_child_case_arms.push(quote! { #target => #case_index, });
 
     if field.repeated {
       child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -850,8 +855,8 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate(#validate_child_tokens)?;
         }
       });
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&visitor_reader_ident, true));
+      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
+      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -883,8 +888,8 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&visitor_reader_ident, true));
+      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
+      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
     }
   }
 
@@ -910,7 +915,7 @@ fn expand_helper_struct(
     let build_visit_arm = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
@@ -927,7 +932,7 @@ fn expand_helper_struct(
         }
       } else {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
@@ -947,7 +952,7 @@ fn expand_helper_struct(
     let build_parse_arm = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
@@ -964,7 +969,7 @@ fn expand_helper_struct(
         }
       } else {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
@@ -1098,6 +1103,14 @@ fn expand_helper_struct(
         e: quick_xml::events::BytesStart<'de>,
         next_empty: bool,
       | -> Result<bool, crate::common::SdkError> {
+        let direct_child_case = match e.name().as_ref() {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_visit_dispatch_tokens )*
+          _ => {}
+        }
         match e.name().as_ref() {
           #( #child_visit_parse_tokens )*
           _ => Ok(false),
@@ -1111,6 +1124,14 @@ fn expand_helper_struct(
         e: quick_xml::events::BytesStart<'de>,
         next_empty: bool,
       | -> Result<bool, crate::common::SdkError> {
+        let direct_child_case = match e.name().as_ref() {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_visit_dispatch_tokens )*
+          _ => {}
+        }
         let matched: bool = match e.name().as_ref() {
           #( #child_visit_parse_tokens )*
           _ => {
@@ -1125,6 +1146,14 @@ fn expand_helper_struct(
   };
   let main_dispatch_tokens = if !has_choice_dispatch {
     quote! {
+      let direct_child_case = match e.name().as_ref() {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens )*
+        _ => {}
+      }
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
         _ => false,
@@ -1135,6 +1164,14 @@ fn expand_helper_struct(
     }
   } else {
     quote! {
+      let direct_child_case = match e.name().as_ref() {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens )*
+        _ => {}
+      }
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
         _ => {
@@ -1209,10 +1246,10 @@ fn expand_helper_struct(
           };
 
           {
-            #visit_foreign_child_tokens
             #main_dispatch_tokens
             match e.name().as_ref() {
               b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens
                 crate::common::process_markup_compatibility_children(
                   xml_reader,
                   next_empty,
@@ -1222,6 +1259,7 @@ fn expand_helper_struct(
               }
               _ => {
                 if crate::common::is_foreign_prefixed_child(e.name().as_ref(), "") {
+                  #visit_foreign_child_tokens
                   crate::common::process_foreign_element_children(
                     xml_reader,
                     next_empty,
@@ -1618,6 +1656,9 @@ fn expand_named_struct(
       let mut xml_header_state = crate::common::XmlHeaderType::None;
     }
   };
+  let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_visit_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_decl_tokens = Vec::new();
   let mut child_parse_tokens = Vec::new();
   let mut child_visit_parse_tokens = Vec::new();
@@ -1654,39 +1695,40 @@ fn expand_named_struct(
     } else {
       quote! { parsed_child }
     };
-    let build_arm = |reader_ident: &Ident, as_result: bool| {
-      let target = if tag_prefix.is_empty() {
-        quote! { #local_name_lit }
-      } else {
-        let tag_qname_lit = LitByteStr::new(
-          format!("{tag_prefix}:{local_name}").as_bytes(),
-          Span::call_site(),
-        );
-        quote! { #tag_qname_lit | #local_name_lit }
-      };
+    let case_index = direct_child_dispatch_tokens.len() + 1;
+    let target = if tag_prefix.is_empty() {
+      quote! { #local_name_lit }
+    } else {
+      let tag_qname_lit = LitByteStr::new(
+        format!("{tag_prefix}:{local_name}").as_bytes(),
+        Span::call_site(),
+      );
+      quote! { #tag_qname_lit | #local_name_lit }
+    };
+    let build_dispatch = |reader_ident: &Ident, as_result: bool| {
       if field.repeated {
         if as_result {
           quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+            #case_index => {
+              return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   Ok(true)
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
                 Err(err) => Err(err),
-              }
+              };
             },
           }
         } else {
           quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+            #case_index => {
+              match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
-                  true
+                  continue;
                 },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
+                Err(crate::common::SdkError::MissingField { .. }) => continue,
                 Err(err) => return Err(err),
               }
             },
@@ -1695,26 +1737,26 @@ fn expand_named_struct(
       } else {
         if as_result {
           quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+            #case_index => {
+              return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   Ok(true)
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
                 Err(err) => Err(err),
-              }
+              };
             },
           }
         } else {
           quote! {
-            #target => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
+            #case_index => {
+              match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
-                  true
+                  continue;
                 },
-                Err(crate::common::SdkError::MissingField { .. }) => true,
+                Err(crate::common::SdkError::MissingField { .. }) => continue,
                 Err(err) => return Err(err),
               }
             },
@@ -1736,8 +1778,9 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate(#validate_child_tokens)?;
         }
       });
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&visitor_reader_ident, true));
+      direct_child_case_arms.push(quote! { #target => #case_index, });
+      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
+      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -1769,8 +1812,9 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
-      child_parse_tokens.push(build_arm(&xml_reader_ident, false));
-      child_visit_parse_tokens.push(build_arm(&visitor_reader_ident, true));
+      direct_child_case_arms.push(quote! { #target => #case_index, });
+      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
+      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
     }
   }
 
@@ -1840,7 +1884,7 @@ fn expand_named_struct(
     let build_visit_block = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
@@ -1857,7 +1901,7 @@ fn expand_named_struct(
         }
       } else {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
@@ -1877,7 +1921,7 @@ fn expand_named_struct(
     let build_parse_block = |reader_ident: &Ident| {
       if field.repeated {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
@@ -1894,7 +1938,7 @@ fn expand_named_struct(
         }
       } else {
         quote! {
-          if !matched {
+          if !matched && #choice_ty::matches_start_qname(e.name().as_ref()) {
             match #choice_ty::deserialize_inner(#reader_ident, Some((e.clone(), next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
@@ -2057,6 +2101,14 @@ fn expand_named_struct(
           e: quick_xml::events::BytesStart<'de>,
           next_empty: bool,
         | -> Result<bool, crate::common::SdkError> {
+          let direct_child_case = match e.name().as_ref() {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens )*
+            _ => {}
+          }
           match e.name().as_ref() {
             #( #child_visit_parse_tokens )*
             _ => Ok(false),
@@ -2070,6 +2122,14 @@ fn expand_named_struct(
           e: quick_xml::events::BytesStart<'de>,
           next_empty: bool,
         | -> Result<bool, crate::common::SdkError> {
+          let direct_child_case = match e.name().as_ref() {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens )*
+            _ => {}
+          }
           let matched: bool = match e.name().as_ref() {
             #( #child_visit_parse_tokens )*
             _ => {
@@ -2085,6 +2145,14 @@ fn expand_named_struct(
     };
   let child_choice_dispatch_tokens = if !has_choice_dispatch && !has_any_dispatch {
     quote! {
+      let direct_child_case = match e.name().as_ref() {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens )*
+        _ => {}
+      }
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
         _ => false,
@@ -2095,6 +2163,14 @@ fn expand_named_struct(
     }
   } else {
     quote! {
+      let direct_child_case = match e.name().as_ref() {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens )*
+        _ => {}
+      }
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
         _ => {
@@ -2536,9 +2612,9 @@ fn expand_named_struct(
 
             if let Some(e) = next_event {
               #child_choice_dispatch_tokens
-              #visit_foreign_child_tokens
               match e.name().as_ref() {
                 b"mc:AlternateContent" | b"AlternateContent" => {
+                  #visit_foreign_child_tokens
                   crate::common::process_markup_compatibility_children(
                     xml_reader,
                     next_empty,
@@ -2550,6 +2626,7 @@ fn expand_named_struct(
                     e.name().as_ref(),
                     #tag_prefix,
                   ) {
+                    #visit_foreign_child_tokens
                     crate::common::process_foreign_element_children(
                       xml_reader,
                       next_empty,

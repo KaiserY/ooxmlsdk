@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone)]
 enum NamedSequenceVariantFieldKind {
-  Child,
+  Child { qname: String },
   TextChild { qname: String },
 }
 
@@ -66,7 +66,7 @@ fn parse_named_sequence_variant_fields(
       ));
     };
     let kind = match field_kind {
-      SdkTypeFieldKind::Child { .. } => NamedSequenceVariantFieldKind::Child,
+      SdkTypeFieldKind::Child { qname } => NamedSequenceVariantFieldKind::Child { qname },
       SdkTypeFieldKind::TextChild { qname } => NamedSequenceVariantFieldKind::TextChild { qname },
       _ => {
         return Err(syn::Error::new_spanned(
@@ -94,7 +94,7 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
   let inner_ty = unwrap_wrapped_type(&field.ty);
 
   match &field.kind {
-    NamedSequenceVariantFieldKind::Child => {
+    NamedSequenceVariantFieldKind::Child { .. } => {
       if field.repeated {
         quote! {
           for child in #field_ident {
@@ -350,15 +350,18 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             #( #helper_fields, )*
           }
         });
-        helper_matcher_checks.push(quote! {
+        let start_qname = match &named_fields[0].kind {
+          NamedSequenceVariantFieldKind::Child { qname }
+          | NamedSequenceVariantFieldKind::TextChild { qname } => qname,
+        };
+        let start_qname_patterns = choice_qname_patterns(std::slice::from_ref(start_qname));
+        direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
-          if #helper_ident::matches_start_qname(name) {
-            return true;
-          }
+          #( #start_qname_patterns )|* => true,
         });
-        helper_child_dispatch_tokens.push(quote! {
+        direct_child_dispatch_arms.push(quote! {
           #(#cfg_attrs)*
-          if #helper_ident::matches_start_qname(e.name().as_ref()) {
+          #( #start_qname_patterns )|* => {
             let parsed_child = #helper_ident::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
             let #helper_ident { #( #field_idents ),* } = parsed_child;
             return Ok(Self::#variant_ident { #( #field_idents ),* });
@@ -642,7 +645,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
 
     impl #ident {
-      #[inline(always)]
+      #[inline]
       pub(crate) fn matches_start_qname(name: &[u8]) -> bool {
         #matches_start_qname_tokens
       }

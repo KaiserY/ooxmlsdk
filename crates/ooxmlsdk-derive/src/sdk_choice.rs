@@ -573,25 +573,26 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
   }
 
+  let matches_specific_start_qname_tokens = quote! {
+    match name {
+      #( #direct_matcher_arms )*
+      _ => {
+        #( #helper_matcher_checks )*
+        false
+      }
+    }
+  };
   let matches_start_qname_tokens = if has_any_variant {
     quote! {
-      match name {
-        #( #direct_matcher_arms )*
-        _ => {
-          #( #helper_matcher_checks )*
-          true
-        }
+      if Self::matches_specific_start_qname(name) {
+        true
+      } else {
+        true
       }
     }
   } else {
     quote! {
-      match name {
-        #( #direct_matcher_arms )*
-        _ => {
-          #( #helper_matcher_checks )*
-          false
-        }
-      }
+      Self::matches_specific_start_qname(name)
     }
   };
   let from_text_value_tokens = if text_from_string_tokens.is_empty() {
@@ -646,8 +647,18 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
 
     impl #ident {
       #[inline]
+      pub(crate) fn matches_specific_start_qname(name: &[u8]) -> bool {
+        #matches_specific_start_qname_tokens
+      }
+
+      #[inline]
       pub(crate) fn matches_start_qname(name: &[u8]) -> bool {
         #matches_start_qname_tokens
+      }
+
+      #[inline]
+      pub(crate) const fn accepts_any_child() -> bool {
+        #has_any_variant
       }
 
       pub(crate) fn from_text_value(value: &str) -> Option<Self> {

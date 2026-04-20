@@ -529,11 +529,22 @@ fn write_qualified_name<W: std::fmt::Write>(
 }
 
 #[inline(always)]
+pub(crate) fn write_escaped_str<W: std::fmt::Write>(
+  writer: &mut W,
+  value: &str,
+) -> Result<(), std::fmt::Error> {
+  match quick_xml::escape::escape(value) {
+    std::borrow::Cow::Borrowed(value) => writer.write_str(value),
+    std::borrow::Cow::Owned(value) => writer.write_str(&value),
+  }
+}
+
+#[inline(always)]
 pub(crate) fn write_escaped_text<W: std::fmt::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   value: &T,
 ) -> Result<(), std::fmt::Error> {
-  writer.write_str(&quick_xml::escape::escape(value.to_string()))
+  write_escaped_str(writer, &value.to_string())
 }
 
 #[inline(always)]
@@ -546,6 +557,19 @@ pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized
   writer.write_str(attr_name)?;
   writer.write_str("=\"")?;
   write_escaped_text(writer, value)?;
+  writer.write_char('"')
+}
+
+#[inline(always)]
+pub(crate) fn write_attr_value_str<W: std::fmt::Write>(
+  writer: &mut W,
+  attr_name: &str,
+  value: &str,
+) -> Result<(), std::fmt::Error> {
+  writer.write_char(' ')?;
+  writer.write_str(attr_name)?;
+  writer.write_str("=\"")?;
+  write_escaped_str(writer, value)?;
   writer.write_char('"')
 }
 

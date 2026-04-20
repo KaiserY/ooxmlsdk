@@ -202,6 +202,12 @@ enum SdkNumberSignKind {
   Positive,
 }
 
+#[derive(Clone)]
+struct ParsedSdkTypeFieldAttrs {
+  kind: Option<SdkTypeFieldKind>,
+  validators: Vec<SdkFieldValidator>,
+}
+
 enum SdkChoiceVariantKind {
   Child { qnames: Vec<String> },
   Choice,
@@ -462,12 +468,16 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
   Ok(None)
 }
 
-fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeFieldKind>> {
+fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
+  let mut kind = None;
+  let mut validators = Vec::new();
+
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
     }
+
     let metas =
       attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
     for meta in metas {
@@ -494,9 +504,9 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
               Err(nested.error("unsupported sdk child attribute"))
             }
           })?;
-          return Ok(Some(SdkTypeFieldKind::Child {
+          kind = Some(SdkTypeFieldKind::Child {
             qname: qname.unwrap_or_default(),
-          }));
+          });
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
@@ -509,59 +519,25 @@ fn parse_sdk_type_field_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkTypeF
               Err(nested.error("unsupported sdk text_child attribute"))
             }
           })?;
-          return Ok(Some(SdkTypeFieldKind::TextChild {
+          kind = Some(SdkTypeFieldKind::TextChild {
             qname: qname.unwrap_or_default(),
-          }));
+          });
         }
-        Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkTypeFieldKind::Text)),
-        Meta::Path(path) if path.is_ident("choice") => return Ok(Some(SdkTypeFieldKind::Choice)),
-        Meta::Path(path) if path.is_ident("any") => return Ok(Some(SdkTypeFieldKind::Any)),
+        Meta::Path(path) if path.is_ident("text") => {
+          kind = Some(SdkTypeFieldKind::Text);
+        }
+        Meta::Path(path) if path.is_ident("choice") => {
+          kind = Some(SdkTypeFieldKind::Choice);
+        }
+        Meta::Path(path) if path.is_ident("any") => {
+          kind = Some(SdkTypeFieldKind::Any);
+        }
         Meta::NameValue(meta) if meta.path.is_ident("bit") => {}
         Meta::Path(path)
           if path.is_ident("xmlns") || path.is_ident("mce") || path.is_ident("xml_header") =>
         {
           continue;
         }
-        Meta::List(meta)
-          if meta.path.is_ident("pattern")
-            || meta.path.is_ident("string_length")
-            || meta.path.is_ident("string_format")
-            || meta.path.is_ident("string_set")
-            || meta.path.is_ident("number_type")
-            || meta.path.is_ident("number_range")
-            || meta.path.is_ident("number_sign") =>
-        {
-          continue;
-        }
-        other => {
-          return Err(syn::Error::new_spanned(
-            other,
-            "unsupported sdk field attribute",
-          ));
-        }
-      }
-    }
-  }
-  if attr_name.is_some() {
-    return Ok(Some(SdkTypeFieldKind::Attr {
-      name: attr_name.unwrap_or_default(),
-    }));
-  }
-  Ok(None)
-}
-
-fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFieldValidator>> {
-  let mut validators = Vec::new();
-
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in metas {
-      match meta {
         Meta::List(meta) if meta.path.is_ident("pattern") => {
           let mut regex = None;
           let mut source_id = 0;
@@ -705,13 +681,13 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
           });
         }
         Meta::List(meta) if meta.path.is_ident("string_format") => {
-          let mut kind = None;
+          let mut kind_value = None;
           let mut source_id = 0;
           let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("kind") {
               let value: LitStr = nested.value()?.parse()?;
-              kind = Some(match value.value().as_str() {
+              kind_value = Some(match value.value().as_str() {
                 "token" => SdkStringFormatKind::Token,
                 "ncname" => SdkStringFormatKind::NcName,
                 "qname" => SdkStringFormatKind::QName,
@@ -732,7 +708,7 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
               Err(nested.error("unsupported sdk string_format attribute"))
             }
           })?;
-          if let Some(kind) = kind {
+          if let Some(kind) = kind_value {
             validators.push(SdkFieldValidator::StringFormat {
               kind,
               source_id,
@@ -782,13 +758,13 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
           });
         }
         Meta::List(meta) if meta.path.is_ident("number_sign") => {
-          let mut kind = None;
+          let mut kind_value = None;
           let mut source_id = 0;
           let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("kind") {
               let value: LitStr = nested.value()?.parse()?;
-              kind = Some(match value.value().as_str() {
+              kind_value = Some(match value.value().as_str() {
                 "non_negative" => SdkNumberSignKind::NonNegative,
                 "positive" => SdkNumberSignKind::Positive,
                 _ => return Err(nested.error("unsupported sdk number_sign kind")),
@@ -806,7 +782,7 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
               Err(nested.error("unsupported sdk number_sign attribute"))
             }
           })?;
-          if let Some(kind) = kind {
+          if let Some(kind) = kind_value {
             validators.push(SdkFieldValidator::NumberSign {
               kind,
               source_id,
@@ -814,12 +790,23 @@ fn parse_sdk_type_field_validators(attrs: &[Attribute]) -> syn::Result<Vec<SdkFi
             });
           }
         }
-        _ => {}
+        other => {
+          return Err(syn::Error::new_spanned(
+            other,
+            "unsupported sdk field attribute",
+          ));
+        }
       }
     }
   }
 
-  Ok(validators)
+  if kind.is_none() && attr_name.is_some() {
+    kind = Some(SdkTypeFieldKind::Attr {
+      name: attr_name.unwrap_or_default(),
+    });
+  }
+
+  Ok(ParsedSdkTypeFieldAttrs { kind, validators })
 }
 
 fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {
@@ -964,6 +951,37 @@ fn parse_qname_info(qname: &str) -> QNameInfo {
       local_name: first.to_string(),
     },
   }
+}
+
+fn relationship_type_match_values(relationship_type: &str) -> Vec<String> {
+  let mut values = vec![relationship_type.to_string()];
+
+  if let Some(suffix) = relationship_type
+    .strip_prefix("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+  {
+    let alias_suffix = match suffix {
+      "custom-properties" => "customProperties",
+      "extended-properties" => "extendedProperties",
+      other => other,
+    };
+    values.push(format!(
+      "http://purl.oclc.org/ooxml/officeDocument/relationships/{alias_suffix}"
+    ));
+  } else if relationship_type
+    == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
+  {
+    values.push(
+      "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail".to_string(),
+    );
+  } else if relationship_type
+    == "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects"
+  {
+    values.push(
+      "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects".to_string(),
+    );
+  }
+
+  values
 }
 
 fn is_xmlns_field(ident: &Ident) -> bool {
@@ -1183,7 +1201,7 @@ fn write_bool_tokens(
       writer.write_str(if *#value_expr { "1" } else { "0" })?;
     },
     Some(_) => quote! {
-      crate::common::write_escaped_text(writer, #value_expr)?;
+      writer.write_str(if *#value_expr { "true" } else { "false" })?;
     },
     None => unreachable!("write_bool_tokens requires a bool-like type"),
   }
@@ -1208,5 +1226,176 @@ fn choice_variant_inner_type(ty: &Type) -> proc_macro2::TokenStream {
     quote! { #inner_ty }
   } else {
     quote! { #ty }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::{
+    fs,
+    io::Write,
+    sync::{Mutex, OnceLock},
+  };
+
+  static SNAPSHOT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+  static SNAPSHOT_INIT: OnceLock<()> = OnceLock::new();
+  const SNAPSHOT_DIR: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../target/ooxmlsdk_macro_expanded"
+  );
+  const RUNTIME_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../ooxmlsdk/src");
+
+  #[test]
+  #[ignore]
+  fn dump_context_node_expansion() {
+    dump_one_expansion(
+      &std::env::var("OOXMLSDK_DUMP_KIND").unwrap_or_else(|_| "SdkPart".to_string()),
+      &std::env::var("OOXMLSDK_DUMP_FILE")
+        .unwrap_or_else(|_| "parts/main_document_part.rs".to_string()),
+      &std::env::var("OOXMLSDK_DUMP_TARGET").unwrap_or_else(|_| "MainDocumentPart".to_string()),
+    );
+  }
+
+  fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::TokenStream) {
+    let lock = SNAPSHOT_LOCK.get_or_init(|| Mutex::new(()));
+    let _guard = lock.lock().expect("snapshot lock");
+    SNAPSHOT_INIT.get_or_init(|| {
+      let _ = fs::remove_dir_all(SNAPSHOT_DIR);
+      let _ = fs::create_dir_all(SNAPSHOT_DIR);
+    });
+
+    let kind_dir = format!("{SNAPSHOT_DIR}/{kind}");
+    if fs::create_dir_all(&kind_dir).is_err() {
+      return;
+    }
+
+    let file_path = format!("{kind_dir}/{}.rs", snapshot_file_stem(input));
+    let mut file = match fs::File::create(&file_path) {
+      Ok(file) => file,
+      Err(_) => return,
+    };
+
+    let formatted = syn::parse2::<syn::File>(tokens.clone())
+      .map(|file| prettyplease::unparse(&file))
+      .unwrap_or_else(|_| tokens.to_string());
+
+    let _ = writeln!(
+      file,
+      "// ===== {}: {} =====\n{}\n",
+      kind, input.ident, formatted
+    );
+  }
+
+  fn dump_one_expansion(kind: &str, file: &str, target: &str) {
+    let source =
+      fs::read_to_string(format!("{RUNTIME_SRC_DIR}/{file}")).expect("read runtime source file");
+    let item_src = extract_derive_item(&source, kind, target)
+      .unwrap_or_else(|| panic!("no {kind} derive named {target} found in runtime source"));
+    let input = syn::parse_str::<DeriveInput>(&item_src).expect("parse derive input");
+    let tokens = match kind {
+      "SdkEnum" => sdk_enum::expand_sdk_enum(&input).expect("SdkEnum expansion"),
+      "SdkType" => sdk_type::expand_sdk_type(&input).expect("SdkType expansion"),
+      "SdkChoice" => sdk_choice::expand_sdk_choice(&input).expect("SdkChoice expansion"),
+      "SdkPart" => sdk_part::expand_sdk_part(&input).expect("SdkPart expansion"),
+      other => panic!("unexpected kind: {other}"),
+    };
+    dump_macro_expansion(kind, &input, &tokens);
+  }
+
+  fn snapshot_file_stem(input: &DeriveInput) -> String {
+    let ident = input.ident.to_string();
+    let mut stem = String::with_capacity(ident.len() * 2);
+    for (idx, ch) in ident.chars().enumerate() {
+      if ch.is_ascii_uppercase() {
+        if idx > 0 {
+          stem.push('_');
+        }
+        stem.push(ch.to_ascii_lowercase());
+      } else if ch.is_ascii_alphanumeric() {
+        stem.push(ch);
+      } else {
+        stem.push('_');
+      }
+    }
+    stem
+  }
+
+  fn extract_derive_item(source: &str, kind: &str, target: &str) -> Option<String> {
+    let syntax_markers = [
+      format!("pub struct {target} {{"),
+      format!("pub struct {target}("),
+      format!("struct {target} {{"),
+      format!("struct {target}("),
+      format!("pub enum {target} {{"),
+      format!("enum {target} {{"),
+    ];
+    let target_pos = syntax_markers
+      .iter()
+      .find_map(|pattern| source.find(pattern))?;
+    let derive_pos = source[..target_pos].rfind("#[derive(")?;
+    if !source[derive_pos..target_pos].contains(kind) {
+      return None;
+    }
+
+    let start = derive_pos;
+    let mut item = String::new();
+    let mut started = false;
+    let mut brace_depth = 0isize;
+    let mut item_name = None::<String>;
+
+    for line in source[start..].lines() {
+      item.push_str(line);
+      item.push('\n');
+
+      if item_name.is_none() {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("pub struct ") {
+          item_name = rest
+            .split(['{', '('])
+            .next()
+            .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("struct ") {
+          item_name = rest
+            .split(['{', '('])
+            .next()
+            .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("pub enum ") {
+          item_name = rest
+            .split('{')
+            .next()
+            .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("enum ") {
+          item_name = rest
+            .split('{')
+            .next()
+            .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
+        }
+      }
+
+      if !started {
+        if line.contains(" struct ")
+          || line.trim_start().starts_with("struct ")
+          || line.contains(" enum ")
+          || line.trim_start().starts_with("enum ")
+        {
+          started = true;
+          brace_depth += line.chars().filter(|ch| *ch == '{').count() as isize;
+          brace_depth -= line.chars().filter(|ch| *ch == '}').count() as isize;
+          if brace_depth <= 0 && line.contains(';') {
+            break;
+          }
+        }
+        continue;
+      }
+
+      brace_depth += line.chars().filter(|ch| *ch == '{').count() as isize;
+      brace_depth -= line.chars().filter(|ch| *ch == '}').count() as isize;
+      if brace_depth <= 0 {
+        break;
+      }
+    }
+
+    (item_name.as_deref() == Some(target)).then_some(item)
   }
 }

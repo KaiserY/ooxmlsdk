@@ -58,7 +58,8 @@ fn parse_named_sequence_variant_fields(
       .ident
       .clone()
       .ok_or_else(|| syn::Error::new_spanned(field, "named field ident"))?;
-    let Some(field_kind) = parse_sdk_type_field_kind(&field.attrs)? else {
+    let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
+    let Some(field_kind) = parsed_attrs.kind else {
       return Err(syn::Error::new_spanned(
         field,
         "named #[sdk(sequence)] variants require #[sdk(child(...))] fields",
@@ -122,6 +123,10 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
           write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
         } else if is_bool_type(&inner_ty) {
           write_bool_tokens(value_expr.clone(), &inner_ty)
+        } else if is_string_like_type(&inner_ty) {
+          quote! {
+            crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
+          }
         } else {
           quote! {
             crate::common::write_escaped_text(writer, #value_expr)?;
@@ -201,8 +206,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   };
 
   let mut write_arms = Vec::with_capacity(variants.len());
-  let mut matcher_checks = Vec::with_capacity(variants.len());
-  let mut child_dispatch_tokens = Vec::with_capacity(variants.len());
+  let mut direct_matcher_arms = Vec::with_capacity(variants.len());
+  let mut helper_matcher_checks = Vec::new();
+  let mut direct_child_dispatch_arms = Vec::with_capacity(variants.len());
+  let mut helper_child_dispatch_tokens = Vec::new();
   let mut any_dispatch_tokens = Vec::new();
   let mut text_from_string_tokens = Vec::new();
   let mut validate_arms = Vec::new();
@@ -230,19 +237,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           quote! { Self::#variant_ident(parsed_child) }
         };
         let qname_patterns = choice_qname_patterns(&qnames);
-        matcher_checks.push(quote! {
+        direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
-          if matches!(name, #( #qname_patterns )|*) {
-            return true;
-          }
+          #( #qname_patterns )|* => true,
         });
-        let read_arm = quote! {
-          if matches!(e.name().as_ref(), #( #qname_patterns )|*) {
+        direct_child_dispatch_arms.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
             let parsed_child = #inner_ty::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
-        };
-        child_dispatch_tokens.push(quote! { #(#cfg_attrs)* #read_arm });
+        });
 
         let write_arm = quote! {
           #(#cfg_attrs)*
@@ -272,13 +277,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         } else {
           quote! { Self::#variant_ident(parsed_child) }
         };
-        matcher_checks.push(quote! {
+        helper_matcher_checks.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_start_qname(name) {
             return true;
           }
         });
-        child_dispatch_tokens.push(quote! {
+        helper_child_dispatch_tokens.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_start_qname(e.name().as_ref()) {
             let parsed_child = #inner_ty::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
@@ -345,13 +350,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             #( #helper_fields, )*
           }
         });
-        matcher_checks.push(quote! {
+        helper_matcher_checks.push(quote! {
           #(#cfg_attrs)*
           if #helper_ident::matches_start_qname(name) {
             return true;
           }
         });
-        child_dispatch_tokens.push(quote! {
+        helper_child_dispatch_tokens.push(quote! {
           #(#cfg_attrs)*
           if #helper_ident::matches_start_qname(e.name().as_ref()) {
             let parsed_child = #helper_ident::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
@@ -429,14 +434,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             )?
           }
         };
-        matcher_checks.push(quote! {
+        direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
-          if matches!(name, #( #qname_patterns )|*) {
-            return true;
-          }
+          #( #qname_patterns )|* => true,
         });
-        let read_arm = quote! {
-          if matches!(e.name().as_ref(), #( #qname_patterns )|*) {
+        direct_child_dispatch_arms.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
             let parsed_child = if empty_tag {
               #empty_value_tokens
             } else {
@@ -471,12 +475,15 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             };
             return Ok(Self::#variant_ident(parsed_child));
           }
-        };
-        child_dispatch_tokens.push(quote! { #(#cfg_attrs)* #read_arm });
+        });
         let value_write_tokens = if is_xml_schema_float_type(&payload_ty) {
           write_xml_schema_float_tokens(quote! { value }, &payload_ty)
         } else if is_bool_type(&payload_ty) {
           write_bool_tokens(quote! { value }, &payload_ty)
+        } else if is_string_like_type(&payload_ty) {
+          quote! {
+            crate::common::write_escaped_str(writer, value.as_ref())?;
+          }
         } else {
           quote! {
             crate::common::write_escaped_text(writer, value)?;
@@ -500,12 +507,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         has_any_variant = true;
-        matcher_checks.push(quote! {
-          #(#cfg_attrs)*
-          {
-            matched = true;
-          }
-        });
         let constructor = if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(xml)) }
         } else {
@@ -534,6 +535,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           write_xml_schema_float_tokens(quote! { value }, &payload_ty)
         } else if is_bool_type(&payload_ty) {
           write_bool_tokens(quote! { value }, &payload_ty)
+        } else if is_string_like_type(&payload_ty) {
+          quote! {
+            crate::common::write_escaped_str(writer, value.as_ref())?;
+          }
         } else {
           quote! {
             crate::common::write_escaped_text(writer, value)?;
@@ -567,14 +572,23 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
 
   let matches_start_qname_tokens = if has_any_variant {
     quote! {
-      let mut matched = false;
-      #( #matcher_checks )*
-      matched
+      match name {
+        #( #direct_matcher_arms )*
+        _ => {
+          #( #helper_matcher_checks )*
+          true
+        }
+      }
     }
   } else {
     quote! {
-      #( #matcher_checks )*
-      false
+      match name {
+        #( #direct_matcher_arms )*
+        _ => {
+          #( #helper_matcher_checks )*
+          false
+        }
+      }
     }
   };
   let from_text_value_tokens = if text_from_string_tokens.is_empty() {
@@ -589,20 +603,28 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
 
   let read_tokens = if any_dispatch_tokens.is_empty() {
     quote! {
-      #( #child_dispatch_tokens )*
-      {
-        let found = e.name();
-        Err(crate::common::unexpected_tag(
-          stringify!(#ident),
-          "choice",
-          found.as_ref(),
-        ))
+      match e.name().as_ref() {
+        #( #direct_child_dispatch_arms )*
+        _ => {
+          #( #helper_child_dispatch_tokens )*
+          let found = e.name();
+          Err(crate::common::unexpected_tag(
+            stringify!(#ident),
+            "choice",
+            found.as_ref(),
+          ))
+        }
       }
     }
   } else {
     quote! {
-      #( #child_dispatch_tokens )*
-      #( #any_dispatch_tokens )*
+      match e.name().as_ref() {
+        #( #direct_child_dispatch_arms )*
+        _ => {
+          #( #helper_child_dispatch_tokens )*
+          #( #any_dispatch_tokens )*
+        }
+      }
     }
   };
 

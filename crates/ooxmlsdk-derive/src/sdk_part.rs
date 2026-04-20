@@ -128,7 +128,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   for child in &child_infos {
     let child_type = &child.ty;
-    let relationship_type = &child.relationship_type;
+    let relationship_type_values = relationship_type_match_values(&child.relationship_type);
     let child_field_ident = &child.field_ident;
     let child_item_ident = child.field_ident.clone();
     let child_load_ident: Ident = parse_str(&format!("loaded_{}", child_item_ident))?;
@@ -139,7 +139,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Vec<#child_type> = vec![];
         });
         child_match_arms.push(quote! {
-          relationship_type if relationship_type == #relationship_type => {
+          #( #relationship_type_values )|* => {
             let target_path = crate::common::resolve_zip_file_path(
               &crate::common::resolve_relationship_target_path(
                 &child_parent_path,
@@ -181,7 +181,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
         child_match_arms.push(quote! {
-          relationship_type if relationship_type == #relationship_type => {
+          #( #relationship_type_values )|* => {
             let target_path = crate::common::resolve_zip_file_path(
               &crate::common::resolve_relationship_target_path(
                 &child_parent_path,
@@ -226,7 +226,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
         child_match_arms.push(quote! {
-          relationship_type if relationship_type == #relationship_type => {
+          #( #relationship_type_values )|* => {
             let target_path = crate::common::resolve_zip_file_path(
               &crate::common::resolve_relationship_target_path(
                 &child_parent_path,
@@ -270,7 +270,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     field_declarations.push(quote! {
       if let Some(relationships) = &relationships {
         for relationship in &relationships.relationship {
-          match crate::common::normalize_relationship_type(relationship.r#type.as_str()) {
+          match relationship.r#type.as_str() {
             #( #child_match_arms )*
             _ => {}
           }
@@ -351,29 +351,26 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let mut content_write_stmts: Vec<proc_macro2::TokenStream> = Vec::new();
   if has_root_element {
     content_write_stmts.push(quote! {
-      if !entry_set.contains(&self.inner_path) {
+      if entry_set.insert(self.inner_path.clone()) {
         zip.start_file(&self.inner_path, options)?;
         zip.write_all(self.root_element.to_xml()?.as_bytes())?;
-        entry_set.insert(self.inner_path.to_string());
       }
     });
   } else if let Some(kind) = content_kind {
     match kind {
       DerivedPartContentKind::Text => {
         content_write_stmts.push(quote! {
-          if !entry_set.contains(&self.inner_path) {
+          if entry_set.insert(self.inner_path.clone()) {
             zip.start_file(&self.inner_path, options)?;
             zip.write_all(self.part_content.as_bytes())?;
-            entry_set.insert(self.inner_path.to_string());
           }
         });
       }
       DerivedPartContentKind::Binary => {
         content_write_stmts.push(quote! {
-          if !entry_set.contains(&self.inner_path) {
+          if entry_set.insert(self.inner_path.clone()) {
             zip.start_file(&self.inner_path, options)?;
             zip.write_all(&self.part_content)?;
-            entry_set.insert(self.inner_path.to_string());
           }
         });
       }
@@ -387,14 +384,12 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         let rels_dir_path = crate::common::resolve_zip_file_path(
           &format!("{rels_parent_path}_rels"),
         );
-        if !rels_dir_path.is_empty() && !entry_set.contains(&rels_dir_path) {
+        if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {
           zip.add_directory(&rels_dir_path, options)?;
-          entry_set.insert(rels_dir_path);
         }
-        if !entry_set.contains(&self.rels_path) {
+        if entry_set.insert(self.rels_path.clone()) {
           zip.start_file(&self.rels_path, options)?;
           zip.write_all(relationships.to_xml()?.as_bytes())?;
-          entry_set.insert(self.rels_path.to_string());
         }
       }
     }
@@ -418,9 +413,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o755);
       let directory_path = crate::common::resolve_zip_file_path(parent_path);
-      if !directory_path.is_empty() && !entry_set.contains(&directory_path) {
+      if !directory_path.is_empty() && entry_set.insert(directory_path.clone()) {
         zip.add_directory(&directory_path, options)?;
-        entry_set.insert(directory_path);
       }
       let child_parent_path = crate::common::parent_zip_path(&self.inner_path);
       let dir_path = self
@@ -428,9 +422,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         .rsplit_once('/')
         .map(|(dir_path, _)| crate::common::resolve_zip_file_path(&format!("{dir_path}/")))
         .unwrap_or_default();
-      if !dir_path.is_empty() && !entry_set.contains(&dir_path) {
+      if !dir_path.is_empty() && entry_set.insert(dir_path.clone()) {
         zip.add_directory(&dir_path, options)?;
-        entry_set.insert(dir_path);
       }
       #relationships_write_tokens
       #( #content_write_stmts )*
@@ -442,24 +435,28 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let mut impl_items = vec![new_from_archive_impl, save_zip_impl];
 
   if has_content_types {
-    impl_items.insert(0, quote! {
-      pub fn new<R: std::io::Read + std::io::Seek>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut archive = zip::ZipArchive::new(reader)?;
-        let mut file_path_set: std::collections::HashSet<String> = std::collections::HashSet::new();
-        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
-        for i in 0..archive.len() {
-          let file = archive.by_index(i)?;
-          let file_path = match file.enclosed_name() {
-            Some(path) => path.to_string_lossy().to_string(),
-            None => continue,
-          };
-          file_path_set.insert(file_path);
+    impl_items.insert(
+      0,
+      quote! {
+        pub fn new<R: std::io::Read + std::io::Seek>(
+          reader: R,
+        ) -> Result<Self, crate::common::SdkError> {
+          let mut archive = zip::ZipArchive::new(reader)?;
+          let mut file_path_set: std::collections::HashSet<String> =
+            std::collections::HashSet::with_capacity(archive.len());
+          let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+          for i in 0..archive.len() {
+            let file = archive.by_index(i)?;
+            let file_path = match file.enclosed_name() {
+              Some(path) => path.to_string_lossy().to_string(),
+              None => continue,
+            };
+            file_path_set.insert(file_path);
+          }
+          Self::new_from_archive("", "", "", &file_path_set, &mut archive, &mut visited)
         }
-        Self::new_from_archive("", "", "", &file_path_set, &mut archive, &mut visited)
-      }
-    });
+      },
+    );
     impl_items.insert(
       1,
       quote! {

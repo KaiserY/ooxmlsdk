@@ -379,6 +379,10 @@ fn build_text_child_write_tokens(
       write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
     } else if is_bool_type(&inner_ty) {
       write_bool_tokens(value_expr.clone(), &inner_ty)
+    } else if is_string_like_type(&inner_ty) {
+      quote! {
+        crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
+      }
     } else {
       quote! {
         crate::common::write_escaped_text(writer, #value_expr)?;
@@ -434,7 +438,8 @@ fn expand_sequence_helper_struct(
       .ident
       .as_ref()
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
-    match parse_sdk_type_field_kind(&field.attrs)? {
+    let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
+    match parsed_attrs.kind {
       Some(SdkTypeFieldKind::Child { qname }) => {
         let QNameInfo {
           tag_prefix,
@@ -684,7 +689,8 @@ fn expand_helper_struct(
       .ident
       .as_ref()
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
-    match parse_sdk_type_field_kind(&field.attrs)? {
+    let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
+    match parsed_attrs.kind {
       Some(SdkTypeFieldKind::Child { qname }) => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
@@ -1074,7 +1080,8 @@ fn expand_helper_struct(
   }
 
   let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
-  let visit_foreign_child_tokens = if !has_child_dispatch && choice_fields.is_empty() {
+  let has_choice_dispatch = !choice_fields.is_empty();
+  let visit_foreign_child_tokens = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
       let mut visit_foreign_child = |
         _xml_reader: &mut R,
@@ -1084,7 +1091,7 @@ fn expand_helper_struct(
         Ok(false)
       };
     }
-  } else if choice_fields.is_empty() {
+  } else if !has_choice_dispatch {
     quote! {
       let mut visit_foreign_child = |
         xml_reader: &mut R,
@@ -1106,18 +1113,17 @@ fn expand_helper_struct(
       | -> Result<bool, crate::common::SdkError> {
         let matched: bool = match e.name().as_ref() {
           #( #child_visit_parse_tokens )*
-          _ => Ok::<bool, crate::common::SdkError>(false),
+          _ => {
+            let mut matched = false;
+            #( #choice_visit_parse_tokens )*
+            Ok::<bool, crate::common::SdkError>(matched)
+          }
         }?;
-        if matched {
-          return Ok(true);
-        }
-        let mut matched = false;
-        #( #choice_visit_parse_tokens )*
         Ok(matched)
       };
     }
   };
-  let main_dispatch_tokens = if choice_fields.is_empty() {
+  let main_dispatch_tokens = if !has_choice_dispatch {
     quote! {
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
@@ -1131,13 +1137,12 @@ fn expand_helper_struct(
     quote! {
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
-        _ => false,
+        _ => {
+          let mut matched = false;
+          #( #choice_parse_tokens )*
+          matched
+        }
       };
-      if matched {
-        continue;
-      }
-      let mut matched = false;
-      #( #choice_parse_tokens )*
       if matched {
         continue;
       }
@@ -1277,6 +1282,7 @@ fn expand_named_struct(
   let mut xmlns_fields = Vec::new();
   let mut xml_header_field = None;
   let mut mc_ignorable_field = None;
+  let mut ordered_field_specs = Vec::new();
 
   for field in &fields.named {
     let field_ident = field
@@ -1296,51 +1302,54 @@ fn expand_named_struct(
       continue;
     }
 
-    match parse_sdk_type_field_kind(&field.attrs)? {
-      Some(SdkTypeFieldKind::Attr { name }) => attr_fields.push(SdkAttrField {
+    let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
+    let Some(field_kind) = parsed_attrs.kind else {
+      return Err(syn::Error::new_spanned(
+        field,
+        "missing #[sdk(...)] field attribute",
+      ));
+    };
+    ordered_field_specs.push((field_ident.clone(), field.ty.clone(), field_kind.clone()));
+
+    match field_kind {
+      SdkTypeFieldKind::Attr { name } => attr_fields.push(SdkAttrField {
         ident: field_ident.clone(),
         name,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
-        validators: parse_sdk_type_field_validators(&field.attrs)?,
+        validators: parsed_attrs.validators,
       }),
-      Some(SdkTypeFieldKind::Child { qname }) => child_fields.push(SdkChildField {
+      SdkTypeFieldKind::Child { qname } => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::TextChild { qname }) => text_child_fields.push(SdkTextChildField {
+      SdkTypeFieldKind::TextChild { qname } => text_child_fields.push(SdkTextChildField {
         ident: field_ident.clone(),
         qname,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::Choice) => choice_fields.push(SdkChoiceField {
+      SdkTypeFieldKind::Choice => choice_fields.push(SdkChoiceField {
         ident: field_ident.clone(),
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::Any) => any_fields.push(SdkAnyField {
+      SdkTypeFieldKind::Any => any_fields.push(SdkAnyField {
         ident: field_ident.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::Text) => {
+      SdkTypeFieldKind::Text => {
         text_field = Some(SdkTextField {
           ident: field_ident.clone(),
           ty: field.ty.clone(),
           optional: is_option_type(&field.ty),
         });
-      }
-      None => {
-        return Err(syn::Error::new_spanned(
-          field,
-          "missing #[sdk(...)] field attribute",
-        ));
       }
     }
   }
@@ -1419,6 +1428,10 @@ fn expand_named_struct(
         writer.write_str("=\"")?;
         #write_value_tokens
         writer.write_char('"')?;
+      }
+    } else if is_string_like_type(&parse_ty) {
+      quote! {
+        crate::common::write_attr_value_str(writer, #name_lit, value.as_ref())?;
       }
     } else {
       quote! {
@@ -2024,50 +2037,53 @@ fn expand_named_struct(
   }
 
   let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
-  let visit_foreign_child_tokens = if !has_child_dispatch && choice_fields.is_empty() {
-    quote! {
-      let mut visit_foreign_child = |
-        _xml_reader: &mut R,
-        _e: quick_xml::events::BytesStart<'de>,
-        _next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        Ok(false)
-      };
-    }
-  } else if choice_fields.is_empty() {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => Ok(false),
-        }
-      };
-    }
-  } else {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut R,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let matched: bool = match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => Ok::<bool, crate::common::SdkError>(false),
-        }?;
-        if matched {
-          return Ok(true);
-        }
-        let mut matched = false;
-        #( #choice_visit_parse_tokens )*
-        Ok(matched)
-      };
-    }
-  };
-  let child_choice_dispatch_tokens = if choice_fields.is_empty() {
+  let has_choice_dispatch = !choice_fields.is_empty();
+  let has_any_dispatch = !any_fields.is_empty();
+  let visit_foreign_child_tokens =
+    if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          _xml_reader: &mut R,
+          _e: quick_xml::events::BytesStart<'de>,
+          _next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          Ok(false)
+        };
+      }
+    } else if !has_choice_dispatch && !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut R,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          match e.name().as_ref() {
+            #( #child_visit_parse_tokens )*
+            _ => Ok(false),
+          }
+        };
+      }
+    } else {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut R,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let matched: bool = match e.name().as_ref() {
+            #( #child_visit_parse_tokens )*
+            _ => {
+              let mut matched = false;
+              #( #choice_visit_parse_tokens )*
+              #( #any_visit_parse_tokens )*
+              Ok::<bool, crate::common::SdkError>(matched)
+            }
+          }?;
+          Ok(matched)
+        };
+      }
+    };
+  let child_choice_dispatch_tokens = if !has_choice_dispatch && !has_any_dispatch {
     quote! {
       let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
@@ -2079,14 +2095,15 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      let mut matched = match e.name().as_ref() {
+      let matched = match e.name().as_ref() {
         #( #child_parse_tokens )*
-        _ => false,
+        _ => {
+          let mut matched = false;
+          #( #choice_parse_tokens )*
+          #( #any_parse_tokens )*
+          matched
+        }
       };
-      if !matched {
-        #( #choice_parse_tokens )*
-      }
-      #( #any_parse_tokens )*
       if matched {
         continue;
       }
@@ -2159,15 +2176,11 @@ fn expand_named_struct(
     }
   };
   let mut ordered_write_tokens = Vec::new();
-  for field in &fields.named {
-    let field_ident = field
-      .ident
-      .as_ref()
-      .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
-    match parse_sdk_type_field_kind(&field.attrs)? {
-      Some(SdkTypeFieldKind::Child { .. }) => {
-        let repeated = contains_vec_type(&field.ty);
-        let optional = is_option_type(&field.ty);
+  for (field_ident, field_ty, field_kind) in &ordered_field_specs {
+    match field_kind {
+      SdkTypeFieldKind::Child { .. } => {
+        let repeated = contains_vec_type(field_ty);
+        let optional = is_option_type(field_ty);
         if repeated {
           ordered_write_tokens.push(quote! {
             for child in &self.#field_ident {
@@ -2186,18 +2199,18 @@ fn expand_named_struct(
           });
         }
       }
-      Some(SdkTypeFieldKind::TextChild { qname }) => {
+      SdkTypeFieldKind::TextChild { qname } => {
         ordered_write_tokens.push(build_text_child_write_tokens(
           field_ident,
-          &qname,
-          &field.ty,
-          contains_vec_type(&field.ty),
-          is_option_type(&field.ty),
+          qname,
+          field_ty,
+          contains_vec_type(field_ty),
+          is_option_type(field_ty),
         ));
       }
-      Some(SdkTypeFieldKind::Choice) => {
-        let repeated = contains_vec_type(&field.ty);
-        let optional = is_option_type(&field.ty);
+      SdkTypeFieldKind::Choice => {
+        let repeated = contains_vec_type(field_ty);
+        let optional = is_option_type(field_ty);
         if repeated {
           ordered_write_tokens.push(quote! {
             for choice in &self.#field_ident {
@@ -2216,9 +2229,9 @@ fn expand_named_struct(
           });
         }
       }
-      Some(SdkTypeFieldKind::Any) => {
-        let repeated = contains_vec_type(&field.ty);
-        let optional = is_option_type(&field.ty);
+      SdkTypeFieldKind::Any => {
+        let repeated = contains_vec_type(field_ty);
+        let optional = is_option_type(field_ty);
         if repeated {
           ordered_write_tokens.push(quote! {
             for value in &self.#field_ident {
@@ -2237,12 +2250,16 @@ fn expand_named_struct(
           });
         }
       }
-      Some(SdkTypeFieldKind::Text) => {
-        let inner_ty = unwrap_wrapped_type(&field.ty);
+      SdkTypeFieldKind::Text => {
+        let inner_ty = unwrap_wrapped_type(field_ty);
         let optional_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { value }, &inner_ty)
         } else if is_bool_type(&inner_ty) {
           write_bool_tokens(quote! { value }, &inner_ty)
+        } else if is_string_like_type(&inner_ty) {
+          quote! {
+            crate::common::write_escaped_str(writer, value.as_ref())?;
+          }
         } else {
           quote! {
             crate::common::write_escaped_text(writer, value)?;
@@ -2252,12 +2269,16 @@ fn expand_named_struct(
           write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
         } else if is_bool_type(&inner_ty) {
           write_bool_tokens(quote! { &self.#field_ident }, &inner_ty)
+        } else if is_string_like_type(&inner_ty) {
+          quote! {
+            crate::common::write_escaped_str(writer, self.#field_ident.as_ref())?;
+          }
         } else {
           quote! {
             crate::common::write_escaped_text(writer, &self.#field_ident)?;
           }
         };
-        if is_option_type(&field.ty) {
+        if is_option_type(field_ty) {
           ordered_write_tokens.push(quote! {
             if let Some(value) = &self.#field_ident {
               #optional_text_write_tokens
@@ -2269,7 +2290,7 @@ fn expand_named_struct(
           });
         }
       }
-      Some(SdkTypeFieldKind::Attr { .. }) | None => {}
+      SdkTypeFieldKind::Attr { .. } => {}
     }
   }
   let text_finish_tokens = if let Some(text_field) = &text_field {
@@ -2335,7 +2356,7 @@ fn expand_named_struct(
   let mc_ignorable_write_tokens = if has_mc_ignorable_field {
     quote! {
       if let Some(mc_ignorable) = &self.mc_ignorable {
-        crate::common::write_attr_value(writer, "mc:Ignorable", mc_ignorable)?;
+        crate::common::write_attr_value_str(writer, "mc:Ignorable", mc_ignorable.as_ref())?;
       }
     }
   } else {

@@ -1,5 +1,38 @@
 # Change Log
 
+## 0.4.0
+
+### Breaking Changes
+
+- Simplified the public crate feature surface. The old version-sliced feature layout from earlier releases is no longer the supported model; the runtime crate now centers on `parts`, `microsoft365`, and `validators`.
+- The default feature set is now `["microsoft365", "parts"]`. Consumers that previously depended on a schema-only or narrower custom feature mix may need to switch to `default-features = false` and opt back into the exact features they want.
+- Office 2007-oriented validation and compatibility checks are now expected to be exercised with `--no-default-features --features parts`, while newer Microsoft 365 coverage remains behind `microsoft365`.
+- `ooxmlsdk` now depends on `ooxmlsdk-derive` instead of `ooxmlsdk-build`. Downstream users should treat `ooxmlsdk-build` as generator-side tooling rather than as a runtime dependency path.
+- The workspace now targets Rust 2024 edition.
+- The minimum supported Rust version is now `1.88`.
+
+### New Features
+
+- Expanded checked-in generated runtime coverage for package parts and schema modules used by Wordprocessing, Spreadsheet, and Presentation documents.
+- Kept validator support available behind the optional `validators` feature with dedicated integration coverage.
+- Added release-oriented repository guidance around checked-in generated runtime artifacts and the full validation sequence used before publishing.
+
+### Performance
+
+- Improved derive-generated read-path performance by pushing more child and choice dispatch work into code generation instead of generic runtime fallback logic.
+- Reduced runtime branching and unnecessary allocations in generated parsers, especially on package and XML read paths.
+
+### Bug Fixes
+
+- Tightened package relationship handling and compatibility aliases in generated part loading.
+- Improved generated read-path correctness around child and choice dispatch while keeping the workspace validation matrix green.
+
+### Misc Changes
+
+- Bumped `quick-xml` to `0.39.2`.
+- Bumped `regex` to `1.12.3`.
+- Refreshed release validation and benchmark guidance in the repository documentation.
+
 ## 0.3.0
 
 ### New Features

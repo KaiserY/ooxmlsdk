@@ -55,6 +55,8 @@ Execute Cargo commands in the repository's default `target/` directory. Do not s
 
 For long-running Cargo commands such as `cargo test`, `cargo clippy`, and generation flows, prefer linear execution and patient waiting over short polling loops. Start the command, let it run, and wait for completion before analyzing results unless there is a concrete reason to interrupt. Do not rely on `ps`, process-list probing, or similar background-process heuristics to decide whether Cargo is still active; sandboxing and wrapper processes can make those signals misleading. Treat Cargo's own lock messages and final exit status as the source of truth.
 
+When checking runtime performance, prefer evaluating `cargo bench -p ooxmlsdk-test` as a whole rather than drawing conclusions from a single case. The `packages` and `xml` suites have repeatedly disagreed on `wordprocessing_document/write/parsed`, so treat that one metric as a known benchmark anomaly until it is investigated; rely on the surrounding read, write, and round-trip trends before deciding whether a performance change is real.
+
 ## Coding Style & Naming Conventions
 Follow standard Rust formatting and keep the workspace `rustfmt`-clean. Use snake_case for modules and functions, PascalCase for Rust types, and preserve the schema-derived module naming pattern already in use, for example `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
 

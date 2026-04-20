@@ -1,0 +1,1360 @@
+//
+// -----------------------------------------------------------------------------
+//  THIS FILE WAS @generated AUTOMATICALLY. DO NOT MODIFY THIS FILE MANUALLY.
+// -----------------------------------------------------------------------------
+//
+
+/// Defines the PivotSource Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:pivotSource.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_PivotSource/c15:pivotSource")]
+pub struct PivotSource {
+  ///Pivot Name
+  #[sdk(text_child(qname = "c:ST_Xstring/c:name"))]
+  pub pivot_table_name: crate::simple_type::StringValue,
+  ///Format ID
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:fmtId"))]
+  pub format_id:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::FormatId>,
+  ///Chart Extensibility
+  #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
+  pub extension_list:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+}
+/// Defines the NumberingFormat Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:numFmt.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_NumFmt/c15:numFmt")]
+pub struct NumberingFormat {
+  /// Number Format Code
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :formatCode
+  #[sdk(attr(qname = ":formatCode"))]
+  pub format_code: crate::simple_type::StringValue,
+  /// Linked to Source
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :sourceLinked
+  #[sdk(attr(qname = ":sourceLinked"))]
+  pub source_linked: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the ShapeProperties Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:spPr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "a:CT_ShapeProperties/c15:spPr")]
+pub struct ShapeProperties {
+  /// Black and White Mode
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :bwMode
+  #[sdk(attr(qname = ":bwMode"))]
+  #[sdk(string_format(source = 0u32, kind = "token"))]
+  pub black_white_mode:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  ///2D Transform for Individual Objects
+  #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
+  pub transform2_d: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
+  >,
+  #[sdk(choice)]
+  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
+  #[sdk(choice)]
+  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
+  /// _
+  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
+  pub a_ln: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
+  >,
+  #[sdk(choice)]
+  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
+  /// _
+  #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
+  pub a_scene3d: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
+  >,
+  /// _
+  #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
+  pub a_sp3d: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
+  >,
+  /// _
+  #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
+  pub a_ext_lst: Option<
+    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
+  >,
+}
+/// Defines the Layout Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:layout.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Layout/c15:layout")]
+pub struct Layout {
+  ///Manual Layout
+  #[sdk(child(qname = "c:CT_ManualLayout/c:manualLayout"))]
+  pub manual_layout: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ManualLayout>,
+  >,
+  ///Chart Extensibility
+  #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
+  pub extension_list:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+}
+/// Defines the FullReference Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:fullRef.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FullRef/c15:fullRef")]
+pub struct FullReference {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:sqref"))]
+  pub sequence_of_references: crate::simple_type::StringValue,
+}
+/// Defines the LevelReference Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:levelRef.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_LevelRef/c15:levelRef")]
+pub struct LevelReference {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:sqref"))]
+  pub sequence_of_references: crate::simple_type::StringValue,
+}
+/// Defines the FormulaReference Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:formulaRef.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FormulaRef/c15:formulaRef")]
+pub struct FormulaReference {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:sqref"))]
+  pub sequence_of_references: crate::simple_type::StringValue,
+}
+/// Defines the FilteredSeriesTitle Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredSeriesTitle.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle")]
+pub struct FilteredSeriesTitle {
+  /// _
+  #[sdk(child(qname = "c:CT_Tx/c15:tx"))]
+  pub chart_text: std::boxed::Box<ChartText>,
+}
+/// Defines the FilteredCategoryTitle Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredCategoryTitle.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle")]
+pub struct FilteredCategoryTitle {
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c15:cat"))]
+  pub axis_data_source_type: std::boxed::Box<AxisDataSourceType>,
+}
+/// Defines the FilteredAreaSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredAreaSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries")]
+pub struct FilteredAreaSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_AreaSer/c15:ser"))]
+  pub area_chart_series: std::boxed::Box<AreaChartSeries>,
+}
+/// Defines the FilteredBarSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredBarSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries")]
+pub struct FilteredBarSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_BarSer/c15:ser"))]
+  pub bar_chart_series: std::boxed::Box<BarChartSeries>,
+}
+/// Defines the FilteredBubbleSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredBubbleSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries")]
+pub struct FilteredBubbleSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_BubbleSer/c15:ser"))]
+  pub bubble_chart_series: std::boxed::Box<BubbleChartSeries>,
+}
+/// Defines the FilteredLineSeriesExtension Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredLineSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries")]
+pub struct FilteredLineSeriesExtension {
+  /// _
+  #[sdk(child(qname = "c:CT_LineSer/c15:ser"))]
+  pub line_chart_series: std::boxed::Box<LineChartSeries>,
+}
+/// Defines the FilteredPieSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredPieSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries")]
+pub struct FilteredPieSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_PieSer/c15:ser"))]
+  pub pie_chart_series: std::boxed::Box<PieChartSeries>,
+}
+/// Defines the FilteredRadarSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredRadarSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries")]
+pub struct FilteredRadarSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_RadarSer/c15:ser"))]
+  pub radar_chart_series: std::boxed::Box<RadarChartSeries>,
+}
+/// Defines the FilteredScatterSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredScatterSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries")]
+pub struct FilteredScatterSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_ScatterSer/c15:ser"))]
+  pub scatter_chart_series: std::boxed::Box<ScatterChartSeries>,
+}
+/// Defines the FilteredSurfaceSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:filteredSurfaceSeries.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries")]
+pub struct FilteredSurfaceSeries {
+  /// _
+  #[sdk(child(qname = "c:CT_SurfaceSer/c15:ser"))]
+  pub surface_chart_series: std::boxed::Box<SurfaceChartSeries>,
+}
+/// Defines the DataLabelsRange Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:datalabelsRange.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange")]
+pub struct DataLabelsRange {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:f"))]
+  pub formula: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "c:CT_StrData/c15:dlblRangeCache"))]
+  pub data_labels_range_chache: Option<std::boxed::Box<DataLabelsRangeChache>>,
+}
+/// Defines the CategoryFilterExceptions Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:categoryFilterExceptions.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions")]
+pub struct CategoryFilterExceptions {
+  /// _
+  #[sdk(child(qname = "c15:CT_CategoryFilterException/c15:categoryFilterException"))]
+  pub c15_category_filter_exception: Vec<CategoryFilterException>,
+}
+/// Defines the DataLabelFieldTable Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:dlblFieldTable.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable")]
+pub struct DataLabelFieldTable {
+  /// _
+  #[sdk(child(qname = "c15:CT_DataLabelFieldTableEntry/c15:dlblFTEntry"))]
+  pub c15_dlbl_ft_entry: Vec<DataLabelFieldTableEntry>,
+}
+/// Defines the ExceptionForSave Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:xForSave.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/c15:xForSave")]
+pub struct ExceptionForSave {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the ShowDataLabelsRange Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:showDataLabelsRange.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/c15:showDataLabelsRange")]
+pub struct ShowDataLabelsRange {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the ShowLeaderLines Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:showLeaderLines.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/c15:showLeaderLines")]
+pub struct ShowLeaderLines {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the AutoGeneneratedCategories Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:autoCat.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/c15:autoCat")]
+pub struct AutoGeneneratedCategories {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the InvertIfNegativeBoolean Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:invertIfNegative.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/c15:invertIfNegative")]
+pub struct InvertIfNegativeBoolean {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the Bubble3D Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:bubble3D.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/c15:bubble3D")]
+pub struct Bubble3D {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the BooleanType Class.
+///
+/// Available in Office2007 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Boolean/")]
+pub struct BooleanType {
+  /// Boolean Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::BooleanValue>,
+}
+/// Defines the ChartText Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:tx.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Tx/c15:tx")]
+pub struct ChartText {
+  #[sdk(choice)]
+  pub xml_children: Option<ChartTextChoice>,
+}
+/// Defines the LeaderLines Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:leaderLines.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_ChartLines/c15:leaderLines")]
+pub struct LeaderLines {
+  /// _
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+}
+/// Defines the SequenceOfReferences Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:sqref.
+pub type SequenceOfReferences = crate::simple_type::StringValue;
+/// Defines the Formula Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:f.
+pub type Formula = crate::simple_type::StringValue;
+/// Defines the TextFieldGuid Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:txfldGUID.
+pub type TextFieldGuid = crate::simple_type::StringValue;
+/// Defines the AxisDataSourceType Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:cat.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_AxDataSource/c15:cat")]
+pub struct AxisDataSourceType {
+  #[sdk(choice)]
+  pub xml_children: Option<AxisDataSourceTypeChoice>,
+}
+/// Defines the BarChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_BarSer/c15:ser")]
+pub struct BarChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c:invertIfNegative"))]
+  pub invert_if_negative:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::InvertIfNegative>,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
+  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  /// _
+  #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
+  pub c_err_bars: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
+  pub c_cat: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
+  pub c_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Shape/c:shape"))]
+  pub c_shape: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Shape>,
+  /// _
+  #[sdk(child(qname = "c:CT_BarSerExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::BarSerExtensionList>,
+}
+/// Defines the LineChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_LineSer/c15:ser")]
+pub struct LineChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Marker/c:marker"))]
+  pub marker: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Marker>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
+  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  /// _
+  #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
+  pub c_err_bars: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
+  pub c_cat: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
+  pub c_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
+  pub c_smooth: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Smooth>,
+  /// _
+  #[sdk(child(qname = "c:CT_LineSerExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::LineSerExtensionList>,
+}
+/// Defines the ScatterChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_ScatterSer/c15:ser")]
+pub struct ScatterChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Marker/c:marker"))]
+  pub marker: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Marker>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
+  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  /// _
+  #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
+  pub c_err_bars: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
+  pub c_x_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::XValues>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
+  pub c_y_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::YValues>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
+  pub c_smooth: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Smooth>,
+  /// _
+  #[sdk(child(qname = "c:CT_ScatterSerExtensionList/c:extLst"))]
+  pub c_ext_lst: Option<
+    crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ScatterSerExtensionList,
+  >,
+}
+/// Defines the AreaChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_AreaSer/c15:ser")]
+pub struct AreaChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
+  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  /// _
+  #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
+  pub c_err_bars: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
+  pub c_cat: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
+  pub c_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_AreaSerExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::AreaSerExtensionList>,
+}
+/// Defines the PieChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_PieSer/c15:ser")]
+pub struct PieChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:explosion"))]
+  pub explosion: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Explosion>,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
+  pub c_cat: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
+  pub c_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PieSerExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PieSerExtensionList>,
+}
+/// Defines the BubbleChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_BubbleSer/c15:ser")]
+pub struct BubbleChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c:invertIfNegative"))]
+  pub invert_if_negative:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::InvertIfNegative>,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
+  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  /// _
+  #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
+  pub c_err_bars: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
+  pub c_x_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::XValues>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
+  pub c_y_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::YValues>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:bubbleSize"))]
+  pub c_bubble_size: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::BubbleSize>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
+  pub c_bubble3_d:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Bubble3D>,
+  /// _
+  #[sdk(child(qname = "c:CT_BubbleSerExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::BubbleSerExtensionList>,
+}
+/// Defines the RadarChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_RadarSer/c15:ser")]
+pub struct RadarChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Marker/c:marker"))]
+  pub marker: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Marker>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
+  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
+  pub c_d_lbls: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
+  pub c_cat: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
+  pub c_val: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_RadarSerExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::RadarSerExtensionList>,
+}
+/// Defines the SurfaceChartSeries Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:ser.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_SurfaceSer/c15:ser")]
+pub struct SurfaceChartSeries {
+  ///Index.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  ///Order.
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
+  pub order:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  ///Series Text.
+  #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
+  pub series_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
+  >,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
+  pub picture_options: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
+  pub category_axis_data: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
+  pub values: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
+  >,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
+  pub bubble3_d: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Bubble3D>,
+  /// _
+  #[sdk(child(qname = "c:CT_SurfaceSerExtensionList/c:extLst"))]
+  pub surface_ser_extension_list: Option<
+    crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SurfaceSerExtensionList,
+  >,
+}
+/// Defines the DataLabelsRangeChache Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:dlblRangeCache.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_StrData/c15:dlblRangeCache")]
+pub struct DataLabelsRangeChache {
+  /// _
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
+  pub point_count:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
+  /// _
+  #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
+  pub c_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
+}
+/// Defines the DataLabelFieldTableCache Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:dlblFieldTableCache.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_StrData/c15:dlblFieldTableCache")]
+pub struct DataLabelFieldTableCache {
+  /// _
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
+  pub point_count:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
+  /// _
+  #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
+  pub c_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
+  /// _
+  #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
+}
+/// Defines the StringDataType Class.
+///
+/// Available in Office2007 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_StrData/")]
+pub struct StringDataType {
+  #[sdk(choice)]
+  pub xml_children: Vec<StringDataTypeChoice>,
+}
+/// Defines the Explosion Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:explosion.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_UnsignedInt/c15:explosion")]
+pub struct Explosion {
+  /// Integer Value
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :val
+  #[sdk(attr(qname = ":val"))]
+  pub val: crate::simple_type::UInt32Value,
+}
+/// Defines the Marker Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:marker.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_Marker/c15:marker")]
+pub struct Marker {
+  ///Symbol
+  #[sdk(child(qname = "c:CT_MarkerStyle/c:symbol"))]
+  pub symbol: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Symbol>,
+  ///Size
+  #[sdk(child(qname = "c:CT_MarkerSize/c:size"))]
+  pub size: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Size>,
+  /// _
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  ///Chart Extensibility
+  #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
+  pub extension_list:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+}
+/// Defines the DataLabel Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:dLbl.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c:CT_DLbl/c15:dLbl")]
+pub struct DataLabel {
+  /// _
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
+  pub index:
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  #[sdk(choice)]
+  pub data_label_choice: Option<DataLabelChoice>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
+  pub c_ext_lst:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DLblExtensionList>,
+}
+/// Defines the CategoryFilterException Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:categoryFilterException.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_CategoryFilterException/c15:categoryFilterException")]
+pub struct CategoryFilterException {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:sqref"))]
+  pub sequence_of_references: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "a:CT_ShapeProperties/c15:spPr"))]
+  pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
+  /// _
+  #[sdk(child(qname = "c:CT_UnsignedInt/c15:explosion"))]
+  pub explosion: Option<Explosion>,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c15:invertIfNegative"))]
+  pub invert_if_negative_boolean: Option<InvertIfNegativeBoolean>,
+  /// _
+  #[sdk(child(qname = "c:CT_Boolean/c15:bubble3D"))]
+  pub bubble3_d: Option<Bubble3D>,
+  /// _
+  #[sdk(child(qname = "c:CT_Marker/c15:marker"))]
+  pub marker: Option<std::boxed::Box<Marker>>,
+  /// _
+  #[sdk(child(qname = "c:CT_DLbl/c15:dLbl"))]
+  pub data_label: Option<std::boxed::Box<DataLabel>>,
+}
+/// Defines the DataLabelFieldTableEntry Class.
+///
+/// Available in Office2013 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is c15:dlblFTEntry.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "c15:CT_DataLabelFieldTableEntry/c15:dlblFTEntry")]
+pub struct DataLabelFieldTableEntry {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:txfldGUID"))]
+  pub text_field_guid: crate::simple_type::StringValue,
+  /// _
+  #[sdk(text_child(qname = "xsd:string/c15:f"))]
+  pub formula: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "c:CT_StrData/c15:dlblFieldTableCache"))]
+  pub data_label_field_table_cache: Option<std::boxed::Box<DataLabelFieldTableCache>>,
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ShapePropertiesChoice {
+  #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
+  ACustGeom(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
+  ),
+  #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
+  APrstGeom(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ShapePropertiesChoice2 {
+  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
+  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
+  ASolidFill(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
+  ),
+  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
+  AGradFill(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
+  ),
+  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
+  ABlipFill(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
+  ),
+  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
+  APattFill(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
+  ),
+  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ShapePropertiesChoice3 {
+  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
+  AEffectLst(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
+  ),
+  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
+  AEffectDag(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ChartTextChoice {
+  #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
+  CStrRef(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringReference,
+    >,
+  ),
+  #[sdk(child(qname = "a:CT_TextBody/c:rich"))]
+  CRich(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::RichText>),
+  #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
+  CStrLit(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringLiteral>,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum AxisDataSourceTypeChoice {
+  #[sdk(child(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef"))]
+  CMultiLvlStrRef(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::MultiLevelStringReference,
+    >,
+  ),
+  #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
+  CNumRef(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumberReference,
+    >,
+  ),
+  #[sdk(child(qname = "c:CT_NumData/c:numLit"))]
+  CNumLit(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumberLiteral>,
+  ),
+  #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
+  CStrRef(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringReference,
+    >,
+  ),
+  #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
+  CStrLit(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringLiteral>,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum StringDataTypeChoice {
+  #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
+  CPtCount(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
+  ),
+  #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
+  CPt(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
+  ),
+  #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
+  CExtLst(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList,
+    >,
+  ),
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+pub struct DataLabelChoiceSequence {
+  ///Layout.
+  #[sdk(child(qname = "c:CT_Layout/c:layout"))]
+  pub layout: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Layout>,
+  >,
+  ///Defines the ChartText Class.
+  #[sdk(child(qname = "c:CT_Tx/c:tx"))]
+  pub chart_text: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartText>,
+  >,
+  ///Number Format.
+  #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
+  pub numbering_format:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumberingFormat>,
+  ///Defines the ChartShapeProperties Class.
+  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
+  pub chart_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
+    >,
+  >,
+  ///Defines the TextProperties Class.
+  #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
+  pub text_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::TextProperties,
+    >,
+  >,
+  ///Data Label Position.
+  #[sdk(child(qname = "c:CT_DLblPos/c:dLblPos"))]
+  pub data_label_position:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabelPosition>,
+  ///Show Legend Key.
+  #[sdk(child(qname = "c:CT_Boolean/c:showLegendKey"))]
+  pub show_legend_key:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowLegendKey>,
+  ///Show Value.
+  #[sdk(child(qname = "c:CT_Boolean/c:showVal"))]
+  pub show_value:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowValue>,
+  ///Show Category Name.
+  #[sdk(child(qname = "c:CT_Boolean/c:showCatName"))]
+  pub show_category_name:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowCategoryName>,
+  ///Show Series Name.
+  #[sdk(child(qname = "c:CT_Boolean/c:showSerName"))]
+  pub show_series_name:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowSeriesName>,
+  ///Show Percent.
+  #[sdk(child(qname = "c:CT_Boolean/c:showPercent"))]
+  pub show_percent:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowPercent>,
+  ///Show Bubble Size.
+  #[sdk(child(qname = "c:CT_Boolean/c:showBubbleSize"))]
+  pub show_bubble_size:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowBubbleSize>,
+  ///Separator.
+  #[sdk(text_child(qname = "xsd:string/c:separator"))]
+  pub separator: Option<crate::simple_type::StringValue>,
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum DataLabelChoice {
+  #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
+  CDelete(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Delete>),
+  #[sdk(sequence)]
+  Sequence(std::boxed::Box<DataLabelChoiceSequence>),
+}

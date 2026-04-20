@@ -1,0 +1,3775 @@
+//
+// -----------------------------------------------------------------------------
+//  THIS FILE WAS @generated AUTOMATICALLY. DO NOT MODIFY THIS FILE MANUALLY.
+// -----------------------------------------------------------------------------
+//
+
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum OnOffValues {
+  #[sdk(rename = "true")]
+  #[default]
+  True,
+  #[sdk(rename = "false")]
+  False,
+  #[sdk(rename = "0")]
+  Zero,
+  #[sdk(rename = "1")]
+  One,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum SchemeColorValues {
+  #[sdk(rename = "bg1")]
+  #[default]
+  BackgroundColor,
+  #[sdk(rename = "tx1")]
+  TextColor,
+  #[sdk(rename = "bg2")]
+  AdditionalBackgroundColor,
+  #[sdk(rename = "tx2")]
+  AdditionalTextColor,
+  #[sdk(rename = "accent1")]
+  ExtraSchemeColor1,
+  #[sdk(rename = "accent2")]
+  ExtraSchemeColor2,
+  #[sdk(rename = "accent3")]
+  ExtraSchemeColor3,
+  #[sdk(rename = "accent4")]
+  ExtraSchemeColor4,
+  #[sdk(rename = "accent5")]
+  ExtraSchemeColor5,
+  #[sdk(rename = "accent6")]
+  ExtraSchemeColor6,
+  #[sdk(rename = "hlink")]
+  HyperlinkColor,
+  #[sdk(rename = "folHlink")]
+  FollowedHyperlinkColor,
+  #[sdk(rename = "dk1")]
+  MainDarkColor1,
+  #[sdk(rename = "lt1")]
+  MainLightColor1,
+  #[sdk(rename = "dk2")]
+  MainDarkColor2,
+  #[sdk(rename = "lt2")]
+  MainLightColor2,
+  #[sdk(rename = "phClr")]
+  AutoColor,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum RectangleAlignmentValues {
+  #[sdk(rename = "none")]
+  #[default]
+  None,
+  #[sdk(rename = "tl")]
+  TopLeft,
+  #[sdk(rename = "t")]
+  Top,
+  #[sdk(rename = "tr")]
+  TopRight,
+  #[sdk(rename = "l")]
+  Left,
+  #[sdk(rename = "ctr")]
+  Center,
+  #[sdk(rename = "r")]
+  Right,
+  #[sdk(rename = "bl")]
+  BottomLeft,
+  #[sdk(rename = "b")]
+  Bottom,
+  #[sdk(rename = "br")]
+  BottomRight,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum PathShadeTypeValues {
+  #[sdk(rename = "shape")]
+  #[default]
+  Shape,
+  #[sdk(rename = "circle")]
+  Circle,
+  #[sdk(rename = "rect")]
+  Rect,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum LineCapValues {
+  #[sdk(rename = "rnd")]
+  #[default]
+  Round,
+  #[sdk(rename = "sq")]
+  Square,
+  #[sdk(rename = "flat")]
+  Flat,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum PresetLineDashValues {
+  #[sdk(rename = "solid")]
+  #[default]
+  Solid,
+  #[sdk(rename = "dot")]
+  Dot,
+  #[sdk(rename = "sysDot")]
+  SysDot,
+  #[sdk(rename = "dash")]
+  Dash,
+  #[sdk(rename = "sysDash")]
+  SysDash,
+  #[sdk(rename = "lgDash")]
+  LongDash,
+  #[sdk(rename = "dashDot")]
+  DashDot,
+  #[sdk(rename = "sysDashDot")]
+  SystemDashDot,
+  #[sdk(rename = "lgDashDot")]
+  LongDashDot,
+  #[sdk(rename = "lgDashDotDot")]
+  LongDashDotDot,
+  #[sdk(rename = "sysDashDotDot")]
+  SystemDashDotDot,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum PenAlignmentValues {
+  #[sdk(rename = "ctr")]
+  #[default]
+  Center,
+  #[sdk(rename = "in")]
+  Inset,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum CompoundLineValues {
+  #[sdk(rename = "sng")]
+  #[default]
+  Simple,
+  #[sdk(rename = "dbl")]
+  Double,
+  #[sdk(rename = "thickThin")]
+  ThickThin,
+  #[sdk(rename = "thinThick")]
+  ThinThick,
+  #[sdk(rename = "tri")]
+  Triple,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum PresetCameraTypeValues {
+  #[sdk(rename = "legacyObliqueTopLeft")]
+  #[default]
+  LegacyObliqueTopLeft,
+  #[sdk(rename = "legacyObliqueTop")]
+  LegacyObliqueTop,
+  #[sdk(rename = "legacyObliqueTopRight")]
+  LegacyObliqueTopRight,
+  #[sdk(rename = "legacyObliqueLeft")]
+  LegacyObliqueLeft,
+  #[sdk(rename = "legacyObliqueFront")]
+  LegacyObliqueFront,
+  #[sdk(rename = "legacyObliqueRight")]
+  LegacyObliqueRight,
+  #[sdk(rename = "legacyObliqueBottomLeft")]
+  LegacyObliqueBottomLeft,
+  #[sdk(rename = "legacyObliqueBottom")]
+  LegacyObliqueBottom,
+  #[sdk(rename = "legacyObliqueBottomRight")]
+  LegacyObliqueBottomRight,
+  #[sdk(rename = "legacyPerspectiveTopLeft")]
+  LegacyPerspectiveTopLeft,
+  #[sdk(rename = "legacyPerspectiveTop")]
+  LegacyPerspectiveTop,
+  #[sdk(rename = "legacyPerspectiveTopRight")]
+  LegacyPerspectiveTopRight,
+  #[sdk(rename = "legacyPerspectiveLeft")]
+  LegacyPerspectiveLeft,
+  #[sdk(rename = "legacyPerspectiveFront")]
+  LegacyPerspectiveFront,
+  #[sdk(rename = "legacyPerspectiveRight")]
+  LegacyPerspectiveRight,
+  #[sdk(rename = "legacyPerspectiveBottomLeft")]
+  LegacyPerspectiveBottomLeft,
+  #[sdk(rename = "legacyPerspectiveBottom")]
+  LegacyPerspectiveBottom,
+  #[sdk(rename = "legacyPerspectiveBottomRight")]
+  LegacyPerspectiveBottomRight,
+  #[sdk(rename = "orthographicFront")]
+  OrthographicFront,
+  #[sdk(rename = "isometricTopUp")]
+  IsometricTopUp,
+  #[sdk(rename = "isometricTopDown")]
+  IsometricTopDown,
+  #[sdk(rename = "isometricBottomUp")]
+  IsometricBottomUp,
+  #[sdk(rename = "isometricBottomDown")]
+  IsometricBottomDown,
+  #[sdk(rename = "isometricLeftUp")]
+  IsometricLeftUp,
+  #[sdk(rename = "isometricLeftDown")]
+  IsometricLeftDown,
+  #[sdk(rename = "isometricRightUp")]
+  IsometricRightUp,
+  #[sdk(rename = "isometricRightDown")]
+  IsometricRightDown,
+  #[sdk(rename = "isometricOffAxis1Left")]
+  IsometricOffAxis1Left,
+  #[sdk(rename = "isometricOffAxis1Right")]
+  IsometricOffAxis1Right,
+  #[sdk(rename = "isometricOffAxis1Top")]
+  IsometricOffAxis1Top,
+  #[sdk(rename = "isometricOffAxis2Left")]
+  IsometricOffAxis2Left,
+  #[sdk(rename = "isometricOffAxis2Right")]
+  IsometricOffAxis2Right,
+  #[sdk(rename = "isometricOffAxis2Top")]
+  IsometricOffAxis2Top,
+  #[sdk(rename = "isometricOffAxis3Left")]
+  IsometricOffAxis3Left,
+  #[sdk(rename = "isometricOffAxis3Right")]
+  IsometricOffAxis3Right,
+  #[sdk(rename = "isometricOffAxis3Bottom")]
+  IsometricOffAxis3Bottom,
+  #[sdk(rename = "isometricOffAxis4Left")]
+  IsometricOffAxis4Left,
+  #[sdk(rename = "isometricOffAxis4Right")]
+  IsometricOffAxis4Right,
+  #[sdk(rename = "isometricOffAxis4Bottom")]
+  IsometricOffAxis4Bottom,
+  #[sdk(rename = "obliqueTopLeft")]
+  ObliqueTopLeft,
+  #[sdk(rename = "obliqueTop")]
+  ObliqueTop,
+  #[sdk(rename = "obliqueTopRight")]
+  ObliqueTopRight,
+  #[sdk(rename = "obliqueLeft")]
+  ObliqueLeft,
+  #[sdk(rename = "obliqueRight")]
+  ObliqueRight,
+  #[sdk(rename = "obliqueBottomLeft")]
+  ObliqueBottomLeft,
+  #[sdk(rename = "obliqueBottom")]
+  ObliqueBottom,
+  #[sdk(rename = "obliqueBottomRight")]
+  ObliqueBottomRight,
+  #[sdk(rename = "perspectiveFront")]
+  PerspectiveFront,
+  #[sdk(rename = "perspectiveLeft")]
+  PerspectiveLeft,
+  #[sdk(rename = "perspectiveRight")]
+  PerspectiveRight,
+  #[sdk(rename = "perspectiveAbove")]
+  PerspectiveAbove,
+  #[sdk(rename = "perspectiveBelow")]
+  PerspectiveBelow,
+  #[sdk(rename = "perspectiveAboveLeftFacing")]
+  PerspectiveAboveLeftFacing,
+  #[sdk(rename = "perspectiveAboveRightFacing")]
+  PerspectiveAboveRightFacing,
+  #[sdk(rename = "perspectiveContrastingLeftFacing")]
+  PerspectiveContrastingLeftFacing,
+  #[sdk(rename = "perspectiveContrastingRightFacing")]
+  PerspectiveContrastingRightFacing,
+  #[sdk(rename = "perspectiveHeroicLeftFacing")]
+  PerspectiveHeroicLeftFacing,
+  #[sdk(rename = "perspectiveHeroicRightFacing")]
+  PerspectiveHeroicRightFacing,
+  #[sdk(rename = "perspectiveHeroicExtremeLeftFacing")]
+  PerspectiveHeroicExtremeLeftFacing,
+  #[sdk(rename = "perspectiveHeroicExtremeRightFacing")]
+  PerspectiveHeroicExtremeRightFacing,
+  #[sdk(rename = "perspectiveRelaxed")]
+  PerspectiveRelaxed,
+  #[sdk(rename = "perspectiveRelaxedModerately")]
+  PerspectiveRelaxedModerately,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum LightRigTypeValues {
+  #[sdk(rename = "legacyFlat1")]
+  #[default]
+  LegacyFlat1,
+  #[sdk(rename = "legacyFlat2")]
+  LegacyFlat2,
+  #[sdk(rename = "legacyFlat3")]
+  LegacyFlat3,
+  #[sdk(rename = "legacyFlat4")]
+  LegacyFlat4,
+  #[sdk(rename = "legacyNormal1")]
+  LegacyNormal1,
+  #[sdk(rename = "legacyNormal2")]
+  LegacyNormal2,
+  #[sdk(rename = "legacyNormal3")]
+  LegacyNormal3,
+  #[sdk(rename = "legacyNormal4")]
+  LegacyNormal4,
+  #[sdk(rename = "legacyHarsh1")]
+  LegacyHarsh1,
+  #[sdk(rename = "legacyHarsh2")]
+  LegacyHarsh2,
+  #[sdk(rename = "legacyHarsh3")]
+  LegacyHarsh3,
+  #[sdk(rename = "legacyHarsh4")]
+  LegacyHarsh4,
+  #[sdk(rename = "threePt")]
+  ThreePoint,
+  #[sdk(rename = "balanced")]
+  Balanced,
+  #[sdk(rename = "soft")]
+  Soft,
+  #[sdk(rename = "harsh")]
+  Harsh,
+  #[sdk(rename = "flood")]
+  Flood,
+  #[sdk(rename = "contrasting")]
+  Contrasting,
+  #[sdk(rename = "morning")]
+  Morning,
+  #[sdk(rename = "sunrise")]
+  Sunrise,
+  #[sdk(rename = "sunset")]
+  Sunset,
+  #[sdk(rename = "chilly")]
+  Chilly,
+  #[sdk(rename = "freezing")]
+  Freezing,
+  #[sdk(rename = "flat")]
+  Flat,
+  #[sdk(rename = "twoPt")]
+  TwoPoint,
+  #[sdk(rename = "glow")]
+  Glow,
+  #[sdk(rename = "brightRoom")]
+  BrightRoom,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum LightRigDirectionValues {
+  #[sdk(rename = "tl")]
+  #[default]
+  TopLeft,
+  #[sdk(rename = "t")]
+  Top,
+  #[sdk(rename = "tr")]
+  TopRight,
+  #[sdk(rename = "l")]
+  Left,
+  #[sdk(rename = "r")]
+  Right,
+  #[sdk(rename = "bl")]
+  BottomLeft,
+  #[sdk(rename = "b")]
+  Bottom,
+  #[sdk(rename = "br")]
+  BottomRight,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum BevelPresetTypeValues {
+  #[sdk(rename = "relaxedInset")]
+  #[default]
+  RelaxedInset,
+  #[sdk(rename = "circle")]
+  Circle,
+  #[sdk(rename = "slope")]
+  Slope,
+  #[sdk(rename = "cross")]
+  Cross,
+  #[sdk(rename = "angle")]
+  Angle,
+  #[sdk(rename = "softRound")]
+  SoftRound,
+  #[sdk(rename = "convex")]
+  Convex,
+  #[sdk(rename = "coolSlant")]
+  CoolSlant,
+  #[sdk(rename = "divot")]
+  Divot,
+  #[sdk(rename = "riblet")]
+  Riblet,
+  #[sdk(rename = "hardEdge")]
+  HardEdge,
+  #[sdk(rename = "artDeco")]
+  ArtDeco,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum PresetMaterialTypeValues {
+  #[sdk(rename = "legacyMatte")]
+  #[default]
+  LegacyMatte,
+  #[sdk(rename = "legacyPlastic")]
+  LegacyPlastic,
+  #[sdk(rename = "legacyMetal")]
+  LegacyMetal,
+  #[sdk(rename = "legacyWireframe")]
+  LegacyWireframe,
+  #[sdk(rename = "matte")]
+  Matte,
+  #[sdk(rename = "plastic")]
+  Plastic,
+  #[sdk(rename = "metal")]
+  Metal,
+  #[sdk(rename = "warmMatte")]
+  WarmMatte,
+  #[sdk(rename = "translucentPowder")]
+  TranslucentPowder,
+  #[sdk(rename = "powder")]
+  Powder,
+  #[sdk(rename = "dkEdge")]
+  DarkEdge,
+  #[sdk(rename = "softEdge")]
+  SoftEdge,
+  #[sdk(rename = "clear")]
+  Clear,
+  #[sdk(rename = "flat")]
+  Flat,
+  #[sdk(rename = "softmetal")]
+  SoftMetal,
+  #[sdk(rename = "none")]
+  None,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum LigaturesValues {
+  #[sdk(rename = "none")]
+  #[default]
+  None,
+  #[sdk(rename = "standard")]
+  Standard,
+  #[sdk(rename = "contextual")]
+  Contextual,
+  #[sdk(rename = "historical")]
+  Historical,
+  #[sdk(rename = "discretional")]
+  Discretional,
+  #[sdk(rename = "standardContextual")]
+  StandardContextual,
+  #[sdk(rename = "standardHistorical")]
+  StandardHistorical,
+  #[sdk(rename = "contextualHistorical")]
+  ContextualHistorical,
+  #[sdk(rename = "standardDiscretional")]
+  StandardDiscretional,
+  #[sdk(rename = "contextualDiscretional")]
+  ContextualDiscretional,
+  #[sdk(rename = "historicalDiscretional")]
+  HistoricalDiscretional,
+  #[sdk(rename = "standardContextualHistorical")]
+  StandardContextualHistorical,
+  #[sdk(rename = "standardContextualDiscretional")]
+  StandardContextualDiscretional,
+  #[sdk(rename = "standardHistoricalDiscretional")]
+  StandardHistoricalDiscretional,
+  #[sdk(rename = "contextualHistoricalDiscretional")]
+  ContextualHistoricalDiscretional,
+  #[sdk(rename = "all")]
+  All,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum NumberFormValues {
+  #[sdk(rename = "default")]
+  #[default]
+  Default,
+  #[sdk(rename = "lining")]
+  Lining,
+  #[sdk(rename = "oldStyle")]
+  OldStyle,
+}
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+pub enum NumberSpacingValues {
+  #[sdk(rename = "default")]
+  #[default]
+  Default,
+  #[sdk(rename = "proportional")]
+  Proportional,
+  #[sdk(rename = "tabular")]
+  Tabular,
+}
+/// Defines the RunConflictInsertion Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:conflictIns.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_RunTrackChange/w14:conflictIns")]
+pub struct RunConflictInsertion {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+  #[sdk(choice)]
+  pub run_conflict_insertion_choice: Vec<RunConflictInsertionChoice>,
+}
+/// Defines the RunConflictDeletion Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:conflictDel.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_RunTrackChange/w14:conflictDel")]
+pub struct RunConflictDeletion {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+  #[sdk(choice)]
+  pub run_conflict_deletion_choice: Vec<RunConflictDeletionChoice>,
+}
+/// Defines the RunTrackChangeType Class.
+///
+/// Available in Office2007 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_RunTrackChange/")]
+pub struct RunTrackChangeType {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+  #[sdk(choice)]
+  pub xml_children: Vec<RunTrackChangeTypeChoice>,
+}
+/// Defines the ConflictInsertion Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:conflictIns.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_TrackChange/w14:conflictIns")]
+pub struct ConflictInsertion {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the ConflictDeletion Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:conflictDel.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_TrackChange/w14:conflictDel")]
+pub struct ConflictDeletion {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the CustomXmlConflictInsertionRangeStart Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictInsRangeStart.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")]
+pub struct CustomXmlConflictInsertionRangeStart {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the CustomXmlConflictDeletionRangeStart Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictDelRangeStart.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")]
+pub struct CustomXmlConflictDeletionRangeStart {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the TrackChangeType Class.
+///
+/// Available in Office2007 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_TrackChange/")]
+pub struct TrackChangeType {
+  /// author
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:author
+  #[sdk(attr(qname = "w:author"))]
+  #[sdk(string_length(source = 1u32, max = 255u32))]
+  pub author: crate::simple_type::StringValue,
+  /// date
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:date
+  #[sdk(attr(qname = "w:date"))]
+  pub date: Option<crate::simple_type::DateTimeValue>,
+  /// dateUtc
+  ///
+  /// Available in Microsoft365 and above.
+  ///
+  /// Represents the following attribute in the schema: w16du:dateUtc
+  #[sdk(attr(qname = "w16du:dateUtc"))]
+  pub date_utc: Option<crate::simple_type::DateTimeValue>,
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the Tint Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:tint.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PositiveFixedPercentage/w14:tint")]
+pub struct Tint {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the Shade Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:shade.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PositiveFixedPercentage/w14:shade")]
+pub struct Shade {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the Alpha Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:alpha.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PositiveFixedPercentage/w14:alpha")]
+pub struct Alpha {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the PositiveFixedPercentageType Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PositiveFixedPercentage/")]
+pub struct PositiveFixedPercentageType {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the HueModulation Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:hueMod.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PositivePercentage/w14:hueMod")]
+pub struct HueModulation {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the Saturation Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:sat.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/w14:sat")]
+pub struct Saturation {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the SaturationOffset Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:satOff.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/w14:satOff")]
+pub struct SaturationOffset {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the SaturationModulation Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:satMod.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/w14:satMod")]
+pub struct SaturationModulation {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the Luminance Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:lum.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/w14:lum")]
+pub struct Luminance {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the LuminanceOffset Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:lumOff.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/w14:lumOff")]
+pub struct LuminanceOffset {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the LuminanceModulation Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:lumMod.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/w14:lumMod")]
+pub struct LuminanceModulation {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the PercentageType Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Percentage/")]
+pub struct PercentageType {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the RgbColorModelHex Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:srgbClr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SRgbColor/w14:srgbClr")]
+pub struct RgbColorModelHex {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(string_length(source = 2u32, union = 0u64, min = 3u32, max = 3u32))]
+  pub val: crate::simple_type::HexBinaryValue,
+  #[sdk(choice)]
+  pub rgb_color_model_hex_choice: Vec<RgbColorModelHexChoice>,
+}
+/// Defines the SchemeColor Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:schemeClr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SchemeColor/w14:schemeClr")]
+pub struct SchemeColor {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: SchemeColorValues,
+  #[sdk(choice)]
+  pub scheme_color_choice: Vec<SchemeColorChoice>,
+}
+/// Defines the LinearShadeProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:lin.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_LinearShadeProperties/w14:lin")]
+pub struct LinearShadeProperties {
+  /// ang
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:ang
+  #[sdk(attr(qname = "w14:ang"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub angle: Option<crate::simple_type::Int32Value>,
+  /// scaled
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:scaled
+  #[sdk(attr(qname = "w14:scaled"))]
+  pub scaled: Option<OnOffValues>,
+}
+/// Defines the PathShadeProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:path.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PathShadeProperties/w14:path")]
+pub struct PathShadeProperties {
+  /// path
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:path
+  #[sdk(attr(qname = "w14:path"))]
+  pub path: Option<PathShadeTypeValues>,
+  /// _
+  #[sdk(child(qname = "w14:CT_RelativeRect/w14:fillToRect"))]
+  pub fill_to_rectangle: Option<FillToRectangle>,
+}
+/// Defines the NoFillEmpty Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:noFill.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Empty/w14:noFill")]
+pub struct NoFillEmpty {}
+/// Defines the RoundEmpty Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:round.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Empty/w14:round")]
+pub struct RoundEmpty {}
+/// Defines the BevelEmpty Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:bevel.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Empty/w14:bevel")]
+pub struct BevelEmpty {}
+/// Defines the EntityPickerEmpty Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:entityPicker.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Empty/w14:entityPicker")]
+pub struct EntityPickerEmpty {}
+/// Defines the EmptyType Class.
+///
+/// Available in Office2007 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Empty/")]
+pub struct EmptyType {}
+/// Defines the SolidColorFillProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:solidFill.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SolidColorFillProperties/w14:solidFill")]
+pub struct SolidColorFillProperties {
+  #[sdk(choice)]
+  pub xml_children: Option<SolidColorFillPropertiesChoice>,
+}
+/// Defines the GradientFillProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:gradFill.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_GradientFillProperties/w14:gradFill")]
+pub struct GradientFillProperties {
+  /// _
+  #[sdk(child(qname = "w14:CT_GradientStopList/w14:gsLst"))]
+  pub gradient_stop_list: Option<GradientStopList>,
+  #[sdk(choice)]
+  pub gradient_fill_properties_choice: Option<GradientFillPropertiesChoice>,
+}
+/// Defines the PresetLineDashProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:prstDash.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_PresetLineDashProperties/w14:prstDash")]
+pub struct PresetLineDashProperties {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<PresetLineDashValues>,
+}
+/// Defines the LineJoinMiterProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:miter.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_LineJoinMiterProperties/w14:miter")]
+pub struct LineJoinMiterProperties {
+  /// lim
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:lim
+  #[sdk(attr(qname = "w14:lim"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub limit: Option<crate::simple_type::Int32Value>,
+}
+/// Defines the Glow Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:glow.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Glow/w14:glow")]
+pub struct Glow {
+  /// rad
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:rad
+  #[sdk(attr(qname = "w14:rad"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub glow_radius: Option<crate::simple_type::Int64Value>,
+  #[sdk(choice)]
+  pub xml_children: Option<GlowChoice>,
+}
+/// Defines the Shadow Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:shadow.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Shadow/w14:shadow")]
+pub struct Shadow {
+  /// blurRad
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:blurRad
+  #[sdk(attr(qname = "w14:blurRad"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub blur_radius: Option<crate::simple_type::Int64Value>,
+  /// dist
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:dist
+  #[sdk(attr(qname = "w14:dist"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub distance_from_text: Option<crate::simple_type::Int64Value>,
+  /// dir
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:dir
+  #[sdk(attr(qname = "w14:dir"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub direction_angle: Option<crate::simple_type::Int32Value>,
+  /// sx
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:sx
+  #[sdk(attr(qname = "w14:sx"))]
+  pub horizontal_scaling_factor: Option<crate::simple_type::Int32Value>,
+  /// sy
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:sy
+  #[sdk(attr(qname = "w14:sy"))]
+  pub vertical_scaling_factor: Option<crate::simple_type::Int32Value>,
+  /// kx
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:kx
+  #[sdk(attr(qname = "w14:kx"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "-5400000",
+    max = "5400000",
+    min_inclusive = false,
+    max_inclusive = false
+  ))]
+  pub horizontal_skew_angle: Option<crate::simple_type::Int32Value>,
+  /// ky
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:ky
+  #[sdk(attr(qname = "w14:ky"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "-5400000",
+    max = "5400000",
+    min_inclusive = false,
+    max_inclusive = false
+  ))]
+  pub vertical_skew_angle: Option<crate::simple_type::Int32Value>,
+  /// algn
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:algn
+  #[sdk(attr(qname = "w14:algn"))]
+  pub alignment: Option<RectangleAlignmentValues>,
+  #[sdk(choice)]
+  pub xml_children: Option<ShadowChoice>,
+}
+/// Defines the Reflection Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:reflection.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Reflection/w14:reflection")]
+pub struct Reflection {
+  /// blurRad
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:blurRad
+  #[sdk(attr(qname = "w14:blurRad"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub blur_radius: Option<crate::simple_type::Int64Value>,
+  /// stA
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:stA
+  #[sdk(attr(qname = "w14:stA"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub starting_opacity: Option<crate::simple_type::Int32Value>,
+  /// stPos
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:stPos
+  #[sdk(attr(qname = "w14:stPos"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub start_position: Option<crate::simple_type::Int32Value>,
+  /// endA
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:endA
+  #[sdk(attr(qname = "w14:endA"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub ending_opacity: Option<crate::simple_type::Int32Value>,
+  /// endPos
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:endPos
+  #[sdk(attr(qname = "w14:endPos"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub end_position: Option<crate::simple_type::Int32Value>,
+  /// dist
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:dist
+  #[sdk(attr(qname = "w14:dist"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub distance_from_text: Option<crate::simple_type::Int64Value>,
+  /// dir
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:dir
+  #[sdk(attr(qname = "w14:dir"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub direction_angle: Option<crate::simple_type::Int32Value>,
+  /// fadeDir
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:fadeDir
+  #[sdk(attr(qname = "w14:fadeDir"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub fade_direction: Option<crate::simple_type::Int32Value>,
+  /// sx
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:sx
+  #[sdk(attr(qname = "w14:sx"))]
+  pub horizontal_scaling_factor: Option<crate::simple_type::Int32Value>,
+  /// sy
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:sy
+  #[sdk(attr(qname = "w14:sy"))]
+  pub vertical_scaling_factor: Option<crate::simple_type::Int32Value>,
+  /// kx
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:kx
+  #[sdk(attr(qname = "w14:kx"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "-5400000",
+    max = "5400000",
+    min_inclusive = false,
+    max_inclusive = false
+  ))]
+  pub horizontal_skew_angle: Option<crate::simple_type::Int32Value>,
+  /// ky
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:ky
+  #[sdk(attr(qname = "w14:ky"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "-5400000",
+    max = "5400000",
+    min_inclusive = false,
+    max_inclusive = false
+  ))]
+  pub vertical_skew_angle: Option<crate::simple_type::Int32Value>,
+  /// algn
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:algn
+  #[sdk(attr(qname = "w14:algn"))]
+  pub alignment: Option<RectangleAlignmentValues>,
+}
+/// Defines the TextOutlineEffect Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:textOutline.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_TextOutlineEffect/w14:textOutline")]
+pub struct TextOutlineEffect {
+  /// w
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:w
+  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "20116800",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub line_width: Option<crate::simple_type::Int32Value>,
+  /// cap
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:cap
+  #[sdk(attr(qname = "w14:cap"))]
+  pub cap_type: Option<LineCapValues>,
+  /// cmpd
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:cmpd
+  #[sdk(attr(qname = "w14:cmpd"))]
+  pub compound: Option<CompoundLineValues>,
+  /// algn
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:algn
+  #[sdk(attr(qname = "w14:algn"))]
+  pub alignment: Option<PenAlignmentValues>,
+  #[sdk(choice)]
+  pub text_outline_effect_choice1: Option<TextOutlineEffectChoice>,
+  /// _
+  #[sdk(child(qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
+  pub w14_prst_dash: Option<PresetLineDashProperties>,
+  #[sdk(choice)]
+  pub text_outline_effect_choice3: Option<TextOutlineEffectChoice2>,
+}
+/// Defines the FillTextEffect Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:textFill.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_FillTextEffect/w14:textFill")]
+pub struct FillTextEffect {
+  #[sdk(choice)]
+  pub xml_children: Option<FillTextEffectChoice>,
+}
+/// Defines the Scene3D Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:scene3d.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Scene3D/w14:scene3d")]
+pub struct Scene3D {
+  /// _
+  #[sdk(child(qname = "w14:CT_Camera/w14:camera"))]
+  pub camera: std::boxed::Box<Camera>,
+  /// _
+  #[sdk(child(qname = "w14:CT_LightRig/w14:lightRig"))]
+  pub light_rig: std::boxed::Box<LightRig>,
+}
+/// Defines the Properties3D Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:props3d.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Props3D/w14:props3d")]
+pub struct Properties3D {
+  /// extrusionH
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:extrusionH
+  #[sdk(attr(qname = "w14:extrusionH"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub extrusion_height: Option<crate::simple_type::Int64Value>,
+  /// contourW
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:contourW
+  #[sdk(attr(qname = "w14:contourW"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub contour_width: Option<crate::simple_type::Int64Value>,
+  /// prstMaterial
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:prstMaterial
+  #[sdk(attr(qname = "w14:prstMaterial"))]
+  #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
+  pub preset_material_type: Option<PresetMaterialTypeValues>,
+  /// _
+  #[sdk(child(qname = "w14:CT_Bevel/w14:bevelT"))]
+  pub bevel_top: Option<BevelTop>,
+  /// _
+  #[sdk(child(qname = "w14:CT_Bevel/w14:bevelB"))]
+  pub bevel_bottom: Option<BevelBottom>,
+  /// _
+  #[sdk(child(qname = "w14:CT_Color/w14:extrusionClr"))]
+  pub extrusion_color: Option<std::boxed::Box<ExtrusionColor>>,
+  /// _
+  #[sdk(child(qname = "w14:CT_Color/w14:contourClr"))]
+  pub contour_color: Option<std::boxed::Box<ContourColor>>,
+}
+/// Defines the Ligatures Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:ligatures.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Ligatures/w14:ligatures")]
+pub struct Ligatures {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: LigaturesValues,
+}
+/// Defines the NumberingFormat Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:numForm.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_NumForm/w14:numForm")]
+pub struct NumberingFormat {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: NumberFormValues,
+}
+/// Defines the NumberSpacing Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:numSpacing.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_NumSpacing/w14:numSpacing")]
+pub struct NumberSpacing {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: NumberSpacingValues,
+}
+/// Defines the StylisticSets Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:stylisticSets.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_StylisticSets/w14:stylisticSets")]
+pub struct StylisticSets {
+  /// _
+  #[sdk(child(qname = "w14:CT_StyleSet/w14:styleSet"))]
+  pub w14_style_set: Vec<StyleSet>,
+}
+/// Defines the ContextualAlternatives Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:cntxtAlts.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_OnOff/w14:cntxtAlts")]
+pub struct ContextualAlternatives {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<OnOffValues>,
+}
+/// Defines the ConflictMode Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:conflictMode.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_OnOff/w14:conflictMode")]
+pub struct ConflictMode {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<OnOffValues>,
+}
+/// Defines the DiscardImageEditingData Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:discardImageEditingData.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_OnOff/w14:discardImageEditingData")]
+pub struct DiscardImageEditingData {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<OnOffValues>,
+}
+/// Defines the Checked Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:checked.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_OnOff/w14:checked")]
+pub struct Checked {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<OnOffValues>,
+}
+/// Defines the OnOffType Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_OnOff/")]
+pub struct OnOffType {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<OnOffValues>,
+}
+/// Defines the ContentPart Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:contentPart.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_WordContentPart/w14:contentPart")]
+pub struct ContentPart {
+  /// bwMode
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:bwMode
+  #[sdk(attr(qname = "w14:bwMode"))]
+  #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
+  pub black_white_mode:
+    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  /// id
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: r:id
+  #[sdk(attr(qname = "r:id"))]
+  pub relationship_id: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr"))]
+  pub word_non_visual_content_part_shape_properties:
+    Option<std::boxed::Box<WordNonVisualContentPartShapeProperties>>,
+  /// _
+  #[sdk(child(qname = "a:CT_Transform2D/w14:xfrm"))]
+  pub transform2_d: Option<std::boxed::Box<Transform2D>>,
+  /// _
+  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/w14:extLst"))]
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
+}
+/// Defines the DocumentId Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:docId.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_LongHexNumber/w14:docId")]
+pub struct DocumentId {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]
+  pub val: crate::simple_type::HexBinaryValue,
+}
+/// Defines the CustomXmlConflictInsertionRangeEnd Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictInsRangeEnd.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd")]
+pub struct CustomXmlConflictInsertionRangeEnd {
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the CustomXmlConflictDeletionRangeEnd Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictDelRangeEnd.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd")]
+pub struct CustomXmlConflictDeletionRangeEnd {
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the MarkupType Class.
+///
+/// Available in Office2007 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Markup/")]
+pub struct MarkupType {
+  /// Annotation Identifier
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: w:id
+  #[sdk(attr(qname = "w:id"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    max = "-2",
+    min_inclusive = false,
+    max_inclusive = true
+  ))]
+  pub id: crate::simple_type::StringValue,
+}
+/// Defines the DefaultImageDpi Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:defaultImageDpi.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi")]
+pub struct DefaultImageDpi {
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: crate::simple_type::Int32Value,
+}
+/// Defines the SdtContentCheckBox Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:checkbox.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SdtCheckbox/w14:checkbox")]
+pub struct SdtContentCheckBox {
+  /// _
+  #[sdk(child(qname = "w14:CT_OnOff/w14:checked"))]
+  pub checked: Option<Checked>,
+  /// _
+  #[sdk(child(qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState"))]
+  pub checked_state: Option<CheckedState>,
+  /// _
+  #[sdk(child(qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState"))]
+  pub unchecked_state: Option<UncheckedState>,
+}
+/// Defines the GradientStop Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:gs.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_GradientStop/w14:gs")]
+pub struct GradientStop {
+  /// pos
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:pos
+  #[sdk(attr(qname = "w14:pos"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "100000",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub stop_position: crate::simple_type::Int32Value,
+  #[sdk(choice)]
+  pub xml_children: Option<GradientStopChoice>,
+}
+/// Defines the FillToRectangle Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:fillToRect.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_RelativeRect/w14:fillToRect")]
+pub struct FillToRectangle {
+  /// l
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:l
+  #[sdk(attr(qname = "w14:l"))]
+  pub left: Option<crate::simple_type::Int32Value>,
+  /// t
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:t
+  #[sdk(attr(qname = "w14:t"))]
+  pub top: Option<crate::simple_type::Int32Value>,
+  /// r
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:r
+  #[sdk(attr(qname = "w14:r"))]
+  pub right: Option<crate::simple_type::Int32Value>,
+  /// b
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:b
+  #[sdk(attr(qname = "w14:b"))]
+  pub bottom: Option<crate::simple_type::Int32Value>,
+}
+/// Defines the GradientStopList Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:gsLst.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_GradientStopList/w14:gsLst")]
+pub struct GradientStopList {
+  /// _
+  #[sdk(child(qname = "w14:CT_GradientStop/w14:gs"))]
+  pub w14_gs: Vec<GradientStop>,
+}
+/// Defines the SphereCoordinates Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:rot.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SphereCoords/w14:rot")]
+pub struct SphereCoordinates {
+  /// lat
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:lat
+  #[sdk(attr(qname = "w14:lat"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub lattitude: crate::simple_type::Int32Value,
+  /// lon
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:lon
+  #[sdk(attr(qname = "w14:lon"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub longitude: crate::simple_type::Int32Value,
+  /// rev
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:rev
+  #[sdk(attr(qname = "w14:rev"))]
+  #[sdk(number_range(
+    source = 2u32,
+    union = 0u64,
+    min = "0",
+    max = "21600000",
+    min_inclusive = true,
+    max_inclusive = false
+  ))]
+  pub revolution: crate::simple_type::Int32Value,
+}
+/// Defines the Camera Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:camera.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Camera/w14:camera")]
+pub struct Camera {
+  /// prst
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:prst
+  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
+  pub preset_camera_type: PresetCameraTypeValues,
+}
+/// Defines the LightRig Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:lightRig.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_LightRig/w14:lightRig")]
+pub struct LightRig {
+  /// rig
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:rig
+  #[sdk(attr(qname = "w14:rig"))]
+  #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
+  pub light_rig_type: LightRigTypeValues,
+  /// dir
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:dir
+  #[sdk(attr(qname = "w14:dir"))]
+  #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
+  pub light_direction_type: LightRigDirectionValues,
+  /// _
+  #[sdk(child(qname = "w14:CT_SphereCoords/w14:rot"))]
+  pub sphere_coordinates: Option<SphereCoordinates>,
+}
+/// Defines the BevelTop Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:bevelT.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Bevel/w14:bevelT")]
+pub struct BevelTop {
+  /// w
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:w
+  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub width: Option<crate::simple_type::Int64Value>,
+  /// h
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:h
+  #[sdk(attr(qname = "w14:h"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub height: Option<crate::simple_type::Int64Value>,
+  /// prst
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:prst
+  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
+  pub preset_profile_type: Option<BevelPresetTypeValues>,
+}
+/// Defines the BevelBottom Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:bevelB.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Bevel/w14:bevelB")]
+pub struct BevelBottom {
+  /// w
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:w
+  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub width: Option<crate::simple_type::Int64Value>,
+  /// h
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:h
+  #[sdk(attr(qname = "w14:h"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub height: Option<crate::simple_type::Int64Value>,
+  /// prst
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:prst
+  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
+  pub preset_profile_type: Option<BevelPresetTypeValues>,
+}
+/// Defines the BevelType Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Bevel/")]
+pub struct BevelType {
+  /// w
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:w
+  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub width: Option<crate::simple_type::Int64Value>,
+  /// h
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:h
+  #[sdk(attr(qname = "w14:h"))]
+  #[sdk(number_range(
+    source = 1u32,
+    union = 0u64,
+    min = "0",
+    max = "2147483647",
+    min_inclusive = true,
+    max_inclusive = true
+  ))]
+  pub height: Option<crate::simple_type::Int64Value>,
+  /// prst
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:prst
+  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
+  pub preset_profile_type: Option<BevelPresetTypeValues>,
+}
+/// Defines the ExtrusionColor Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:extrusionClr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Color/w14:extrusionClr")]
+pub struct ExtrusionColor {
+  #[sdk(choice)]
+  pub xml_children: Option<ExtrusionColorChoice>,
+}
+/// Defines the ContourColor Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:contourClr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Color/w14:contourClr")]
+pub struct ContourColor {
+  #[sdk(choice)]
+  pub xml_children: Option<ContourColorChoice>,
+}
+/// Defines the ColorType Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_Color/")]
+pub struct ColorType {
+  #[sdk(choice)]
+  pub xml_children: Option<ColorTypeChoice>,
+}
+/// Defines the StyleSet Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:styleSet.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_StyleSet/w14:styleSet")]
+pub struct StyleSet {
+  /// id
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:id
+  #[sdk(attr(qname = "w14:id"))]
+  pub id: crate::simple_type::UInt32Value,
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  pub val: Option<OnOffValues>,
+}
+/// Defines the CheckedState Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:checkedState.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState")]
+pub struct CheckedState {
+  /// font
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:font
+  #[sdk(attr(qname = "w14:font"))]
+  pub font: Option<crate::simple_type::StringValue>,
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(string_length(source = 1u32, union = 0u64, min = 2u32, max = 2u32))]
+  pub val: Option<crate::simple_type::HexBinaryValue>,
+}
+/// Defines the UncheckedState Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:uncheckedState.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState")]
+pub struct UncheckedState {
+  /// font
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:font
+  #[sdk(attr(qname = "w14:font"))]
+  pub font: Option<crate::simple_type::StringValue>,
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(string_length(source = 1u32, union = 0u64, min = 2u32, max = 2u32))]
+  pub val: Option<crate::simple_type::HexBinaryValue>,
+}
+/// Defines the CheckBoxSymbolType Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is .
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_SdtCheckboxSymbol/")]
+pub struct CheckBoxSymbolType {
+  /// font
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:font
+  #[sdk(attr(qname = "w14:font"))]
+  pub font: Option<crate::simple_type::StringValue>,
+  /// val
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: w14:val
+  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(string_length(source = 1u32, union = 0u64, min = 2u32, max = 2u32))]
+  pub val: Option<crate::simple_type::HexBinaryValue>,
+}
+/// Defines the NonVisualDrawingProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:cNvPr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "a:CT_NonVisualDrawingProps/w14:cNvPr")]
+pub struct NonVisualDrawingProperties {
+    /// Application defined unique identifier.
+    ///
+    /// Available in Office2007 and above.
+    ///
+    /// Represents the following attribute in the schema: :id
+    #[sdk(attr(qname = ":id"))]
+    pub id: crate::simple_type::UInt32Value,
+    /// Name compatible with Object Model (non-unique).
+    ///
+    /// Available in Office2007 and above.
+    ///
+    /// Represents the following attribute in the schema: :name
+    #[sdk(attr(qname = ":name"))]
+    pub name: crate::simple_type::StringValue,
+    /// Description of the drawing element.
+    ///
+    /// Available in Office2007 and above.
+    ///
+    /// Represents the following attribute in the schema: :descr
+    #[sdk(attr(qname = ":descr"))]
+    pub description: Option<crate::simple_type::StringValue>,
+    /// Flag determining to show or hide this element.
+    ///
+    /// Available in Office2007 and above.
+    ///
+    /// Represents the following attribute in the schema: :hidden
+    #[sdk(attr(qname = ":hidden"))]
+    pub hidden: Option<crate::simple_type::BooleanValue>,
+    /// Title
+    ///
+    /// Available in Office2007 and above.
+    ///
+    /// Represents the following attribute in the schema: :title
+    #[sdk(attr(qname = ":title"))]
+    pub title: Option<crate::simple_type::StringValue>,
+    ///Hyperlink associated with clicking or selecting the element.
+    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+    pub hyperlink_on_click: Option<
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
+        >,
+    >,
+    ///Hyperlink associated with hovering over the element.
+    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+    pub hyperlink_on_hover: Option<
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
+        >,
+    >,
+    ///Future extension
+    #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+    pub non_visual_drawing_properties_extension_list: Option<
+        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
+    >,
+}
+/// Defines the NonVisualInkContentPartProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:cNvContentPartPr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr")]
+pub struct NonVisualInkContentPartProperties {
+  /// isComment
+  ///
+  /// Available in Office2010 and above.
+  ///
+  /// Represents the following attribute in the schema: :isComment
+  #[sdk(attr(qname = ":isComment"))]
+  pub is_comment: Option<crate::simple_type::BooleanValue>,
+  /// _
+  #[sdk(child(qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
+  pub content_part_locks: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ContentPartLocks,
+    >,
+  >,
+  /// _
+  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  pub office_art_extension_list:
+    Option<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::OfficeArtExtensionList>,
+}
+/// Defines the WordNonVisualContentPartShapeProperties Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:nvContentPartPr.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr")]
+pub struct WordNonVisualContentPartShapeProperties {
+  /// _
+  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/w14:cNvPr"))]
+  pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
+  /// _
+  #[sdk(child(qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr"))]
+  pub non_visual_ink_content_part_properties:
+    Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
+}
+/// Defines the Transform2D Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:xfrm.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "a:CT_Transform2D/w14:xfrm")]
+pub struct Transform2D {
+  /// Rotation
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :rot
+  #[sdk(attr(qname = ":rot"))]
+  pub rotation: Option<crate::simple_type::Int32Value>,
+  /// Horizontal Flip
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :flipH
+  #[sdk(attr(qname = ":flipH"))]
+  pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
+  /// Vertical Flip
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :flipV
+  #[sdk(attr(qname = ":flipV"))]
+  pub vertical_flip: Option<crate::simple_type::BooleanValue>,
+  ///Offset
+  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
+  ///Extents
+  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
+}
+/// Defines the OfficeArtExtensionList Class.
+///
+/// Available in Office2010 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is w14:extLst.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "a:CT_OfficeArtExtensionList/w14:extLst")]
+pub struct OfficeArtExtensionList {
+  ///Extension.
+  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum RunConflictInsertionChoice2 {
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+    WProofErr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ProofError,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+    WPermStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::PermStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+    WPermEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::PermEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+    WBookmarkStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BookmarkStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+    WBookmarkEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BookmarkEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+    WCommentRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CommentRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+    WCommentRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CommentRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+    WMoveFromRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+    WMoveFromRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+    WMoveToRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+    WMoveToRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+    WCustomXmlInsRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlInsRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+    WCustomXmlInsRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlInsRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+    WCustomXmlDelRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlDelRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+    WCustomXmlDelRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlDelRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+    WCustomXmlMoveFromRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveFromRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+    WCustomXmlMoveFromRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveFromRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+    WCustomXmlMoveToRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+    WCustomXmlMoveToRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    W14CustomXmlConflictInsRangeStart(
+        std::boxed::Box<CustomXmlConflictInsertionRangeStart>,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    W14CustomXmlConflictInsRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
+    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    W14CustomXmlConflictDelRangeStart(
+        std::boxed::Box<CustomXmlConflictDeletionRangeStart>,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+    WIns(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::InsertedRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+    WDel(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::DeletedRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+    WMoveFrom(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+    WMoveTo(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    WContentPart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
+        >,
+    ),
+    #[sdk(sequence)]
+    Sequence {
+        ///Defines the RunConflictInsertion Class.
+        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        run_conflict_insertion: Option<std::boxed::Box<RunConflictInsertion>>,
+        ///Defines the RunConflictDeletion Class.
+        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
+    },
+    #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
+    MOMathPara(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Paragraph,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+    MOMath(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::OfficeMath,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Acc/m:acc"))]
+    MAcc(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Accent,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Bar/m:bar"))]
+    MBar(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Bar,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Box/m:box"))]
+    MBox(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Box,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
+    MBorderBox(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::BorderBox,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_D/m:d"))]
+    MD(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Delimiter,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
+    MEqArr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::EquationArray,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_F/m:f"))]
+    MF(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Fraction,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Func/m:func"))]
+    MFunc(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::MathFunction,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
+    MGroupChr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::GroupChar,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
+    MLimLow(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::LimitLower,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
+    MLimUpp(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::LimitUpper,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_M/m:m"))]
+    MM(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Matrix,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Nary/m:nary"))]
+    MNary(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Nary,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Phant/m:phant"))]
+    MPhant(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Phantom,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Rad/m:rad"))]
+    MRad(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Radical,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
+    MSPre(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::PreSubSuper,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
+    MSSub(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Subscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
+    MSSubSup(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::SubSuperscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
+    MSSup(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Superscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_R/m:r"))]
+    MR(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
+        >,
+    ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum RunConflictInsertionChoice {
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
+  ),
+  #[sdk(choice)]
+  EgRunLevelElts(std::boxed::Box<RunConflictInsertionChoice2>),
+  #[sdk(child(qname = "w:CT_R/w:r"))]
+  WR(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Run>),
+  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  WBdo(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalOverride,
+    >,
+  ),
+  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  WDir(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalEmbedding,
+    >,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum RunConflictDeletionChoice2 {
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+    WProofErr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ProofError,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+    WPermStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::PermStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+    WPermEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::PermEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+    WBookmarkStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BookmarkStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+    WBookmarkEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BookmarkEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+    WCommentRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CommentRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+    WCommentRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CommentRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+    WMoveFromRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+    WMoveFromRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+    WMoveToRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+    WMoveToRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+    WCustomXmlInsRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlInsRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+    WCustomXmlInsRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlInsRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+    WCustomXmlDelRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlDelRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+    WCustomXmlDelRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlDelRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+    WCustomXmlMoveFromRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveFromRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+    WCustomXmlMoveFromRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveFromRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+    WCustomXmlMoveToRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+    WCustomXmlMoveToRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    W14CustomXmlConflictInsRangeStart(
+        std::boxed::Box<CustomXmlConflictInsertionRangeStart>,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    W14CustomXmlConflictInsRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
+    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    W14CustomXmlConflictDelRangeStart(
+        std::boxed::Box<CustomXmlConflictDeletionRangeStart>,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+    WIns(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::InsertedRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+    WDel(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::DeletedRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+    WMoveFrom(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+    WMoveTo(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    WContentPart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
+        >,
+    ),
+    #[sdk(sequence)]
+    Sequence {
+        ///Defines the RunConflictInsertion Class.
+        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        run_conflict_insertion: Option<std::boxed::Box<RunConflictInsertion>>,
+        ///Defines the RunConflictDeletion Class.
+        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
+    },
+    #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
+    MOMathPara(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Paragraph,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+    MOMath(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::OfficeMath,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Acc/m:acc"))]
+    MAcc(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Accent,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Bar/m:bar"))]
+    MBar(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Bar,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Box/m:box"))]
+    MBox(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Box,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
+    MBorderBox(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::BorderBox,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_D/m:d"))]
+    MD(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Delimiter,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
+    MEqArr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::EquationArray,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_F/m:f"))]
+    MF(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Fraction,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Func/m:func"))]
+    MFunc(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::MathFunction,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
+    MGroupChr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::GroupChar,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
+    MLimLow(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::LimitLower,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
+    MLimUpp(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::LimitUpper,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_M/m:m"))]
+    MM(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Matrix,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Nary/m:nary"))]
+    MNary(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Nary,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Phant/m:phant"))]
+    MPhant(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Phantom,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Rad/m:rad"))]
+    MRad(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Radical,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
+    MSPre(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::PreSubSuper,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
+    MSSub(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Subscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
+    MSSubSup(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::SubSuperscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
+    MSSup(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Superscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_R/m:r"))]
+    MR(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
+        >,
+    ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum RunConflictDeletionChoice {
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
+  ),
+  #[sdk(choice)]
+  EgRunLevelElts(std::boxed::Box<RunConflictDeletionChoice2>),
+  #[sdk(child(qname = "w:CT_R/w:r"))]
+  WR(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Run>),
+  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  WBdo(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalOverride,
+    >,
+  ),
+  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  WDir(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalEmbedding,
+    >,
+  ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum RunTrackChangeTypeChoice {
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+    WProofErr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ProofError,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+    WPermStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::PermStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+    WPermEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::PermEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+    WBookmarkStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BookmarkStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+    WBookmarkEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BookmarkEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+    WCommentRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CommentRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+    WCommentRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CommentRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+    WMoveFromRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+    WMoveFromRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+    WMoveToRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+    WMoveToRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+    WCustomXmlInsRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlInsRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+    WCustomXmlInsRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlInsRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+    WCustomXmlDelRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlDelRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+    WCustomXmlDelRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlDelRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+    WCustomXmlMoveFromRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveFromRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+    WCustomXmlMoveFromRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveFromRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+    WCustomXmlMoveToRangeStart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeStart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+    WCustomXmlMoveToRangeEnd(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    W14CustomXmlConflictInsRangeStart(
+        std::boxed::Box<CustomXmlConflictInsertionRangeStart>,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    W14CustomXmlConflictInsRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
+    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    W14CustomXmlConflictDelRangeStart(
+        std::boxed::Box<CustomXmlConflictDeletionRangeStart>,
+    ),
+    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+    WIns(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::InsertedRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+    WDel(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::DeletedRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+    WMoveFrom(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveFromRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+    WMoveTo(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    WContentPart(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    W14ConflictIns(std::boxed::Box<RunConflictInsertion>),
+    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    W14ConflictDel(std::boxed::Box<RunConflictDeletion>),
+    #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
+    MOMathPara(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Paragraph,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+    MOMath(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::OfficeMath,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Acc/m:acc"))]
+    MAcc(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Accent,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Bar/m:bar"))]
+    MBar(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Bar,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Box/m:box"))]
+    MBox(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Box,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
+    MBorderBox(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::BorderBox,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_D/m:d"))]
+    MD(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Delimiter,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
+    MEqArr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::EquationArray,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_F/m:f"))]
+    MF(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Fraction,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Func/m:func"))]
+    MFunc(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::MathFunction,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
+    MGroupChr(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::GroupChar,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
+    MLimLow(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::LimitLower,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
+    MLimUpp(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::LimitUpper,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_M/m:m"))]
+    MM(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Matrix,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Nary/m:nary"))]
+    MNary(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Nary,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Phant/m:phant"))]
+    MPhant(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Phantom,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_Rad/m:rad"))]
+    MRad(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Radical,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
+    MSPre(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::PreSubSuper,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
+    MSSub(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Subscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
+    MSSubSup(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::SubSuperscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
+    MSSup(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Superscript,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_R/m:r"))]
+    MR(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_R/w:r"))]
+    WR(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Run,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    WBdo(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalOverride,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    WDir(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalEmbedding,
+        >,
+    ),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum RgbColorModelHexChoice {
+  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
+  W14Tint(std::boxed::Box<Tint>),
+  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
+  W14Shade(std::boxed::Box<Shade>),
+  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
+  W14Alpha(std::boxed::Box<Alpha>),
+  #[sdk(child(qname = "w14:CT_PositivePercentage/w14:hueMod"))]
+  W14HueMod(std::boxed::Box<HueModulation>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:sat"))]
+  W14Sat(std::boxed::Box<Saturation>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:satOff"))]
+  W14SatOff(std::boxed::Box<SaturationOffset>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:satMod"))]
+  W14SatMod(std::boxed::Box<SaturationModulation>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:lum"))]
+  W14Lum(std::boxed::Box<Luminance>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:lumOff"))]
+  W14LumOff(std::boxed::Box<LuminanceOffset>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:lumMod"))]
+  W14LumMod(std::boxed::Box<LuminanceModulation>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum SchemeColorChoice {
+  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
+  W14Tint(std::boxed::Box<Tint>),
+  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
+  W14Shade(std::boxed::Box<Shade>),
+  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
+  W14Alpha(std::boxed::Box<Alpha>),
+  #[sdk(child(qname = "w14:CT_PositivePercentage/w14:hueMod"))]
+  W14HueMod(std::boxed::Box<HueModulation>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:sat"))]
+  W14Sat(std::boxed::Box<Saturation>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:satOff"))]
+  W14SatOff(std::boxed::Box<SaturationOffset>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:satMod"))]
+  W14SatMod(std::boxed::Box<SaturationModulation>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:lum"))]
+  W14Lum(std::boxed::Box<Luminance>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:lumOff"))]
+  W14LumOff(std::boxed::Box<LuminanceOffset>),
+  #[sdk(child(qname = "w14:CT_Percentage/w14:lumMod"))]
+  W14LumMod(std::boxed::Box<LuminanceModulation>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum SolidColorFillPropertiesChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum GradientFillPropertiesChoice {
+  #[sdk(child(qname = "w14:CT_LinearShadeProperties/w14:lin"))]
+  W14Lin(std::boxed::Box<LinearShadeProperties>),
+  #[sdk(child(qname = "w14:CT_PathShadeProperties/w14:path"))]
+  W14Path(std::boxed::Box<PathShadeProperties>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum GlowChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ShadowChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum TextOutlineEffectChoice {
+  #[sdk(child(qname = "w:CT_Empty/w14:noFill"))]
+  W14NoFill(std::boxed::Box<NoFillEmpty>),
+  #[sdk(child(qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
+  W14SolidFill(std::boxed::Box<SolidColorFillProperties>),
+  #[sdk(child(qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
+  W14GradFill(std::boxed::Box<GradientFillProperties>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum TextOutlineEffectChoice2 {
+  #[sdk(child(qname = "w:CT_Empty/w14:round"))]
+  W14Round(std::boxed::Box<RoundEmpty>),
+  #[sdk(child(qname = "w:CT_Empty/w14:bevel"))]
+  W14Bevel(std::boxed::Box<BevelEmpty>),
+  #[sdk(child(qname = "w14:CT_LineJoinMiterProperties/w14:miter"))]
+  W14Miter(std::boxed::Box<LineJoinMiterProperties>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum FillTextEffectChoice {
+  #[sdk(child(qname = "w:CT_Empty/w14:noFill"))]
+  W14NoFill(std::boxed::Box<NoFillEmpty>),
+  #[sdk(child(qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
+  W14SolidFill(std::boxed::Box<SolidColorFillProperties>),
+  #[sdk(child(qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
+  W14GradFill(std::boxed::Box<GradientFillProperties>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum GradientStopChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ExtrusionColorChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ContourColorChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}
+#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+pub enum ColorTypeChoice {
+  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
+  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  W14SchemeClr(std::boxed::Box<SchemeColor>),
+}

@@ -1,0 +1,54 @@
+//
+// -----------------------------------------------------------------------------
+//  THIS FILE WAS @generated AUTOMATICALLY. DO NOT MODIFY THIS FILE MANUALLY.
+// -----------------------------------------------------------------------------
+//
+
+/// Defines the CacheVersionInfo Class.
+///
+/// Available in Microsoft365 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is xxpvi:cacheVersionInfo.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo")]
+pub struct CacheVersionInfo {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/xxpvi:requiredFeature"))]
+  pub xxpvi_required_feature: Vec<crate::simple_type::StringValue>,
+  /// _
+  #[sdk(text_child(qname = "xsd:string/xxpvi:lastRefreshFeature"))]
+  pub xxpvi_last_refresh_feature: Vec<crate::simple_type::StringValue>,
+}
+/// Defines the PivotVersionInfo Class.
+///
+/// Available in Microsoft365 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is xxpvi:pivotVersionInfo.
+#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo")]
+pub struct PivotVersionInfo {
+  /// _
+  #[sdk(text_child(qname = "xsd:string/xxpvi:requiredFeature"))]
+  pub xxpvi_required_feature: Vec<crate::simple_type::StringValue>,
+  /// _
+  #[sdk(text_child(qname = "xsd:string/xxpvi:lastUpdateFeature"))]
+  pub xxpvi_last_update_feature: Vec<crate::simple_type::StringValue>,
+}
+/// Defines the RequiredFeatureXsdstring Class.
+///
+/// Available in Microsoft365 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is xxpvi:requiredFeature.
+pub type RequiredFeatureXsdstring = crate::simple_type::StringValue;
+/// Defines the LastRefreshFeatureXsdstring Class.
+///
+/// Available in Microsoft365 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is xxpvi:lastRefreshFeature.
+pub type LastRefreshFeatureXsdstring = crate::simple_type::StringValue;
+/// Defines the LastUpdateFeatureXsdstring Class.
+///
+/// Available in Microsoft365 and above.
+///
+/// When the object is serialized out as xml, it's qualified name is xxpvi:lastUpdateFeature.
+pub type LastUpdateFeatureXsdstring = crate::simple_type::StringValue;

@@ -3,7 +3,10 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::{
   Attribute, Data, DataEnum, DeriveInput, Fields, Ident, LitByteStr, LitStr, Meta, Token, Type,
-  TypePath, parse_macro_input, parse_str,
+  TypePath, bracketed,
+  parse::{Parse, ParseStream},
+  parse_macro_input, parse_str,
+  punctuated::Punctuated,
 };
 
 mod sdk_choice;
@@ -206,6 +209,26 @@ enum SdkNumberSignKind {
 struct ParsedSdkTypeFieldAttrs {
   kind: Option<SdkTypeFieldKind>,
   validators: Vec<SdkFieldValidator>,
+}
+
+struct StringSetValues {
+  values: Vec<String>,
+}
+
+impl Parse for StringSetValues {
+  fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+    input.parse::<Token![&]>()?;
+    let content;
+    bracketed!(content in input);
+    let literals = Punctuated::<LitStr, Token![,]>::parse_terminated(&content)?;
+
+    Ok(Self {
+      values: literals
+        .into_iter()
+        .map(|literal| literal.value())
+        .collect(),
+    })
+  }
 }
 
 enum SdkChoiceVariantKind {
@@ -722,22 +745,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           let mut union_id = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("values") {
-              let expr: syn::Expr = nested.value()?.parse()?;
-              let syn::Expr::Reference(reference) = expr else {
-                return Err(nested.error("sdk string_set values must be a slice reference"));
-              };
-              let syn::Expr::Array(array) = *reference.expr else {
-                return Err(nested.error("sdk string_set values must be an array"));
-              };
-              for element in array.elems {
-                let syn::Expr::Lit(expr_lit) = element else {
-                  return Err(nested.error("sdk string_set values must be string literals"));
-                };
-                let syn::Lit::Str(value) = expr_lit.lit else {
-                  return Err(nested.error("sdk string_set values must be string literals"));
-                };
-                values.push(value.value());
-              }
+              values = nested.value()?.parse::<StringSetValues>()?.values;
               Ok(())
             } else if nested.path.is_ident("source") {
               let value: syn::LitInt = nested.value()?.parse()?;

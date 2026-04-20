@@ -1,0 +1,485 @@
+{
+  "Types": [
+    {
+      "ClassName": "Paragraph",
+      "Attributes": [
+        {
+          "QName": "w14:editId",
+          "PropertyName": "w14:editId",
+          "Type": "HexBinaryValue",
+          "PropertyComments": "Word 2010 paragraph edit identifier.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "RunPropertiesDefault",
+      "HasXmlnsFields": true,
+      "HasMcIgnorableField": true,
+      "Attributes": [
+        {
+          "QName": "w14:attr",
+          "PropertyName": "w14:attr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "ParagraphProperties",
+      "Attributes": [
+        {
+          "QName": "mc:PreserveAttributes",
+          "PropertyName": "mc_preserve_attributes",
+          "Type": "StringValue",
+          "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:myattr",
+          "PropertyName": "w14:myattr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Run",
+      "Children": [
+        {
+          "Kind": "Choice",
+          "MatchParticleId": "sequence_1/choice_1",
+          "Children": [
+            {
+              "Kind": "TextChild"
+            },
+            {
+              "Name": "w16se:CT_SymEx/w16se:sym",
+              "Kind": "Child"
+            }
+          ]
+        }
+      ],
+      "Attributes": [
+        {
+          "QName": "mc:PreserveAttributes",
+          "PropertyName": "mc_preserve_attributes",
+          "Type": "StringValue",
+          "PropertyComments": "Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:myattr",
+          "PropertyName": "w14:myattr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "RunProperties",
+      "Children": [
+        {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "Shadow14",
+          "Kind": "Child",
+          "Optional": true
+        }
+      ],
+      "Attributes": [
+        {
+          "QName": "w14:myanotherAttr",
+          "PropertyName": "w14:myanotherAttr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "SpacingBetweenLines",
+      "Attributes": [
+        {
+          "QName": "w14:myattr",
+          "PropertyName": "w14:myattr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:myanotherAttr",
+          "PropertyName": "w14:myanotherAttr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "RunPropertiesBaseStyle",
+      "Children": [
+        {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "Shadow14",
+          "Kind": "Child",
+          "Optional": true
+        },
+        {
+          "Name": "w14:CT_Ligatures/w14:ligatures",
+          "PropertyName": "Ligatures",
+          "Kind": "Child",
+          "Optional": true
+        }
+      ]
+    },
+    {
+      "ClassName": "ParagraphMarkRunProperties",
+      "Children": [
+        {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "Shadow14",
+          "Kind": "Child",
+          "Optional": true
+        }
+      ]
+    },
+    {
+      "ClassName": "Settings",
+      "Children": [
+        {
+          "Name": "w:CT_CompatSetting/w:compatSetting",
+          "PropertyName": "w_compat_setting",
+          "Kind": "Child",
+          "Optional": true,
+          "Repeated": true
+        },
+        {
+          "Name": "w:CT_OnOff/w:doNotEmbedSmartTags",
+          "PropertyName": "w_do_not_embed_smart_tags",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "w:CT_String/w:decimalSymbol"
+        }
+      ]
+    },
+    {
+      "ClassName": "DoNotEmbedSmartTags",
+      "CloneFromClassName": "OnOffType",
+      "Name": "w:CT_OnOff/w:doNotEmbedSmartTags"
+    },
+    {
+      "ClassName": "TableIndentation",
+      "Attributes": [
+        {
+          "QName": "w:w",
+          "PropertyName": "Width",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "TabStop",
+      "Attributes": [
+        {
+          "QName": "w:pos",
+          "PropertyName": "Position",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "DefaultTabStop",
+      "Attributes": [
+        {
+          "QName": "w:val",
+          "PropertyName": "Value",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "PageSize",
+      "Attributes": [
+        {
+          "QName": "w:w",
+          "PropertyName": "Width",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:h",
+          "PropertyName": "Height",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "PageMargin",
+      "Attributes": [
+        {
+          "QName": "w:top",
+          "PropertyName": "Top",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:right",
+          "PropertyName": "Right",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:bottom",
+          "PropertyName": "Bottom",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:left",
+          "PropertyName": "Left",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:header",
+          "PropertyName": "Header",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:footer",
+          "PropertyName": "Footer",
+          "Type": "StringValue"
+        },
+        {
+          "QName": "w:gutter",
+          "PropertyName": "Gutter",
+          "Type": "StringValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "Body",
+      "McAlternateContentInsertBefore": [
+        "w:CT_P/w:p"
+      ]
+    },
+    {
+      "ClassName": "BodyType",
+      "McAlternateContentInsertBefore": [
+        "w:CT_P/w:p"
+      ]
+    },
+    {
+      "ClassName": "Run",
+      "McAlternateContentInsertBefore": [
+        "w:CT_Drawing/w:drawing"
+      ]
+    },
+    {
+      "ClassName": "CustomXmlBlock",
+      "Attributes": [
+        {
+          "QName": "w:element",
+          "PropertyName": "element",
+          "Type": "StringValue",
+          "PropertyComments": "Custom XML element name.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "CustomXmlRun",
+      "Attributes": [
+        {
+          "QName": "w:element",
+          "PropertyName": "element",
+          "Type": "StringValue",
+          "PropertyComments": "Custom XML element name.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "ConditionalFormatStyle",
+      "Attributes": [
+        {
+          "QName": "w:val",
+          "PropertyName": "Val",
+          "Type": "StringValue",
+          "PropertyComments": "Conditional Formatting Bit Mask",
+          "Version": "",
+          "Required": true,
+          "Bit": null
+        },
+        {
+          "QName": "w:firstRow",
+          "Bit": 2048
+        },
+        {
+          "QName": "w:lastRow",
+          "Bit": 1024
+        },
+        {
+          "QName": "w:firstColumn",
+          "Bit": 512
+        },
+        {
+          "QName": "w:lastColumn",
+          "Bit": 256
+        },
+        {
+          "QName": "w:oddVBand",
+          "Bit": 128
+        },
+        {
+          "QName": "w:evenVBand",
+          "Bit": 64
+        },
+        {
+          "QName": "w:oddHBand",
+          "Bit": 32
+        },
+        {
+          "QName": "w:evenHBand",
+          "Bit": 16
+        },
+        {
+          "QName": "w:firstRowFirstColumn",
+          "Bit": 4
+        },
+        {
+          "QName": "w:firstRowLastColumn",
+          "Bit": 8
+        },
+        {
+          "QName": "w:lastRowFirstColumn",
+          "Bit": 2
+        },
+        {
+          "QName": "w:lastRowLastColumn",
+          "Bit": 1
+        }
+      ]
+    },
+    {
+      "ClassName": "AbstractNum",
+      "Attributes": [
+        {
+          "QName": "w15:restartNumberingAfterBreak",
+          "PropertyName": "w15_restart_numbering_after_break",
+          "Type": "StringValue",
+          "Version": "Office2013"
+        }
+      ]
+    }
+  ],
+  "Enums": [
+    {
+      "Name": "JustificationValues",
+      "Facets": [
+        {
+          "Value": "left",
+          "Aliases": [
+            "start"
+          ]
+        },
+        {
+          "Value": "right",
+          "Aliases": [
+            "end"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "LevelJustificationValues",
+      "Facets": [
+        {
+          "Value": "left",
+          "Aliases": [
+            "start"
+          ]
+        },
+        {
+          "Value": "right",
+          "Aliases": [
+            "end"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "TableRowAlignmentValues",
+      "Facets": [
+        {
+          "Value": "left",
+          "Aliases": [
+            "start"
+          ]
+        },
+        {
+          "Value": "right",
+          "Aliases": [
+            "end"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "TabStopValues",
+      "Facets": [
+        {
+          "Value": "left",
+          "Aliases": [
+            "start"
+          ]
+        },
+        {
+          "Value": "right",
+          "Aliases": [
+            "end"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "TextDirectionValues",
+      "Facets": [
+        {
+          "Value": "btLr",
+          "Aliases": [
+            "lr"
+          ]
+        },
+        {
+          "Value": "lrTb",
+          "Aliases": [
+            "tb"
+          ]
+        },
+        {
+          "Value": "lrTbV",
+          "Aliases": [
+            "tbV"
+          ]
+        },
+        {
+          "Value": "tbLrV",
+          "Aliases": [
+            "lrV"
+          ]
+        },
+        {
+          "Value": "tbRl",
+          "Aliases": [
+            "rl"
+          ]
+        },
+        {
+          "Value": "tbRlV",
+          "Aliases": [
+            "rlV"
+          ]
+        }
+      ]
+    }
+  ]
+}

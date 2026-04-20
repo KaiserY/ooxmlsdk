@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "Shape",
+      "HasXmlnsFields": true
+    }
+  ]
+}

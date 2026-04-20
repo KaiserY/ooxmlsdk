@@ -1,27 +1,11 @@
-#![recursion_limit = "512"]
+#![cfg_attr(doc, recursion_limit = "512")]
 
-pub mod common {
-  include!(concat!(env!("OUT_DIR"), "/common/mod.rs"));
-}
-
-pub mod schemas {
-  include!(concat!(env!("OUT_DIR"), "/schemas/mod.rs"));
-}
-
-pub mod deserializers {
-  include!(concat!(env!("OUT_DIR"), "/deserializers/mod.rs"));
-}
-
-pub mod serializers {
-  include!(concat!(env!("OUT_DIR"), "/serializers/mod.rs"));
-}
-
+pub mod common;
+pub mod namespaces;
 #[cfg(feature = "parts")]
-pub mod parts {
-  include!(concat!(env!("OUT_DIR"), "/parts/mod.rs"));
-}
-
+pub mod parts;
+pub mod schemas;
+pub mod sdk;
+pub mod simple_type;
 #[cfg(feature = "validators")]
-pub mod validators {
-  include!(concat!(env!("OUT_DIR"), "/validators/mod.rs"));
-}
+pub mod validator;

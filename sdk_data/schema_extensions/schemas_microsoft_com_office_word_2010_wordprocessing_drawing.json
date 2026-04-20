@@ -1,0 +1,20 @@
+{
+  "Types": [
+    {
+      "ClassName": "PercentagePositionHeightOffset",
+      "TextValueType": "StringValue"
+    },
+    {
+      "ClassName": "PercentagePositionVerticalOffset",
+      "TextValueType": "StringValue"
+    },
+    {
+      "ClassName": "PercentageWidth",
+      "TextValueType": "StringValue"
+    },
+    {
+      "ClassName": "PercentageHeight",
+      "TextValueType": "StringValue"
+    }
+  ]
+}

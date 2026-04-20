@@ -1,0 +1,10 @@
+{
+  "Types": [
+    {
+      "ClassName": "TwoCellAnchor",
+      "McAlternateContentInsertBefore": [
+        "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame"
+      ]
+    }
+  ]
+}

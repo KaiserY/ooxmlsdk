@@ -1,0 +1,27 @@
+{
+  "Types": [
+    {
+      "ClassName": "ChartDataIntentionallyChanged",
+      "CloneFromClassName": "ChartData",
+      "Name": "cx:CT_ChartData/cx:chartDataIntentionallyChanged"
+    },
+    {
+      "ClassName": "ChartSpace",
+      "Children": [
+        {
+          "Name": "cx:CT_ChartData/cx:chartData",
+          "PropertyName": "ChartData",
+          "Kind": "Child",
+          "Optional": true
+        },
+        {
+          "Name": "cx:CT_ChartData/cx:chartDataIntentionallyChanged",
+          "PropertyName": "ChartDataIntentionallyChanged",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "cx:CT_Chart/cx:chart"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "Parts": [
+    {
+      "Name": "SlidePart",
+      "Children": [
+        {
+          "MaxOccursGreatThanOne": true,
+          "ApiName": "AudioReferenceRelationships",
+          "Name": "MediaDataPart",
+          "RelationshipType": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio",
+          "InsertBefore": "ImageParts"
+        },
+        {
+          "MaxOccursGreatThanOne": true,
+          "ApiName": "MediaReferenceRelationships",
+          "Name": "MediaDataPart",
+          "RelationshipType": "http://schemas.microsoft.com/office/2007/relationships/media",
+          "InsertBefore": "ImageParts"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: ReferenceEqualsTest
+pub const WORDPROCESSING_PARAGRAPH_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: AttributeTest
+pub const WORDPROCESSING_PARAGRAPH_RSID_P_002_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_rsid_p_002.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: AttributeOrderingTest
+pub const WORDPROCESSING_PARAGRAPH_RSID_ORDER_1_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_rsid_order_1.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: AttributeOrderingTest
+pub const WORDPROCESSING_PARAGRAPH_RSID_ORDER_2_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_rsid_order_2.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: ChildrenOrderingDifferentChildren
+pub const WORDPROCESSING_PARAGRAPH_SDT_THEN_RUN_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_sdt_then_run.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: ChildrenOrderingDifferentChildren
+pub const WORDPROCESSING_PARAGRAPH_RUN_THEN_SDT_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_run_then_sdt.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: DifferentAmountOfChildrenTest
+pub const WORDPROCESSING_PARAGRAPH_ONLY_RUN_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_only_run.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementEqualityTest.cs :: DifferentChildValueTest
+pub const WORDPROCESSING_PARAGRAPH_RUN_1_XML: &str =
+  include_str!("../samples/wordprocessing_paragraph_run_1.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlElementTest.cs :: TextOuterXmlTest
+pub const WORDPROCESSING_TEXT_XML: &str = include_str!("../samples/wordprocessing_text.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs :: PartReaderMiscNodeTest
+pub const WORDPROCESSING_DOCUMENT_XML: &str =
+  include_str!("../samples/wordprocessing_document.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs :: PartReaderBasicTest
+pub const WORDPROCESSING_DOCUMENT_TWO_PARAGRAPHS_XML: &str =
+  include_str!("../samples/wordprocessing_document_two_paragraphs.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs :: PartReaderIgnoreWhitespaceTest
+pub const WORDPROCESSING_DOCUMENT_WHITESPACE_TEXT_XML: &str =
+  include_str!("../samples/wordprocessing_document_whitespace_text.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs :: TestIgnoreWhitespaceWithFormattedXml
+pub const WORDPROCESSING_DOCUMENT_FORMATTED_XML: &str =
+  include_str!("../samples/wordprocessing_document_formatted.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs :: TestIgnoreWhitespaceWhitespaceAfterLastElement
+pub const WORDPROCESSING_DOCUMENT_TRAILING_WHITESPACE_XML: &str =
+  include_str!("../samples/wordprocessing_document_trailing_whitespace.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs :: TestMiscNodeAfterDocument
+pub const WORDPROCESSING_DOCUMENT_TRAILING_COMMENT_XML: &str =
+  include_str!("../samples/wordprocessing_document_trailing_comment.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Hyperlink.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_HYPERLINK_XML: &str =
+  include_str!("../samples/wordprocessing_document_hyperlink.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Plain.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_PLAIN_XML: &str =
+  include_str!("../samples/wordprocessing_document_plain.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/HelloWorld.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_HELLO_WORLD_XML: &str =
+  include_str!("../samples/wordprocessing_document_hello_world.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/HelloO14.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_HELLO_O14_XML: &str =
+  include_str!("../samples/wordprocessing_document_hello_o14.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Comments.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_COMMENTS_XML: &str =
+  include_str!("../samples/wordprocessing_document_comments.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Comments.docx :: word/comments.xml
+pub const WORDPROCESSING_COMMENTS_XML: &str =
+  include_str!("../samples/wordprocessing_comments.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/simpleSdt.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_SIMPLE_SDT_XML: &str =
+  include_str!("../samples/wordprocessing_document_simple_sdt.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Document.docx :: word/document.xml
+pub const WORDPROCESSING_DOCUMENT_DOCUMENT_XML: &str =
+  include_str!("../samples/wordprocessing_document_document.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Spreadsheet.xlsx :: xl/workbook.xml
+pub const SPREADSHEET_WORKBOOK_XML: &str = include_str!("../samples/spreadsheet_workbook.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Complex01.xlsx :: xl/workbook.xml
+pub const SPREADSHEET_WORKBOOK_COMPLEX01_XML: &str =
+  include_str!("../samples/spreadsheet_workbook_complex01.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Complex01.xlsx :: xl/worksheets/sheet1.xml
+pub const SPREADSHEET_WORKSHEET_COMPLEX01_SHEET1_XML: &str =
+  include_str!("../samples/spreadsheet_worksheet_complex01_sheet1.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Presentation.pptx :: ppt/presentation.xml
+pub const PRESENTATION_PRESENTATION_XML: &str =
+  include_str!("../samples/presentation_presentation.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlElementParsingTests.cs :: ParseOpenXmlAttributeWithEmbeddedXml
+pub const PRESENTATION_NON_VISUAL_DRAWING_PROPERTIES_XML: &str =
+  include_str!("../samples/presentation_non_visual_drawing_properties.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlCompositeElementTest.cs :: Bug225919Test
+pub const EXTENDED_PROPERTIES_TITLES_OF_PARTS_XML: &str =
+  include_str!("../samples/extended_properties_titles_of_parts.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlCompositeElementTest.cs :: Bug225919Test
+pub const CUSTOM_PROPERTIES_BOOL_XML: &str = include_str!("../samples/custom_properties_bool.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/HelloWorld.docx :: docProps/core.xml
+pub const OPC_CORE_PROPERTIES_HELLO_WORLD_XML: &str =
+  include_str!("../samples/opc_core_properties_hello_world.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/MoreDocProps.docx :: docProps/core.xml
+pub const OPC_CORE_PROPERTIES_MORE_DOC_PROPS_XML: &str =
+  include_str!("../samples/opc_core_properties_more_doc_props.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/MoreDocProps.docx :: docProps/app.xml
+pub const EXTENDED_PROPERTIES_MORE_DOC_PROPS_XML: &str =
+  include_str!("../samples/extended_properties_more_doc_props.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs :: GetStreamWrite
+pub const SPREADSHEET_SHARED_STRING_TABLE_XML: &str =
+  include_str!("../samples/spreadsheet_shared_string_table.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs :: GetStreamWriteNoUpdates
+pub const SPREADSHEET_SHARED_STRING_TABLE_EMPTY_XML: &str =
+  include_str!("../samples/spreadsheet_shared_string_table_empty.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/BugRegressionTest.cs :: Bug743591
+pub const SPREADSHEET_COLOR_SCALE_XML: &str =
+  include_str!("../samples/spreadsheet_color_scale.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellDoubleTest
+pub const SPREADSHEET_CELL_VALUE_DOUBLE_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_double.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellDoubleTestExponential
+pub const SPREADSHEET_CELL_VALUE_DOUBLE_EXPONENTIAL_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_double_exponential.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellIntTestExponential
+pub const SPREADSHEET_CELL_VALUE_INT_EXPONENTIAL_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_int_exponential.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellBooleanTest
+pub const SPREADSHEET_CELL_VALUE_BOOLEAN_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_boolean.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellIntTest
+pub const SPREADSHEET_CELL_VALUE_INT_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_int.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellDecimalTestExponential
+pub const SPREADSHEET_CELL_VALUE_DECIMAL_EXPONENTIAL_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_decimal_exponential.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellDateTimeWithMillisecondsTest
+pub const SPREADSHEET_CELL_VALUE_DATETIME_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_datetime.xml");
+
+// Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs :: CellDateTimeOffsetWithMillisecondsTest
+pub const SPREADSHEET_CELL_VALUE_DATETIME_OFFSET_XML: &str =
+  include_str!("../samples/spreadsheet_cell_value_datetime_offset.xml");
+
+pub const DOC_SAMPLES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/doc_samples");
+
+pub fn doc_sample_path(file_name: &str) -> std::path::PathBuf {
+  std::path::Path::new(DOC_SAMPLES_DIR).join(file_name)
+}

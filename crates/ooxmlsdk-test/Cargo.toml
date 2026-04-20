@@ -1,0 +1,29 @@
+[package]
+name = "ooxmlsdk-test"
+version.workspace = true
+edition.workspace = true
+publish = false
+build = "build.rs"
+
+[features]
+default = ["microsoft365", "parts"]
+parts = ["ooxmlsdk/parts"]
+microsoft365 = ["ooxmlsdk/microsoft365"]
+validators = ["ooxmlsdk/validators"]
+
+[dependencies]
+ooxmlsdk = { workspace = true, default-features = false }
+
+[dev-dependencies]
+criterion = { workspace = true }
+quick-xml = { workspace = true }
+zip = { workspace = true }
+
+[[bench]]
+name = "xml"
+harness = false
+
+[[bench]]
+name = "packages"
+harness = false
+required-features = ["parts"]

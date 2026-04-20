@@ -1,0 +1,10 @@
+{
+  "Types": [
+    {
+      "ClassName": "ShapeTree",
+      "McAlternateContentInsertBefore": [
+        "p:CT_GraphicalObjectFrame/p:graphicFrame"
+      ]
+    }
+  ]
+}

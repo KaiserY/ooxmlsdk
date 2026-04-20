@@ -1,0 +1,16 @@
+{
+  "Parts": [
+    {
+      "Name": "DrawingsPart",
+      "Children": [
+        {
+          "MaxOccursGreatThanOne": true,
+          "ApiName": "HdPhotoParts",
+          "Name": "ImagePart",
+          "RelationshipType": "http://schemas.microsoft.com/office/2007/relationships/hdphoto",
+          "InsertBefore": "ImageParts"
+        }
+      ]
+    }
+  ]
+}

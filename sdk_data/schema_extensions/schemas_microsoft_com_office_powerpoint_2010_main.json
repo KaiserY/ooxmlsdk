@@ -1,0 +1,20 @@
+{
+  "Types": [
+    {
+      "ClassName": "DefaultImageDpi",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "DiscardImageEditData",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "CreationId",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ModificationId",
+      "HasXmlnsFields": true
+    }
+  ]
+}

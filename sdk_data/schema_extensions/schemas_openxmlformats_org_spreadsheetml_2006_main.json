@@ -1,0 +1,208 @@
+{
+  "Types": [
+    {
+      "ClassName": "WorkbookExtensionList",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "WorkbookExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "StylesheetExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotCacheDefinitionExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotTableDefinitionExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TableExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Table",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "AutoFilter",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Worksheet",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "SharedStringItem",
+      "HasXmlnsFields": true,
+      "HasMcIgnorableField": true,
+      "Attributes": [
+        {
+          "QName": "w14:attr",
+          "PropertyName": "w14:attr",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ],
+      "Children": [
+        {
+          "Name": "w14:CT_Rst/w14:placeholder",
+          "PropertyName": "w14_placeholder",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "x:CT_Xstring/x:t"
+        },
+        {
+          "Name": "w14:CT_Empty/w14:no",
+          "PropertyName": "w14_no",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "x:CT_Xstring/x:t"
+        }
+      ]
+    },
+    {
+      "ClassName": "Text",
+      "Attributes": [
+        {
+          "QName": "w14:a",
+          "PropertyName": "w14:a",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:b",
+          "PropertyName": "w14:b",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "w14:c",
+          "PropertyName": "w14:c",
+          "Type": "StringValue",
+          "PropertyComments": "Preserved Word 2010 extension attribute.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Placeholder",
+      "CloneFromClassName": "SharedStringItem",
+      "Name": "w14:CT_Rst/w14:placeholder",
+      "Attributes": [
+        {
+          "QName": "mc:ProcessContent",
+          "PropertyName": "mc:ProcessContent",
+          "Type": "StringValue",
+          "PropertyComments": "MCE process content directive.",
+          "Version": "Office2007"
+        },
+        {
+          "QName": "mc:PreserveAttributes",
+          "PropertyName": "mc:PreserveAttributes",
+          "Type": "StringValue",
+          "PropertyComments": "MCE preserve attributes directive.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "No",
+      "CloneFromClassName": "MissingTable",
+      "Name": "w14:CT_Empty/w14:no"
+    },
+    {
+      "ClassName": "Hyperlink",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "DataValidation",
+      "Attributes": [
+        {
+          "QName": "xr:uid",
+          "PropertyName": "xr:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "TableColumn",
+      "Attributes": [
+        {
+          "QName": "xr3:uid",
+          "PropertyName": "xr3:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision ID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "WorkbookView",
+      "Attributes": [
+        {
+          "QName": "xr2:uid",
+          "PropertyName": "xr2:uid",
+          "Type": "StringValue",
+          "PropertyComments": "Revision UID.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Workbook",
+      "Children": [
+        {
+          "Name": "xr:CT_RevisionPtr/xr:revisionPtr",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "x:CT_BookViews/x:bookViews"
+        }
+      ],
+      "McAlternateContentInsertBefore": [
+        "x15ac:CT_AbsolutePath/x15ac:absPath"
+      ]
+    }
+  ]
+}

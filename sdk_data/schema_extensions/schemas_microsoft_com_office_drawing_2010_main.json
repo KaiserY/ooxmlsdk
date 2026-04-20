@@ -1,0 +1,12 @@
+{
+  "Types": [
+    {
+      "ClassName": "ImageProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "UseLocalDpi",
+      "HasXmlnsFields": true
+    }
+  ]
+}

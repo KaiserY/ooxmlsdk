@@ -1,0 +1,22 @@
+{
+  "Types": [
+    {
+      "ClassName": "ChartSpaceExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Extension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "RadarSerExtension",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ChartSpace",
+      "McAlternateContentInsertBefore": [
+        "c:CT_Style/c:style"
+      ]
+    }
+  ]
+}

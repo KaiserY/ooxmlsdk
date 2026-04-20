@@ -1,0 +1,40 @@
+{
+  "Types": [
+    {
+      "ClassName": "RelativeAnchorSize",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "Shape",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "NonVisualDrawingProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "NonVisualShapeDrawingProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "NonVisualShapeProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ShapeProperties",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "TextBody",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "FromAnchor",
+      "HasXmlnsFields": true
+    },
+    {
+      "ClassName": "ToAnchor",
+      "HasXmlnsFields": true
+    }
+  ]
+}

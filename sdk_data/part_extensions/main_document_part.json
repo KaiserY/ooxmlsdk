@@ -1,0 +1,14 @@
+{
+  "Parts": [
+    {
+      "Name": "MainDocumentPart",
+      "Children": [
+        {
+          "MaxOccursGreatThanOne": true,
+          "ApiName": "WordprocessingTextBoxParts",
+          "Name": "WordprocessingTextBoxPart"
+        }
+      ]
+    }
+  ]
+}

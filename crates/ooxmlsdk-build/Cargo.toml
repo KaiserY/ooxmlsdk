@@ -2,31 +2,11 @@
 name = "ooxmlsdk-build"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
-authors.workspace = true
-license.workspace = true
-repository.workspace = true
-documentation.workspace = true
-description.workspace = true
-keywords.workspace = true
-categories.workspace = true
-readme.workspace = true
+publish = false
 
 [features]
-default = ["docx", "xlsx", "pptx", "office2007", "parts"]
-schemas = []
-parts = ["schemas", "dep:zip"]
-validators = ["schemas"]
-docx = []
-xlsx = []
-pptx = []
-office2007 = []
-office2010 = ["office2007"]
-office2013 = ["office2010"]
-office2016 = ["office2013"]
-office2019 = ["office2016"]
-office2021 = ["office2019"]
-microsoft365 = []
+default = ["parts"]
+parts = ["dep:zip"]
 
 [dependencies]
 quick-xml = { workspace = true, features = ["serialize"] }
@@ -40,11 +20,3 @@ proc-macro2 = { workspace = true }
 heck = { workspace = true }
 thiserror = { workspace = true }
 zip = { workspace = true, optional = true }
-
-[dev-dependencies]
-criterion = { workspace = true }
-pprof = { workspace = true }
-
-[[bench]]
-name = "serde_bench"
-harness = false

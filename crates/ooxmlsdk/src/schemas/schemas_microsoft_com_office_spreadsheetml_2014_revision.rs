@@ -881,7 +881,7 @@ pub struct RevExFormatting {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sqref: String,
+  pub sqref: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// start
   ///
   /// Available in Office2016 and above.
@@ -1990,7 +1990,7 @@ pub struct RefCell {
   ///
   /// Represents the following attribute in the schema: :r
   #[sdk(attr(qname = ":r"))]
-  pub r: String,
+  pub r: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// uid
   ///
   /// Available in Office2016 and above.
@@ -2379,7 +2379,9 @@ pub struct DataValidation {
     ///
     /// Represents the following attribute in the schema: :sqref
     #[sdk(attr(qname = ":sqref"))]
-    pub sequence_of_references: String,
+    pub sequence_of_references: crate::simple_type::ListValue<
+        crate::simple_type::StringValue,
+    >,
     /// _
     #[sdk(text_child(qname = "x:ST_Xstring/x12ac:list"))]
     pub list: Option<crate::simple_type::StringValue>,

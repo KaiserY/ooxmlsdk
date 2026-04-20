@@ -8854,7 +8854,7 @@ pub struct RevisionFormat {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: String,
+  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// Start index
   ///
   /// Available in Office2007 and above.
@@ -9959,7 +9959,7 @@ pub struct Row {
   ///
   /// Represents the following attribute in the schema: :spans
   #[sdk(attr(qname = ":spans"))]
-  pub spans: Option<String>,
+  pub spans: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// Style Index
   ///
   /// Available in Office2007 and above.
@@ -10263,7 +10263,8 @@ pub struct Selection {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: Option<String>,
+  pub sequence_of_references:
+    Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
 }
 /// PivotTable Selection.
 ///
@@ -11168,7 +11169,7 @@ pub struct ProtectedRange {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: String,
+  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -11573,7 +11574,7 @@ pub struct IgnoredError {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: String,
+  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// Evaluation Error
   ///
   /// Available in Office2007 and above.
@@ -11752,7 +11753,7 @@ pub struct DataValidation {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: String,
+  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// Revision ID.
   ///
   /// Available in Office2007 and above.
@@ -16318,7 +16319,8 @@ pub struct ConditionalFormatting {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: Option<String>,
+  pub sequence_of_references:
+    Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "x:CT_CfRule/x:cfRule"))]
   pub x_cf_rule: Vec<ConditionalFormattingRule>,
@@ -17843,7 +17845,8 @@ pub struct Scenarios {
   ///
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: Option<String>,
+  pub sequence_of_references:
+    Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "x:CT_Scenario/x:scenario"))]
   pub x_scenario: Vec<Scenario>,

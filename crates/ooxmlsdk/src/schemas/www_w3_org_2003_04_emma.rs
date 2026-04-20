@@ -118,7 +118,7 @@ pub struct Lattice {
   ///
   /// Represents the following attribute in the schema: :final
   #[sdk(attr(qname = ":final"))]
-  pub r#final: String,
+  pub r#final: crate::simple_type::ListValue<crate::simple_type::DecimalValue>,
   /// time-ref-uri
   ///
   /// Available in Office2007 and above.
@@ -271,14 +271,14 @@ pub struct Interpretation {
   ///
   /// Represents the following attribute in the schema: emma:medium
   #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<String>,
+  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
   /// mode
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<String>,
+  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// function
   ///
   /// Available in Office2007 and above.
@@ -488,14 +488,14 @@ pub struct OneOf {
   ///
   /// Represents the following attribute in the schema: emma:medium
   #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<String>,
+  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
   /// mode
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<String>,
+  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// function
   ///
   /// Available in Office2007 and above.
@@ -684,14 +684,14 @@ pub struct Group {
   ///
   /// Represents the following attribute in the schema: emma:medium
   #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<String>,
+  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
   /// mode
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<String>,
+  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// function
   ///
   /// Available in Office2007 and above.
@@ -880,14 +880,14 @@ pub struct Sequence {
   ///
   /// Represents the following attribute in the schema: emma:medium
   #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<String>,
+  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
   /// mode
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<String>,
+  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// function
   ///
   /// Available in Office2007 and above.
@@ -1145,14 +1145,14 @@ pub struct EndPoint {
   ///
   /// Represents the following attribute in the schema: emma:medium
   #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<String>,
+  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
   /// mode
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<String>,
+  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub xml_children: Vec<EndPointChoice>,
 }
@@ -1302,14 +1302,14 @@ pub struct Arc {
   ///
   /// Represents the following attribute in the schema: emma:medium
   #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<String>,
+  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
   /// mode
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<String>,
+  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// source
   ///
   /// Available in Office2007 and above.

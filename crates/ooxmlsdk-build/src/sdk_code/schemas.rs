@@ -2940,6 +2940,17 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
 }
 
 fn type_from_decl_ref(type_ref: &TypeRefDecl) -> Result<Type> {
+  if type_ref.rust_type.contains('<') || type_ref.rust_type.contains("::") {
+    if let Some(module_path) = &type_ref.module_path {
+      return Ok(parse_str(&format!(
+        "{module_path}::{}",
+        type_ref.rust_type
+      ))?);
+    }
+
+    return Ok(parse_str(&type_ref.rust_type)?);
+  }
+
   if let Some(module_path) = &type_ref.module_path {
     Ok(parse_str(&format!(
       "{module_path}::{}",

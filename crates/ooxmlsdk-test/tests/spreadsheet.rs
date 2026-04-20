@@ -1,10 +1,11 @@
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::{
-  ArrayFeatureProperty, ArrayFeaturePropertyChoice, BoolFeatureProperty,
+  ArrayFeatureProperty, ArrayFeaturePropertyChoice, BoolFeatureProperty, IntFeatureProperty,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
+use ooxmlsdk::simple_type::{ListValue, StringValue};
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 fn assert_cell_value_xml(serialized: &str, expected_value: &str) {
@@ -93,6 +94,10 @@ fn worksheet_round_trip_from_complex01_part_test() {
   );
   assert_eq!(parsed.x_sheet_data.x_row.len(), 13);
   assert_eq!(
+    parsed.x_sheet_data.x_row[0].spans,
+    Some(ListValue::<StringValue>(vec!["1:22".to_string()]))
+  );
+  assert_eq!(
     parsed
       .x_hyperlinks
       .as_ref()
@@ -117,6 +122,10 @@ fn worksheet_round_trip_from_complex01_part_test() {
     Some(1)
   );
   assert_eq!(reparsed.x_sheet_data.x_row.len(), 13);
+  assert_eq!(
+    reparsed.x_sheet_data.x_row[0].spans,
+    Some(ListValue::<StringValue>(vec!["1:22".to_string()]))
+  );
 }
 
 #[test]
@@ -258,6 +267,25 @@ fn bool_feature_property_uses_boolean_value_lexical_form() {
   let reparsed = serialized.parse::<BoolFeatureProperty>().unwrap();
   assert_eq!(reparsed.k.as_str(), "flag");
   assert_eq!(reparsed.xml_content, Some(true));
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn int_feature_property_uses_integer_value_numeric_form() {
+  let value = IntFeatureProperty {
+    k: "count".into(),
+    xml_content: Some(-42),
+  };
+
+  let xml = value.to_xml().unwrap();
+  let serialized = trim_xml_declaration(&xml);
+  assert!(serialized.contains("<xfpb:i"));
+  assert!(serialized.contains("k=\"count\""));
+  assert!(serialized.contains(">-42</xfpb:i>"));
+
+  let reparsed = serialized.parse::<IntFeatureProperty>().unwrap();
+  assert_eq!(reparsed.k.as_str(), "count");
+  assert_eq!(reparsed.xml_content, Some(-42));
 }
 
 #[test]

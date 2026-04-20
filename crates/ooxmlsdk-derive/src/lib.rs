@@ -1109,7 +1109,6 @@ fn is_string_like_type(ty: &Type) -> bool {
         | "DecimalValue"
         | "HexBinaryValue"
         | "Base64BinaryValue"
-        | "IntegerValue"
     )
   }))
 }

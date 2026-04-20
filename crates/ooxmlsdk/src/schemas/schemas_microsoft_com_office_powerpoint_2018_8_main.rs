@@ -211,14 +211,14 @@ pub struct CommentReply {
   ///
   /// Represents the following attribute in the schema: :tags
   #[sdk(attr(qname = ":tags"))]
-  pub tags: Option<String>,
+  pub tags: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// likes
   ///
   /// Available in Office2021 and above.
   ///
   /// Represents the following attribute in the schema: :likes
   #[sdk(attr(qname = ":likes"))]
-  pub likes: Option<String>,
+  pub likes: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   ///Defines the TextBodyType Class.
   #[sdk(child(qname = "a:CT_TextBody/p188:txBody"))]
   pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
@@ -320,14 +320,14 @@ pub struct Comment {
   ///
   /// Represents the following attribute in the schema: :tags
   #[sdk(attr(qname = ":tags"))]
-  pub tags: Option<String>,
+  pub tags: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// likes
   ///
   /// Available in Office2021 and above.
   ///
   /// Represents the following attribute in the schema: :likes
   #[sdk(attr(qname = ":likes"))]
-  pub likes: Option<String>,
+  pub likes: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// startDate
   ///
   /// Available in Office2021 and above.
@@ -348,7 +348,7 @@ pub struct Comment {
   ///
   /// Represents the following attribute in the schema: :assignedTo
   #[sdk(attr(qname = ":assignedTo"))]
-  pub assigned_to: Option<String>,
+  pub assigned_to: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// complete
   ///
   /// Available in Office2021 and above.

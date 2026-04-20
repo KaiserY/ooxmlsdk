@@ -2388,42 +2388,42 @@ pub struct PresentationOf {
   ///
   /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<String>,
+  pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
   /// Data Point Type
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
-  pub point_type: Option<String>,
+  pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
   /// Hide Last Transition
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :hideLastTrans
   #[sdk(attr(qname = ":hideLastTrans"))]
-  pub hide_last_trans: Option<String>,
+  pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
   /// Start
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :st
   #[sdk(attr(qname = ":st"))]
-  pub start: Option<String>,
+  pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Count
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :cnt
   #[sdk(attr(qname = ":cnt"))]
-  pub count: Option<String>,
+  pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// Step
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :step
   #[sdk(attr(qname = ":step"))]
-  pub step: Option<String>,
+  pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -2563,42 +2563,42 @@ pub struct ForEach {
   ///
   /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<String>,
+  pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
   /// Data Point Type
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
-  pub point_type: Option<String>,
+  pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
   /// Hide Last Transition
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :hideLastTrans
   #[sdk(attr(qname = ":hideLastTrans"))]
-  pub hide_last_trans: Option<String>,
+  pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
   /// Start
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :st
   #[sdk(attr(qname = ":st"))]
-  pub start: Option<String>,
+  pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Count
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :cnt
   #[sdk(attr(qname = ":cnt"))]
-  pub count: Option<String>,
+  pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// Step
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :step
   #[sdk(attr(qname = ":step"))]
-  pub step: Option<String>,
+  pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   #[sdk(choice)]
   pub xml_children: Vec<ForEachChoice>,
 }
@@ -2685,42 +2685,42 @@ pub struct DiagramChooseIf {
   ///
   /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<String>,
+  pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
   /// Data Point Type
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
-  pub point_type: Option<String>,
+  pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
   /// Hide Last Transition
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :hideLastTrans
   #[sdk(attr(qname = ":hideLastTrans"))]
-  pub hide_last_trans: Option<String>,
+  pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
   /// Start
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :st
   #[sdk(attr(qname = ":st"))]
-  pub start: Option<String>,
+  pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Count
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :cnt
   #[sdk(attr(qname = ":cnt"))]
-  pub count: Option<String>,
+  pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// Step
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :step
   #[sdk(attr(qname = ":step"))]
-  pub step: Option<String>,
+  pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Function
   ///
   /// Available in Office2007 and above.

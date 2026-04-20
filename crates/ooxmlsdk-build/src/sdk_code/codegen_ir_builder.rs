@@ -1324,10 +1324,7 @@ fn build_attr_type_ref(
 ) -> Result<TypeRefDecl> {
   Ok(
     match classify_attr_type(attr.r#type.as_str()).ok_or_else(|| attr.r#type.clone())? {
-      AttrTypeKind::List => TypeRefDecl {
-        rust_type: "String".to_string(),
-        module_path: None,
-      },
+      AttrTypeKind::List => build_list_attr_type_ref(attr.r#type.as_str(), schema, context)?,
       AttrTypeKind::Enum { .. } => {
         let (enum_module_name, enum_name) = context.resolve_attr_enum_module(&attr.r#type)?;
 
@@ -1346,6 +1343,43 @@ fn build_attr_type_ref(
       },
     },
   )
+}
+
+fn build_list_attr_type_ref(
+  attr_type: &str,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<TypeRefDecl> {
+  let inner_type = attr_type
+    .strip_prefix("ListValue<")
+    .and_then(|value| value.strip_suffix('>'))
+    .ok_or_else(|| attr_type.to_string())?;
+
+  let inner_rust_type =
+    match classify_attr_type(inner_type).ok_or_else(|| inner_type.to_string())? {
+      AttrTypeKind::List => {
+        return Err(format!("nested ListValue is unsupported: {attr_type}").into());
+      }
+      AttrTypeKind::Enum { .. } => {
+        let (enum_module_name, enum_name) = context.resolve_attr_enum_module(inner_type)?;
+        if enum_module_name == schema.module_name {
+          enum_name.to_upper_camel_case()
+        } else {
+          format!(
+            "crate::schemas::{enum_module_name}::{}",
+            enum_name.to_upper_camel_case()
+          )
+        }
+      }
+      AttrTypeKind::Simple { simple_type, .. } => {
+        format!("crate::simple_type::{simple_type}")
+      }
+    };
+
+  Ok(TypeRefDecl {
+    rust_type: format!("ListValue<{inner_rust_type}>"),
+    module_path: Some("crate::simple_type".to_string()),
+  })
 }
 
 fn build_xml_content_type_ref(

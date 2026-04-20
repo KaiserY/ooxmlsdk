@@ -366,7 +366,7 @@ pub struct LineReference {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub line_reference_choice: Option<LineReferenceChoice>,
   /// _
@@ -394,7 +394,7 @@ pub struct FillReference {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub fill_reference_choice: Option<FillReferenceChoice>,
   /// _
@@ -422,7 +422,7 @@ pub struct EffectReference {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub effect_reference_choice: Option<EffectReferenceChoice>,
   /// _
@@ -450,7 +450,7 @@ pub struct StyleReference {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub xml_children: Vec<StyleReferenceChoice>,
 }
@@ -483,7 +483,7 @@ pub struct FontReference {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub font_reference_choice: Option<FontReferenceChoice>,
   /// _
@@ -1579,7 +1579,7 @@ pub struct AxisTitle {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1622,7 +1622,7 @@ pub struct CategoryAxis {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1665,7 +1665,7 @@ pub struct ChartArea {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1708,7 +1708,7 @@ pub struct DataLabel {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1751,7 +1751,7 @@ pub struct DataLabelCallout {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1794,7 +1794,7 @@ pub struct DataPoint {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1837,7 +1837,7 @@ pub struct DataPoint3D {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1880,7 +1880,7 @@ pub struct DataPointLine {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1923,7 +1923,7 @@ pub struct DataPointMarker {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1966,7 +1966,7 @@ pub struct DataPointWireframe {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2009,7 +2009,7 @@ pub struct DataTableStyle {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2052,7 +2052,7 @@ pub struct DownBar {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2095,7 +2095,7 @@ pub struct DropLine {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2138,7 +2138,7 @@ pub struct ErrorBar {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2181,7 +2181,7 @@ pub struct Floor {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2224,7 +2224,7 @@ pub struct GridlineMajor {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2267,7 +2267,7 @@ pub struct GridlineMinor {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2310,7 +2310,7 @@ pub struct HiLoLine {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2353,7 +2353,7 @@ pub struct LeaderLine {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2396,7 +2396,7 @@ pub struct LegendStyle {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2439,7 +2439,7 @@ pub struct PlotArea {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2482,7 +2482,7 @@ pub struct PlotArea3D {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2525,7 +2525,7 @@ pub struct SeriesAxis {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2568,7 +2568,7 @@ pub struct SeriesLine {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2611,7 +2611,7 @@ pub struct TitleStyle {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2654,7 +2654,7 @@ pub struct TrendlineStyle {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2697,7 +2697,7 @@ pub struct TrendlineLabel {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2740,7 +2740,7 @@ pub struct UpBar {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2783,7 +2783,7 @@ pub struct ValueAxis {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2826,7 +2826,7 @@ pub struct Wall {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2869,7 +2869,7 @@ pub struct StyleEntry {
   ///
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
-  pub modifiers: Option<String>,
+  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(choice)]
   pub xml_children: Vec<StyleEntryChoice>,
 }

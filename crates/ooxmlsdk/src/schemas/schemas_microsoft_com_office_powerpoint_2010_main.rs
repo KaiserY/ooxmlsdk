@@ -1031,7 +1031,7 @@ pub struct SectionOld {
     min_inclusive = true,
     max_inclusive = false
   ))]
-  pub slide_id_list: Option<String>,
+  pub slide_id_list: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// id
   ///
   /// Available in Office2010 and above.

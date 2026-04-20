@@ -158,7 +158,7 @@ pub struct ContextNode {
   /// Represents the following attribute in the schema: :rotatedBoundingBox
   #[sdk(attr(qname = ":rotatedBoundingBox"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
-  pub rotated_bounding_box: Option<String>,
+  pub rotated_bounding_box: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// alignmentLevel
   ///
   /// Available in Office2007 and above.
@@ -270,7 +270,7 @@ pub struct ContextNode {
   /// Represents the following attribute in the schema: :hotPoints
   #[sdk(attr(qname = ":hotPoints"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
-  pub hot_points: Option<String>,
+  pub hot_points: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// centroid
   ///
   /// Available in Office2007 and above.
@@ -318,7 +318,7 @@ pub struct ContextNode {
   /// Represents the following attribute in the schema: :shapeGeometry
   #[sdk(attr(qname = ":shapeGeometry"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
-  pub shape_geometry: Option<String>,
+  pub shape_geometry: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// _
   #[sdk(child(qname = "msink:CT_Property/msink:property"))]
   pub msink_property: Vec<ContextNodeProperty>,

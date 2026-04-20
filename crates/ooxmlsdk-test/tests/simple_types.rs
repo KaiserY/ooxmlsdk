@@ -1,8 +1,8 @@
 use ooxmlsdk::simple_type::{
   Base64BinaryValue, BooleanValue, ByteValue, DateTimeValue, DecimalValue, DoubleValue,
-  HexBinaryValue, Int16Value, Int32Value, Int64Value, IntegerValue, OnOffValue, SByteValue,
-  SingleValue, StringValue, TrueFalseBlankValue, TrueFalseValue, UInt16Value, UInt32Value,
-  UInt64Value,
+  HexBinaryValue, Int16Value, Int32Value, Int64Value, IntegerValue, ListValue, OnOffValue,
+  SByteValue, SingleValue, StringValue, TrueFalseBlankValue, TrueFalseValue, UInt16Value,
+  UInt32Value, UInt64Value,
 };
 
 fn assert_round_trip<T>(input: &str)
@@ -83,7 +83,20 @@ fn int64_value_round_trip_test() {
 
 #[test]
 fn integer_value_round_trip_test() {
+  assert_round_trip::<IntegerValue>("-1");
+  assert_round_trip::<IntegerValue>("0");
   assert_round_trip::<IntegerValue>("123456789");
+}
+
+#[test]
+fn list_value_string_round_trip_test() {
+  assert_round_trip::<ListValue<StringValue>>("1:22");
+  assert_round_trip::<ListValue<StringValue>>("alpha beta gamma");
+}
+
+#[test]
+fn list_value_int32_round_trip_test() {
+  assert_round_trip::<ListValue<Int32Value>>("-1 0 42");
 }
 
 #[test]

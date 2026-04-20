@@ -134,7 +134,7 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
         };
         quote! {
           crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
-          writer.write_char('>')?;
+          writer.write_all(b">")?;
           #value_write_tokens
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         }
@@ -496,7 +496,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident(value) => {
             crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
-            writer.write_char('>')?;
+            writer.write_all(b">")?;
             #value_write_tokens
             crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
           }
@@ -517,7 +517,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         let write_arm = quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(value) => writer.write_str(value.as_ref()),
+          Self::#variant_ident(value) => writer.write_all(value.as_bytes()),
         };
         write_arms.push(write_arm);
         validate_arms.push(quote! {
@@ -686,11 +686,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         #read_tokens
       }
 
-      pub(crate) fn write_xml<W: std::fmt::Write>(
+      pub(crate) fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
         xmlns_prefix: &str,
-      ) -> Result<(), std::fmt::Error> {
+      ) -> Result<(), std::io::Error> {
         match self {
           #( #write_arms )*
         }

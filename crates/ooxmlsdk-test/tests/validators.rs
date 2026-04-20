@@ -10,8 +10,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_math::Arg
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   ConditionalFormatStyle, DocPartId,
 };
-use ooxmlsdk::validator::{SdkValidator, StringFormatKind, validate_string_format};
 use ooxmlsdk::validator::validate_number_type;
+use ooxmlsdk::validator::{SdkValidator, StringFormatKind, validate_string_format};
 
 fn repeated_a(count: usize) -> String {
   "A".repeat(count)
@@ -221,32 +221,12 @@ fn any_uri_string_format_trims_edge_whitespace_like_upstream() {
 
 #[test]
 fn non_negative_integer_number_type_rejects_negative_values() {
+  assert!(validate_number_type("NumberTypeTests", "value", &"0", "xsd:nonNegativeInteger").is_ok());
   assert!(
-    validate_number_type(
-      "NumberTypeTests",
-      "value",
-      &"0",
-      "xsd:nonNegativeInteger"
-    )
-    .is_ok()
+    validate_number_type("NumberTypeTests", "value", &"42", "xsd:nonNegativeInteger").is_ok()
   );
   assert!(
-    validate_number_type(
-      "NumberTypeTests",
-      "value",
-      &"42",
-      "xsd:nonNegativeInteger"
-    )
-    .is_ok()
-  );
-  assert!(
-    validate_number_type(
-      "NumberTypeTests",
-      "value",
-      &"-1",
-      "xsd:nonNegativeInteger"
-    )
-    .is_err()
+    validate_number_type("NumberTypeTests", "value", &"-1", "xsd:nonNegativeInteger").is_err()
   );
 }
 

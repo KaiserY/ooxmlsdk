@@ -353,7 +353,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     content_write_stmts.push(quote! {
       if entry_set.insert(self.inner_path.clone()) {
         zip.start_file(&self.inner_path, options)?;
-        zip.write_all(self.root_element.to_xml()?.as_bytes())?;
+        let xml = self.root_element.to_xml_bytes()?;
+        zip.write_all(&xml)?;
       }
     });
   } else if let Some(kind) = content_kind {
@@ -389,7 +390,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
         if entry_set.insert(self.rels_path.clone()) {
           zip.start_file(&self.rels_path, options)?;
-          zip.write_all(relationships.to_xml()?.as_bytes())?;
+          let xml = relationships.to_xml_bytes()?;
+          zip.write_all(&xml)?;
         }
       }
     }
@@ -482,7 +484,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             .compression_method(zip::CompressionMethod::Deflated)
             .unix_permissions(0o755);
           zip.start_file("[Content_Types].xml", options)?;
-          zip.write_all(self.content_types.to_xml()?.as_bytes())?;
+          let xml = self.content_types.to_xml_bytes()?;
+          zip.write_all(&xml)?;
           self.save_zip("", &mut zip, &mut entry_set, &mut visited)?;
           zip.finish()?;
           Ok(())

@@ -491,102 +491,102 @@ pub(crate) fn read_outer_xml<'de, R: XmlReader<'de>>(
 }
 
 #[inline(always)]
-pub(crate) fn write_start_tag_open<W: std::fmt::Write>(
+pub(crate) fn write_start_tag_open<W: std::io::Write>(
   writer: &mut W,
   default_namespace_prefix: &str,
   tag_prefix: &str,
   local_name: &str,
-) -> Result<(), std::fmt::Error> {
-  writer.write_char('<')?;
+) -> std::io::Result<()> {
+  writer.write_all(b"<")?;
   write_qualified_name(writer, default_namespace_prefix, tag_prefix, local_name)
 }
 
 #[inline(always)]
-pub(crate) fn write_end_tag<W: std::fmt::Write>(
+pub(crate) fn write_end_tag<W: std::io::Write>(
   writer: &mut W,
   default_namespace_prefix: &str,
   tag_prefix: &str,
   local_name: &str,
-) -> Result<(), std::fmt::Error> {
-  writer.write_str("</")?;
+) -> std::io::Result<()> {
+  writer.write_all(b"</")?;
   write_qualified_name(writer, default_namespace_prefix, tag_prefix, local_name)?;
-  writer.write_char('>')
+  writer.write_all(b">")
 }
 
 #[inline(always)]
-fn write_qualified_name<W: std::fmt::Write>(
+fn write_qualified_name<W: std::io::Write>(
   writer: &mut W,
   default_namespace_prefix: &str,
   tag_prefix: &str,
   local_name: &str,
-) -> Result<(), std::fmt::Error> {
+) -> std::io::Result<()> {
   if !tag_prefix.is_empty() && default_namespace_prefix != tag_prefix {
-    writer.write_str(tag_prefix)?;
-    writer.write_char(':')?;
+    writer.write_all(tag_prefix.as_bytes())?;
+    writer.write_all(b":")?;
   }
 
-  writer.write_str(local_name)
+  writer.write_all(local_name.as_bytes())
 }
 
 #[inline]
-pub(crate) fn write_escaped_str<W: std::fmt::Write>(
+pub(crate) fn write_escaped_str<W: std::io::Write>(
   writer: &mut W,
   value: &str,
-) -> Result<(), std::fmt::Error> {
+) -> std::io::Result<()> {
   match quick_xml::escape::escape(value) {
-    std::borrow::Cow::Borrowed(value) => writer.write_str(value),
-    std::borrow::Cow::Owned(value) => writer.write_str(&value),
+    std::borrow::Cow::Borrowed(value) => writer.write_all(value.as_bytes()),
+    std::borrow::Cow::Owned(value) => writer.write_all(value.as_bytes()),
   }
 }
 
 #[inline]
-pub(crate) fn write_escaped_text<W: std::fmt::Write, T: std::fmt::Display + ?Sized>(
+pub(crate) fn write_escaped_text<W: std::io::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   value: &T,
-) -> Result<(), std::fmt::Error> {
+) -> std::io::Result<()> {
   write_escaped_str(writer, &value.to_string())
 }
 
 #[inline]
-pub(crate) fn write_attr_value<W: std::fmt::Write, T: std::fmt::Display + ?Sized>(
+pub(crate) fn write_attr_value<W: std::io::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   attr_name: &str,
   value: &T,
-) -> Result<(), std::fmt::Error> {
-  writer.write_char(' ')?;
-  writer.write_str(attr_name)?;
-  writer.write_str("=\"")?;
+) -> std::io::Result<()> {
+  writer.write_all(b" ")?;
+  writer.write_all(attr_name.as_bytes())?;
+  writer.write_all(b"=\"")?;
   write_escaped_text(writer, value)?;
-  writer.write_char('"')
+  writer.write_all(b"\"")
 }
 
 #[inline]
-pub(crate) fn write_attr_value_str<W: std::fmt::Write>(
+pub(crate) fn write_attr_value_str<W: std::io::Write>(
   writer: &mut W,
   attr_name: &str,
   value: &str,
-) -> Result<(), std::fmt::Error> {
-  writer.write_char(' ')?;
-  writer.write_str(attr_name)?;
-  writer.write_str("=\"")?;
+) -> std::io::Result<()> {
+  writer.write_all(b" ")?;
+  writer.write_all(attr_name.as_bytes())?;
+  writer.write_all(b"=\"")?;
   write_escaped_str(writer, value)?;
-  writer.write_char('"')
+  writer.write_all(b"\"")
 }
 
 #[inline]
-pub(crate) fn write_xmlns_attr<W: std::fmt::Write>(
+pub(crate) fn write_xmlns_attr<W: std::io::Write>(
   writer: &mut W,
   prefix: Option<&str>,
   uri: &str,
-) -> Result<(), std::fmt::Error> {
-  writer.write_str(" xmlns")?;
+) -> std::io::Result<()> {
+  writer.write_all(b" xmlns")?;
   if let Some(prefix) = prefix
     && !prefix.is_empty()
   {
-    writer.write_char(':')?;
-    writer.write_str(prefix)?;
+    writer.write_all(b":")?;
+    writer.write_all(prefix.as_bytes())?;
   }
-  writer.write_str("=\"")?;
-  writer.write_str(uri)?;
-  writer.write_char('"')
+  writer.write_all(b"=\"")?;
+  writer.write_all(uri.as_bytes())?;
+  writer.write_all(b"\"")
 }

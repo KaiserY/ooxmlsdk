@@ -16,11 +16,11 @@ pub trait SdkType: Sized {
     ))
   }
 
-  fn write_xml<W: std::fmt::Write>(
+  fn write_xml<W: std::io::Write>(
     &self,
     _writer: &mut W,
     _xmlns_prefix: &str,
-  ) -> Result<(), std::fmt::Error> {
+  ) -> Result<(), std::io::Error> {
     Ok(())
   }
 }
@@ -35,11 +35,11 @@ pub trait SdkChoice: Sized {
     ))
   }
 
-  fn write_xml<W: std::fmt::Write>(
+  fn write_xml<W: std::io::Write>(
     &self,
     _writer: &mut W,
     _xmlns_prefix: &str,
-  ) -> Result<(), std::fmt::Error> {
+  ) -> Result<(), std::io::Error> {
     Ok(())
   }
 }

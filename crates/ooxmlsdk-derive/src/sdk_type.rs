@@ -390,7 +390,7 @@ fn build_text_child_write_tokens(
     };
     quote! {
       crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
-      writer.write_char('>')?;
+      writer.write_all(b">")?;
       #value_write_tokens
       crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
     }
@@ -670,11 +670,11 @@ fn expand_sequence_helper_struct(
         })
       }
 
-      pub(crate) fn write_xml<W: std::fmt::Write>(
+      pub(crate) fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
         xmlns_prefix: &str,
-      ) -> Result<(), std::fmt::Error> {
+      ) -> Result<(), std::io::Error> {
         #( #child_write_tokens )*
         Ok(())
       }
@@ -1548,20 +1548,20 @@ fn expand_named_struct(
     let attr_write_value_tokens = if is_xml_schema_float_type(&parse_ty) {
       let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &parse_ty);
       quote! {
-        writer.write_char(' ')?;
-        writer.write_str(#name_lit)?;
-        writer.write_str("=\"")?;
+        writer.write_all(b" ")?;
+        writer.write_all(#name_lit.as_bytes())?;
+        writer.write_all(b"=\"")?;
         #write_value_tokens
-        writer.write_char('"')?;
+        writer.write_all(b"\"")?;
       }
     } else if is_bool_type(&parse_ty) {
       let write_value_tokens = write_bool_tokens(quote! { value }, &parse_ty);
       quote! {
-        writer.write_char(' ')?;
-        writer.write_str(#name_lit)?;
-        writer.write_str("=\"")?;
+        writer.write_all(b" ")?;
+        writer.write_all(#name_lit.as_bytes())?;
+        writer.write_all(b"=\"")?;
         #write_value_tokens
-        writer.write_char('"')?;
+        writer.write_all(b"\"")?;
       }
     } else if is_string_like_type(&parse_ty) {
       quote! {
@@ -2493,18 +2493,18 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for value in &self.#field_ident {
-              writer.write_str(value.as_ref())?;
+              writer.write_all(value.as_bytes())?;
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(value) = &self.#field_ident {
-              writer.write_str(value.as_ref())?;
+              writer.write_all(value.as_bytes())?;
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            writer.write_str(self.#field_ident.as_ref())?;
+            writer.write_all(self.#field_ident.as_bytes())?;
           });
         }
       }
@@ -2646,10 +2646,10 @@ fn expand_named_struct(
     quote! {
       match self.xml_header {
         crate::common::XmlHeaderType::Standalone => {
-          writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
+          writer.write_all(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")?;
         }
         crate::common::XmlHeaderType::Plain => {
-          writer.write_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
+          writer.write_all(b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n")?;
         }
         crate::common::XmlHeaderType::None => {}
       }
@@ -2840,28 +2840,41 @@ fn expand_named_struct(
         })
       }
 
-      pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
-        let mut writer = String::with_capacity(32);
-        self.write_xml(&mut writer, #to_xml_prefix_tokens)?;
+      pub fn write_xml_to_writer<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> Result<(), std::io::Error> {
+        self.write_xml(writer, #to_xml_prefix_tokens)
+      }
+
+      pub fn to_xml_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
+        let mut writer = Vec::with_capacity(32);
+        self.write_xml_to_writer(&mut writer)?;
         Ok(writer)
       }
 
-      pub(crate) fn write_xml<W: std::fmt::Write>(
+      pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
+        let bytes = self.to_xml_bytes().map_err(|_| std::fmt::Error)?;
+        // SAFETY: XML serialization only writes UTF-8 data via byte literals and UTF-8 strings.
+        Ok(unsafe { String::from_utf8_unchecked(bytes) })
+      }
+
+      pub(crate) fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
         xmlns_prefix: &str,
-      ) -> Result<(), std::fmt::Error> {
+      ) -> Result<(), std::io::Error> {
         #xml_header_tokens
         crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         #special_namespace_write_tokens
         #mc_ignorable_write_tokens
         #( #attr_write_tokens )*
         if #has_body {
-          writer.write_char('>')?;
+          writer.write_all(b">")?;
           #( #ordered_write_tokens )*
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {
-          writer.write_str("/>")?;
+          writer.write_all(b"/>")?;
         }
         Ok(())
       }

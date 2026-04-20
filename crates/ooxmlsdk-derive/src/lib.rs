@@ -1134,11 +1134,11 @@ fn write_xml_schema_float_tokens(
     {
       let __ooxmlsdk_float_value = *#value_expr;
       if __ooxmlsdk_float_value.is_nan() {
-        writer.write_str("NaN")?;
+        writer.write_all(b"NaN")?;
       } else if __ooxmlsdk_float_value == #positive_infinity {
-        writer.write_str("INF")?;
+        writer.write_all(b"INF")?;
       } else if __ooxmlsdk_float_value == #negative_infinity {
-        writer.write_str("-INF")?;
+        writer.write_all(b"-INF")?;
       } else {
         crate::common::write_escaped_text(writer, #value_expr)?;
       }
@@ -1205,10 +1205,10 @@ fn write_bool_tokens(
 ) -> proc_macro2::TokenStream {
   match bool_type_kind(bool_ty) {
     Some(BoolTypeKind::BooleanValue) => quote! {
-      writer.write_str(if *#value_expr { "1" } else { "0" })?;
+      writer.write_all(if *#value_expr { b"1" } else { b"0" })?;
     },
     Some(_) => quote! {
-      writer.write_str(if *#value_expr { "true" } else { "false" })?;
+      writer.write_all(if *#value_expr { b"true" } else { b"false" })?;
     },
     None => unreachable!("write_bool_tokens requires a bool-like type"),
   }

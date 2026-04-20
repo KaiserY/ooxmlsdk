@@ -246,7 +246,8 @@ pub fn validate_number_type<T: Display>(
     "xsd:unsignedShort" => value_string.parse::<u16>().is_ok(),
     "xsd:unsignedInt" => value_string.parse::<u32>().is_ok(),
     "xsd:unsignedLong" => value_string.parse::<u64>().is_ok(),
-    "xsd:integer" | "xsd:nonNegativeInteger" => value_string.parse::<i128>().is_ok(),
+    "xsd:integer" => value_string.parse::<i128>().is_ok(),
+    "xsd:nonNegativeInteger" => value_string.parse::<u128>().is_ok(),
     "xsd:decimal" | "xsd:double" => value_string.parse::<f64>().is_ok(),
     "xsd:float" => value_string.parse::<f32>().is_ok(),
     "wp:ST_PositionOffset"
@@ -335,6 +336,13 @@ fn is_qname(value: &str) -> bool {
 }
 
 fn is_uri(value: &str) -> bool {
+  if value.is_empty() {
+    return true;
+  }
+  let value = value.trim_matches([' ', '\t', '\n', '\r']);
+  if value.is_empty() {
+    return false;
+  }
   if value.chars().any(char::is_whitespace) {
     return false;
   }

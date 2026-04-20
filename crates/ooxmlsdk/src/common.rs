@@ -318,12 +318,33 @@ fn markup_compatibility_choice_supported<'a>(
   };
 
   for prefix in requires.split_ascii_whitespace() {
-    if crate::namespaces::uri_by_prefix(prefix).is_none() {
+    if !markup_compatibility_prefix_supported(choice_start, decoder, prefix)? {
       return Ok(false);
     }
   }
 
   Ok(true)
+}
+
+fn markup_compatibility_prefix_supported(
+  choice_start: &quick_xml::events::BytesStart<'_>,
+  decoder: Decoder,
+  prefix: &str,
+) -> Result<bool, SdkError> {
+  if crate::namespaces::uri_by_prefix(prefix).is_some() {
+    return Ok(true);
+  }
+
+  let xmlns_name = format!("xmlns:{prefix}");
+  for attr in choice_start.attributes().with_checks(false) {
+    let attr = attr?;
+    if attr.key.as_ref() == xmlns_name.as_bytes() {
+      let uri = decode_attr_value(&attr, decoder)?;
+      return Ok(crate::namespaces::prefix_by_uri(uri.as_str()).is_some());
+    }
+  }
+
+  Ok(false)
 }
 
 fn skip_foreign_element_children<'de, R: XmlReader<'de>>(
@@ -333,4 +354,65 @@ fn skip_foreign_element_children<'de, R: XmlReader<'de>>(
   process_foreign_element_children(xml_reader, empty_tag, &mut |_xml_reader, _e, _e_empty| {
     Ok(false)
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn mc_choice_requires_supports_local_alias_for_known_namespace() {
+    let xml = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+  <mc:Choice xmlns:foo="http://schemas.openxmlformats.org/drawingml/2006/main" Requires="foo">
+    <foo:bar/>
+  </mc:Choice>
+  <mc:Fallback>
+    <fallback/>
+  </mc:Fallback>
+</mc:AlternateContent>"#;
+
+    let mut reader = from_str_inner(xml).expect("reader");
+    let start = match reader.next().expect("alternate content start") {
+      quick_xml::events::Event::Start(e) => e,
+      other => panic!("expected start, got {other:?}"),
+    };
+    assert_eq!(start.name().as_ref(), b"mc:AlternateContent");
+
+    let mut selected = Vec::new();
+    process_markup_compatibility_children(&mut reader, false, &mut |_reader, e, _empty| {
+      selected.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
+      Ok(false)
+    })
+    .expect("process alternate content");
+
+    assert_eq!(selected, vec!["foo:bar"]);
+  }
+
+  #[test]
+  fn mc_choice_requires_rejects_unknown_local_alias_namespace() {
+    let xml = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+  <mc:Choice xmlns:foo="http://example.com/unknown" Requires="foo">
+    <foo:bar/>
+  </mc:Choice>
+  <mc:Fallback>
+    <fallback/>
+  </mc:Fallback>
+</mc:AlternateContent>"#;
+
+    let mut reader = from_str_inner(xml).expect("reader");
+    let start = match reader.next().expect("alternate content start") {
+      quick_xml::events::Event::Start(e) => e,
+      other => panic!("expected start, got {other:?}"),
+    };
+    assert_eq!(start.name().as_ref(), b"mc:AlternateContent");
+
+    let mut selected = Vec::new();
+    process_markup_compatibility_children(&mut reader, false, &mut |_reader, e, _empty| {
+      selected.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
+      Ok(false)
+    })
+    .expect("process alternate content");
+
+    assert_eq!(selected, vec!["fallback"]);
+  }
 }

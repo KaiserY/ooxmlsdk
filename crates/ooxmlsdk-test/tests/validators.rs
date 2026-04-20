@@ -11,6 +11,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   ConditionalFormatStyle, DocPartId,
 };
 use ooxmlsdk::validator::{SdkValidator, StringFormatKind, validate_string_format};
+use ooxmlsdk::validator::validate_number_type;
 
 fn repeated_a(count: usize) -> String {
   "A".repeat(count)
@@ -44,47 +45,39 @@ fn verify_token_from_token_restriction_tests() {
 #[test]
 fn positive_integer_attribute_validation_test() {
   let mut element = TopBorder {
-    width: Some("1".to_string()),
+    width: Some(1),
     ..Default::default()
   };
   assert!(element.validate().is_ok());
 
-  element.width = Some("2".to_string());
+  element.width = Some(2);
   assert!(element.validate().is_ok());
 
-  element.width = Some("1000".to_string());
+  element.width = Some(1000);
   assert!(element.validate().is_ok());
 
-  element.width = Some("abc".to_string());
+  element.width = Some(0);
   assert!(element.validate().is_err());
 
-  element.width = Some("0".to_string());
-  assert!(element.validate().is_err());
-
-  element.width = Some("-3".to_string());
+  element.width = Some(-3);
   assert!(element.validate().is_err());
 }
 
 #[test]
 fn integer_attribute_validation_test() {
-  let mut element = ArgumentSize {
-    val: "-2".to_string(),
-  };
+  let mut element = ArgumentSize { val: -2 };
   assert!(element.validate().is_ok());
 
-  element.val = "2".to_string();
+  element.val = 2;
   assert!(element.validate().is_ok());
 
-  element.val = "0".to_string();
+  element.val = 0;
   assert!(element.validate().is_ok());
 
-  element.val = "abc".to_string();
+  element.val = -3;
   assert!(element.validate().is_err());
 
-  element.val = "-3".to_string();
-  assert!(element.validate().is_err());
-
-  element.val = "3".to_string();
+  element.val = 3;
   assert!(element.validate().is_err());
 }
 
@@ -182,11 +175,79 @@ fn any_uri_attribute_validation_test() {
   element.r#type = "urn:schemas-microsoft-com:office:office".to_string();
   assert!(element.validate().is_ok());
 
+  element.r#type = " http://temp ".to_string();
+  assert!(element.validate().is_ok());
+
+  element.r#type = "\thttp://microsoft.com\r\n".to_string();
+  assert!(element.validate().is_ok());
+
   element.r#type = "http://temp##s".to_string();
   assert!(element.validate().is_err());
 
   element.r#type = "http:///temp".to_string();
   assert!(element.validate().is_err());
+
+  element.r#type = "http://temp /a".to_string();
+  assert!(element.validate().is_err());
+
+  element.r#type = "   ".to_string();
+  assert!(element.validate().is_err());
+}
+
+#[test]
+fn any_uri_string_format_trims_edge_whitespace_like_upstream() {
+  assert!(
+    validate_string_format("AnyUriRestrictionTests", "text", &"", StringFormatKind::Uri).is_ok()
+  );
+  assert!(
+    validate_string_format(
+      "AnyUriRestrictionTests",
+      "text",
+      &" http://temp ",
+      StringFormatKind::Uri,
+    )
+    .is_ok()
+  );
+  assert!(
+    validate_string_format(
+      "AnyUriRestrictionTests",
+      "text",
+      &"   ",
+      StringFormatKind::Uri
+    )
+    .is_err()
+  );
+}
+
+#[test]
+fn non_negative_integer_number_type_rejects_negative_values() {
+  assert!(
+    validate_number_type(
+      "NumberTypeTests",
+      "value",
+      &"0",
+      "xsd:nonNegativeInteger"
+    )
+    .is_ok()
+  );
+  assert!(
+    validate_number_type(
+      "NumberTypeTests",
+      "value",
+      &"42",
+      "xsd:nonNegativeInteger"
+    )
+    .is_ok()
+  );
+  assert!(
+    validate_number_type(
+      "NumberTypeTests",
+      "value",
+      &"-1",
+      "xsd:nonNegativeInteger"
+    )
+    .is_err()
+  );
 }
 
 #[test]

@@ -1,5 +1,18 @@
 use super::*;
 
+#[derive(Clone, Copy)]
+enum DeserializeMode {
+  Borrowed,
+  Io,
+}
+
+fn deserialize_type_inner_ident(mode: DeserializeMode) -> Ident {
+  match mode {
+    DeserializeMode::Borrowed => Ident::new("deserialize_borrowed_inner", Span::call_site()),
+    DeserializeMode::Io => Ident::new("deserialize_io_inner", Span::call_site()),
+  }
+}
+
 pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -33,6 +46,8 @@ fn sdk_type_impl_tokens(
   impl_items: proc_macro2::TokenStream,
   validate_items: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
   quote! {
     impl crate::sdk::SdkType for #ident {}
     #[cfg(feature = "validators")]
@@ -48,21 +63,26 @@ fn sdk_type_impl_tokens(
 
       fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
       }
     }
 
     impl #ident {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
+      }
+
       pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
       }
 
       pub fn from_reader<R: std::io::BufRead>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_io_inner_ident(&mut xml_reader, None)
       }
 
       #impl_items
@@ -423,9 +443,12 @@ fn expand_sequence_helper_struct(
   fields: &syn::FieldsNamed,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
+  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   let mut child_decl_tokens = Vec::new();
-  let mut child_dispatch_tokens = Vec::new();
+  let mut child_dispatch_tokens_borrowed = Vec::new();
+  let mut child_dispatch_tokens_io = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
@@ -495,9 +518,21 @@ fn expand_sequence_helper_struct(
               crate::validator::SdkValidator::validate(#validate_child_tokens)?;
             }
           });
-          child_dispatch_tokens.push(quote! {
-            if matches!(e.name().as_ref(), #match_target) {
-              match #child_ty::deserialize_inner(#xml_reader_ident, Some((e, next_empty))) {
+          child_dispatch_tokens_borrowed.push(quote! {
+            if matches!(event_name, #match_target) {
+              match #child_ty::#deserialize_borrowed_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
+                Ok(parsed_child) => {
+                  #field_ident.push(#parsed_child_expr);
+                }
+                Err(crate::common::SdkError::MissingField { .. }) => {}
+                Err(err) => return Err(err),
+              }
+              continue;
+            }
+          });
+          child_dispatch_tokens_io.push(quote! {
+            if matches!(event_name, #match_target) {
+              match #child_ty::#deserialize_io_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                 }
@@ -538,9 +573,21 @@ fn expand_sequence_helper_struct(
               crate::validator::SdkValidator::validate(#validate_self_tokens)?;
             });
           }
-          child_dispatch_tokens.push(quote! {
-            if matches!(e.name().as_ref(), #match_target) {
-              match #child_ty::deserialize_inner(#xml_reader_ident, Some((e, next_empty))) {
+          child_dispatch_tokens_borrowed.push(quote! {
+            if matches!(event_name, #match_target) {
+              match #child_ty::#deserialize_borrowed_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
+                Ok(parsed_child) => {
+                  #field_ident = Some(#parsed_child_expr);
+                }
+                Err(crate::common::SdkError::MissingField { .. }) => {}
+                Err(err) => return Err(err),
+              }
+              continue;
+            }
+          });
+          child_dispatch_tokens_io.push(quote! {
+            if matches!(event_name, #match_target) {
+              match #child_ty::#deserialize_io_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                 }
@@ -590,15 +637,17 @@ fn expand_sequence_helper_struct(
           contains_vec_type(&field.ty),
           false,
         );
-        child_dispatch_tokens.push(quote! {
-          if matches!(e.name().as_ref(), #match_target) {
-            match e.name().as_ref() {
+        let text_child_dispatch = quote! {
+          if matches!(event_name, #match_target) {
+            match event_name {
               #parse_arm
               _ => false,
             };
             continue;
           }
-        });
+        };
+        child_dispatch_tokens_borrowed.push(text_child_dispatch.clone());
+        child_dispatch_tokens_io.push(text_child_dispatch);
       }
       _ => {
         return Err(syn::Error::new_spanned(
@@ -628,8 +677,8 @@ fn expand_sequence_helper_struct(
         false
       }
 
-      pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
-        xml_reader: &mut R,
+      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
+        xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
         let mut pending_event = xml_event;
@@ -638,7 +687,9 @@ fn expand_sequence_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            #( #child_dispatch_tokens )*
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #( #child_dispatch_tokens_borrowed )*
             xml_reader.unread(if next_empty {
               quick_xml::events::Event::Empty(e)
             } else {
@@ -649,19 +700,60 @@ fn expand_sequence_helper_struct(
 
           match xml_reader.next()? {
             quick_xml::events::Event::Start(e) => {
-              pending_event = Some((e, false));
+              pending_event = Some((e.into_owned(), false));
             }
             quick_xml::events::Event::Empty(e) => {
-              pending_event = Some((e, true));
+              pending_event = Some((e.into_owned(), true));
             }
             quick_xml::events::Event::End(e) => {
-              xml_reader.unread(quick_xml::events::Event::End(e))?;
+              xml_reader.unread(quick_xml::events::Event::End(e.into_owned()))?;
               break;
             }
             quick_xml::events::Event::Eof => {
               return Err(crate::common::unexpected_eof(stringify!(#ident)));
             }
             _ => {}
+          }
+        }
+
+        Ok(Self {
+          #( #child_init_tokens, )*
+        })
+      }
+
+      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+        xml_reader: &mut crate::common::IoReader<R>,
+        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        let mut pending_event = xml_event;
+
+        #( #child_decl_tokens )*
+
+        loop {
+          if let Some((e, next_empty)) = pending_event.take() {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #( #child_dispatch_tokens_io )*
+            xml_reader.unread(if next_empty {
+              quick_xml::events::Event::Empty(e)
+            } else {
+              quick_xml::events::Event::Start(e)
+            })?;
+            break;
+          }
+
+          match xml_reader.next_tag_event()? {
+            crate::common::IoTagEvent::Start(e, next_empty) => {
+              pending_event = Some((e, next_empty));
+            }
+            crate::common::IoTagEvent::End(e) => {
+              xml_reader.unread(quick_xml::events::Event::End(e))?;
+              break;
+            }
+            crate::common::IoTagEvent::Eof => {
+              return Err(crate::common::unexpected_eof(stringify!(#ident)));
+            }
+            crate::common::IoTagEvent::Decl(_) | crate::common::IoTagEvent::Other => {}
           }
         }
 
@@ -690,6 +782,8 @@ fn expand_helper_struct(
   fields: &syn::FieldsNamed,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
+  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   let mut child_fields = Vec::new();
   let mut text_child_fields = Vec::new();
@@ -744,8 +838,10 @@ fn expand_helper_struct(
 
   let mut child_decl_tokens = Vec::new();
   let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_visit_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_visit_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_parse_tokens = Vec::new();
   let mut child_visit_parse_tokens = Vec::new();
   let mut child_write_tokens = Vec::new();
@@ -781,7 +877,7 @@ fn expand_helper_struct(
     } else {
       quote! { parsed_child }
     };
-    let case_index = direct_child_dispatch_tokens.len() + 1;
+    let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
     let target = if tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
@@ -791,12 +887,12 @@ fn expand_helper_struct(
       );
       quote! { #tag_qname_lit | #local_name_lit }
     };
-    let build_dispatch = |reader_ident: &Ident, as_result: bool| {
+    let build_dispatch = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
       if field.repeated {
         if as_result {
           quote! {
               #case_index => {
-                return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+                return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
                     Ok(true)
@@ -809,7 +905,7 @@ fn expand_helper_struct(
         } else {
           quote! {
               #case_index => {
-                match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+                match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
                     continue;
@@ -824,7 +920,7 @@ fn expand_helper_struct(
         if as_result {
           quote! {
             #case_index => {
-              return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   Ok(true)
@@ -837,7 +933,7 @@ fn expand_helper_struct(
         } else {
           quote! {
             #case_index => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   continue;
@@ -865,8 +961,26 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate(#validate_child_tokens)?;
         }
       });
-      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
-      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
+      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_dispatch_tokens_io.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_io_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_io_inner_ident,
+      ));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -898,18 +1012,40 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate(#validate_self_tokens)?;
         });
       }
-      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
-      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
+      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_dispatch_tokens_io.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_io_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_io_inner_ident,
+      ));
     }
   }
 
   let mut choice_decl_tokens = Vec::new();
   let mut choice_match_init_tokens = Vec::new();
   let mut choice_match_decl_tokens = Vec::new();
-  let mut choice_unique_parse_tokens = Vec::new();
-  let mut choice_unique_visit_parse_tokens = Vec::new();
-  let mut choice_any_unique_parse_tokens = Vec::new();
-  let mut choice_any_unique_visit_parse_tokens = Vec::new();
+  let mut choice_unique_parse_tokens_borrowed = Vec::new();
+  let mut choice_unique_parse_tokens_io = Vec::new();
+  let mut choice_unique_visit_parse_tokens_borrowed = Vec::new();
+  let mut choice_unique_visit_parse_tokens_io = Vec::new();
+  let mut choice_any_unique_parse_tokens_borrowed = Vec::new();
+  let mut choice_any_unique_parse_tokens_io = Vec::new();
+  let mut choice_any_unique_visit_parse_tokens_borrowed = Vec::new();
+  let mut choice_any_unique_visit_parse_tokens_io = Vec::new();
   let mut choice_parse_tokens = Vec::new();
   let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
@@ -950,9 +1086,9 @@ fn expand_helper_struct(
       }
     });
     if field.repeated {
-      choice_unique_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -962,9 +1098,21 @@ fn expand_helper_struct(
           }
         }
       });
-      choice_unique_visit_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -974,9 +1122,21 @@ fn expand_helper_struct(
           };
         }
       });
-      choice_any_unique_parse_tokens.push(quote! {
+      choice_unique_visit_parse_tokens_io.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_parse_tokens_borrowed.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -986,9 +1146,33 @@ fn expand_helper_struct(
           }
         }
       });
-      choice_any_unique_visit_parse_tokens.push(quote! {
+      choice_any_unique_parse_tokens_io.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_visit_parse_tokens_io.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -999,9 +1183,9 @@ fn expand_helper_struct(
         }
       });
     } else {
-      choice_unique_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -1011,9 +1195,21 @@ fn expand_helper_struct(
           }
         }
       });
-      choice_unique_visit_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -1023,9 +1219,21 @@ fn expand_helper_struct(
           };
         }
       });
-      choice_any_unique_parse_tokens.push(quote! {
+      choice_unique_visit_parse_tokens_io.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_parse_tokens_borrowed.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -1035,9 +1243,33 @@ fn expand_helper_struct(
           }
         }
       });
-      choice_any_unique_visit_parse_tokens.push(quote! {
+      choice_any_unique_parse_tokens_io.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_visit_parse_tokens_io.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -1148,10 +1380,10 @@ fn expand_helper_struct(
 
   let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
-  let visit_foreign_child_tokens = if !has_child_dispatch && !has_choice_dispatch {
+  let visit_foreign_child_tokens_borrowed = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
       let mut visit_foreign_child = |
-        _xml_reader: &mut R,
+        _xml_reader: &mut crate::common::SliceReader<'de>,
         _e: quick_xml::events::BytesStart<'de>,
         _next_empty: bool,
       | -> Result<bool, crate::common::SdkError> {
@@ -1161,19 +1393,21 @@ fn expand_helper_struct(
   } else if !has_choice_dispatch {
     quote! {
       let mut visit_foreign_child = |
-        xml_reader: &mut R,
+        xml_reader: &mut crate::common::SliceReader<'de>,
         e: quick_xml::events::BytesStart<'de>,
         next_empty: bool,
       | -> Result<bool, crate::common::SdkError> {
-        let direct_child_case = match e.name().as_ref() {
+        let event_name = e.name();
+        let event_name = event_name.as_ref();
+        let direct_child_case = match event_name {
           #( #direct_child_case_arms )*
           _ => 0usize,
         };
         match direct_child_case {
-          #( #direct_child_visit_dispatch_tokens )*
+          #( #direct_child_visit_dispatch_tokens_borrowed )*
           _ => {}
         }
-        match e.name().as_ref() {
+        match event_name {
           #( #child_visit_parse_tokens )*
           _ => Ok(false),
         }
@@ -1182,27 +1416,27 @@ fn expand_helper_struct(
   } else {
     quote! {
       let mut visit_foreign_child = |
-        xml_reader: &mut R,
+        xml_reader: &mut crate::common::SliceReader<'de>,
         e: quick_xml::events::BytesStart<'de>,
         next_empty: bool,
       | -> Result<bool, crate::common::SdkError> {
-        let direct_child_case = match e.name().as_ref() {
+        let event_name = e.name();
+        let event_name = event_name.as_ref();
+        let direct_child_case = match event_name {
           #( #direct_child_case_arms )*
           _ => 0usize,
         };
         match direct_child_case {
-          #( #direct_child_visit_dispatch_tokens )*
+          #( #direct_child_visit_dispatch_tokens_borrowed )*
           _ => {}
         }
         #( #choice_match_init_tokens )*
         {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
           let mut specific_choice_match_count = 0usize;
           let mut any_choice_match_count = 0usize;
           #( #choice_match_decl_tokens )*
-          #( #choice_unique_visit_parse_tokens )*
-          #( #choice_any_unique_visit_parse_tokens )*
+          #( #choice_unique_visit_parse_tokens_borrowed )*
+          #( #choice_any_unique_visit_parse_tokens_borrowed )*
           if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
             return Err(crate::common::unexpected_tag(
               stringify!(#ident),
@@ -1211,7 +1445,7 @@ fn expand_helper_struct(
             ));
           }
         }
-        let matched: bool = match e.name().as_ref() {
+        let matched: bool = match event_name {
           #( #child_visit_parse_tokens )*
           _ => {
             let mut matched = false;
@@ -1223,17 +1457,94 @@ fn expand_helper_struct(
       };
     }
   };
-  let main_dispatch_tokens = if !has_choice_dispatch {
+  let visit_foreign_child_tokens_io = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
-      let direct_child_case = match e.name().as_ref() {
+      let mut visit_foreign_child = |
+        _xml_reader: &mut crate::common::IoReader<R>,
+        _e: quick_xml::events::BytesStart<'static>,
+        _next_empty: bool,
+      | -> Result<bool, crate::common::SdkError> {
+        Ok(false)
+      };
+    }
+  } else if !has_choice_dispatch {
+    quote! {
+      let mut visit_foreign_child = |
+        xml_reader: &mut crate::common::IoReader<R>,
+        e: quick_xml::events::BytesStart<'static>,
+        next_empty: bool,
+      | -> Result<bool, crate::common::SdkError> {
+        let event_name = e.name();
+        let event_name = event_name.as_ref();
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_visit_dispatch_tokens_io )*
+          _ => {}
+        }
+        match event_name {
+          #( #child_visit_parse_tokens )*
+          _ => Ok(false),
+        }
+      };
+    }
+  } else {
+    quote! {
+      let mut visit_foreign_child = |
+        xml_reader: &mut crate::common::IoReader<R>,
+        e: quick_xml::events::BytesStart<'static>,
+        next_empty: bool,
+      | -> Result<bool, crate::common::SdkError> {
+        let event_name = e.name();
+        let event_name = event_name.as_ref();
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_visit_dispatch_tokens_io )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_visit_parse_tokens_io )*
+          #( #choice_any_unique_visit_parse_tokens_io )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+        let matched: bool = match event_name {
+          #( #child_visit_parse_tokens )*
+          _ => {
+            let mut matched = false;
+            #( #choice_visit_parse_tokens )*
+            Ok::<bool, crate::common::SdkError>(matched)
+          }
+        }?;
+        Ok(matched)
+      };
+    }
+  };
+  let main_dispatch_tokens_borrowed = if !has_choice_dispatch {
+    quote! {
+      let direct_child_case = match event_name {
         #( #direct_child_case_arms )*
         _ => 0usize,
       };
       match direct_child_case {
-        #( #direct_child_dispatch_tokens )*
+        #( #direct_child_dispatch_tokens_borrowed )*
         _ => {}
       }
-      let matched = match e.name().as_ref() {
+      let matched = match event_name {
         #( #child_parse_tokens )*
         _ => false,
       };
@@ -1243,23 +1554,21 @@ fn expand_helper_struct(
     }
   } else {
     quote! {
-      let direct_child_case = match e.name().as_ref() {
+      let direct_child_case = match event_name {
         #( #direct_child_case_arms )*
         _ => 0usize,
       };
       match direct_child_case {
-        #( #direct_child_dispatch_tokens )*
+        #( #direct_child_dispatch_tokens_borrowed )*
         _ => {}
       }
       #( #choice_match_init_tokens )*
       {
-        let event_name = e.name();
-        let event_name = event_name.as_ref();
         let mut specific_choice_match_count = 0usize;
         let mut any_choice_match_count = 0usize;
         #( #choice_match_decl_tokens )*
-        #( #choice_unique_parse_tokens )*
-        #( #choice_any_unique_parse_tokens )*
+        #( #choice_unique_parse_tokens_borrowed )*
+        #( #choice_any_unique_parse_tokens_borrowed )*
         if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
           return Err(crate::common::unexpected_tag(
             stringify!(#ident),
@@ -1268,7 +1577,63 @@ fn expand_helper_struct(
           ));
         }
       }
-      let matched = match e.name().as_ref() {
+      let matched = match event_name {
+        #( #child_parse_tokens )*
+        _ => {
+          let mut matched = false;
+          #( #choice_parse_tokens )*
+          matched
+        }
+      };
+      if matched {
+        continue;
+      }
+    }
+  };
+  let main_dispatch_tokens_io = if !has_choice_dispatch {
+    quote! {
+      let direct_child_case = match event_name {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens_io )*
+        _ => {}
+      }
+      let matched = match event_name {
+        #( #child_parse_tokens )*
+        _ => false,
+      };
+      if matched {
+        continue;
+      }
+    }
+  } else {
+    quote! {
+      let direct_child_case = match event_name {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens_io )*
+        _ => {}
+      }
+      #( #choice_match_init_tokens )*
+      {
+        let mut specific_choice_match_count = 0usize;
+        let mut any_choice_match_count = 0usize;
+        #( #choice_match_decl_tokens )*
+        #( #choice_unique_parse_tokens_io )*
+        #( #choice_any_unique_parse_tokens_io )*
+        if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+          return Err(crate::common::unexpected_tag(
+            stringify!(#ident),
+            "known child",
+            event_name,
+          ));
+        }
+      }
+      let matched = match event_name {
         #( #child_parse_tokens )*
         _ => {
           let mut matched = false;
@@ -1298,25 +1663,30 @@ fn expand_helper_struct(
 
       fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
       }
     }
 
     impl #ident {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
+      }
+
       pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
       }
 
       pub fn from_reader<R: std::io::BufRead>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_io_inner_ident(&mut xml_reader, None)
       }
 
-      pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
-        xml_reader: &mut R,
+      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
+        xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
         let mut pending_event = xml_event;
@@ -1325,28 +1695,14 @@ fn expand_helper_struct(
         #( #choice_decl_tokens )*
 
         loop {
-          let (e, next_empty) = if let Some((e, next_empty)) = pending_event.take() {
-            (e, next_empty)
-          } else {
-            match xml_reader.next()? {
-              quick_xml::events::Event::Start(e) => (e, false),
-              quick_xml::events::Event::Empty(e) => (e, true),
-              quick_xml::events::Event::End(e) => {
-                break;
-              }
-              quick_xml::events::Event::Eof => {
-                return Err(crate::common::unexpected_eof(stringify!(#ident)));
-              }
-              _ => continue,
-            }
-          };
-
-          {
-            #main_dispatch_tokens
-            match e.name().as_ref() {
+          if let Some((e, next_empty)) = pending_event.take() {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #main_dispatch_tokens_borrowed
+            match event_name {
               b"mc:AlternateContent" | b"AlternateContent" => {
-                #visit_foreign_child_tokens
-                crate::common::process_markup_compatibility_children(
+                #visit_foreign_child_tokens_borrowed
+                crate::common::process_markup_compatibility_children_borrowed(
                   xml_reader,
                   next_empty,
                   &mut visit_foreign_child,
@@ -1354,9 +1710,137 @@ fn expand_helper_struct(
                 continue;
               }
               _ => {
-                if crate::common::is_foreign_prefixed_child(e.name().as_ref(), "") {
-                  #visit_foreign_child_tokens
-                  crate::common::process_foreign_element_children(
+                if crate::common::is_foreign_prefixed_child(event_name, "") {
+                  #visit_foreign_child_tokens_borrowed
+                  crate::common::process_foreign_element_children_borrowed(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                  )?;
+                  continue;
+                }
+              }
+            }
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+
+          match xml_reader.next()? {
+            quick_xml::events::Event::Start(e) => {
+              let e = e.into_owned();
+              let next_empty = false;
+              let event_name = e.name();
+              let event_name = event_name.as_ref();
+              #main_dispatch_tokens_borrowed
+              match event_name {
+                b"mc:AlternateContent" | b"AlternateContent" => {
+                  #visit_foreign_child_tokens_borrowed
+                  crate::common::process_markup_compatibility_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                  continue;
+                }
+                _ => {
+                  if crate::common::is_foreign_prefixed_child(event_name, "") {
+                    #visit_foreign_child_tokens_borrowed
+                    crate::common::process_foreign_element_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                    )?;
+                    continue;
+                  }
+                }
+              }
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+            quick_xml::events::Event::Empty(e) => {
+              let e = e.into_owned();
+              let next_empty = true;
+              let event_name = e.name();
+              let event_name = event_name.as_ref();
+              #main_dispatch_tokens_borrowed
+              match event_name {
+                b"mc:AlternateContent" | b"AlternateContent" => {
+                  #visit_foreign_child_tokens_borrowed
+                  crate::common::process_markup_compatibility_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                  continue;
+                }
+                _ => {
+                  if crate::common::is_foreign_prefixed_child(event_name, "") {
+                    #visit_foreign_child_tokens_borrowed
+                    crate::common::process_foreign_element_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                    )?;
+                    continue;
+                  }
+                }
+              }
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+            quick_xml::events::Event::End(_) => {
+              break;
+            }
+            quick_xml::events::Event::Eof => {
+              return Err(crate::common::unexpected_eof(stringify!(#ident)));
+            }
+            _ => continue,
+          }
+        }
+
+        Ok(Self {
+          #( #child_init_tokens, )*
+          #( #choice_init_tokens, )*
+        })
+      }
+
+      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+        xml_reader: &mut crate::common::IoReader<R>,
+        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        let mut pending_event = xml_event;
+
+        #( #child_decl_tokens )*
+        #( #choice_decl_tokens )*
+
+        loop {
+          if let Some((e, next_empty)) = pending_event.take() {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #main_dispatch_tokens_io
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_io
+                crate::common::process_markup_compatibility_children_io(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+                continue;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(event_name, "") {
+                  #visit_foreign_child_tokens_io
+                  crate::common::process_foreign_element_children_io(
                     xml_reader,
                     next_empty,
                     &mut visit_foreign_child,
@@ -1368,7 +1852,49 @@ fn expand_helper_struct(
             return Err(crate::common::unexpected_tag(
               stringify!(#ident),
               "known child",
-              e.name().as_ref(),
+              event_name,
+            ));
+          }
+
+          let next_event = match xml_reader.next_tag_event()? {
+            crate::common::IoTagEvent::Start(e, next_empty) => Some((e, next_empty)),
+            crate::common::IoTagEvent::End(_) => break,
+            crate::common::IoTagEvent::Eof => {
+              return Err(crate::common::unexpected_eof(stringify!(#ident)));
+            }
+            crate::common::IoTagEvent::Decl(_) | crate::common::IoTagEvent::Other => None,
+          };
+
+          if let Some((e, next_empty)) = next_event {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #main_dispatch_tokens_io
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_io
+                crate::common::process_markup_compatibility_children_io(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+                continue;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(event_name, "") {
+                  #visit_foreign_child_tokens_io
+                  crate::common::process_foreign_element_children_io(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                  continue;
+                }
+              }
+            }
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
             ));
           }
         }
@@ -1406,6 +1932,8 @@ fn expand_named_struct(
   };
   let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
@@ -1753,8 +2281,10 @@ fn expand_named_struct(
     }
   };
   let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_dispatch_tokens: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_visit_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut direct_child_visit_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_decl_tokens = Vec::new();
   let mut child_parse_tokens = Vec::new();
   let mut child_visit_parse_tokens = Vec::new();
@@ -1791,7 +2321,7 @@ fn expand_named_struct(
     } else {
       quote! { parsed_child }
     };
-    let case_index = direct_child_dispatch_tokens.len() + 1;
+    let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
     let target = if tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
@@ -1801,12 +2331,12 @@ fn expand_named_struct(
       );
       quote! { #tag_qname_lit | #local_name_lit }
     };
-    let build_dispatch = |reader_ident: &Ident, as_result: bool| {
+    let build_dispatch = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
       if field.repeated {
         if as_result {
           quote! {
             #case_index => {
-              return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   Ok(true)
@@ -1819,7 +2349,7 @@ fn expand_named_struct(
         } else {
           quote! {
             #case_index => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   continue;
@@ -1834,7 +2364,7 @@ fn expand_named_struct(
         if as_result {
           quote! {
             #case_index => {
-              return match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   Ok(true)
@@ -1847,7 +2377,7 @@ fn expand_named_struct(
         } else {
           quote! {
             #case_index => {
-              match #child_ty::deserialize_inner(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   continue;
@@ -1875,8 +2405,26 @@ fn expand_named_struct(
         }
       });
       direct_child_case_arms.push(quote! { #target => #case_index, });
-      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
-      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
+      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_dispatch_tokens_io.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_io_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_io_inner_ident,
+      ));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -1909,8 +2457,26 @@ fn expand_named_struct(
         });
       }
       direct_child_case_arms.push(quote! { #target => #case_index, });
-      direct_child_dispatch_tokens.push(build_dispatch(&xml_reader_ident, false));
-      direct_child_visit_dispatch_tokens.push(build_dispatch(&visitor_reader_ident, true));
+      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_dispatch_tokens_io.push(build_dispatch(
+        &xml_reader_ident,
+        false,
+        &deserialize_io_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_borrowed_inner_ident,
+      ));
+      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
+        &visitor_reader_ident,
+        true,
+        &deserialize_io_inner_ident,
+      ));
     }
   }
 
@@ -1960,10 +2526,14 @@ fn expand_named_struct(
   let mut choice_decl_tokens = Vec::new();
   let mut choice_match_init_tokens = Vec::new();
   let mut choice_match_decl_tokens = Vec::new();
-  let mut choice_unique_parse_tokens = Vec::new();
-  let mut choice_unique_visit_parse_tokens = Vec::new();
-  let mut choice_any_unique_parse_tokens = Vec::new();
-  let mut choice_any_unique_visit_parse_tokens = Vec::new();
+  let mut choice_unique_parse_tokens_borrowed = Vec::new();
+  let mut choice_unique_parse_tokens_io = Vec::new();
+  let mut choice_unique_visit_parse_tokens_borrowed = Vec::new();
+  let mut choice_unique_visit_parse_tokens_io = Vec::new();
+  let mut choice_any_unique_parse_tokens_borrowed = Vec::new();
+  let mut choice_any_unique_parse_tokens_io = Vec::new();
+  let mut choice_any_unique_visit_parse_tokens_borrowed = Vec::new();
+  let mut choice_any_unique_visit_parse_tokens_io = Vec::new();
   let mut choice_parse_tokens = Vec::new();
   let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
@@ -2024,9 +2594,9 @@ fn expand_named_struct(
       }
     });
     if field.repeated {
-      choice_unique_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -2036,9 +2606,21 @@ fn expand_named_struct(
           }
         }
       });
-      choice_unique_visit_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -2048,9 +2630,21 @@ fn expand_named_struct(
           };
         }
       });
-      choice_any_unique_parse_tokens.push(quote! {
+      choice_unique_visit_parse_tokens_io.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_parse_tokens_borrowed.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -2060,9 +2654,33 @@ fn expand_named_struct(
           }
         }
       });
-      choice_any_unique_visit_parse_tokens.push(quote! {
+      choice_any_unique_parse_tokens_io.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident.push(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_visit_parse_tokens_io.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -2073,9 +2691,9 @@ fn expand_named_struct(
         }
       });
     } else {
-      choice_unique_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -2085,9 +2703,21 @@ fn expand_named_struct(
           }
         }
       });
-      choice_unique_visit_parse_tokens.push(quote! {
+      choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -2097,9 +2727,21 @@ fn expand_named_struct(
           };
         }
       });
-      choice_any_unique_parse_tokens.push(quote! {
+      choice_unique_visit_parse_tokens_io.push(quote! {
+        if #match_ident && specific_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_parse_tokens_borrowed.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -2109,9 +2751,33 @@ fn expand_named_struct(
           }
         }
       });
-      choice_any_unique_visit_parse_tokens.push(quote! {
+      choice_any_unique_parse_tokens_io.push(quote! {
         if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-          return match #choice_ty::deserialize_inner(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              continue;
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => continue,
+            Err(err) => return Err(err),
+          }
+        }
+      });
+      choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            Ok(parsed_choice) => {
+              #field_ident = Some(parsed_choice);
+              Ok(true)
+            }
+            Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
+            Err(err) => Err(err),
+          };
+        }
+      });
+      choice_any_unique_visit_parse_tokens_io.push(quote! {
+        if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -2177,24 +2843,40 @@ fn expand_named_struct(
 
   let mut any_decl_tokens = Vec::new();
   let mut any_init_tokens = Vec::new();
-  let mut any_parse_tokens = Vec::new();
-  let mut any_visit_parse_tokens = Vec::new();
+  let mut any_parse_tokens_borrowed = Vec::new();
+  let mut any_parse_tokens_io = Vec::new();
+  let mut any_visit_parse_tokens_borrowed = Vec::new();
+  let mut any_visit_parse_tokens_io = Vec::new();
   for field in &any_fields {
     let field_ident = &field.ident;
 
     if field.repeated {
       any_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       any_init_tokens.push(quote! { #field_ident });
-      any_parse_tokens.push(quote! {
+      any_parse_tokens_borrowed.push(quote! {
         if !matched {
-          let xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+          let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, next_empty)?;
           #field_ident.push(xml);
           continue;
         }
       });
-      any_visit_parse_tokens.push(quote! {
+      any_parse_tokens_io.push(quote! {
         if !matched {
-          let xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+          let xml = crate::common::read_outer_xml_io(xml_reader, e, next_empty)?;
+          #field_ident.push(xml);
+          continue;
+        }
+      });
+      any_visit_parse_tokens_borrowed.push(quote! {
+        if !matched {
+          let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, next_empty)?;
+          #field_ident.push(xml);
+          return Ok(true);
+        }
+      });
+      any_visit_parse_tokens_io.push(quote! {
+        if !matched {
+          let xml = crate::common::read_outer_xml_io(xml_reader, e, next_empty)?;
           #field_ident.push(xml);
           return Ok(true);
         }
@@ -2211,16 +2893,30 @@ fn expand_named_struct(
           ))?
         });
       }
-      any_parse_tokens.push(quote! {
+      any_parse_tokens_borrowed.push(quote! {
         if !matched {
-          let xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+          let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, next_empty)?;
           #field_ident = Some(xml);
           continue;
         }
       });
-      any_visit_parse_tokens.push(quote! {
+      any_parse_tokens_io.push(quote! {
         if !matched {
-          let xml = crate::common::read_outer_xml(xml_reader, e, next_empty)?;
+          let xml = crate::common::read_outer_xml_io(xml_reader, e, next_empty)?;
+          #field_ident = Some(xml);
+          continue;
+        }
+      });
+      any_visit_parse_tokens_borrowed.push(quote! {
+        if !matched {
+          let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, next_empty)?;
+          #field_ident = Some(xml);
+          return Ok(true);
+        }
+      });
+      any_visit_parse_tokens_io.push(quote! {
+        if !matched {
+          let xml = crate::common::read_outer_xml_io(xml_reader, e, next_empty)?;
           #field_ident = Some(xml);
           return Ok(true);
         }
@@ -2231,11 +2927,11 @@ fn expand_named_struct(
   let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let has_any_dispatch = !any_fields.is_empty();
-  let visit_foreign_child_tokens =
+  let visit_foreign_child_tokens_borrowed =
     if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let mut visit_foreign_child = |
-          _xml_reader: &mut R,
+          _xml_reader: &mut crate::common::SliceReader<'de>,
           _e: quick_xml::events::BytesStart<'de>,
           _next_empty: bool,
         | -> Result<bool, crate::common::SdkError> {
@@ -2245,19 +2941,21 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let mut visit_foreign_child = |
-          xml_reader: &mut R,
+          xml_reader: &mut crate::common::SliceReader<'de>,
           e: quick_xml::events::BytesStart<'de>,
           next_empty: bool,
         | -> Result<bool, crate::common::SdkError> {
-          let direct_child_case = match e.name().as_ref() {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
             #( #direct_child_case_arms )*
             _ => 0usize,
           };
           match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens )*
+            #( #direct_child_visit_dispatch_tokens_borrowed )*
             _ => {}
           }
-          match e.name().as_ref() {
+          match event_name {
             #( #child_visit_parse_tokens )*
             _ => Ok(false),
           }
@@ -2266,41 +2964,41 @@ fn expand_named_struct(
     } else {
       quote! {
         let mut visit_foreign_child = |
-          xml_reader: &mut R,
+          xml_reader: &mut crate::common::SliceReader<'de>,
           e: quick_xml::events::BytesStart<'de>,
           next_empty: bool,
         | -> Result<bool, crate::common::SdkError> {
-          let direct_child_case = match e.name().as_ref() {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
             #( #direct_child_case_arms )*
             _ => 0usize,
           };
-        match direct_child_case {
-          #( #direct_child_visit_dispatch_tokens )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let mut specific_choice_match_count = 0usize;
-          let mut any_choice_match_count = 0usize;
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_visit_parse_tokens )*
-          #( #choice_any_unique_visit_parse_tokens )*
-          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
-            return Err(crate::common::unexpected_tag(
-              stringify!(#ident),
-              "known child",
-              event_name,
-            ));
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_borrowed )*
+            _ => {}
           }
-        }
-        let matched: bool = match e.name().as_ref() {
-          #( #child_visit_parse_tokens )*
-          _ => {
-            let mut matched = false;
-            #( #choice_visit_parse_tokens )*
-              #( #any_visit_parse_tokens )*
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_borrowed )*
+            #( #choice_any_unique_visit_parse_tokens_borrowed )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          let matched: bool = match event_name {
+            #( #child_visit_parse_tokens )*
+            _ => {
+              let mut matched = false;
+              #( #choice_visit_parse_tokens )*
+              #( #any_visit_parse_tokens_borrowed )*
               Ok::<bool, crate::common::SdkError>(matched)
             }
           }?;
@@ -2308,17 +3006,96 @@ fn expand_named_struct(
         };
       }
     };
-  let child_choice_dispatch_tokens = if !has_choice_dispatch && !has_any_dispatch {
+  let visit_foreign_child_tokens_io =
+    if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          _xml_reader: &mut crate::common::IoReader<R>,
+          _e: quick_xml::events::BytesStart<'static>,
+          _next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          Ok(false)
+        };
+      }
+    } else if !has_choice_dispatch && !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_io )*
+            _ => {}
+          }
+          match event_name {
+            #( #child_visit_parse_tokens )*
+            _ => Ok(false),
+          }
+        };
+      }
+    } else {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_io )*
+            _ => {}
+          }
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_io )*
+            #( #choice_any_unique_visit_parse_tokens_io )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          let matched: bool = match event_name {
+            #( #child_visit_parse_tokens )*
+            _ => {
+              let mut matched = false;
+              #( #choice_visit_parse_tokens )*
+              #( #any_visit_parse_tokens_io )*
+              Ok::<bool, crate::common::SdkError>(matched)
+            }
+          }?;
+          Ok(matched)
+        };
+      }
+    };
+  let child_choice_dispatch_tokens_borrowed = if !has_choice_dispatch && !has_any_dispatch {
     quote! {
-      let direct_child_case = match e.name().as_ref() {
+      let direct_child_case = match event_name {
         #( #direct_child_case_arms )*
         _ => 0usize,
       };
       match direct_child_case {
-        #( #direct_child_dispatch_tokens )*
+        #( #direct_child_dispatch_tokens_borrowed )*
         _ => {}
       }
-      let matched = match e.name().as_ref() {
+      let matched = match event_name {
         #( #child_parse_tokens )*
         _ => false,
       };
@@ -2328,23 +3105,21 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      let direct_child_case = match e.name().as_ref() {
+      let direct_child_case = match event_name {
         #( #direct_child_case_arms )*
         _ => 0usize,
       };
       match direct_child_case {
-        #( #direct_child_dispatch_tokens )*
+        #( #direct_child_dispatch_tokens_borrowed )*
         _ => {}
       }
       #( #choice_match_init_tokens )*
       {
-        let event_name = e.name();
-        let event_name = event_name.as_ref();
         let mut specific_choice_match_count = 0usize;
         let mut any_choice_match_count = 0usize;
         #( #choice_match_decl_tokens )*
-        #( #choice_unique_parse_tokens )*
-        #( #choice_any_unique_parse_tokens )*
+        #( #choice_unique_parse_tokens_borrowed )*
+        #( #choice_any_unique_parse_tokens_borrowed )*
         if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
           return Err(crate::common::unexpected_tag(
             stringify!(#ident),
@@ -2353,12 +3128,69 @@ fn expand_named_struct(
           ));
         }
       }
-      let matched = match e.name().as_ref() {
+      let matched = match event_name {
         #( #child_parse_tokens )*
         _ => {
           let mut matched = false;
           #( #choice_parse_tokens )*
-          #( #any_parse_tokens )*
+          #( #any_parse_tokens_borrowed )*
+          matched
+        }
+      };
+      if matched {
+        continue;
+      }
+    }
+  };
+  let child_choice_dispatch_tokens_io = if !has_choice_dispatch && !has_any_dispatch {
+    quote! {
+      let direct_child_case = match event_name {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens_io )*
+        _ => {}
+      }
+      let matched = match event_name {
+        #( #child_parse_tokens )*
+        _ => false,
+      };
+      if matched {
+        continue;
+      }
+    }
+  } else {
+    quote! {
+      let direct_child_case = match event_name {
+        #( #direct_child_case_arms )*
+        _ => 0usize,
+      };
+      match direct_child_case {
+        #( #direct_child_dispatch_tokens_io )*
+        _ => {}
+      }
+      #( #choice_match_init_tokens )*
+      {
+        let mut specific_choice_match_count = 0usize;
+        let mut any_choice_match_count = 0usize;
+        #( #choice_match_decl_tokens )*
+        #( #choice_unique_parse_tokens_io )*
+        #( #choice_any_unique_parse_tokens_io )*
+        if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+          return Err(crate::common::unexpected_tag(
+            stringify!(#ident),
+            "known child",
+            event_name,
+          ));
+        }
+      }
+      let matched = match event_name {
+        #( #child_parse_tokens )*
+        _ => {
+          let mut matched = false;
+          #( #choice_parse_tokens )*
+          #( #any_parse_tokens_io )*
           matched
         }
       };
@@ -2690,25 +3522,30 @@ fn expand_named_struct(
 
       fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
       }
     }
 
     impl #ident {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
+      }
+
       pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
       }
 
       pub fn from_reader<R: std::io::BufRead>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::deserialize_inner(&mut xml_reader, None)
+        Self::#deserialize_io_inner_ident(&mut xml_reader, None)
       }
 
-      pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
-        xml_reader: &mut R,
+      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
+        xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
         #xml_header_decl_tokens
@@ -2729,8 +3566,8 @@ fn expand_named_struct(
                   };
                 }
               }
-              quick_xml::events::Event::Start(e) => break (e, false),
-              quick_xml::events::Event::Empty(e) => break (e, true),
+              quick_xml::events::Event::Start(e) => break (e.into_owned(), false),
+              quick_xml::events::Event::Empty(e) => break (e.into_owned(), true),
               quick_xml::events::Event::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
               }
@@ -2758,8 +3595,6 @@ fn expand_named_struct(
 
         if !empty_tag {
           loop {
-            let mut next_event = None;
-            let mut next_empty = false;
             match xml_reader.next()? {
               quick_xml::events::Event::Decl(e) => {
                 if #has_xml_header_field {
@@ -2774,11 +3609,76 @@ fn expand_named_struct(
                 }
               }
               quick_xml::events::Event::Start(e) => {
-                next_event = Some(e);
+                let e = e.into_owned();
+                let next_empty = false;
+                let event_name = e.name();
+                let event_name = event_name.as_ref();
+                #child_choice_dispatch_tokens_borrowed
+                match event_name {
+                  b"mc:AlternateContent" | b"AlternateContent" => {
+                    #visit_foreign_child_tokens_borrowed
+                    crate::common::process_markup_compatibility_children_borrowed(
+                      xml_reader,
+                      next_empty,
+                      &mut visit_foreign_child,
+                    )?;
+                  }
+                  _ => {
+                    if crate::common::is_foreign_prefixed_child(
+                      event_name,
+                      #tag_prefix,
+                    ) {
+                      #visit_foreign_child_tokens_borrowed
+                      crate::common::process_foreign_element_children_borrowed(
+                        xml_reader,
+                        next_empty,
+                        &mut visit_foreign_child,
+                      )?;
+                    } else {
+                      Err(crate::common::unexpected_tag(
+                        stringify!(#ident),
+                        "known child",
+                        event_name,
+                      ))?;
+                    }
+                  }
+                }
               }
               quick_xml::events::Event::Empty(e) => {
-                next_empty = true;
-                next_event = Some(e);
+                let e = e.into_owned();
+                let next_empty = true;
+                let event_name = e.name();
+                let event_name = event_name.as_ref();
+                #child_choice_dispatch_tokens_borrowed
+                match event_name {
+                  b"mc:AlternateContent" | b"AlternateContent" => {
+                    #visit_foreign_child_tokens_borrowed
+                    crate::common::process_markup_compatibility_children_borrowed(
+                      xml_reader,
+                      next_empty,
+                      &mut visit_foreign_child,
+                    )?;
+                  }
+                  _ => {
+                    if crate::common::is_foreign_prefixed_child(
+                      event_name,
+                      #tag_prefix,
+                    ) {
+                      #visit_foreign_child_tokens_borrowed
+                      crate::common::process_foreign_element_children_borrowed(
+                        xml_reader,
+                        next_empty,
+                        &mut visit_foreign_child,
+                      )?;
+                    } else {
+                      Err(crate::common::unexpected_tag(
+                        stringify!(#ident),
+                        "known child",
+                        event_name,
+                      ))?;
+                    }
+                  }
+                }
               }
               #text_read_tokens
               quick_xml::events::Event::End(e) => {
@@ -2791,38 +3691,168 @@ fn expand_named_struct(
               }
               _ => {}
             }
+          }
+        }
 
-            if let Some(e) = next_event {
-              #child_choice_dispatch_tokens
-              match e.name().as_ref() {
-                b"mc:AlternateContent" | b"AlternateContent" => {
-                  #visit_foreign_child_tokens
-                  crate::common::process_markup_compatibility_children(
-                    xml_reader,
-                    next_empty,
-                    &mut visit_foreign_child,
-                  )?;
+        Ok(Self {
+          #( #attr_init_tokens, )*
+          #( #child_init_tokens, )*
+          #( #choice_init_tokens, )*
+          #( #any_init_tokens, )*
+          #text_finish_tokens
+          #( #attr_finish_tokens, )*
+          #special_namespace_init_tokens
+          #xml_header_init_tokens
+          #mc_ignorable_init_tokens
+        })
+      }
+
+      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+        xml_reader: &mut crate::common::IoReader<R>,
+        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        #xml_header_decl_tokens
+        let (e, empty_tag) = if let Some((e, empty_tag)) = xml_event {
+          (e, empty_tag)
+        } else {
+          loop {
+            let next_event = match xml_reader.next_tag_event()? {
+              crate::common::IoTagEvent::Decl(standalone) => {
+                if #has_xml_header_field {
+                  xml_header_state = if standalone {
+                    crate::common::XmlHeaderType::Standalone
+                  } else {
+                    crate::common::XmlHeaderType::Plain
+                  };
                 }
-                _ => {
-                  if crate::common::is_foreign_prefixed_child(
-                    e.name().as_ref(),
-                    #tag_prefix,
+                None
+              }
+              crate::common::IoTagEvent::Start(e, empty_tag) => Some((e, empty_tag)),
+              crate::common::IoTagEvent::Eof => {
+                return Err(crate::common::unexpected_eof(stringify!(#ident)));
+              }
+              crate::common::IoTagEvent::End(_) | crate::common::IoTagEvent::Other => None,
+            };
+            if let Some((e, empty_tag)) = next_event {
+              break (e, empty_tag);
+            }
+          }
+        };
+        match e.name().as_ref() {
+          #tag_qname_lit | #local_name_lit => {}
+          found => {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              stringify!(#ident),
+              found,
+            ));
+          }
+        }
+
+        #( #attr_decl_tokens )*
+        #namespace_attr_parse_tokens
+        #( #child_decl_tokens )*
+        #( #choice_decl_tokens )*
+        #( #any_decl_tokens )*
+        #text_decl_tokens
+
+        if !empty_tag {
+          loop {
+            match xml_reader.next()? {
+              quick_xml::events::Event::Decl(e) => {
+                if #has_xml_header_field {
+                  xml_header_state = if matches!(
+                    e.standalone(),
+                    Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
                   ) {
-                    #visit_foreign_child_tokens
-                    crate::common::process_foreign_element_children(
+                    crate::common::XmlHeaderType::Standalone
+                  } else {
+                    crate::common::XmlHeaderType::Plain
+                  };
+                }
+              }
+              quick_xml::events::Event::Start(e) => {
+                let e = e.into_owned();
+                let next_empty = false;
+                let event_name = e.name();
+                let event_name = event_name.as_ref();
+                #child_choice_dispatch_tokens_io
+                match event_name {
+                  b"mc:AlternateContent" | b"AlternateContent" => {
+                    #visit_foreign_child_tokens_io
+                    crate::common::process_markup_compatibility_children_io(
                       xml_reader,
                       next_empty,
                       &mut visit_foreign_child,
                     )?;
-                  } else {
-                    Err(crate::common::unexpected_tag(
-                      stringify!(#ident),
-                      "known child",
-                      e.name().as_ref(),
-                    ))?;
+                  }
+                  _ => {
+                    if crate::common::is_foreign_prefixed_child(
+                      event_name,
+                      #tag_prefix,
+                    ) {
+                      #visit_foreign_child_tokens_io
+                      crate::common::process_foreign_element_children_io(
+                        xml_reader,
+                        next_empty,
+                        &mut visit_foreign_child,
+                      )?;
+                    } else {
+                      Err(crate::common::unexpected_tag(
+                        stringify!(#ident),
+                        "known child",
+                        event_name,
+                      ))?;
+                    }
                   }
                 }
               }
+              quick_xml::events::Event::Empty(e) => {
+                let e = e.into_owned();
+                let next_empty = true;
+                let event_name = e.name();
+                let event_name = event_name.as_ref();
+                #child_choice_dispatch_tokens_io
+                match event_name {
+                  b"mc:AlternateContent" | b"AlternateContent" => {
+                    #visit_foreign_child_tokens_io
+                    crate::common::process_markup_compatibility_children_io(
+                      xml_reader,
+                      next_empty,
+                      &mut visit_foreign_child,
+                    )?;
+                  }
+                  _ => {
+                    if crate::common::is_foreign_prefixed_child(
+                      event_name,
+                      #tag_prefix,
+                    ) {
+                      #visit_foreign_child_tokens_io
+                      crate::common::process_foreign_element_children_io(
+                        xml_reader,
+                        next_empty,
+                        &mut visit_foreign_child,
+                      )?;
+                    } else {
+                      Err(crate::common::unexpected_tag(
+                        stringify!(#ident),
+                        "known child",
+                        event_name,
+                      ))?;
+                    }
+                  }
+                }
+              }
+              #text_read_tokens
+              quick_xml::events::Event::End(e) => {
+                if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
+                  break;
+                }
+              }
+              quick_xml::events::Event::Eof => {
+                return Err(crate::common::unexpected_eof(stringify!(#ident)));
+              }
+              _ => {}
             }
           }
         }

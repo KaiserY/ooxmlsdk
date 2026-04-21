@@ -7,16 +7,19 @@ use std::io::Cursor;
 
 use super::{SdkError, invalid_field_value, unexpected_eof};
 
-pub trait XmlReader<'de> {
-  fn next(&mut self) -> Result<Event<'de>, SdkError>;
-  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError>;
-  fn decoder(&self) -> Decoder;
-}
-
 pub struct IoReader<R: BufRead> {
   reader: Reader<R>,
   buf: Vec<u8>,
+  current: Option<Event<'static>>,
   pending: Option<Event<'static>>,
+}
+
+pub(crate) enum IoTagEvent {
+  Start(quick_xml::events::BytesStart<'static>, bool),
+  End(quick_xml::events::BytesEnd<'static>),
+  Decl(bool),
+  Eof,
+  Other,
 }
 
 impl<R: BufRead> IoReader<R> {
@@ -24,14 +27,14 @@ impl<R: BufRead> IoReader<R> {
     Self {
       reader,
       buf: Vec::new(),
+      current: None,
       pending: None,
     }
   }
-}
 
-impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
   #[inline]
-  fn next(&mut self) -> Result<Event<'de>, SdkError> {
+  pub fn next(&mut self) -> Result<Event<'static>, SdkError> {
+    self.current = None;
     if let Some(event) = self.pending.take() {
       return Ok(event);
     }
@@ -41,7 +44,41 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
   }
 
   #[inline]
-  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+  pub fn next_borrowed(&mut self) -> Result<Event<'_>, SdkError> {
+    self.current = None;
+    if let Some(event) = self.pending.take() {
+      self.current = Some(event);
+      return Ok(self.current.as_ref().expect("current event").borrow());
+    }
+
+    self.buf.clear();
+    Ok(self.reader.read_event_into(&mut self.buf)?)
+  }
+
+  #[inline]
+  pub fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
+    self.current = None;
+    if let Some(event) = self.pending.take() {
+      return Ok(Self::tag_event_from_owned(event));
+    }
+
+    self.buf.clear();
+    Ok(match self.reader.read_event_into(&mut self.buf)? {
+      Event::Start(e) => IoTagEvent::Start(e.into_owned(), false),
+      Event::Empty(e) => IoTagEvent::Start(e.into_owned(), true),
+      Event::End(e) => IoTagEvent::End(e.into_owned()),
+      Event::Decl(e) => IoTagEvent::Decl(matches!(
+        e.standalone(),
+        Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+      )),
+      Event::Eof => IoTagEvent::Eof,
+      _ => IoTagEvent::Other,
+    })
+  }
+
+  #[inline]
+  pub fn unread(&mut self, event: Event<'static>) -> Result<(), SdkError> {
+    self.current = None;
     if self.pending.is_some() {
       return Err(SdkError::CommonError(
         "xml reader unread buffer already occupied".to_string(),
@@ -53,8 +90,23 @@ impl<'de, R: BufRead> XmlReader<'de> for IoReader<R> {
   }
 
   #[inline]
-  fn decoder(&self) -> Decoder {
+  pub fn decoder(&self) -> Decoder {
     self.reader.decoder()
+  }
+
+  #[inline]
+  fn tag_event_from_owned(event: Event<'static>) -> IoTagEvent {
+    match event {
+      Event::Start(e) => IoTagEvent::Start(e, false),
+      Event::Empty(e) => IoTagEvent::Start(e, true),
+      Event::End(e) => IoTagEvent::End(e),
+      Event::Decl(e) => IoTagEvent::Decl(matches!(
+        e.standalone(),
+        Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+      )),
+      Event::Eof => IoTagEvent::Eof,
+      _ => IoTagEvent::Other,
+    }
   }
 }
 
@@ -70,11 +122,9 @@ impl<'de> SliceReader<'de> {
       pending: None,
     }
   }
-}
 
-impl<'de> XmlReader<'de> for SliceReader<'de> {
   #[inline]
-  fn next(&mut self) -> Result<Event<'de>, SdkError> {
+  pub fn next(&mut self) -> Result<Event<'de>, SdkError> {
     if let Some(event) = self.pending.take() {
       return Ok(event);
     }
@@ -83,7 +133,7 @@ impl<'de> XmlReader<'de> for SliceReader<'de> {
   }
 
   #[inline]
-  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+  pub fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
     if self.pending.is_some() {
       return Err(SdkError::CommonError(
         "xml reader unread buffer already occupied".to_string(),
@@ -95,7 +145,7 @@ impl<'de> XmlReader<'de> for SliceReader<'de> {
   }
 
   #[inline]
-  fn decoder(&self) -> Decoder {
+  pub fn decoder(&self) -> Decoder {
     self.reader.decoder()
   }
 }
@@ -129,6 +179,13 @@ pub(crate) fn from_reader_inner<R: BufRead>(reader: R) -> Result<IoReader<R>, Sd
   let mut xml_reader = Reader::from_reader(reader);
   xml_reader.config_mut().check_end_names = false;
   Ok(IoReader::new(xml_reader))
+}
+
+#[inline]
+pub(crate) fn from_bytes_inner(bytes: &[u8]) -> Result<SliceReader<'_>, SdkError> {
+  let mut xml_reader = Reader::from_reader(bytes);
+  xml_reader.config_mut().check_end_names = false;
+  Ok(SliceReader::new(xml_reader))
 }
 
 #[inline]
@@ -452,8 +509,8 @@ fn resolve_general_ref_entity(entity: &str) -> Option<std::borrow::Cow<'_, str>>
   None
 }
 
-pub(crate) fn read_outer_xml<'de, R: XmlReader<'de>>(
-  xml_reader: &mut R,
+pub(crate) fn read_outer_xml_borrowed<'de>(
+  xml_reader: &mut SliceReader<'de>,
   start: quick_xml::events::BytesStart<'de>,
   empty_tag: bool,
 ) -> Result<String, SdkError> {
@@ -475,6 +532,44 @@ pub(crate) fn read_outer_xml<'de, R: XmlReader<'de>>(
           depth -= 1;
         }
         Event::Eof => return Err(unexpected_eof("read_outer_xml")),
+        _ => {}
+      }
+
+      writer.write_event(event)?;
+
+      if depth == 0 {
+        break;
+      }
+    }
+  }
+
+  String::from_utf8(writer.into_inner().into_inner())
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+pub(crate) fn read_outer_xml_io<R: BufRead>(
+  xml_reader: &mut IoReader<R>,
+  start: quick_xml::events::BytesStart<'static>,
+  empty_tag: bool,
+) -> Result<String, SdkError> {
+  let mut writer = Writer::new(Cursor::new(Vec::new()));
+
+  if empty_tag {
+    writer.write_event(Event::Empty(start.into_owned()))?;
+  } else {
+    writer.write_event(Event::Start(start.into_owned()))?;
+
+    let mut depth = 1usize;
+    loop {
+      let event = xml_reader.next()?.into_owned();
+      match &event {
+        Event::Start(_) => {
+          depth += 1;
+        }
+        Event::End(_) => {
+          depth -= 1;
+        }
+        Event::Eof => return Err(unexpected_eof("read_outer_xml_io")),
         _ => {}
       }
 

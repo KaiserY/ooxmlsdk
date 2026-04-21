@@ -86,15 +86,6 @@ fn parse_core_properties(xml: &str) -> Result<CoreProperties, Box<dyn std::error
 }
 ```
 
-## What 0.4.0 Focuses On
-
-`0.4.0` is mainly a quality and runtime release rather than a surface-area explosion.
-
-- The derive-generated read path was tightened so more child and choice dispatch work happens in generated code instead of generic runtime fallback logic.
-- Package handling remains centered on generated strongly typed parts instead of a thin zip wrapper.
-- Feature gating is clearer: the Office 2007-oriented validation surface is `--no-default-features --features parts`, while newer Office 2010+ and Microsoft 365-era coverage stays behind `microsoft365`.
-- Validator support is still optional and should be treated as an extra capability, not the default path.
-
 ## Project Structure
 
 - `crates/ooxmlsdk`: runtime library exposed to downstream users

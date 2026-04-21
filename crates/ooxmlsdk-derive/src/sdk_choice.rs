@@ -1,5 +1,18 @@
 use super::*;
 
+#[derive(Clone, Copy)]
+enum DeserializeMode {
+  Borrowed,
+  Io,
+}
+
+fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
+  match mode {
+    DeserializeMode::Borrowed => Ident::new("deserialize_borrowed_inner", Span::call_site()),
+    DeserializeMode::Io => Ident::new("deserialize_io_inner", Span::call_site()),
+  }
+}
+
 #[derive(Clone)]
 enum NamedSequenceVariantFieldKind {
   Child { qname: String },
@@ -208,13 +221,18 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   let mut write_arms = Vec::with_capacity(variants.len());
   let mut direct_matcher_arms = Vec::with_capacity(variants.len());
   let mut helper_matcher_checks = Vec::new();
-  let mut direct_child_dispatch_arms = Vec::with_capacity(variants.len());
-  let mut helper_child_dispatch_tokens = Vec::new();
-  let mut any_dispatch_tokens = Vec::new();
+  let mut direct_child_dispatch_arms_borrowed = Vec::with_capacity(variants.len());
+  let mut direct_child_dispatch_arms_io = Vec::with_capacity(variants.len());
+  let mut helper_child_dispatch_tokens_borrowed = Vec::new();
+  let mut helper_child_dispatch_tokens_io = Vec::new();
+  let mut any_dispatch_tokens_borrowed = Vec::new();
+  let mut any_dispatch_tokens_io = Vec::new();
   let mut text_from_string_tokens = Vec::new();
   let mut validate_arms = Vec::new();
   let mut has_any_variant = false;
   let mut helper_items = Vec::new();
+  let deserialize_borrowed_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Borrowed);
+  let deserialize_io_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Io);
 
   for variant in variants {
     let variant_ident = &variant.ident;
@@ -241,10 +259,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           #( #qname_patterns )|* => true,
         });
-        direct_child_dispatch_arms.push(quote! {
+        direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = #inner_ty::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            return Ok(#constructor);
+          }
+        });
+        direct_child_dispatch_arms_io.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
+            let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
@@ -283,10 +308,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             return true;
           }
         });
-        helper_child_dispatch_tokens.push(quote! {
+        helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
-          if #inner_ty::matches_start_qname(e.name().as_ref()) {
-            let parsed_child = #inner_ty::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
+          if #inner_ty::matches_start_qname(event_name) {
+            let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            return Ok(#constructor);
+          }
+        });
+        helper_child_dispatch_tokens_io.push(quote! {
+          #(#cfg_attrs)*
+          if #inner_ty::matches_start_qname(event_name) {
+            let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
@@ -359,10 +391,18 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => true,
         });
-        direct_child_dispatch_arms.push(quote! {
+        direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => {
-            let parsed_child = #helper_ident::deserialize_inner(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = #helper_ident::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let #helper_ident { #( #field_idents ),* } = parsed_child;
+            return Ok(Self::#variant_ident { #( #field_idents ),* });
+          }
+        });
+        direct_child_dispatch_arms_io.push(quote! {
+          #(#cfg_attrs)*
+          #( #start_qname_patterns )|* => {
+            let parsed_child = #helper_ident::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             let #helper_ident { #( #field_idents ),* } = parsed_child;
             return Ok(Self::#variant_ident { #( #field_idents ),* });
           }
@@ -441,7 +481,45 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           #( #qname_patterns )|* => true,
         });
-        direct_child_dispatch_arms.push(quote! {
+        direct_child_dispatch_arms_borrowed.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
+            let parsed_child = if empty_tag {
+              #empty_value_tokens
+            } else {
+              let mut text = None;
+              loop {
+                match xml_reader.next()? {
+                  quick_xml::events::Event::Text(t) => {
+                    crate::common::push_xml_text(&mut text, t)?;
+                  }
+                  quick_xml::events::Event::GeneralRef(t) => {
+                    crate::common::push_xml_general_ref(
+                      &mut text,
+                      t,
+                      stringify!(#ident),
+                      stringify!(#variant_ident),
+                    )?;
+                  }
+                  quick_xml::events::Event::End(end) => {
+                    if end.name().as_ref() == #tag_qname_lit
+                      || end.name().as_ref() == #local_name_lit
+                    {
+                      break;
+                    }
+                  }
+                  quick_xml::events::Event::Eof => {
+                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                  }
+                  _ => {}
+                }
+              }
+              #parse_from_text_tokens
+            };
+            return Ok(Self::#variant_ident(parsed_child));
+          }
+        });
+        direct_child_dispatch_arms_io.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
             let parsed_child = if empty_tag {
@@ -524,10 +602,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident(_) => Ok(()),
         });
-        any_dispatch_tokens.push(quote! {
+        any_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           {
-            let xml = crate::common::read_outer_xml(xml_reader, e, empty_tag)?;
+            let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, empty_tag)?;
+            return Ok(#constructor);
+          }
+        });
+        any_dispatch_tokens_io.push(quote! {
+          #(#cfg_attrs)*
+          {
+            let xml = crate::common::read_outer_xml_io(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
@@ -605,28 +690,61 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
   };
 
-  let read_tokens = if any_dispatch_tokens.is_empty() {
+  let read_tokens_borrowed = if any_dispatch_tokens_borrowed.is_empty() {
     quote! {
-      match e.name().as_ref() {
-        #( #direct_child_dispatch_arms )*
+      let event_name = e.name();
+      let event_name = event_name.as_ref();
+      match event_name {
+        #( #direct_child_dispatch_arms_borrowed )*
         _ => {
-          #( #helper_child_dispatch_tokens )*
-          let found = e.name();
+          #( #helper_child_dispatch_tokens_borrowed )*
           Err(crate::common::unexpected_tag(
             stringify!(#ident),
             "choice",
-            found.as_ref(),
+            event_name,
           ))
         }
       }
     }
   } else {
     quote! {
-      match e.name().as_ref() {
-        #( #direct_child_dispatch_arms )*
+      let event_name = e.name();
+      let event_name = event_name.as_ref();
+      match event_name {
+        #( #direct_child_dispatch_arms_borrowed )*
         _ => {
-          #( #helper_child_dispatch_tokens )*
-          #( #any_dispatch_tokens )*
+          #( #helper_child_dispatch_tokens_borrowed )*
+          #( #any_dispatch_tokens_borrowed )*
+        }
+      }
+    }
+  };
+
+  let read_tokens_io = if any_dispatch_tokens_io.is_empty() {
+    quote! {
+      let event_name = e.name();
+      let event_name = event_name.as_ref();
+      match event_name {
+        #( #direct_child_dispatch_arms_io )*
+        _ => {
+          #( #helper_child_dispatch_tokens_io )*
+          Err(crate::common::unexpected_tag(
+            stringify!(#ident),
+            "choice",
+            event_name,
+          ))
+        }
+      }
+    }
+  } else {
+    quote! {
+      let event_name = e.name();
+      let event_name = event_name.as_ref();
+      match event_name {
+        #( #direct_child_dispatch_arms_io )*
+        _ => {
+          #( #helper_child_dispatch_tokens_io )*
+          #( #any_dispatch_tokens_io )*
         }
       }
     }
@@ -665,8 +783,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         #from_text_value_tokens
       }
 
-      pub(crate) fn deserialize_inner<'de, R: crate::common::XmlReader<'de>>(
-        xml_reader: &mut R,
+      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
+        xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
         let (e, empty_tag) = if let Some((e, empty_tag)) = xml_event {
@@ -683,7 +801,29 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             }
           }
         };
-        #read_tokens
+        #read_tokens_borrowed
+      }
+
+      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+        xml_reader: &mut crate::common::IoReader<R>,
+        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        let (e, empty_tag) = if let Some((e, empty_tag)) = xml_event {
+          (e, empty_tag)
+        } else {
+          loop {
+            match xml_reader.next_tag_event()? {
+              crate::common::IoTagEvent::Start(e, empty_tag) => break (e, empty_tag),
+              crate::common::IoTagEvent::Eof => {
+                return Err(crate::common::unexpected_eof(stringify!(#ident)));
+              }
+              crate::common::IoTagEvent::Decl(_)
+              | crate::common::IoTagEvent::End(_)
+              | crate::common::IoTagEvent::Other => continue,
+            }
+          }
+        };
+        #read_tokens_io
       }
 
       pub(crate) fn write_xml<W: std::io::Write>(

@@ -11,9 +11,10 @@ pub use error::{
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  XmlReader, decode_attr_value, from_reader_inner, from_str_inner, read_outer_xml,
-  write_attr_value, write_attr_value_str, write_end_tag, write_escaped_str, write_escaped_text,
-  write_start_tag_open, write_xmlns_attr,
+  IoReader, IoTagEvent, SliceReader, decode_attr_value, from_bytes_inner, from_reader_inner,
+  from_str_inner, read_outer_xml_borrowed, read_outer_xml_io, write_attr_value,
+  write_attr_value_str, write_end_tag, write_escaped_str, write_escaped_text, write_start_tag_open,
+  write_xmlns_attr,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -200,14 +201,17 @@ pub(crate) fn parent_zip_path(path: &str) -> String {
     .unwrap_or_default()
 }
 
-pub(crate) fn process_foreign_element_children<'de, R, F>(
-  xml_reader: &mut R,
+pub(crate) fn process_foreign_element_children_borrowed<'de, F>(
+  xml_reader: &mut SliceReader<'de>,
   empty_tag: bool,
   visitor: &mut F,
 ) -> Result<(), SdkError>
 where
-  R: XmlReader<'de>,
-  F: FnMut(&mut R, quick_xml::events::BytesStart<'de>, bool) -> Result<bool, SdkError>,
+  F: FnMut(
+    &mut SliceReader<'de>,
+    quick_xml::events::BytesStart<'de>,
+    bool,
+  ) -> Result<bool, SdkError>,
 {
   if empty_tag {
     return Ok(());
@@ -218,7 +222,7 @@ where
       quick_xml::events::Event::Start(e) => match visitor(xml_reader, e, false)? {
         true => {}
         false => {
-          process_foreign_element_children(xml_reader, false, visitor)?;
+          process_foreign_element_children_borrowed(xml_reader, false, visitor)?;
         }
       },
       quick_xml::events::Event::Empty(e) => {
@@ -233,14 +237,57 @@ where
   Ok(())
 }
 
-pub(crate) fn process_markup_compatibility_children<'de, R, F>(
-  xml_reader: &mut R,
+pub(crate) fn process_foreign_element_children_io<R, F>(
+  xml_reader: &mut IoReader<R>,
   empty_tag: bool,
   visitor: &mut F,
 ) -> Result<(), SdkError>
 where
-  R: XmlReader<'de>,
-  F: FnMut(&mut R, quick_xml::events::BytesStart<'de>, bool) -> Result<bool, SdkError>,
+  R: std::io::BufRead,
+  F:
+    FnMut(&mut IoReader<R>, quick_xml::events::BytesStart<'static>, bool) -> Result<bool, SdkError>,
+{
+  if empty_tag {
+    return Ok(());
+  }
+
+  loop {
+    let next_event = match xml_reader.next_borrowed()? {
+      quick_xml::events::Event::Start(e) => Some((e.into_owned(), false)),
+      quick_xml::events::Event::Empty(e) => Some((e.into_owned(), true)),
+      quick_xml::events::Event::End(_) => break,
+      quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children_io"))?,
+      _ => None,
+    };
+
+    match next_event {
+      Some((e, false)) => match visitor(xml_reader, e, false)? {
+        true => {}
+        false => {
+          process_foreign_element_children_io(xml_reader, false, visitor)?;
+        }
+      },
+      Some((e, true)) => {
+        visitor(xml_reader, e, true)?;
+      }
+      None => {}
+    }
+  }
+
+  Ok(())
+}
+
+pub(crate) fn process_markup_compatibility_children_borrowed<'de, F>(
+  xml_reader: &mut SliceReader<'de>,
+  empty_tag: bool,
+  visitor: &mut F,
+) -> Result<(), SdkError>
+where
+  F: FnMut(
+    &mut SliceReader<'de>,
+    quick_xml::events::BytesStart<'de>,
+    bool,
+  ) -> Result<bool, SdkError>,
 {
   if empty_tag {
     return Ok(());
@@ -256,21 +303,21 @@ where
             !selected_branch && markup_compatibility_choice_supported(&e, xml_reader.decoder())?;
           if should_use {
             selected_branch = true;
-            process_foreign_element_children(xml_reader, false, visitor)?;
+            process_foreign_element_children_borrowed(xml_reader, false, visitor)?;
           } else {
-            skip_foreign_element_children(xml_reader, false)?;
+            skip_foreign_element_children_borrowed(xml_reader, false)?;
           }
         }
         b"mc:Fallback" | b"Fallback" => {
           if selected_branch {
-            skip_foreign_element_children(xml_reader, false)?;
+            skip_foreign_element_children_borrowed(xml_reader, false)?;
           } else {
             selected_branch = true;
-            process_foreign_element_children(xml_reader, false, visitor)?;
+            process_foreign_element_children_borrowed(xml_reader, false, visitor)?;
           }
         }
         _ => {
-          skip_foreign_element_children(xml_reader, false)?;
+          skip_foreign_element_children_borrowed(xml_reader, false)?;
         }
       },
       quick_xml::events::Event::Empty(e) => match e.name().as_ref() {
@@ -292,6 +339,80 @@ where
       quick_xml::events::Event::Eof => {
         Err(unexpected_eof("process_markup_compatibility_children"))?
       }
+      _ => {}
+    }
+  }
+
+  Ok(())
+}
+
+pub(crate) fn process_markup_compatibility_children_io<R, F>(
+  xml_reader: &mut IoReader<R>,
+  empty_tag: bool,
+  visitor: &mut F,
+) -> Result<(), SdkError>
+where
+  R: std::io::BufRead,
+  F:
+    FnMut(&mut IoReader<R>, quick_xml::events::BytesStart<'static>, bool) -> Result<bool, SdkError>,
+{
+  if empty_tag {
+    return Ok(());
+  }
+
+  let mut selected_branch = false;
+
+  loop {
+    let decoder = xml_reader.decoder();
+    let next_event = match xml_reader.next_borrowed()? {
+      quick_xml::events::Event::Start(e) => Some(quick_xml::events::Event::Start(e.into_owned())),
+      quick_xml::events::Event::Empty(e) => Some(quick_xml::events::Event::Empty(e.into_owned())),
+      quick_xml::events::Event::End(e) => Some(quick_xml::events::Event::End(e.into_owned())),
+      quick_xml::events::Event::Eof => Some(quick_xml::events::Event::Eof),
+      _ => None,
+    };
+    match next_event {
+      Some(quick_xml::events::Event::Start(e)) => match e.name().as_ref() {
+        b"mc:Choice" | b"Choice" => {
+          let should_use = !selected_branch && markup_compatibility_choice_supported(&e, decoder)?;
+          if should_use {
+            selected_branch = true;
+            process_foreign_element_children_io(xml_reader, false, visitor)?;
+          } else {
+            skip_foreign_element_children_io(xml_reader, false)?;
+          }
+        }
+        b"mc:Fallback" | b"Fallback" => {
+          if selected_branch {
+            skip_foreign_element_children_io(xml_reader, false)?;
+          } else {
+            selected_branch = true;
+            process_foreign_element_children_io(xml_reader, false, visitor)?;
+          }
+        }
+        _ => {
+          skip_foreign_element_children_io(xml_reader, false)?;
+        }
+      },
+      Some(quick_xml::events::Event::Empty(e)) => match e.name().as_ref() {
+        b"mc:Choice" | b"Choice"
+          if !selected_branch && markup_compatibility_choice_supported(&e, decoder)? =>
+        {
+          selected_branch = true;
+        }
+        b"mc:Fallback" | b"Fallback" if !selected_branch => {
+          selected_branch = true;
+        }
+        _ => {}
+      },
+      Some(quick_xml::events::Event::End(e)) => match e.name().as_ref() {
+        b"mc:AlternateContent" | b"AlternateContent" => break,
+        _ => {}
+      },
+      Some(quick_xml::events::Event::Eof) => {
+        Err(unexpected_eof("process_markup_compatibility_children_io"))?
+      }
+      None => {}
       _ => {}
     }
   }
@@ -347,11 +468,22 @@ fn markup_compatibility_prefix_supported(
   Ok(false)
 }
 
-fn skip_foreign_element_children<'de, R: XmlReader<'de>>(
-  xml_reader: &mut R,
+fn skip_foreign_element_children_borrowed<'de>(
+  xml_reader: &mut SliceReader<'de>,
   empty_tag: bool,
 ) -> Result<(), SdkError> {
-  process_foreign_element_children(xml_reader, empty_tag, &mut |_xml_reader, _e, _e_empty| {
+  process_foreign_element_children_borrowed(
+    xml_reader,
+    empty_tag,
+    &mut |_xml_reader, _e, _e_empty| Ok(false),
+  )
+}
+
+fn skip_foreign_element_children_io<R: std::io::BufRead>(
+  xml_reader: &mut IoReader<R>,
+  empty_tag: bool,
+) -> Result<(), SdkError> {
+  process_foreign_element_children_io(xml_reader, empty_tag, &mut |_xml_reader, _e, _e_empty| {
     Ok(false)
   })
 }
@@ -379,10 +511,14 @@ mod tests {
     assert_eq!(start.name().as_ref(), b"mc:AlternateContent");
 
     let mut selected = Vec::new();
-    process_markup_compatibility_children(&mut reader, false, &mut |_reader, e, _empty| {
-      selected.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
-      Ok(false)
-    })
+    process_markup_compatibility_children_borrowed(
+      &mut reader,
+      false,
+      &mut |_reader, e, _empty| {
+        selected.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
+        Ok(false)
+      },
+    )
     .expect("process alternate content");
 
     assert_eq!(selected, vec!["foo:bar"]);
@@ -407,10 +543,14 @@ mod tests {
     assert_eq!(start.name().as_ref(), b"mc:AlternateContent");
 
     let mut selected = Vec::new();
-    process_markup_compatibility_children(&mut reader, false, &mut |_reader, e, _empty| {
-      selected.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
-      Ok(false)
-    })
+    process_markup_compatibility_children_borrowed(
+      &mut reader,
+      false,
+      &mut |_reader, e, _empty| {
+        selected.push(String::from_utf8_lossy(e.name().as_ref()).into_owned());
+        Ok(false)
+      },
+    )
     .expect("process alternate content");
 
     assert_eq!(selected, vec!["fallback"]);

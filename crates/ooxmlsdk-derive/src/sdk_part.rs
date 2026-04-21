@@ -83,9 +83,15 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   if has_content_types {
     field_declarations.push(quote! {
-      let content_types = crate::schemas::opc_content_types::Types::from_reader(
-        std::io::BufReader::new(#archive_ident.by_name("[Content_Types].xml")?),
-      )?;
+      use std::io::Read;
+    });
+    field_declarations.push(quote! {
+      let content_types = {
+        let mut zip_entry = #archive_ident.by_name("[Content_Types].xml")?;
+        let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
+        zip_entry.read_to_end(&mut bytes)?;
+        crate::schemas::opc_content_types::Types::from_bytes(&bytes)?
+      };
     });
     self_field_values.push(quote! { content_types });
   } else {
@@ -113,9 +119,14 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     field_declarations.push(quote! {
       let relationships = if let Some(file_path) = #file_path_set_ident.get(&rels_candidate_path) {
         rels_path = file_path.to_string();
-        Some(crate::schemas::opc_relationships::Relationships::from_reader(
-          std::io::BufReader::new(#archive_ident.by_name(file_path)?),
-        )?)
+        Some({
+          use std::io::Read;
+
+          let mut zip_entry = #archive_ident.by_name(file_path)?;
+          let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
+          zip_entry.read_to_end(&mut bytes)?;
+          crate::schemas::opc_relationships::Relationships::from_bytes(&bytes)?
+        })
       } else {
         None
       };
@@ -281,9 +292,14 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   if let Some(root_type) = root_type {
     field_declarations.push(quote! {
-      let root_element = Some(#root_type::from_reader(std::io::BufReader::new(
-        #archive_ident.by_name(#path_ident)?,
-      ))?);
+      let root_element = Some({
+        use std::io::Read;
+
+        let mut zip_entry = #archive_ident.by_name(#path_ident)?;
+        let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
+        zip_entry.read_to_end(&mut bytes)?;
+        #root_type::from_bytes(&bytes)?
+      });
     });
     field_unwraps.push(quote! {
       let root_element = root_element

@@ -3,23 +3,15 @@
 [![crates.io](https://img.shields.io/crates/v/ooxmlsdk.svg)](https://crates.io/crates/ooxmlsdk)
 [![docs](https://docs.rs/ooxmlsdk/badge.svg)](https://docs.rs/ooxmlsdk)
 
-`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The overall API shape is inspired by the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK), but the implementation is code-generated for Rust.
-
-## 0.4.0 Highlights
-
-- Simplified public feature surface around the features that are actually used today: `parts`, `microsoft365`, and `validators`.
-- Stronger package-level coverage for Wordprocessing, Spreadsheet, and Presentation documents through the generated `parts` API.
-- Validator support remains optional behind the `validators` feature and has dedicated integration coverage.
-- Read-path performance work in `ooxmlsdk-derive` now pushes more dispatch decisions into code generation, reducing runtime branching and unnecessary allocations in generated parsers.
-- Release validation for `0.4.0` is based on checked-in generated runtime code plus full workspace test and clippy coverage.
+`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The overall API shape is inspired by the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK), but the implementation is code-generated for Rust and organized around generated schema types, namespaces, serializers, deserializers, and strongly typed package parts.
 
 ## Features
 
-The runtime crate currently exposes these public features:
+The runtime crate exposes a small public feature surface:
 
-- `default`: enables `microsoft365` and `parts`
+- `default`: enables `microsoft365` and `parts`; this is the recommended configuration for most users
 - `parts`: enables package-level OOXML read/write support such as `WordprocessingDocument`, `SpreadsheetDocument`, and `PresentationDocument`
-- `microsoft365`: enables newer schema and part coverage that is not available in the Office 2007-oriented surface
+- `microsoft365`: enables the post-Office 2007 schema and part surface used by newer Office releases
 - `validators`: enables optional validator APIs
 
 The always-available modules in the crate root are:
@@ -35,13 +27,40 @@ Feature-gated modules are:
 - `parts` behind `parts`
 - `validator` behind `validators`
 
+## Version Coverage
+
+This repository treats Office 2007 as the compatibility baseline for the narrower package surface:
+
+- `--no-default-features --features parts`: Office 2007-oriented package and schema coverage
+- default build: Office 2007 baseline plus the broader `microsoft365` surface
+
+The `microsoft365` feature name is an umbrella label for everything newer than the Office 2007-oriented surface in this repository. It is not limited to Microsoft 365 subscription documents.
+
+When `microsoft365` is enabled, the checked-in generated runtime covers newer OOXML namespaces and parts associated with:
+
+- Office 2010
+- Office 2013
+- Office 2016
+- Office 2019
+- Office 2021
+- Microsoft 365-era extensions and newer upstream namespace revisions currently present in the checked-in metadata, including 2022, 2023, and 2024-dated schema additions
+
+In practical terms, this is the feature that pulls in support for newer namespaces and package relationships such as later DrawingML, chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked in the upstream Open XML SDK metadata.
+
 ## Quick Start
 
-Add the crate:
+Most users should keep the default features enabled:
 
 ```toml
 [dependencies]
 ooxmlsdk = "0.4.0"
+```
+
+If you want the narrower Office 2007-oriented package surface, disable default features and enable only `parts`:
+
+```toml
+[dependencies]
+ooxmlsdk = { version = "0.4.0", default-features = false, features = ["parts"] }
 ```
 
 Read and save a package:
@@ -73,7 +92,7 @@ fn parse_core_properties(xml: &str) -> Result<CoreProperties, Box<dyn std::error
 
 - The derive-generated read path was tightened so more child and choice dispatch work happens in generated code instead of generic runtime fallback logic.
 - Package handling remains centered on generated strongly typed parts instead of a thin zip wrapper.
-- Feature gating is clearer: Office 2007-oriented validation is done via `--no-default-features --features parts`, while newer Microsoft 365 coverage stays behind `microsoft365`.
+- Feature gating is clearer: the Office 2007-oriented validation surface is `--no-default-features --features parts`, while newer Office 2010+ and Microsoft 365-era coverage stays behind `microsoft365`.
 - Validator support is still optional and should be treated as an extra capability, not the default path.
 
 ## Project Structure
@@ -83,9 +102,10 @@ fn parse_core_properties(xml: &str) -> Result<CoreProperties, Box<dyn std::error
 - `crates/ooxmlsdk-derive`: derive macros used by the generated runtime code
 - `crates/ooxmlsdk-test`: integration tests and benchmarks
 - `sdk_data/`: checked-in intermediate generator data
+- `data/`: upstream-derived metadata snapshots consumed by the generator pipeline
 - `schemas/OpenPackagingConventions-XMLSchema/`: package schema inputs used by the generator
 
-The generated runtime code under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/parts/`, and related module files is intended to be checked in and reviewed as generated artifacts.
+The generated runtime code under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, and related module files is intended to be checked in and reviewed as generated artifacts.
 
 ## Validation And Benchmarks
 
@@ -115,8 +135,12 @@ For runtime performance work, prefer evaluating `cargo bench -p ooxmlsdk-test` a
 
 See [CHANGELOG.md](./CHANGELOG.md).
 
+## Data Provenance
+
+`data/` is directly copied from the upstream .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK/tree/main/data).
+
+`sdk_data/` is generated from the upstream .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK/tree/main/data), and `schemas/OpenPackagingConventions-XMLSchema/` contains package schema inputs derived from the Open Packaging Conventions XSDs. Review upstream licensing before redistributing refreshed snapshots.
+
 ## License
 
 MIT OR Apache-2.0
-
-`sdk_data/` is generated from the upstream .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK/tree/main/data), and `schemas/OpenPackagingConventions-XMLSchema/` contains package schema inputs derived from the Open Packaging Conventions XSDs. Review upstream licensing before redistributing refreshed snapshots.

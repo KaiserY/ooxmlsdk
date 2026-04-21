@@ -782,7 +782,7 @@ pub struct Model3DExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<Model3DExtensionChoice>,
 }
 /// Defines the ShapeProperties Class.

@@ -3700,7 +3700,7 @@ pub struct DiagramDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<DiagramDefinitionExtensionChoice>,
 }
 /// Defines the SampleData Class.

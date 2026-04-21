@@ -1174,7 +1174,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           );
           fields.push(quote! {
             #( #field_attrs )*
-            #[sdk(choice)]
+            #[sdk(choice(any))]
             pub xml_children: Vec<#child_choice_enum_ident>,
           });
 
@@ -1516,7 +1516,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           );
           fields.push(quote! {
             #( #field_attrs )*
-            #[sdk(choice)]
+            #[sdk(choice(any))]
             pub xml_children: Vec<#child_choice_enum_ident>,
           });
 
@@ -3102,6 +3102,66 @@ fn choice_type_accepts_text(module: &SchemaModuleDecl, rust_type: &str) -> bool 
     .unwrap_or(false)
 }
 
+fn choice_type_accepts_any(module: &SchemaModuleDecl, rust_type: &str) -> bool {
+  fn type_accepts_any_recursive(
+    module: &SchemaModuleDecl,
+    rust_type: &str,
+    visited: &mut HashSet<String>,
+  ) -> bool {
+    if !visited.insert(rust_type.to_string()) {
+      return false;
+    }
+
+    let result = module
+      .types
+      .iter()
+      .find(|type_decl| type_decl.rust_name == rust_type)
+      .map(|type_decl| match type_decl.kind {
+        TypeKind::ChoiceEnum => type_decl.members.iter().any(|member| match member {
+          MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Any,
+            ..
+          }) => true,
+          MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Child { .. },
+            payload,
+            ..
+          })
+          | MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Sequence { .. },
+            payload,
+            ..
+          })
+          | MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::TextChild { .. },
+            payload,
+            ..
+          }) => type_accepts_any_recursive(module, &payload.rust_type, visited),
+          _ => false,
+        }),
+        TypeKind::HelperStruct => type_decl.members.iter().any(|member| match member {
+          MemberDecl::Field(FieldDecl {
+            wire: FieldWireDecl::Any,
+            ..
+          }) => true,
+          MemberDecl::Field(FieldDecl {
+            wire: FieldWireDecl::Choice,
+            type_ref,
+            ..
+          }) => type_accepts_any_recursive(module, &type_ref.rust_type, visited),
+          _ => false,
+        }),
+        _ => false,
+      })
+      .unwrap_or(false);
+
+    visited.remove(rust_type);
+    result
+  }
+
+  type_accepts_any_recursive(module, rust_type, &mut HashSet::new())
+}
+
 fn gen_direct_child_fields_from_decl(
   fields: &[&FieldDecl],
   owner_rust_name: &str,
@@ -3318,8 +3378,13 @@ fn gen_choice_fields_from_decl(
     let field_type = type_from_decl_ref(&field.type_ref)?;
     let attrs = module_version_cfg_attrs(&field.version, field_cfg);
     let choice_accepts_text = choice_type_accepts_text(module, &field.type_ref.rust_type);
-    let sdk_choice_attr = if choice_accepts_text {
+    let choice_accepts_any = choice_type_accepts_any(module, &field.type_ref.rust_type);
+    let sdk_choice_attr = if choice_accepts_text && choice_accepts_any {
+      quote! { #[sdk(choice(text, any))] }
+    } else if choice_accepts_text {
       quote! { #[sdk(choice(text))] }
+    } else if choice_accepts_any {
+      quote! { #[sdk(choice(any))] }
     } else {
       quote! { #[sdk(choice)] }
     };

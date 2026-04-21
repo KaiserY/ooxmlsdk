@@ -64,7 +64,7 @@ pub struct Choice {
   /// Represents the following attribute in the schema: mc:ProcessContent
   #[sdk(attr(qname = "mc:ProcessContent"))]
   pub mc_process_content: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<ChoiceChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -97,7 +97,7 @@ pub struct Fallback {
   /// Represents the following attribute in the schema: mc:ProcessContent
   #[sdk(attr(qname = "mc:ProcessContent"))]
   pub mc_process_content: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<FallbackChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

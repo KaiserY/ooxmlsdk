@@ -2292,7 +2292,7 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<ExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -4595,7 +4595,7 @@ pub struct StockChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<StockChartExtensionChoice>,
 }
 /// Defines the PieChartExtension Class.
@@ -4614,7 +4614,7 @@ pub struct PieChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PieChartExtensionChoice>,
 }
 /// Defines the Pie3DChartExtension Class.
@@ -4633,7 +4633,7 @@ pub struct Pie3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<Pie3DChartExtensionChoice>,
 }
 /// Defines the NumRefExtension Class.
@@ -4652,7 +4652,7 @@ pub struct NumRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<NumRefExtensionChoice>,
 }
 /// Defines the StrDataExtension Class.
@@ -4671,7 +4671,7 @@ pub struct StrDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<StrDataExtensionChoice>,
 }
 /// Defines the StrRefExtension Class.
@@ -4690,7 +4690,7 @@ pub struct StrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<StrRefExtensionChoice>,
 }
 /// Defines the MultiLvlStrRefExtension Class.
@@ -4709,7 +4709,7 @@ pub struct MultiLvlStrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<MultiLvlStrRefExtensionChoice>,
 }
 /// Defines the DLblsExtension Class.
@@ -4728,7 +4728,7 @@ pub struct DLblsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<DLblsExtensionChoice>,
 }
 /// Defines the LineChartExtension Class.
@@ -4747,7 +4747,7 @@ pub struct LineChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<LineChartExtensionChoice>,
 }
 /// Defines the Line3DChartExtension Class.
@@ -4766,7 +4766,7 @@ pub struct Line3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<Line3DChartExtensionChoice>,
 }
 /// Defines the ScatterChartExtension Class.
@@ -4785,7 +4785,7 @@ pub struct ScatterChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ScatterChartExtensionChoice>,
 }
 /// Defines the RadarChartExtension Class.
@@ -4804,7 +4804,7 @@ pub struct RadarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<RadarChartExtensionChoice>,
 }
 /// Defines the BarChartExtension Class.
@@ -4823,7 +4823,7 @@ pub struct BarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<BarChartExtensionChoice>,
 }
 /// Defines the Bar3DChartExtension Class.
@@ -4842,7 +4842,7 @@ pub struct Bar3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<Bar3DChartExtensionChoice>,
 }
 /// Defines the AreaChartExtension Class.
@@ -4861,7 +4861,7 @@ pub struct AreaChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<AreaChartExtensionChoice>,
 }
 /// Defines the Area3DChartExtension Class.
@@ -4880,7 +4880,7 @@ pub struct Area3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<Area3DChartExtensionChoice>,
 }
 /// Defines the BubbleChartExtension Class.
@@ -4899,7 +4899,7 @@ pub struct BubbleChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<BubbleChartExtensionChoice>,
 }
 /// Defines the SurfaceChartExtension Class.
@@ -4918,7 +4918,7 @@ pub struct SurfaceChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SurfaceChartExtensionChoice>,
 }
 /// Defines the Surface3DChartExtension Class.
@@ -4937,7 +4937,7 @@ pub struct Surface3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<Surface3DChartExtensionChoice>,
 }
 /// Defines the CatAxExtension Class.
@@ -4956,7 +4956,7 @@ pub struct CatAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CatAxExtensionChoice>,
 }
 /// Defines the DateAxExtension Class.
@@ -4975,7 +4975,7 @@ pub struct DateAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<DateAxExtensionChoice>,
 }
 /// Defines the SerAxExtension Class.
@@ -4994,7 +4994,7 @@ pub struct SerAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SerAxExtensionChoice>,
 }
 /// Defines the ValAxExtension Class.
@@ -5013,7 +5013,7 @@ pub struct ValAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ValAxExtensionChoice>,
 }
 /// Defines the UpDownBars Class.
@@ -5851,7 +5851,7 @@ pub struct DLblExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<DLblExtensionChoice>,
 }
 /// Defines the DataPoint Class.
@@ -6029,7 +6029,7 @@ pub struct LineSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<LineSerExtensionChoice>,
 }
 /// Defines the ScatterSerExtensionList Class.
@@ -6060,7 +6060,7 @@ pub struct ScatterSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ScatterSerExtensionChoice>,
 }
 /// Defines the RadarSerExtensionList Class.
@@ -6093,7 +6093,7 @@ pub struct RadarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<RadarSerExtensionChoice>,
 }
 /// Defines the BarSerExtensionList Class.
@@ -6124,7 +6124,7 @@ pub struct BarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<BarSerExtensionChoice>,
 }
 /// Defines the AreaSerExtensionList Class.
@@ -6155,7 +6155,7 @@ pub struct AreaSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<AreaSerExtensionChoice>,
 }
 /// Defines the PieSerExtensionList Class.
@@ -6186,7 +6186,7 @@ pub struct PieSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PieSerExtensionChoice>,
 }
 /// Defines the BubbleSerExtensionList Class.
@@ -6217,7 +6217,7 @@ pub struct BubbleSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<BubbleSerExtensionChoice>,
 }
 /// Defines the SurfaceSerExtensionList Class.
@@ -6248,7 +6248,7 @@ pub struct SurfaceSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SurfaceSerExtensionChoice>,
 }
 #[cfg(feature = "microsoft365")]
@@ -6783,7 +6783,7 @@ pub struct ChartSpaceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ChartSpaceExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

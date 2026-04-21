@@ -2670,7 +2670,7 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<ExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -7026,7 +7026,7 @@ pub struct GraphicData {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<GraphicDataChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -13250,7 +13250,7 @@ pub struct ShapePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ShapePropertiesExtensionChoice>,
 }
 /// Defines the GvmlGroupShapeExtension Class.
@@ -13269,7 +13269,7 @@ pub struct GvmlGroupShapeExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<GvmlGroupShapeExtensionChoice>,
 }
 /// Defines the ShapePropertiesExtensionList Class.
@@ -13468,7 +13468,7 @@ pub struct NonVisualGroupDrawingShapePropsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<NonVisualGroupDrawingShapePropsExtensionChoice>,
 }
 /// Defines the OfficeStyleSheetExtension Class.
@@ -13487,7 +13487,7 @@ pub struct OfficeStyleSheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<OfficeStyleSheetExtensionChoice>,
 }
 /// Defines the ConnectorLockingExtension Class.
@@ -13506,7 +13506,7 @@ pub struct ConnectorLockingExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ConnectorLockingExtensionChoice>,
 }
 /// Defines the GroupShapeLocks Class.
@@ -13977,7 +13977,7 @@ pub struct DataModelExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<DataModelExtensionChoice>,
 }
 /// Defines the PtExtension Class.
@@ -13996,7 +13996,7 @@ pub struct PtExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PtExtensionChoice>,
 }
 /// Defines the HyperlinkExtension Class.
@@ -14015,7 +14015,7 @@ pub struct HyperlinkExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<HyperlinkExtensionChoice>,
 }
 /// Future extensions..
@@ -14046,7 +14046,7 @@ pub struct LinePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<LinePropertiesExtensionChoice>,
 }
 /// default head line end style is none.
@@ -14180,7 +14180,7 @@ pub struct NonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<NonVisualDrawingPropertiesExtensionChoice>,
 }
 /// Defines the PictureLocks Class.
@@ -14300,7 +14300,7 @@ pub struct NonVisualPicturePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<NonVisualPicturePropertiesExtensionChoice>,
 }
 /// Future extensions..
@@ -14331,7 +14331,7 @@ pub struct BlipExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<BlipExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

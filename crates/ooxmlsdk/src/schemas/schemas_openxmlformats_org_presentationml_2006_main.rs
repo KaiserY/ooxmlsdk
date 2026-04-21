@@ -981,7 +981,7 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<ExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -5755,7 +5755,7 @@ pub struct SlideExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SlideExtensionChoice>,
 }
 /// Defines the CommonSlideDataExtension Class.
@@ -5774,7 +5774,7 @@ pub struct CommonSlideDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CommonSlideDataExtensionChoice>,
 }
 /// Defines the ShowPropertiesExtension Class.
@@ -5793,7 +5793,7 @@ pub struct ShowPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ShowPropertiesExtensionChoice>,
 }
 /// Defines the Picture Class.
@@ -6283,7 +6283,7 @@ pub struct CommentAuthorExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CommentAuthorExtensionChoice>,
 }
 /// Defines the CommentExtension Class.
@@ -6302,7 +6302,7 @@ pub struct CommentExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CommentExtensionChoice>,
 }
 /// Defines the SlideLayoutExtension Class.
@@ -6321,7 +6321,7 @@ pub struct SlideLayoutExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SlideLayoutExtensionChoice>,
 }
 /// Defines the SlideMasterExtension Class.
@@ -6340,7 +6340,7 @@ pub struct SlideMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SlideMasterExtensionChoice>,
 }
 /// Defines the HandoutMasterExtension Class.
@@ -6359,7 +6359,7 @@ pub struct HandoutMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<HandoutMasterExtensionChoice>,
 }
 /// Defines the NotesMasterExtension Class.
@@ -6378,7 +6378,7 @@ pub struct NotesMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<NotesMasterExtensionChoice>,
 }
 /// Placeholder Shape.
@@ -6459,7 +6459,7 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ApplicationNonVisualDrawingPropertiesExtensionChoice>,
 }
 /// Defines the Iterate Class.
@@ -7014,7 +7014,7 @@ pub struct PresentationExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PresentationExtensionChoice>,
 }
 /// HTML Publishing Properties.
@@ -7265,7 +7265,7 @@ pub struct PresentationPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PresentationPropertiesExtensionChoice>,
 }
 /// Defines the HeaderFooter Class.

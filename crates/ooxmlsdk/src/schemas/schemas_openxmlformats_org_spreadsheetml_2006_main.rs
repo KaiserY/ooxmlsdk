@@ -1576,7 +1576,7 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<ExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -3998,7 +3998,7 @@ pub struct Schema {
   /// Represents the following attribute in the schema: :Namespace
   #[sdk(attr(qname = ":Namespace"))]
   pub namespace: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<SchemaChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -4124,7 +4124,7 @@ pub struct DataBinding {
   /// Represents the following attribute in the schema: :DataBindingLoadMode
   #[sdk(attr(qname = ":DataBindingLoadMode"))]
   pub data_binding_load_mode: crate::simple_type::UInt32Value,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<DataBindingChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
@@ -14862,7 +14862,7 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ConditionalFormattingRuleExtensionChoice>,
 }
 /// Defines the PivotHierarchyExtension Class.
@@ -14881,7 +14881,7 @@ pub struct PivotHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PivotHierarchyExtensionChoice>,
 }
 /// Defines the PivotFieldExtension Class.
@@ -14900,7 +14900,7 @@ pub struct PivotFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PivotFieldExtensionChoice>,
 }
 /// Defines the CacheSourceExtension Class.
@@ -14919,7 +14919,7 @@ pub struct CacheSourceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CacheSourceExtensionChoice>,
 }
 /// OLE Link Item.
@@ -16950,7 +16950,7 @@ pub struct SlicerCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<SlicerCacheDefinitionExtensionChoice>,
 }
 /// Defines the PivotFilterExtension Class.
@@ -16969,7 +16969,7 @@ pub struct PivotFilterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PivotFilterExtensionChoice>,
 }
 /// Defines the QueryTableExtension Class.
@@ -16988,7 +16988,7 @@ pub struct QueryTableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<QueryTableExtensionChoice>,
 }
 /// Defines the DatabaseProperties Class.
@@ -17374,7 +17374,7 @@ pub struct ConnectionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<ConnectionExtensionChoice>,
 }
 /// Defines the TextFields Class.
@@ -17561,7 +17561,7 @@ pub struct CacheFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CacheFieldExtensionChoice>,
 }
 /// Defines the FieldsUsage Class.
@@ -17630,7 +17630,7 @@ pub struct CacheHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CacheHierarchyExtensionChoice>,
 }
 /// Defines the CalculatedMemberExtensionList Class.
@@ -17661,7 +17661,7 @@ pub struct CalculatedMemberExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<CalculatedMemberExtensionChoice>,
 }
 /// Defines the DataFieldExtensionList Class.
@@ -17692,7 +17692,7 @@ pub struct DataFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<DataFieldExtensionChoice>,
 }
 /// Defines the PivotFilterExtensionList Class.
@@ -17996,7 +17996,7 @@ pub struct WorksheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<WorksheetExtensionChoice>,
 }
 /// Defines the NumberingFormats Class.
@@ -18237,7 +18237,7 @@ pub struct StylesheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<StylesheetExtensionChoice>,
 }
 /// Defines the Location Class.
@@ -18638,7 +18638,7 @@ pub struct PivotTableDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PivotTableDefinitionExtensionChoice>,
 }
 /// Defines the CacheSource Class.
@@ -18872,7 +18872,7 @@ pub struct PivotCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<PivotCacheDefinitionExtensionChoice>,
 }
 /// Sheet names of supporting book.
@@ -19004,7 +19004,7 @@ pub struct TableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<TableExtensionChoice>,
 }
 /// Defines the FileVersion Class.
@@ -19727,7 +19727,7 @@ pub struct WorkbookExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<WorkbookExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

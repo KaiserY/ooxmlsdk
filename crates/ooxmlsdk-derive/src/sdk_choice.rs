@@ -292,9 +292,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         validate_arms.push(validate_arm);
       }
-      (Fields::Unnamed(fields), SdkChoiceVariantKind::Choice | SdkChoiceVariantKind::Sequence)
-        if fields.unnamed.len() == 1 =>
-      {
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::Choice) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         let inner_ty = choice_variant_inner_type(&payload_ty);
         let constructor = if is_box_type(&payload_ty) {
@@ -304,20 +302,66 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         helper_matcher_checks.push(quote! {
           #(#cfg_attrs)*
-          if #inner_ty::matches_start_qname(name) {
+          if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(name) {
             return true;
           }
         });
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
-          if #inner_ty::matches_start_qname(event_name) {
+          if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(event_name) {
             let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
-          if #inner_ty::matches_start_qname(event_name) {
+          if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(event_name) {
+            let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            return Ok(#constructor);
+          }
+        });
+        let write_arm = quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => value.write_xml(writer, xmlns_prefix),
+        };
+        write_arms.push(write_arm);
+        let validate_arm = if is_box_type(&payload_ty) {
+          quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value.as_ref()),
+          }
+        } else {
+          quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value),
+          }
+        };
+        validate_arms.push(validate_arm);
+      }
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::Sequence) if fields.unnamed.len() == 1 => {
+        let payload_ty = choice_variant_payload_type(variant)?;
+        let inner_ty = choice_variant_inner_type(&payload_ty);
+        let constructor = if is_box_type(&payload_ty) {
+          quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
+        } else {
+          quote! { Self::#variant_ident(parsed_child) }
+        };
+        helper_matcher_checks.push(quote! {
+          #(#cfg_attrs)*
+          if #inner_ty::matches_specific_start_qname(name) {
+            return true;
+          }
+        });
+        helper_child_dispatch_tokens_borrowed.push(quote! {
+          #(#cfg_attrs)*
+          if #inner_ty::matches_specific_start_qname(event_name) {
+            let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            return Ok(#constructor);
+          }
+        });
+        helper_child_dispatch_tokens_io.push(quote! {
+          #(#cfg_attrs)*
+          if #inner_ty::matches_specific_start_qname(event_name) {
             let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
@@ -667,29 +711,48 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       }
     }
   };
-  let matches_start_qname_tokens = if has_any_variant {
+  let has_text_variant = !text_from_string_tokens.is_empty();
+  let choice_trait_matches_start_tokens = if has_any_variant {
     quote! {
-      if Self::matches_specific_start_qname(name) {
-        true
-      } else {
+      #[inline]
+      fn matches_start_qname(_name: &[u8]) -> bool {
         true
       }
     }
   } else {
-    quote! {
-      Self::matches_specific_start_qname(name)
-    }
+    quote! {}
   };
-  let from_text_value_tokens = if text_from_string_tokens.is_empty() {
-    quote! { None }
+  let choice_trait_accepts_any_tokens = if has_any_variant {
+    quote! {
+      #[inline]
+      fn accepts_any_child() -> bool {
+        true
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let choice_trait_accepts_text_tokens = if has_text_variant {
+    quote! {
+      #[inline]
+      fn accepts_text() -> bool {
+        true
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let choice_trait_from_text_tokens = if text_from_string_tokens.is_empty() {
+    quote! {}
   } else {
     quote! {
-      let mut parsed = None;
-      #( #text_from_string_tokens )*
-      parsed
+      fn from_text_value(value: &str) -> Option<Self> {
+        let mut parsed = None;
+        #( #text_from_string_tokens )*
+        parsed
+      }
     }
   };
-  let has_text_variant = !text_from_string_tokens.is_empty();
 
   let read_tokens_borrowed = if any_dispatch_tokens_borrowed.is_empty() {
     quote! {
@@ -754,7 +817,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   Ok(quote! {
     #( #helper_items )*
 
-    impl crate::sdk::SdkChoice for #ident {}
+    impl crate::sdk::SdkChoice for #ident {
+      #[inline]
+      fn matches_specific_start_qname(name: &[u8]) -> bool {
+        #matches_specific_start_qname_tokens
+      }
+
+      #choice_trait_matches_start_tokens
+      #choice_trait_accepts_any_tokens
+      #choice_trait_accepts_text_tokens
+      #choice_trait_from_text_tokens
+    }
     #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
@@ -765,30 +838,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
 
     impl #ident {
-      #[inline]
-      pub(crate) fn matches_specific_start_qname(name: &[u8]) -> bool {
-        #matches_specific_start_qname_tokens
-      }
-
-      #[inline]
-      pub(crate) fn matches_start_qname(name: &[u8]) -> bool {
-        #matches_start_qname_tokens
-      }
-
-      #[inline]
-      pub(crate) const fn accepts_any_child() -> bool {
-        #has_any_variant
-      }
-
-      #[inline]
-      pub(crate) const fn accepts_text() -> bool {
-        #has_text_variant
-      }
-
-      pub(crate) fn from_text_value(value: &str) -> Option<Self> {
-        #from_text_value_tokens
-      }
-
       pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,

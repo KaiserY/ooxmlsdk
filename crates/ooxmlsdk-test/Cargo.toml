@@ -20,10 +20,6 @@ quick-xml = { workspace = true }
 zip = { workspace = true }
 
 [[bench]]
-name = "xml"
+name = "perf"
 harness = false
-
-[[bench]]
-name = "packages"
-harness = false
-required-features = ["parts"]
+required-features = ["microsoft365", "parts"]

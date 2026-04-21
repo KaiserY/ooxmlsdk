@@ -121,6 +121,7 @@ struct SdkChoiceField {
   optional: bool,
   repeated: bool,
   accepts_text: Option<bool>,
+  accepts_any: Option<bool>,
 }
 
 #[derive(Clone)]
@@ -210,6 +211,7 @@ enum SdkNumberSignKind {
 struct ParsedSdkTypeFieldAttrs {
   kind: Option<SdkTypeFieldKind>,
   choice_accepts_text: Option<bool>,
+  choice_accepts_any: Option<bool>,
   validators: Vec<SdkFieldValidator>,
 }
 
@@ -497,6 +499,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   let mut attr_name = None;
   let mut kind = None;
   let mut choice_accepts_text = None;
+  let mut choice_accepts_any = None;
   let mut validators = Vec::new();
 
   for attr in attrs {
@@ -554,9 +557,13 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::List(meta) if meta.path.is_ident("choice") => {
           let mut accepts_text = false;
+          let mut accepts_any = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("text") {
               accepts_text = true;
+              Ok(())
+            } else if nested.path.is_ident("any") {
+              accepts_any = true;
               Ok(())
             } else {
               Err(nested.error("unsupported sdk choice attribute"))
@@ -564,10 +571,12 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::Choice);
           choice_accepts_text = Some(accepts_text);
+          choice_accepts_any = Some(accepts_any);
         }
         Meta::Path(path) if path.is_ident("choice") => {
           kind = Some(SdkTypeFieldKind::Choice);
           choice_accepts_text = Some(false);
+          choice_accepts_any = Some(false);
         }
         Meta::NameValue(meta) if meta.path.is_ident("choice_accepts_text") => {
           let value = match &meta.value {
@@ -854,6 +863,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   Ok(ParsedSdkTypeFieldAttrs {
     kind,
     choice_accepts_text,
+    choice_accepts_any,
     validators,
   })
 }

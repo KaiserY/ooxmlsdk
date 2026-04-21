@@ -468,7 +468,7 @@ fn markup_compatibility_prefix_supported(
   Ok(false)
 }
 
-fn skip_foreign_element_children_borrowed<'de>(
+pub(crate) fn skip_foreign_element_children_borrowed<'de>(
   xml_reader: &mut SliceReader<'de>,
   empty_tag: bool,
 ) -> Result<(), SdkError> {
@@ -479,7 +479,7 @@ fn skip_foreign_element_children_borrowed<'de>(
   )
 }
 
-fn skip_foreign_element_children_io<R: std::io::BufRead>(
+pub(crate) fn skip_foreign_element_children_io<R: std::io::BufRead>(
   xml_reader: &mut IoReader<R>,
   empty_tag: bool,
 ) -> Result<(), SdkError> {

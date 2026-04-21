@@ -20,7 +20,7 @@ pub struct Extension {
   #[sdk(attr(qname = "w16cur:uri"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub w16cur_uri: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Vec<ExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

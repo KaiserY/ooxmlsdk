@@ -846,7 +846,7 @@ pub struct TextBox {
   /// Represents the following attribute in the schema: o:singleclick
   #[sdk(attr(qname = "o:singleclick"))]
   pub single_click: Option<crate::simple_type::TrueFalseValue>,
-  #[sdk(choice)]
+  #[sdk(choice(any))]
   pub xml_children: Option<TextBoxChoice>,
 }
 /// Defines the TextPath Class.

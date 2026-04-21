@@ -120,6 +120,7 @@ struct SdkChoiceField {
   ty: Type,
   optional: bool,
   repeated: bool,
+  accepts_text: Option<bool>,
 }
 
 #[derive(Clone)]
@@ -208,6 +209,7 @@ enum SdkNumberSignKind {
 #[derive(Clone)]
 struct ParsedSdkTypeFieldAttrs {
   kind: Option<SdkTypeFieldKind>,
+  choice_accepts_text: Option<bool>,
   validators: Vec<SdkFieldValidator>,
 }
 
@@ -494,6 +496,7 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
   let mut kind = None;
+  let mut choice_accepts_text = None;
   let mut validators = Vec::new();
 
   for attr in attrs {
@@ -549,8 +552,42 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         Meta::Path(path) if path.is_ident("text") => {
           kind = Some(SdkTypeFieldKind::Text);
         }
+        Meta::List(meta) if meta.path.is_ident("choice") => {
+          let mut accepts_text = false;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("text") {
+              accepts_text = true;
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk choice attribute"))
+            }
+          })?;
+          kind = Some(SdkTypeFieldKind::Choice);
+          choice_accepts_text = Some(accepts_text);
+        }
         Meta::Path(path) if path.is_ident("choice") => {
           kind = Some(SdkTypeFieldKind::Choice);
+          choice_accepts_text = Some(false);
+        }
+        Meta::NameValue(meta) if meta.path.is_ident("choice_accepts_text") => {
+          let value = match &meta.value {
+            syn::Expr::Lit(expr_lit) => match &expr_lit.lit {
+              syn::Lit::Bool(value) => value.value,
+              _ => {
+                return Err(syn::Error::new_spanned(
+                  &expr_lit.lit,
+                  "sdk choice_accepts_text expects a bool literal",
+                ));
+              }
+            },
+            _ => {
+              return Err(syn::Error::new_spanned(
+                &meta.value,
+                "sdk choice_accepts_text expects a bool literal",
+              ));
+            }
+          };
+          choice_accepts_text = Some(value);
         }
         Meta::Path(path) if path.is_ident("any") => {
           kind = Some(SdkTypeFieldKind::Any);
@@ -814,7 +851,11 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
     });
   }
 
-  Ok(ParsedSdkTypeFieldAttrs { kind, validators })
+  Ok(ParsedSdkTypeFieldAttrs {
+    kind,
+    choice_accepts_text,
+    validators,
+  })
 }
 
 fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {

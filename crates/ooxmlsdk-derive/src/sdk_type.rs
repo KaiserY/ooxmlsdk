@@ -698,21 +698,18 @@ fn expand_sequence_helper_struct(
             break;
           }
 
-          match xml_reader.next()? {
-            quick_xml::events::Event::Start(e) => {
-              pending_event = Some((e.into_owned(), false));
+          match xml_reader.next_tag_event()? {
+            crate::common::SliceTagEvent::Start(e, next_empty) => {
+              pending_event = Some((e, next_empty));
             }
-            quick_xml::events::Event::Empty(e) => {
-              pending_event = Some((e.into_owned(), true));
-            }
-            quick_xml::events::Event::End(e) => {
-              xml_reader.unread(quick_xml::events::Event::End(e.into_owned()))?;
+            crate::common::SliceTagEvent::End(e) => {
+              xml_reader.unread(quick_xml::events::Event::End(e))?;
               break;
             }
-            quick_xml::events::Event::Eof => {
+            crate::common::SliceTagEvent::Eof => {
               return Err(crate::common::unexpected_eof(stringify!(#ident)));
             }
-            _ => {}
+            crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
           }
         }
 
@@ -814,6 +811,7 @@ fn expand_helper_struct(
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
+        accepts_text: parsed_attrs.choice_accepts_text,
       }),
       Some(SdkTypeFieldKind::Text) => {
         return Err(syn::Error::new_spanned(
@@ -2000,6 +1998,7 @@ fn expand_named_struct(
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
+        accepts_text: parsed_attrs.choice_accepts_text,
       }),
       SdkTypeFieldKind::Any => any_fields.push(SdkAnyField {
         ident: field_ident.clone(),
@@ -2925,6 +2924,7 @@ fn expand_named_struct(
   }
 
   let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
+  let has_text_child_dispatch = !text_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let has_any_dispatch = !any_fields.is_empty();
   let visit_foreign_child_tokens_borrowed =
@@ -2935,6 +2935,83 @@ fn expand_named_struct(
           _e: quick_xml::events::BytesStart<'de>,
           _next_empty: bool,
         | -> Result<bool, crate::common::SdkError> {
+          Ok(false)
+        };
+      }
+    } else if !has_child_dispatch && !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::SliceReader<'de>,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_borrowed )*
+            #( #choice_any_unique_visit_parse_tokens_borrowed )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          Ok(false)
+        };
+      }
+    } else if !has_child_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::SliceReader<'de>,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_borrowed )*
+            #( #choice_any_unique_visit_parse_tokens_borrowed )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          let mut matched = false;
+          #( #choice_visit_parse_tokens )*
+          #( #any_visit_parse_tokens_borrowed )*
+          Ok(matched)
+        };
+      }
+    } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::SliceReader<'de>,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_borrowed )*
+            _ => {}
+          }
           Ok(false)
         };
       }
@@ -2954,6 +3031,78 @@ fn expand_named_struct(
           match direct_child_case {
             #( #direct_child_visit_dispatch_tokens_borrowed )*
             _ => {}
+          }
+          match event_name {
+            #( #child_visit_parse_tokens )*
+            _ => Ok(false),
+          }
+        };
+      }
+    } else if !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::SliceReader<'de>,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_borrowed )*
+            _ => {}
+          }
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_borrowed )*
+            #( #choice_any_unique_visit_parse_tokens_borrowed )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          Ok(false)
+        };
+      }
+    } else if !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::SliceReader<'de>,
+          e: quick_xml::events::BytesStart<'de>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_borrowed )*
+            _ => {}
+          }
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_borrowed )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
           }
           match event_name {
             #( #child_visit_parse_tokens )*
@@ -3017,6 +3166,83 @@ fn expand_named_struct(
           Ok(false)
         };
       }
+    } else if !has_child_dispatch && !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_io )*
+            #( #choice_any_unique_visit_parse_tokens_io )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          Ok(false)
+        };
+      }
+    } else if !has_child_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_io )*
+            #( #choice_any_unique_visit_parse_tokens_io )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          let mut matched = false;
+          #( #choice_visit_parse_tokens )*
+          #( #any_visit_parse_tokens_io )*
+          Ok(matched)
+        };
+      }
+    } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_io )*
+            _ => {}
+          }
+          Ok(false)
+        };
+      }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let mut visit_foreign_child = |
@@ -3033,6 +3259,78 @@ fn expand_named_struct(
           match direct_child_case {
             #( #direct_child_visit_dispatch_tokens_io )*
             _ => {}
+          }
+          match event_name {
+            #( #child_visit_parse_tokens )*
+            _ => Ok(false),
+          }
+        };
+      }
+    } else if !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_io )*
+            _ => {}
+          }
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_io )*
+            #( #choice_any_unique_visit_parse_tokens_io )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
+          }
+          Ok(false)
+        };
+      }
+    } else if !has_any_dispatch {
+      quote! {
+        let mut visit_foreign_child = |
+          xml_reader: &mut crate::common::IoReader<R>,
+          e: quick_xml::events::BytesStart<'static>,
+          next_empty: bool,
+        | -> Result<bool, crate::common::SdkError> {
+          let event_name = e.name();
+          let event_name = event_name.as_ref();
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+            _ => 0usize,
+          };
+          match direct_child_case {
+            #( #direct_child_visit_dispatch_tokens_io )*
+            _ => {}
+          }
+          #( #choice_match_init_tokens )*
+          {
+            let mut specific_choice_match_count = 0usize;
+            let mut any_choice_match_count = 0usize;
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_visit_parse_tokens_io )*
+            if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "known child",
+                event_name,
+              ));
+            }
           }
           match event_name {
             #( #child_visit_parse_tokens )*
@@ -3085,120 +3383,348 @@ fn expand_named_struct(
         };
       }
     };
-  let child_choice_dispatch_tokens_borrowed = if !has_choice_dispatch && !has_any_dispatch {
-    quote! {
-      let direct_child_case = match event_name {
-        #( #direct_child_case_arms )*
-        _ => 0usize,
-      };
-      match direct_child_case {
-        #( #direct_child_dispatch_tokens_borrowed )*
-        _ => {}
-      }
-      let matched = match event_name {
-        #( #child_parse_tokens )*
-        _ => false,
-      };
-      if matched {
-        continue;
-      }
-    }
-  } else {
-    quote! {
-      let direct_child_case = match event_name {
-        #( #direct_child_case_arms )*
-        _ => 0usize,
-      };
-      match direct_child_case {
-        #( #direct_child_dispatch_tokens_borrowed )*
-        _ => {}
-      }
-      #( #choice_match_init_tokens )*
-      {
-        let mut specific_choice_match_count = 0usize;
-        let mut any_choice_match_count = 0usize;
-        #( #choice_match_decl_tokens )*
-        #( #choice_unique_parse_tokens_borrowed )*
-        #( #choice_any_unique_parse_tokens_borrowed )*
-        if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
-          return Err(crate::common::unexpected_tag(
-            stringify!(#ident),
-            "known child",
-            event_name,
-          ));
+  let child_choice_dispatch_tokens_borrowed =
+    if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
+      quote! {}
+    } else if !has_child_dispatch && !has_any_dispatch {
+      quote! {
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_borrowed )*
+          #( #choice_any_unique_parse_tokens_borrowed )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
         }
       }
-      let matched = match event_name {
-        #( #child_parse_tokens )*
-        _ => {
-          let mut matched = false;
-          #( #choice_parse_tokens )*
-          #( #any_parse_tokens_borrowed )*
-          matched
+    } else if !has_child_dispatch {
+      quote! {
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_borrowed )*
+          #( #choice_any_unique_parse_tokens_borrowed )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
         }
-      };
-      if matched {
-        continue;
-      }
-    }
-  };
-  let child_choice_dispatch_tokens_io = if !has_choice_dispatch && !has_any_dispatch {
-    quote! {
-      let direct_child_case = match event_name {
-        #( #direct_child_case_arms )*
-        _ => 0usize,
-      };
-      match direct_child_case {
-        #( #direct_child_dispatch_tokens_io )*
-        _ => {}
-      }
-      let matched = match event_name {
-        #( #child_parse_tokens )*
-        _ => false,
-      };
-      if matched {
-        continue;
-      }
-    }
-  } else {
-    quote! {
-      let direct_child_case = match event_name {
-        #( #direct_child_case_arms )*
-        _ => 0usize,
-      };
-      match direct_child_case {
-        #( #direct_child_dispatch_tokens_io )*
-        _ => {}
-      }
-      #( #choice_match_init_tokens )*
-      {
-        let mut specific_choice_match_count = 0usize;
-        let mut any_choice_match_count = 0usize;
-        #( #choice_match_decl_tokens )*
-        #( #choice_unique_parse_tokens_io )*
-        #( #choice_any_unique_parse_tokens_io )*
-        if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
-          return Err(crate::common::unexpected_tag(
-            stringify!(#ident),
-            "known child",
-            event_name,
-          ));
+        let mut matched = false;
+        #( #choice_parse_tokens )*
+        #( #any_parse_tokens_borrowed )*
+        if matched {
+          continue;
         }
       }
-      let matched = match event_name {
-        #( #child_parse_tokens )*
-        _ => {
-          let mut matched = false;
-          #( #choice_parse_tokens )*
-          #( #any_parse_tokens_io )*
-          matched
+    } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_borrowed )*
+          _ => {}
         }
-      };
-      if matched {
-        continue;
       }
-    }
-  };
+    } else if !has_choice_dispatch && !has_any_dispatch {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_borrowed )*
+          _ => {}
+        }
+        let matched = match event_name {
+          #( #child_parse_tokens )*
+          _ => false,
+        };
+        if matched {
+          continue;
+        }
+      }
+    } else if !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_borrowed )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_borrowed )*
+          #( #choice_any_unique_parse_tokens_borrowed )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+      }
+    } else if !has_any_dispatch {
+      quote! {
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_borrowed )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_borrowed )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+        let matched = match event_name {
+          #( #child_parse_tokens )*
+          _ => false,
+        };
+        if matched {
+          continue;
+        }
+      }
+    } else {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_borrowed )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_borrowed )*
+          #( #choice_any_unique_parse_tokens_borrowed )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+        let matched = match event_name {
+          #( #child_parse_tokens )*
+          _ => {
+            let mut matched = false;
+            #( #choice_parse_tokens )*
+            #( #any_parse_tokens_borrowed )*
+            matched
+          }
+        };
+        if matched {
+          continue;
+        }
+      }
+    };
+  let child_choice_dispatch_tokens_io =
+    if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
+      quote! {}
+    } else if !has_child_dispatch && !has_any_dispatch {
+      quote! {
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_io )*
+          #( #choice_any_unique_parse_tokens_io )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+      }
+    } else if !has_child_dispatch {
+      quote! {
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_io )*
+          #( #choice_any_unique_parse_tokens_io )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+        let mut matched = false;
+        #( #choice_parse_tokens )*
+        #( #any_parse_tokens_io )*
+        if matched {
+          continue;
+        }
+      }
+    } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_io )*
+          _ => {}
+        }
+      }
+    } else if !has_choice_dispatch && !has_any_dispatch {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_io )*
+          _ => {}
+        }
+        let matched = match event_name {
+          #( #child_parse_tokens )*
+          _ => false,
+        };
+        if matched {
+          continue;
+        }
+      }
+    } else if !has_any_dispatch && !has_text_child_dispatch {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_io )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_io )*
+          #( #choice_any_unique_parse_tokens_io )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+      }
+    } else if !has_any_dispatch {
+      quote! {
+          let direct_child_case = match event_name {
+            #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_io )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_io )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+        let matched = match event_name {
+          #( #child_parse_tokens )*
+          _ => false,
+        };
+        if matched {
+          continue;
+        }
+      }
+    } else {
+      quote! {
+        let direct_child_case = match event_name {
+          #( #direct_child_case_arms )*
+          _ => 0usize,
+        };
+        match direct_child_case {
+          #( #direct_child_dispatch_tokens_io )*
+          _ => {}
+        }
+        #( #choice_match_init_tokens )*
+        {
+          let mut specific_choice_match_count = 0usize;
+          let mut any_choice_match_count = 0usize;
+          #( #choice_match_decl_tokens )*
+          #( #choice_unique_parse_tokens_io )*
+          #( #choice_any_unique_parse_tokens_io )*
+          if specific_choice_match_count > 1usize || any_choice_match_count > 1usize {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        }
+        let matched = match event_name {
+          #( #child_parse_tokens )*
+          _ => {
+            let mut matched = false;
+            #( #choice_parse_tokens )*
+            #( #any_parse_tokens_io )*
+            matched
+          }
+        };
+        if matched {
+          continue;
+        }
+      }
+    };
 
   let text_decl_tokens = if let Some(text_field) = &text_field {
     let field_ident = &text_field.ident;
@@ -3426,6 +3952,426 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let choice_accepts_text_tokens = if choice_fields.is_empty() {
+    quote! { false }
+  } else {
+    let all_known = choice_fields
+      .iter()
+      .all(|field| field.accepts_text.is_some());
+    if all_known {
+      let any_accepts_text = choice_fields
+        .iter()
+        .any(|field| field.accepts_text.expect("checked above"));
+      quote! { #any_accepts_text }
+    } else {
+      let choice_accepts_text_checks: Vec<_> = choice_fields
+        .iter()
+        .map(|field| {
+          if let Some(accepts_text) = field.accepts_text {
+            quote! { #accepts_text }
+          } else {
+            let choice_ty = unwrap_wrapped_type(&field.ty);
+            quote! { <#choice_ty>::accepts_text() }
+          }
+        })
+        .collect();
+      quote! {
+        false #( || #choice_accepts_text_checks )*
+      }
+    }
+  };
+  let choice_accepts_text_known = if choice_fields.is_empty() {
+    Some(false)
+  } else if choice_fields
+    .iter()
+    .all(|field| field.accepts_text.is_some())
+  {
+    Some(
+      choice_fields
+        .iter()
+        .any(|field| field.accepts_text.expect("checked above")),
+    )
+  } else {
+    None
+  };
+  let borrowed_decl_event_tokens = if has_xml_header_field {
+    quote! {
+      quick_xml::events::Event::Decl(e) => {
+        xml_header_state = if matches!(
+          e.standalone(),
+          Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+        ) {
+          crate::common::XmlHeaderType::Standalone
+        } else {
+          crate::common::XmlHeaderType::Plain
+        };
+      },
+    }
+  } else {
+    quote! {
+      quick_xml::events::Event::Decl(_) => {},
+    }
+  };
+  let tag_decl_tokens_borrowed = if has_xml_header_field {
+    quote! {
+      crate::common::SliceTagEvent::Decl(standalone) => {
+        xml_header_state = if standalone {
+          crate::common::XmlHeaderType::Standalone
+        } else {
+          crate::common::XmlHeaderType::Plain
+        };
+      },
+    }
+  } else {
+    quote! {
+      crate::common::SliceTagEvent::Decl(_) => {},
+    }
+  };
+  let tag_decl_tokens_io = if has_xml_header_field {
+    quote! {
+      crate::common::IoTagEvent::Decl(standalone) => {
+        xml_header_state = if standalone {
+          crate::common::XmlHeaderType::Standalone
+        } else {
+          crate::common::XmlHeaderType::Plain
+        };
+      },
+    }
+  } else {
+    quote! {
+      crate::common::IoTagEvent::Decl(_) => {},
+    }
+  };
+  let root_tag_decl_tokens_io = if has_xml_header_field {
+    quote! {
+      crate::common::IoTagEvent::Decl(standalone) => {
+        xml_header_state = if standalone {
+          crate::common::XmlHeaderType::Standalone
+        } else {
+          crate::common::XmlHeaderType::Plain
+        };
+        None
+      },
+    }
+  } else {
+    quote! {
+      crate::common::IoTagEvent::Decl(_) => None,
+    }
+  };
+  let borrowed_children_text_loop_tokens = quote! {
+    if !empty_tag {
+      loop {
+        match xml_reader.next()? {
+          #borrowed_decl_event_tokens
+          quick_xml::events::Event::Start(e) => {
+            let next_empty = false;
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #child_choice_dispatch_tokens_borrowed
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_borrowed
+                crate::common::process_markup_compatibility_children_borrowed(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(
+                  event_name,
+                  #tag_prefix,
+                ) {
+                  #visit_foreign_child_tokens_borrowed
+                  crate::common::process_foreign_element_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                } else {
+                  Err(crate::common::unexpected_tag(
+                    stringify!(#ident),
+                    "known child",
+                    event_name,
+                  ))?;
+                }
+              }
+            }
+          }
+          quick_xml::events::Event::Empty(e) => {
+            let next_empty = true;
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #child_choice_dispatch_tokens_borrowed
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_borrowed
+                crate::common::process_markup_compatibility_children_borrowed(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(
+                  event_name,
+                  #tag_prefix,
+                ) {
+                  #visit_foreign_child_tokens_borrowed
+                  crate::common::process_foreign_element_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                } else {
+                  Err(crate::common::unexpected_tag(
+                    stringify!(#ident),
+                    "known child",
+                    event_name,
+                  ))?;
+                }
+              }
+            }
+          }
+          #text_read_tokens
+          quick_xml::events::Event::End(e) => {
+            if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          quick_xml::events::Event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#ident)));
+          }
+          _ => {}
+        }
+      }
+    }
+  };
+  let borrowed_children_tag_loop_tokens = quote! {
+    if !empty_tag {
+      loop {
+        match xml_reader.next_tag_event()? {
+          #tag_decl_tokens_borrowed
+          crate::common::SliceTagEvent::Start(e, next_empty) => {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #child_choice_dispatch_tokens_borrowed
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_borrowed
+                crate::common::process_markup_compatibility_children_borrowed(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(
+                  event_name,
+                  #tag_prefix,
+                ) {
+                  #visit_foreign_child_tokens_borrowed
+                  crate::common::process_foreign_element_children_borrowed(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                } else {
+                  Err(crate::common::unexpected_tag(
+                    stringify!(#ident),
+                    "known child",
+                    event_name,
+                  ))?;
+                }
+              }
+            }
+          }
+          crate::common::SliceTagEvent::End(e) => {
+            if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          crate::common::SliceTagEvent::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#ident)));
+          }
+          crate::common::SliceTagEvent::Other => {}
+        }
+      }
+    }
+  };
+  let borrowed_children_loop_tokens = if text_field.is_some() {
+    borrowed_children_text_loop_tokens.clone()
+  } else if choice_accepts_text_known == Some(false) {
+    borrowed_children_tag_loop_tokens.clone()
+  } else if choice_accepts_text_known == Some(true) {
+    borrowed_children_text_loop_tokens.clone()
+  } else {
+    quote! {
+      if #choice_accepts_text_tokens {
+        #borrowed_children_text_loop_tokens
+      } else {
+        #borrowed_children_tag_loop_tokens
+      }
+    }
+  };
+  let io_children_text_loop_tokens = quote! {
+    if !empty_tag {
+      loop {
+        match xml_reader.next()? {
+          #borrowed_decl_event_tokens
+          quick_xml::events::Event::Start(e) => {
+            let e = e.into_owned();
+            let next_empty = false;
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #child_choice_dispatch_tokens_io
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_io
+                crate::common::process_markup_compatibility_children_io(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(
+                  event_name,
+                  #tag_prefix,
+                ) {
+                  #visit_foreign_child_tokens_io
+                  crate::common::process_foreign_element_children_io(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                } else {
+                  Err(crate::common::unexpected_tag(
+                    stringify!(#ident),
+                    "known child",
+                    event_name,
+                  ))?;
+                }
+              }
+            }
+          }
+          quick_xml::events::Event::Empty(e) => {
+            let e = e.into_owned();
+            let next_empty = true;
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #child_choice_dispatch_tokens_io
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_io
+                crate::common::process_markup_compatibility_children_io(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(
+                  event_name,
+                  #tag_prefix,
+                ) {
+                  #visit_foreign_child_tokens_io
+                  crate::common::process_foreign_element_children_io(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                } else {
+                  Err(crate::common::unexpected_tag(
+                    stringify!(#ident),
+                    "known child",
+                    event_name,
+                  ))?;
+                }
+              }
+            }
+          }
+          #text_read_tokens
+          quick_xml::events::Event::End(e) => {
+            if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          quick_xml::events::Event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#ident)));
+          }
+          _ => {}
+        }
+      }
+    }
+  };
+  let io_children_tag_loop_tokens = quote! {
+    if !empty_tag {
+      loop {
+        match xml_reader.next_tag_event()? {
+          #tag_decl_tokens_io
+          crate::common::IoTagEvent::Start(e, next_empty) => {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            #child_choice_dispatch_tokens_io
+            match event_name {
+              b"mc:AlternateContent" | b"AlternateContent" => {
+                #visit_foreign_child_tokens_io
+                crate::common::process_markup_compatibility_children_io(
+                  xml_reader,
+                  next_empty,
+                  &mut visit_foreign_child,
+                )?;
+              }
+              _ => {
+                if crate::common::is_foreign_prefixed_child(
+                  event_name,
+                  #tag_prefix,
+                ) {
+                  #visit_foreign_child_tokens_io
+                  crate::common::process_foreign_element_children_io(
+                    xml_reader,
+                    next_empty,
+                    &mut visit_foreign_child,
+                  )?;
+                } else {
+                  Err(crate::common::unexpected_tag(
+                    stringify!(#ident),
+                    "known child",
+                    event_name,
+                  ))?;
+                }
+              }
+            }
+          }
+          crate::common::IoTagEvent::End(e) => {
+            if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          crate::common::IoTagEvent::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#ident)));
+          }
+          crate::common::IoTagEvent::Other => {}
+        }
+      }
+    }
+  };
+  let io_children_loop_tokens = if text_field.is_some() {
+    io_children_text_loop_tokens.clone()
+  } else if choice_accepts_text_known == Some(false) {
+    io_children_tag_loop_tokens.clone()
+  } else if choice_accepts_text_known == Some(true) {
+    io_children_text_loop_tokens.clone()
+  } else {
+    quote! {
+      if #choice_accepts_text_tokens {
+        #io_children_text_loop_tokens
+      } else {
+        #io_children_tag_loop_tokens
+      }
+    }
+  };
 
   let special_namespace_write_tokens = if has_xmlns_fields {
     quote! {
@@ -3553,25 +4499,15 @@ fn expand_named_struct(
           (e, empty_tag)
         } else {
           loop {
-            match xml_reader.next()? {
-              quick_xml::events::Event::Decl(e) => {
-                if #has_xml_header_field {
-                  xml_header_state = if matches!(
-                    e.standalone(),
-                    Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-                  ) {
-                    crate::common::XmlHeaderType::Standalone
-                  } else {
-                    crate::common::XmlHeaderType::Plain
-                  };
-                }
-              }
-              quick_xml::events::Event::Start(e) => break (e.into_owned(), false),
-              quick_xml::events::Event::Empty(e) => break (e.into_owned(), true),
-              quick_xml::events::Event::Eof => {
+            match xml_reader.next_tag_event()? {
+              #tag_decl_tokens_borrowed
+              crate::common::SliceTagEvent::Start(e, empty_tag) => break (e, empty_tag),
+              crate::common::SliceTagEvent::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
               }
-              _ => continue,
+              crate::common::SliceTagEvent::End(_) | crate::common::SliceTagEvent::Other => {
+                continue;
+              }
             }
           }
         };
@@ -3593,106 +4529,7 @@ fn expand_named_struct(
         #( #any_decl_tokens )*
         #text_decl_tokens
 
-        if !empty_tag {
-          loop {
-            match xml_reader.next()? {
-              quick_xml::events::Event::Decl(e) => {
-                if #has_xml_header_field {
-                  xml_header_state = if matches!(
-                    e.standalone(),
-                    Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-                  ) {
-                    crate::common::XmlHeaderType::Standalone
-                  } else {
-                    crate::common::XmlHeaderType::Plain
-                  };
-                }
-              }
-              quick_xml::events::Event::Start(e) => {
-                let e = e.into_owned();
-                let next_empty = false;
-                let event_name = e.name();
-                let event_name = event_name.as_ref();
-                #child_choice_dispatch_tokens_borrowed
-                match event_name {
-                  b"mc:AlternateContent" | b"AlternateContent" => {
-                    #visit_foreign_child_tokens_borrowed
-                    crate::common::process_markup_compatibility_children_borrowed(
-                      xml_reader,
-                      next_empty,
-                      &mut visit_foreign_child,
-                    )?;
-                  }
-                  _ => {
-                    if crate::common::is_foreign_prefixed_child(
-                      event_name,
-                      #tag_prefix,
-                    ) {
-                      #visit_foreign_child_tokens_borrowed
-                      crate::common::process_foreign_element_children_borrowed(
-                        xml_reader,
-                        next_empty,
-                        &mut visit_foreign_child,
-                      )?;
-                    } else {
-                      Err(crate::common::unexpected_tag(
-                        stringify!(#ident),
-                        "known child",
-                        event_name,
-                      ))?;
-                    }
-                  }
-                }
-              }
-              quick_xml::events::Event::Empty(e) => {
-                let e = e.into_owned();
-                let next_empty = true;
-                let event_name = e.name();
-                let event_name = event_name.as_ref();
-                #child_choice_dispatch_tokens_borrowed
-                match event_name {
-                  b"mc:AlternateContent" | b"AlternateContent" => {
-                    #visit_foreign_child_tokens_borrowed
-                    crate::common::process_markup_compatibility_children_borrowed(
-                      xml_reader,
-                      next_empty,
-                      &mut visit_foreign_child,
-                    )?;
-                  }
-                  _ => {
-                    if crate::common::is_foreign_prefixed_child(
-                      event_name,
-                      #tag_prefix,
-                    ) {
-                      #visit_foreign_child_tokens_borrowed
-                      crate::common::process_foreign_element_children_borrowed(
-                        xml_reader,
-                        next_empty,
-                        &mut visit_foreign_child,
-                      )?;
-                    } else {
-                      Err(crate::common::unexpected_tag(
-                        stringify!(#ident),
-                        "known child",
-                        event_name,
-                      ))?;
-                    }
-                  }
-                }
-              }
-              #text_read_tokens
-              quick_xml::events::Event::End(e) => {
-                if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
-                  break;
-                }
-              }
-              quick_xml::events::Event::Eof => {
-                return Err(crate::common::unexpected_eof(stringify!(#ident)));
-              }
-              _ => {}
-            }
-          }
-        }
+        #borrowed_children_loop_tokens
 
         Ok(Self {
           #( #attr_init_tokens, )*
@@ -3717,16 +4554,7 @@ fn expand_named_struct(
         } else {
           loop {
             let next_event = match xml_reader.next_tag_event()? {
-              crate::common::IoTagEvent::Decl(standalone) => {
-                if #has_xml_header_field {
-                  xml_header_state = if standalone {
-                    crate::common::XmlHeaderType::Standalone
-                  } else {
-                    crate::common::XmlHeaderType::Plain
-                  };
-                }
-                None
-              }
+              #root_tag_decl_tokens_io
               crate::common::IoTagEvent::Start(e, empty_tag) => Some((e, empty_tag)),
               crate::common::IoTagEvent::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
@@ -3756,106 +4584,7 @@ fn expand_named_struct(
         #( #any_decl_tokens )*
         #text_decl_tokens
 
-        if !empty_tag {
-          loop {
-            match xml_reader.next()? {
-              quick_xml::events::Event::Decl(e) => {
-                if #has_xml_header_field {
-                  xml_header_state = if matches!(
-                    e.standalone(),
-                    Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-                  ) {
-                    crate::common::XmlHeaderType::Standalone
-                  } else {
-                    crate::common::XmlHeaderType::Plain
-                  };
-                }
-              }
-              quick_xml::events::Event::Start(e) => {
-                let e = e.into_owned();
-                let next_empty = false;
-                let event_name = e.name();
-                let event_name = event_name.as_ref();
-                #child_choice_dispatch_tokens_io
-                match event_name {
-                  b"mc:AlternateContent" | b"AlternateContent" => {
-                    #visit_foreign_child_tokens_io
-                    crate::common::process_markup_compatibility_children_io(
-                      xml_reader,
-                      next_empty,
-                      &mut visit_foreign_child,
-                    )?;
-                  }
-                  _ => {
-                    if crate::common::is_foreign_prefixed_child(
-                      event_name,
-                      #tag_prefix,
-                    ) {
-                      #visit_foreign_child_tokens_io
-                      crate::common::process_foreign_element_children_io(
-                        xml_reader,
-                        next_empty,
-                        &mut visit_foreign_child,
-                      )?;
-                    } else {
-                      Err(crate::common::unexpected_tag(
-                        stringify!(#ident),
-                        "known child",
-                        event_name,
-                      ))?;
-                    }
-                  }
-                }
-              }
-              quick_xml::events::Event::Empty(e) => {
-                let e = e.into_owned();
-                let next_empty = true;
-                let event_name = e.name();
-                let event_name = event_name.as_ref();
-                #child_choice_dispatch_tokens_io
-                match event_name {
-                  b"mc:AlternateContent" | b"AlternateContent" => {
-                    #visit_foreign_child_tokens_io
-                    crate::common::process_markup_compatibility_children_io(
-                      xml_reader,
-                      next_empty,
-                      &mut visit_foreign_child,
-                    )?;
-                  }
-                  _ => {
-                    if crate::common::is_foreign_prefixed_child(
-                      event_name,
-                      #tag_prefix,
-                    ) {
-                      #visit_foreign_child_tokens_io
-                      crate::common::process_foreign_element_children_io(
-                        xml_reader,
-                        next_empty,
-                        &mut visit_foreign_child,
-                      )?;
-                    } else {
-                      Err(crate::common::unexpected_tag(
-                        stringify!(#ident),
-                        "known child",
-                        event_name,
-                      ))?;
-                    }
-                  }
-                }
-              }
-              #text_read_tokens
-              quick_xml::events::Event::End(e) => {
-                if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
-                  break;
-                }
-              }
-              quick_xml::events::Event::Eof => {
-                return Err(crate::common::unexpected_eof(stringify!(#ident)));
-              }
-              _ => {}
-            }
-          }
-        }
+        #io_children_loop_tokens
 
         Ok(Self {
           #( #attr_init_tokens, )*

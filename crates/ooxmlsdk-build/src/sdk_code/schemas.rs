@@ -9,6 +9,7 @@ use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, FieldDecl, FieldWireDecl, MemberDecl,
   SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind, VariantDecl,
+  VariantWireDecl,
 };
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::helpers::{
@@ -1124,6 +1125,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           } else {
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
+              ir,
               field_version_cfg,
             )?);
           }
@@ -1226,6 +1228,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           if !choice_fields.is_empty() {
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
+              ir,
               field_version_cfg,
             )?);
           } else if !direct_child_fields.is_empty() {
@@ -1243,6 +1246,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           if !choice_fields.is_empty() {
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
+              ir,
               field_version_cfg,
             )?);
           }
@@ -1373,6 +1377,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           } else {
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
+              ir,
               field_version_cfg,
             )?);
           }
@@ -1462,6 +1467,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           if !choice_fields.is_empty() {
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
+              ir,
               field_version_cfg,
             )?);
           } else if !direct_child_fields.is_empty() || !base_direct_child_fields.is_empty() {
@@ -1527,6 +1533,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           if !choice_fields.is_empty() {
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
+              ir,
               field_version_cfg,
             )?);
           }
@@ -3076,6 +3083,25 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   fields
 }
 
+fn choice_type_accepts_text(module: &SchemaModuleDecl, rust_type: &str) -> bool {
+  module
+    .types
+    .iter()
+    .find(|type_decl| type_decl.rust_name == rust_type && type_decl.kind == TypeKind::ChoiceEnum)
+    .map(|type_decl| {
+      type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Text,
+            ..
+          })
+        )
+      })
+    })
+    .unwrap_or(false)
+}
+
 fn gen_direct_child_fields_from_decl(
   fields: &[&FieldDecl],
   owner_rust_name: &str,
@@ -3233,6 +3259,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
       FieldWireDecl::Choice => {
         tokens.extend(gen_choice_fields_from_decl(
           std::slice::from_ref(field),
+          module,
           field_cfg,
         )?);
       }
@@ -3281,6 +3308,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
 
 fn gen_choice_fields_from_decl(
   fields: &[&FieldDecl],
+  module: &SchemaModuleDecl,
   field_cfg: VersionCfgContext,
 ) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
@@ -3289,21 +3317,27 @@ fn gen_choice_fields_from_decl(
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
     let field_type = type_from_decl_ref(&field.type_ref)?;
     let attrs = module_version_cfg_attrs(&field.version, field_cfg);
+    let choice_accepts_text = choice_type_accepts_text(module, &field.type_ref.rust_type);
+    let sdk_choice_attr = if choice_accepts_text {
+      quote! { #[sdk(choice(text))] }
+    } else {
+      quote! { #[sdk(choice)] }
+    };
 
     match field.cardinality {
       Cardinality::Many => tokens.push(quote! {
         #( #attrs )*
-        #[sdk(choice)]
+        #sdk_choice_attr
         pub #field_name_ident: Vec<#field_type>,
       }),
       Cardinality::Optional => tokens.push(quote! {
         #( #attrs )*
-        #[sdk(choice)]
+        #sdk_choice_attr
         pub #field_name_ident: Option<#field_type>,
       }),
       Cardinality::One => tokens.push(quote! {
         #( #attrs )*
-        #[sdk(choice)]
+        #sdk_choice_attr
         pub #field_name_ident: #field_type,
       }),
     }

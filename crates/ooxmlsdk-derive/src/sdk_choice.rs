@@ -689,6 +689,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       parsed
     }
   };
+  let has_text_variant = !text_from_string_tokens.is_empty();
 
   let read_tokens_borrowed = if any_dispatch_tokens_borrowed.is_empty() {
     quote! {
@@ -779,6 +780,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         #has_any_variant
       }
 
+      #[inline]
+      pub(crate) const fn accepts_text() -> bool {
+        #has_text_variant
+      }
+
       pub(crate) fn from_text_value(value: &str) -> Option<Self> {
         #from_text_value_tokens
       }
@@ -791,13 +797,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           (e, empty_tag)
         } else {
           loop {
-            match xml_reader.next()? {
-              quick_xml::events::Event::Start(e) => break (e, false),
-              quick_xml::events::Event::Empty(e) => break (e, true),
-              quick_xml::events::Event::Eof => {
+            match xml_reader.next_tag_event()? {
+              crate::common::SliceTagEvent::Start(e, empty_tag) => break (e, empty_tag),
+              crate::common::SliceTagEvent::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
               }
-              _ => continue,
+              crate::common::SliceTagEvent::Decl(_)
+              | crate::common::SliceTagEvent::End(_)
+              | crate::common::SliceTagEvent::Other => continue,
             }
           }
         };

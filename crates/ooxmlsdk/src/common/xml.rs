@@ -22,6 +22,14 @@ pub(crate) enum IoTagEvent {
   Other,
 }
 
+pub enum SliceTagEvent<'de> {
+  Start(quick_xml::events::BytesStart<'de>, bool),
+  End(quick_xml::events::BytesEnd<'de>),
+  Decl(bool),
+  Eof,
+  Other,
+}
+
 impl<R: BufRead> IoReader<R> {
   pub fn new(reader: Reader<R>) -> Self {
     Self {
@@ -85,7 +93,7 @@ impl<R: BufRead> IoReader<R> {
       ));
     }
 
-    self.pending = Some(event.into_owned());
+    self.pending = Some(event);
     Ok(())
   }
 
@@ -112,7 +120,7 @@ impl<R: BufRead> IoReader<R> {
 
 pub struct SliceReader<'de> {
   reader: Reader<&'de [u8]>,
-  pending: Option<Event<'static>>,
+  pending: Option<Event<'de>>,
 }
 
 impl<'de> SliceReader<'de> {
@@ -133,6 +141,15 @@ impl<'de> SliceReader<'de> {
   }
 
   #[inline]
+  pub fn next_tag_event(&mut self) -> Result<SliceTagEvent<'de>, SdkError> {
+    if let Some(event) = self.pending.take() {
+      return Ok(Self::tag_event_from_event(event));
+    }
+
+    Ok(Self::tag_event_from_event(self.reader.read_event()?))
+  }
+
+  #[inline]
   pub fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
     if self.pending.is_some() {
       return Err(SdkError::CommonError(
@@ -140,13 +157,28 @@ impl<'de> SliceReader<'de> {
       ));
     }
 
-    self.pending = Some(event.into_owned());
+    self.pending = Some(event);
     Ok(())
   }
 
   #[inline]
   pub fn decoder(&self) -> Decoder {
     self.reader.decoder()
+  }
+
+  #[inline]
+  fn tag_event_from_event(event: Event<'de>) -> SliceTagEvent<'de> {
+    match event {
+      Event::Start(e) => SliceTagEvent::Start(e, false),
+      Event::Empty(e) => SliceTagEvent::Start(e, true),
+      Event::End(e) => SliceTagEvent::End(e),
+      Event::Decl(e) => SliceTagEvent::Decl(matches!(
+        e.standalone(),
+        Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+      )),
+      Event::Eof => SliceTagEvent::Eof,
+      _ => SliceTagEvent::Other,
+    }
   }
 }
 
@@ -517,13 +549,13 @@ pub(crate) fn read_outer_xml_borrowed<'de>(
   let mut writer = Writer::new(Cursor::new(Vec::new()));
 
   if empty_tag {
-    writer.write_event(Event::Empty(start.into_owned()))?;
+    writer.write_event(Event::Empty(start))?;
   } else {
-    writer.write_event(Event::Start(start.into_owned()))?;
+    writer.write_event(Event::Start(start))?;
 
     let mut depth = 1usize;
     loop {
-      let event = xml_reader.next()?.into_owned();
+      let event = xml_reader.next()?;
       match &event {
         Event::Start(_) => {
           depth += 1;
@@ -555,13 +587,13 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
   let mut writer = Writer::new(Cursor::new(Vec::new()));
 
   if empty_tag {
-    writer.write_event(Event::Empty(start.into_owned()))?;
+    writer.write_event(Event::Empty(start))?;
   } else {
-    writer.write_event(Event::Start(start.into_owned()))?;
+    writer.write_event(Event::Start(start))?;
 
     let mut depth = 1usize;
     loop {
-      let event = xml_reader.next()?.into_owned();
+      let event = xml_reader.next()?;
       match &event {
         Event::Start(_) => {
           depth += 1;

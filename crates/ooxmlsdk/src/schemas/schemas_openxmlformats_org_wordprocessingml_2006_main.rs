@@ -11257,7 +11257,7 @@ pub struct Run {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  #[sdk(choice)]
+  #[sdk(choice(text))]
   pub run_choice: Vec<RunChoice>,
 }
 /// Defines the SdtRunRuby Class.

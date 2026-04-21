@@ -11,8 +11,8 @@ pub use error::{
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  IoReader, IoTagEvent, SliceReader, decode_attr_value, from_bytes_inner, from_reader_inner,
-  from_str_inner, read_outer_xml_borrowed, read_outer_xml_io, write_attr_value,
+  IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, from_bytes_inner,
+  from_reader_inner, from_str_inner, read_outer_xml_borrowed, read_outer_xml_io, write_attr_value,
   write_attr_value_str, write_end_tag, write_escaped_str, write_escaped_text, write_start_tag_open,
   write_xmlns_attr,
 };
@@ -218,19 +218,19 @@ where
   }
 
   loop {
-    match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => match visitor(xml_reader, e, false)? {
+    match xml_reader.next_tag_event()? {
+      crate::common::SliceTagEvent::Start(e, false) => match visitor(xml_reader, e, false)? {
         true => {}
         false => {
           process_foreign_element_children_borrowed(xml_reader, false, visitor)?;
         }
       },
-      quick_xml::events::Event::Empty(e) => {
+      crate::common::SliceTagEvent::Start(e, true) => {
         visitor(xml_reader, e, true)?;
       }
-      quick_xml::events::Event::End(_) => break,
-      quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
-      _ => {}
+      crate::common::SliceTagEvent::End(_) => break,
+      crate::common::SliceTagEvent::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
+      crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
     }
   }
 
@@ -296,8 +296,8 @@ where
   let mut selected_branch = false;
 
   loop {
-    match xml_reader.next()? {
-      quick_xml::events::Event::Start(e) => match e.name().as_ref() {
+    match xml_reader.next_tag_event()? {
+      crate::common::SliceTagEvent::Start(e, false) => match e.name().as_ref() {
         b"mc:Choice" | b"Choice" => {
           let should_use =
             !selected_branch && markup_compatibility_choice_supported(&e, xml_reader.decoder())?;
@@ -320,7 +320,7 @@ where
           skip_foreign_element_children_borrowed(xml_reader, false)?;
         }
       },
-      quick_xml::events::Event::Empty(e) => match e.name().as_ref() {
+      crate::common::SliceTagEvent::Start(e, true) => match e.name().as_ref() {
         b"mc:Choice" | b"Choice"
           if !selected_branch
             && markup_compatibility_choice_supported(&e, xml_reader.decoder())? =>
@@ -332,14 +332,14 @@ where
         }
         _ => {}
       },
-      quick_xml::events::Event::End(e) => match e.name().as_ref() {
+      crate::common::SliceTagEvent::End(e) => match e.name().as_ref() {
         b"mc:AlternateContent" | b"AlternateContent" => break,
         _ => {}
       },
-      quick_xml::events::Event::Eof => {
+      crate::common::SliceTagEvent::Eof => {
         Err(unexpected_eof("process_markup_compatibility_children"))?
       }
-      _ => {}
+      crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
     }
   }
 

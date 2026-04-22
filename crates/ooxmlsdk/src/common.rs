@@ -49,13 +49,93 @@ where
 }
 
 #[inline(always)]
+pub fn parse_u8_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<u8, SdkError> {
+  xml::parse_u8_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_i8_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<i8, SdkError> {
+  xml::parse_i8_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_u16_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<u16, SdkError> {
+  xml::parse_u16_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_i16_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<i16, SdkError> {
+  xml::parse_i16_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_u32_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<u32, SdkError> {
+  xml::parse_u32_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_i32_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<i32, SdkError> {
+  xml::parse_i32_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_u64_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<u64, SdkError> {
+  xml::parse_u64_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub fn parse_i64_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<i64, SdkError> {
+  xml::parse_i64_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
 pub fn parse_enum_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
 ) -> Result<T, SdkError>
 where
-  T: std::str::FromStr<Err = SdkError>,
+  T: crate::sdk::SdkEnum,
 {
   xml::parse_enum_attr(attr, decoder, ty)
 }
@@ -491,6 +571,27 @@ pub(crate) fn skip_foreign_element_children_io<R: std::io::BufRead>(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use quick_xml::events::Event;
+
+  fn with_first_attr<T>(
+    xml: &str,
+    f: impl FnOnce(Attribute<'_>, Decoder) -> Result<T, SdkError>,
+  ) -> Result<T, SdkError> {
+    let mut reader = from_str_inner(xml)?;
+    let event = reader.next()?;
+    let e = match event {
+      Event::Start(e) | Event::Empty(e) => e,
+      other => panic!("expected start or empty tag, got {other:?}"),
+    };
+    let decoder = reader.decoder();
+    let attr = e
+      .attributes()
+      .with_checks(false)
+      .next()
+      .expect("attribute")
+      .unwrap();
+    f(attr, decoder)
+  }
 
   #[test]
   fn mc_choice_requires_supports_local_alias_for_known_namespace() {
@@ -554,5 +655,47 @@ mod tests {
     .expect("process alternate content");
 
     assert_eq!(selected, vec!["fallback"]);
+  }
+
+  #[test]
+  fn bool_like_attr_parsers_accept_raw_bytes_forms() {
+    let on_off = with_first_attr(r#"<x val="off"/>"#, |attr, decoder| {
+      parse_on_off_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse on_off");
+    assert!(!on_off);
+
+    let true_false_blank = with_first_attr(r#"<x val=""/>"#, |attr, decoder| {
+      parse_true_false_blank_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse true_false_blank");
+    assert!(!true_false_blank);
+
+    let true_false = with_first_attr(r#"<x val="t"/>"#, |attr, decoder| {
+      parse_true_false_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse true_false");
+    assert!(true_false);
+  }
+
+  #[test]
+  fn integer_attr_parsers_accept_bytes_fast_paths() {
+    let unsigned = with_first_attr(r#"<x val="+42"/>"#, |attr, decoder| {
+      parse_u32_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse u32");
+    assert_eq!(unsigned, 42);
+
+    let signed = with_first_attr(r#"<x val="-2147483648"/>"#, |attr, decoder| {
+      parse_i32_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse i32");
+    assert_eq!(signed, i32::MIN);
+
+    let byte = with_first_attr(r#"<x val="255"/>"#, |attr, decoder| {
+      parse_u8_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse u8");
+    assert_eq!(byte, u8::MAX);
   }
 }

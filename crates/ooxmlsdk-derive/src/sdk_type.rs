@@ -2236,6 +2236,16 @@ fn expand_named_struct(
         quote! { stringify!(#ident) },
         quote! { #name_lit },
       )
+    } else if integer_type_kind(&parse_ty).is_some() {
+      parse_integer_attr_tokens(
+        quote! { &attr },
+        quote! { decoder },
+        &parse_ty,
+        quote! { stringify!(#ident) },
+        quote! { #name_lit },
+      )
+    } else if is_sdk_enum_type(&parse_ty) {
+      quote! { crate::common::parse_enum_attr::<#parse_ty>(&attr, decoder, stringify!(#ident))? }
     } else if is_string_like_type(&parse_ty) {
       quote! { crate::common::decode_attr_value(&attr, decoder)? }
     } else {

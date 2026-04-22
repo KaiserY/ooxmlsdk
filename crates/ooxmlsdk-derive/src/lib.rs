@@ -1164,6 +1164,42 @@ fn is_string_like_type(ty: &Type) -> bool {
   }))
 }
 
+fn is_sdk_enum_type(ty: &Type) -> bool {
+  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
+    segment.ident.to_string().ends_with("Values")
+  }))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum IntegerTypeKind {
+  U8,
+  I8,
+  U16,
+  I16,
+  U32,
+  I32,
+  U64,
+  I64,
+}
+
+fn integer_type_kind(ty: &Type) -> Option<IntegerTypeKind> {
+  let Type::Path(TypePath { path, .. }) = ty else {
+    return None;
+  };
+  let ident = path.segments.last()?.ident.to_string();
+  Some(match ident.as_str() {
+    "ByteValue" | "u8" => IntegerTypeKind::U8,
+    "SByteValue" | "i8" => IntegerTypeKind::I8,
+    "UInt16Value" | "u16" => IntegerTypeKind::U16,
+    "Int16Value" | "i16" => IntegerTypeKind::I16,
+    "UInt32Value" | "u32" => IntegerTypeKind::U32,
+    "Int32Value" | "i32" => IntegerTypeKind::I32,
+    "UInt64Value" | "u64" => IntegerTypeKind::U64,
+    "Int64Value" | "IntegerValue" | "i64" => IntegerTypeKind::I64,
+    _ => return None,
+  })
+}
+
 fn is_xml_schema_float_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
     matches!(segment.ident.to_string().as_str(), "DoubleValue" | "SingleValue" | "f64" | "f32")
@@ -1247,6 +1283,42 @@ fn parse_bool_attr_tokens(
       crate::common::parse_bool_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
     None => unreachable!("parse_bool_attr_tokens requires a bool-like type"),
+  }
+}
+
+fn parse_integer_attr_tokens(
+  attr_expr: proc_macro2::TokenStream,
+  decoder_expr: proc_macro2::TokenStream,
+  integer_ty: &Type,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match integer_type_kind(integer_ty) {
+    Some(IntegerTypeKind::U8) => quote! {
+      crate::common::parse_u8_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::I8) => quote! {
+      crate::common::parse_i8_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::U16) => quote! {
+      crate::common::parse_u16_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::I16) => quote! {
+      crate::common::parse_i16_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::U32) => quote! {
+      crate::common::parse_u32_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::I32) => quote! {
+      crate::common::parse_i32_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::U64) => quote! {
+      crate::common::parse_u64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::I64) => quote! {
+      crate::common::parse_i64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    None => unreachable!("parse_integer_attr_tokens requires an integer-like type"),
   }
 }
 

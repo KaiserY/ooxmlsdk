@@ -256,10 +256,8 @@ pub(crate) fn parse_bool_attr(
   ty: &'static str,
   field: &'static str,
 ) -> Result<bool, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = parse_bool_bytes(value)
-  {
-    Ok(value)
+  if let Some(value) = attr_raw_value(attr) {
+    parse_bool_bytes_inner(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
     parse_bool_str(value.as_ref(), ty, field)
@@ -273,10 +271,8 @@ pub(crate) fn parse_boolean_value_attr(
   ty: &'static str,
   field: &'static str,
 ) -> Result<bool, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = parse_boolean_value_bytes(value)
-  {
-    Ok(value)
+  if let Some(value) = attr_raw_value(attr) {
+    parse_boolean_value_bytes_inner(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
     parse_boolean_value_str(value.as_ref(), ty, field)
@@ -290,11 +286,8 @@ pub(crate) fn parse_on_off_attr(
   ty: &'static str,
   field: &'static str,
 ) -> Result<bool, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = std::str::from_utf8(value)
-    && let Ok(parsed) = parse_on_off_str(value, ty, field)
-  {
-    Ok(parsed)
+  if let Some(value) = attr_raw_value(attr) {
+    parse_on_off_bytes(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
     parse_on_off_str(value.as_ref(), ty, field)
@@ -308,11 +301,8 @@ pub(crate) fn parse_true_false_blank_attr(
   ty: &'static str,
   field: &'static str,
 ) -> Result<bool, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = std::str::from_utf8(value)
-    && let Ok(parsed) = parse_true_false_blank_str(value, ty, field)
-  {
-    Ok(parsed)
+  if let Some(value) = attr_raw_value(attr) {
+    parse_true_false_blank_bytes(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
     parse_true_false_blank_str(value.as_ref(), ty, field)
@@ -326,16 +316,117 @@ pub(crate) fn parse_true_false_attr(
   ty: &'static str,
   field: &'static str,
 ) -> Result<bool, SdkError> {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = std::str::from_utf8(value)
-    && let Ok(parsed) = parse_true_false_str(value, ty, field)
-  {
-    Ok(parsed)
+  if let Some(value) = attr_raw_value(attr) {
+    parse_true_false_bytes(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
     parse_true_false_str(value.as_ref(), ty, field)
   }
 }
+
+macro_rules! define_unsigned_decimal_attr_parser {
+  ($attr_name:ident, $bytes_name:ident, $ty:ty) => {
+    #[inline]
+    pub(crate) fn $attr_name(
+      attr: &Attribute<'_>,
+      decoder: Decoder,
+      ty: &'static str,
+      field: &'static str,
+    ) -> Result<$ty, SdkError> {
+      if let Some(value) = attr_raw_value(attr) {
+        $bytes_name(value, ty, field)
+      } else {
+        let value = decode_attr_value(attr, decoder)?;
+        $bytes_name(value.as_bytes(), ty, field)
+      }
+    }
+
+    #[inline(always)]
+    fn $bytes_name(value: &[u8], ty: &'static str, field: &'static str) -> Result<$ty, SdkError> {
+      let digits = match value {
+        [b'+', rest @ ..] => rest,
+        _ => value,
+      };
+      if digits.is_empty() {
+        return Err(invalid_field_value_bytes(ty, field, value));
+      }
+
+      let mut parsed: $ty = 0;
+      for &digit in digits {
+        if !digit.is_ascii_digit() {
+          return Err(invalid_field_value_bytes(ty, field, value));
+        }
+
+        parsed = parsed
+          .checked_mul(10)
+          .and_then(|current| current.checked_add((digit - b'0') as $ty))
+          .ok_or_else(|| invalid_field_value_bytes(ty, field, value))?;
+      }
+
+      Ok(parsed)
+    }
+  };
+}
+
+macro_rules! define_signed_decimal_attr_parser {
+  ($attr_name:ident, $bytes_name:ident, $ty:ty) => {
+    #[inline]
+    pub(crate) fn $attr_name(
+      attr: &Attribute<'_>,
+      decoder: Decoder,
+      ty: &'static str,
+      field: &'static str,
+    ) -> Result<$ty, SdkError> {
+      if let Some(value) = attr_raw_value(attr) {
+        $bytes_name(value, ty, field)
+      } else {
+        let value = decode_attr_value(attr, decoder)?;
+        $bytes_name(value.as_bytes(), ty, field)
+      }
+    }
+
+    #[inline(always)]
+    fn $bytes_name(value: &[u8], ty: &'static str, field: &'static str) -> Result<$ty, SdkError> {
+      let (negative, digits) = match value {
+        [b'-', rest @ ..] => (true, rest),
+        [b'+', rest @ ..] => (false, rest),
+        _ => (false, value),
+      };
+      if digits.is_empty() {
+        return Err(invalid_field_value_bytes(ty, field, value));
+      }
+
+      let mut parsed: $ty = 0;
+      for &digit in digits {
+        if !digit.is_ascii_digit() {
+          return Err(invalid_field_value_bytes(ty, field, value));
+        }
+
+        parsed = parsed
+          .checked_mul(10)
+          .and_then(|current| {
+            if negative {
+              current.checked_sub((digit - b'0') as $ty)
+            } else {
+              current.checked_add((digit - b'0') as $ty)
+            }
+          })
+          .ok_or_else(|| invalid_field_value_bytes(ty, field, value))?;
+      }
+
+      Ok(parsed)
+    }
+  };
+}
+
+define_unsigned_decimal_attr_parser!(parse_u8_attr, parse_u8_bytes, u8);
+define_signed_decimal_attr_parser!(parse_i8_attr, parse_i8_bytes, i8);
+define_unsigned_decimal_attr_parser!(parse_u16_attr, parse_u16_bytes, u16);
+define_signed_decimal_attr_parser!(parse_i16_attr, parse_i16_bytes, i16);
+define_unsigned_decimal_attr_parser!(parse_u32_attr, parse_u32_bytes, u32);
+define_signed_decimal_attr_parser!(parse_i32_attr, parse_i32_bytes, i32);
+define_unsigned_decimal_attr_parser!(parse_u64_attr, parse_u64_bytes, u64);
+define_signed_decimal_attr_parser!(parse_i64_attr, parse_i64_bytes, i64);
 
 #[inline]
 pub(crate) fn parse_attr_value<T>(
@@ -365,16 +456,14 @@ pub(crate) fn parse_enum_attr<T>(
   _ty: &'static str,
 ) -> Result<T, SdkError>
 where
-  T: std::str::FromStr<Err = SdkError>,
+  T: crate::sdk::SdkEnum,
 {
-  if let Some(value) = attr_raw_value(attr)
-    && let Ok(value) = std::str::from_utf8(value)
-  {
-    return value.parse::<T>();
+  if let Some(value) = attr_raw_value(attr) {
+    return T::from_xml_bytes(value);
   }
 
   let value = decode_attr_value(attr, decoder)?;
-  value.parse::<T>()
+  T::from_xml_bytes(value.as_bytes())
 }
 
 #[inline(always)]
@@ -458,28 +547,77 @@ pub(crate) fn parse_true_false_str(
 
 #[inline(always)]
 pub(crate) fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
-  match b {
+  parse_bool_bytes_inner(b, "bool", "value")
+}
+
+#[inline(always)]
+fn parse_bool_bytes_inner(
+  value: &[u8],
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value {
     b"true" | b"1" | b"True" | b"TRUE" | b"t" | b"Yes" | b"YES" | b"yes" | b"y" => Ok(true),
     b"false" | b"0" | b"False" | b"FALSE" | b"f" | b"No" | b"NO" | b"no" | b"n" | b"" => Ok(false),
-    other => Err(invalid_field_value(
-      "bool",
-      "value",
-      String::from_utf8_lossy(other).into_owned(),
-    )),
+    _ => Err(invalid_field_value_bytes(ty, field, value)),
   }
 }
 
 #[inline(always)]
-pub(crate) fn parse_boolean_value_bytes(b: &[u8]) -> Result<bool, SdkError> {
-  match b {
+fn parse_boolean_value_bytes_inner(
+  value: &[u8],
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value {
     b"true" | b"1" => Ok(true),
     b"false" | b"0" => Ok(false),
-    other => Err(invalid_field_value(
-      "bool",
-      "value",
-      String::from_utf8_lossy(other).into_owned(),
-    )),
+    _ => Err(invalid_field_value_bytes(ty, field, value)),
   }
+}
+
+#[inline(always)]
+fn parse_on_off_bytes(
+  value: &[u8],
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value {
+    b"true" | b"1" | b"on" => Ok(true),
+    b"false" | b"0" | b"off" => Ok(false),
+    _ => Err(invalid_field_value_bytes(ty, field, value)),
+  }
+}
+
+#[inline(always)]
+fn parse_true_false_blank_bytes(
+  value: &[u8],
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value {
+    b"true" | b"t" => Ok(true),
+    b"false" | b"f" | b"" => Ok(false),
+    _ => Err(invalid_field_value_bytes(ty, field, value)),
+  }
+}
+
+#[inline(always)]
+fn parse_true_false_bytes(
+  value: &[u8],
+  ty: &'static str,
+  field: &'static str,
+) -> Result<bool, SdkError> {
+  match value {
+    b"true" | b"t" => Ok(true),
+    b"false" | b"f" => Ok(false),
+    _ => Err(invalid_field_value_bytes(ty, field, value)),
+  }
+}
+
+#[inline(always)]
+fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]) -> SdkError {
+  invalid_field_value(ty, field, String::from_utf8_lossy(value).into_owned())
 }
 
 #[inline(always)]

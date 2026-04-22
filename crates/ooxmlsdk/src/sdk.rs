@@ -1,5 +1,7 @@
-pub trait SdkEnum {
+pub trait SdkEnum: Sized {
   fn as_xml_str(&self) -> &'static str;
+
+  fn from_xml_bytes(value: &[u8]) -> Result<Self, crate::common::SdkError>;
 
   fn to_xml(&self) -> String {
     self.as_xml_str().to_string()

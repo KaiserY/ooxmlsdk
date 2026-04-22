@@ -71,7 +71,8 @@ fn field_tokens(field: &crate::sdk_code::part_codegen_ir::PartFieldDecl) -> Resu
   let field_type: Type = parse_str(&field.rust_type)?;
   let sdk_attr = field_sdk_attr(&field.kind);
   let versioned = match &field.kind {
-    PartFieldKind::Child { cardinality, .. } => {
+    PartFieldKind::ChildPart { cardinality, .. }
+    | PartFieldKind::DataPartReference { cardinality, .. } => {
       let rendered_ty = match cardinality {
         PartChildCardinality::Repeated => quote! { Vec<#field_type> },
         PartChildCardinality::Required => quote! { std::boxed::Box<#field_type> },
@@ -99,27 +100,24 @@ fn field_tokens(field: &crate::sdk_code::part_codegen_ir::PartFieldDecl) -> Resu
 
 fn field_sdk_attr(kind: &PartFieldKind) -> TokenStream {
   match kind {
-    PartFieldKind::Rid => quote! { #[sdk(part_rid)] },
-    PartFieldKind::ContentTypes => quote! { #[sdk(part_content_types)] },
-    PartFieldKind::Relationships => quote! { #[sdk(part_relationships)] },
-    PartFieldKind::RelsPath => quote! { #[sdk(part_rels_path)] },
-    PartFieldKind::InnerPath => quote! { #[sdk(part_inner_path)] },
-    PartFieldKind::RootElement => quote! { #[sdk(part_root)] },
-    PartFieldKind::TextContent => quote! { #[sdk(part_content(kind = "text"))] },
-    PartFieldKind::BinaryContent => quote! { #[sdk(part_content(kind = "binary"))] },
-    PartFieldKind::Child {
-      relationship_type,
-      cardinality,
-    } => {
-      let kind = match cardinality {
-        PartChildCardinality::Optional => "optional",
-        PartChildCardinality::Required => "required",
-        PartChildCardinality::Repeated => "repeated",
-      };
-      quote! {
-        #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
-      }
-    }
+    PartFieldKind::Rid => quote! {},
+    PartFieldKind::ContentTypes => quote! {},
+    PartFieldKind::Relationships => quote! {},
+    PartFieldKind::RelsPath => quote! {},
+    PartFieldKind::InnerPath => quote! {},
+    PartFieldKind::RootElement => quote! {},
+    PartFieldKind::TextContent => quote! {},
+    PartFieldKind::BinaryContent => quote! {},
+    PartFieldKind::ExtendedParts => quote! {},
+    PartFieldKind::ChildPart {
+      relationship_type: _,
+      cardinality: _,
+    } => quote! {},
+    PartFieldKind::DataPartReference {
+      relationship_type: _,
+      cardinality: _,
+      reference_kind: _,
+    } => quote! {},
   }
 }
 
@@ -147,7 +145,7 @@ mod tests {
         PartFieldDecl {
           rust_name: "theme_part".to_string(),
           rust_type: "crate::parts::theme_part::ThemePart".to_string(),
-          kind: PartFieldKind::Child {
+          kind: PartFieldKind::ChildPart {
             relationship_type: "theme-rel".to_string(),
             cardinality: PartChildCardinality::Optional,
           },
@@ -158,11 +156,13 @@ mod tests {
     };
 
     let rendered = gen_part_module(&part).unwrap().to_string();
-    assert!(rendered.contains("# [sdk (part_rid)] pub r_id : String"));
+    assert!(rendered.contains("pub r_id : String"));
+    assert!(!rendered.contains("# [sdk (part_rid)]"));
     assert!(
       rendered.contains(
-        "# [sdk (part_child (relationship_type = \"theme-rel\" , kind = \"optional\"))] pub theme_part : Option < std :: boxed :: Box < crate :: parts :: theme_part :: ThemePart > >"
+        "pub theme_part : Option < std :: boxed :: Box < crate :: parts :: theme_part :: ThemePart > >"
       )
     );
+    assert!(!rendered.contains("# [sdk (part_child"));
   }
 }

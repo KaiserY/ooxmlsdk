@@ -1,12 +1,30 @@
 use quick_xml::Decoder;
 use quick_xml::events::attributes::Attribute;
 
+#[cfg(feature = "parts")]
+pub mod data_part;
 mod error;
+#[cfg(feature = "parts")]
+pub mod extended_part;
+#[cfg(feature = "parts")]
+mod part;
 mod xml;
 
+#[cfg(feature = "parts")]
+pub use data_part::{
+  AudioReferenceRelationship, MediaDataPart, MediaReferenceRelationship, VideoReferenceRelationship,
+};
 pub use error::{
   SdkError, invalid_enum_value, invalid_field_value, missing_field, unexpected_eof, unexpected_tag,
   validation_error,
+};
+#[cfg(feature = "parts")]
+pub use extended_part::ExtendedPart;
+#[cfg(feature = "parts")]
+pub use part::{
+  load_data_part_reference, load_extended_part, load_part_relationships, load_typed_child_part,
+  resolve_relationship_part_path, save_data_part_reference, save_part_relationships,
+  save_typed_child_part,
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
@@ -155,6 +173,35 @@ pub fn parse_bool_str(
   field: &'static str,
 ) -> Result<bool, SdkError> {
   xml::parse_bool_str(value, ty, field)
+}
+
+pub fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
+  if actual == canonical {
+    return true;
+  }
+
+  if let Some(suffix) =
+    canonical.strip_prefix("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+  {
+    let alias_suffix = match suffix {
+      "custom-properties" => "customProperties",
+      "extended-properties" => "extendedProperties",
+      other => other,
+    };
+    return actual
+      == format!("http://purl.oclc.org/ooxml/officeDocument/relationships/{alias_suffix}");
+  }
+
+  if canonical == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
+  {
+    return actual == "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail";
+  }
+
+  if canonical == "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects" {
+    return actual == "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects";
+  }
+
+  false
 }
 
 #[inline(always)]

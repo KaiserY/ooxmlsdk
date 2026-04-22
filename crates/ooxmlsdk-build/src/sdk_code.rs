@@ -211,7 +211,6 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
   let out_parts_dir_path = out_dir_path.join("parts");
   fs::create_dir_all(&out_parts_dir_path)?;
   clear_generated_rs_files(&out_parts_dir_path)?;
-  write_generated_module(&out_parts_dir_path.join("mod.rs"), quote! {})?;
 
   for loaded_part in loaded_parts {
     let part_path = out_parts_dir_path.join(format!("{}.rs", loaded_part.ir.module_name));
@@ -227,7 +226,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
   }
 
   write_generated_module(
-    &out_parts_dir_path.join("mod.rs"),
+    &out_dir_path.join("parts.rs"),
     gen_parts_mod(
       &loaded_parts
         .iter()

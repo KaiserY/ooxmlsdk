@@ -1,3 +1,20 @@
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PartDescriptor {
+  pub relationship_type: &'static str,
+  pub path_prefix: &'static str,
+}
+
+#[cfg(feature = "parts")]
+impl PartDescriptor {
+  pub const fn new(relationship_type: &'static str, path_prefix: &'static str) -> Self {
+    Self {
+      relationship_type,
+      path_prefix,
+    }
+  }
+}
+
 pub trait SdkEnum: Sized {
   fn as_xml_str(&self) -> &'static str;
 
@@ -34,4 +51,52 @@ pub trait SdkChoice: Sized {
   }
 }
 
-pub trait SdkPart: Sized {}
+#[cfg(feature = "parts")]
+pub trait SdkPart: Sized {
+  const DESCRIPTOR: PartDescriptor;
+
+  fn new_from_archive<R: std::io::Read + std::io::Seek>(
+    parent_path: &str,
+    path: &str,
+    r_id: &str,
+    file_path_set: &std::collections::HashSet<String>,
+    archive: &mut zip::ZipArchive<R>,
+    visited: &mut std::collections::HashSet<String>,
+  ) -> Result<Self, crate::common::SdkError>;
+
+  fn save_zip<W: std::io::Write + std::io::Seek>(
+    &self,
+    parent_path: &str,
+    zip: &mut zip::ZipWriter<W>,
+    entry_set: &mut std::collections::HashSet<String>,
+    visited: &mut std::collections::HashSet<String>,
+  ) -> Result<(), crate::common::SdkError>;
+
+  #[inline(always)]
+  fn relationship_type() -> &'static str {
+    Self::DESCRIPTOR.relationship_type
+  }
+
+  #[inline(always)]
+  fn path_prefix() -> &'static str {
+    Self::DESCRIPTOR.path_prefix
+  }
+}
+
+#[cfg(feature = "parts")]
+pub trait SdkDataPartReference: Sized {
+  const RELATIONSHIP_TYPE: &'static str;
+
+  fn new_from_archive<R: std::io::Read + std::io::Seek>(
+    path: &str,
+    r_id: &str,
+    archive: &mut zip::ZipArchive<R>,
+  ) -> Result<Self, crate::common::SdkError>;
+
+  fn save_zip<W: std::io::Write + std::io::Seek>(
+    &self,
+    parent_path: &str,
+    zip: &mut zip::ZipWriter<W>,
+    entry_set: &mut std::collections::HashSet<String>,
+  ) -> Result<(), crate::common::SdkError>;
+}

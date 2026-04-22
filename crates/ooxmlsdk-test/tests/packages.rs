@@ -24,6 +24,10 @@ use zip::ZipArchive;
 const ALT_CHUNK_ID: &str = "XmlAltChunkId-1";
 const ALT_CHUNK_TARGET: &str = "afchunk.xml";
 const ALT_CHUNK_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><root><element>Some text</element></root>";
+const WORDPROCESSING_TEXT_BOX_RELATIONSHIP_TYPE: &str =
+  "http://schemas.microsoft.com/office/2006/relationships/txbx";
+const HD_PHOTO_RELATIONSHIP_TYPE: &str =
+  "http://schemas.microsoft.com/office/2007/relationships/hdphoto";
 
 fn keywords_text(value: Option<&ooxmlsdk::schemas::opc_core_properties::Keywords>) -> Option<&str> {
   value.and_then(|keywords| keywords.xml_content.as_deref())
@@ -87,6 +91,16 @@ fn roundtrip_presentation_document(
   let roundtripped = PresentationDocument::new(Cursor::new(buffer.into_inner())).unwrap();
 
   (original, roundtripped)
+}
+
+fn extended_parts_by_relationship<'a>(
+  parts: &'a [ooxmlsdk::common::ExtendedPart],
+  relationship_type: &str,
+) -> Vec<&'a ooxmlsdk::common::ExtendedPart> {
+  parts
+    .iter()
+    .filter(|part| part.relationship_type == relationship_type)
+    .collect()
 }
 
 fn stylesheet_extensions(
@@ -1292,16 +1306,14 @@ fn open_mcdoc_docx_asset_from_openxml_sdk() {
   let package = WordprocessingDocument::new_from_file(&path).unwrap();
 
   assert_eq!(package.main_document_part.custom_xml_parts.len(), 1);
-  assert_eq!(
-    package
-      .main_document_part
-      .wordprocessing_text_box_parts
-      .len(),
-    1
+  let text_box_parts = extended_parts_by_relationship(
+    &package.main_document_part.extended_parts,
+    WORDPROCESSING_TEXT_BOX_RELATIONSHIP_TYPE,
   );
+  assert_eq!(text_box_parts.len(), 1);
   assert!(
-    package.main_document_part.wordprocessing_text_box_parts[0]
-      .part_content
+    std::str::from_utf8(&text_box_parts[0].part_content)
+      .unwrap()
       .contains("<w14:txbx")
   );
   assert!(package.main_document_part.style_definitions_part.is_some());
@@ -1738,12 +1750,11 @@ fn open_complex01_xlsx_asset_from_openxml_sdk() {
   assert_eq!(workbook.sheets.x_sheet[1].name.as_str(), "Sheet2");
   assert_eq!(package.workbook_part.worksheet_parts.len(), 2);
   assert!(workbook.calculation_properties.is_some());
-  assert_eq!(drawings_part.hd_photo_parts.len(), 1);
+  let hd_photo_parts =
+    extended_parts_by_relationship(&drawings_part.extended_parts, HD_PHOTO_RELATIONSHIP_TYPE);
+  assert_eq!(hd_photo_parts.len(), 1);
   assert_eq!(drawings_part.image_parts.len(), 1);
-  assert_eq!(
-    drawings_part.hd_photo_parts[0].inner_path,
-    "xl/media/hdphoto1.wdp"
-  );
+  assert_eq!(hd_photo_parts[0].inner_path, "xl/media/hdphoto1.wdp");
 
   let style_extensions = stylesheet_extensions(&package);
   assert_eq!(style_extensions.len(), 2);
@@ -1792,6 +1803,9 @@ fn add_alternative_format_import_part_to_wordprocessing_document_from_openxml_sd
 
   let alt_chunk_part = AlternativeFormatImportPart {
     r_id: ALT_CHUNK_ID.to_string(),
+    relationships: None,
+    rels_path: String::new(),
+    extended_parts: vec![],
     inner_path: format!("word/{ALT_CHUNK_TARGET}"),
     part_content: ALT_CHUNK_XML.as_bytes().to_vec(),
   };
@@ -2620,22 +2634,21 @@ fn round_trip_mcdoc_docx_asset_from_openxml_sdk() {
   assert!(roundtripped.main_document_part.theme_part.is_some());
   assert!(original.main_document_part.web_settings_part.is_some());
   assert!(roundtripped.main_document_part.web_settings_part.is_some());
-  assert_eq!(
-    original
-      .main_document_part
-      .wordprocessing_text_box_parts
-      .len(),
-    roundtripped
-      .main_document_part
-      .wordprocessing_text_box_parts
-      .len()
+  let original_text_box_parts = extended_parts_by_relationship(
+    &original.main_document_part.extended_parts,
+    WORDPROCESSING_TEXT_BOX_RELATIONSHIP_TYPE,
+  );
+  let roundtripped_text_box_parts = extended_parts_by_relationship(
+    &roundtripped.main_document_part.extended_parts,
+    WORDPROCESSING_TEXT_BOX_RELATIONSHIP_TYPE,
   );
   assert_eq!(
-    original.main_document_part.wordprocessing_text_box_parts[0].part_content,
-    roundtripped
-      .main_document_part
-      .wordprocessing_text_box_parts[0]
-      .part_content
+    original_text_box_parts.len(),
+    roundtripped_text_box_parts.len()
+  );
+  assert_eq!(
+    original_text_box_parts[0].part_content,
+    roundtripped_text_box_parts[0].part_content
   );
 }
 
@@ -3753,17 +3766,25 @@ fn round_trip_complex01_xlsx_asset_from_openxml_sdk() {
   );
   assert_eq!(original.workbook_part.worksheet_parts.len(), 2);
   assert_eq!(roundtripped.workbook_part.worksheet_parts.len(), 2);
-  assert_eq!(
-    original_drawings_part.hd_photo_parts.len(),
-    roundtripped_drawings_part.hd_photo_parts.len()
+  let original_hd_photo_parts = extended_parts_by_relationship(
+    &original_drawings_part.extended_parts,
+    HD_PHOTO_RELATIONSHIP_TYPE,
+  );
+  let roundtripped_hd_photo_parts = extended_parts_by_relationship(
+    &roundtripped_drawings_part.extended_parts,
+    HD_PHOTO_RELATIONSHIP_TYPE,
   );
   assert_eq!(
-    original_drawings_part.hd_photo_parts[0].inner_path,
-    roundtripped_drawings_part.hd_photo_parts[0].inner_path
+    original_hd_photo_parts.len(),
+    roundtripped_hd_photo_parts.len()
   );
   assert_eq!(
-    original_drawings_part.hd_photo_parts[0].part_content,
-    roundtripped_drawings_part.hd_photo_parts[0].part_content
+    original_hd_photo_parts[0].inner_path,
+    roundtripped_hd_photo_parts[0].inner_path
+  );
+  assert_eq!(
+    original_hd_photo_parts[0].part_content,
+    roundtripped_hd_photo_parts[0].part_content
   );
 }
 

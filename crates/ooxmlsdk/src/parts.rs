@@ -69,7 +69,6 @@ pub mod legacy_diagram_text_part;
 pub mod macro_sheet_part;
 pub mod mail_merge_recipient_data_part;
 pub mod main_document_part;
-pub mod media_data_part;
 #[cfg(feature = "microsoft365")]
 pub mod model3_d_reference_relationship_part;
 #[cfg(feature = "microsoft365")]
@@ -156,7 +155,6 @@ pub mod wordprocessing_document;
 #[cfg(feature = "microsoft365")]
 pub mod wordprocessing_people_part;
 pub mod wordprocessing_printer_settings_part;
-pub mod wordprocessing_text_box_part;
 pub mod workbook_part;
 #[cfg(feature = "microsoft365")]
 pub mod workbook_person_part;

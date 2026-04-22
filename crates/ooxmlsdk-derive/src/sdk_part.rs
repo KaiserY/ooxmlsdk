@@ -18,32 +18,49 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   let has_content_types = fields.named.iter().any(|field| {
     matches!(
-      parse_part_field_marker(&field.attrs),
+      part_field_marker(field),
       Ok(Some(PartFieldMarker::ContentTypes))
     )
   });
   let has_relationships = fields.named.iter().any(|field| {
     matches!(
-      parse_part_field_marker(&field.attrs),
+      part_field_marker(field),
       Ok(Some(PartFieldMarker::Relationships))
+    )
+  });
+  let has_extended_parts = fields.named.iter().any(|field| {
+    matches!(
+      part_field_marker(field),
+      Ok(Some(PartFieldMarker::ExtendedParts))
     )
   });
 
   let mut child_infos = Vec::new();
+  let mut data_ref_infos = Vec::new();
   for field in &fields.named {
     if is_system_part_field(field) {
       continue;
     }
 
-    let Some(child_info) = parse_part_child_field(field)? else {
-      return Err(syn::Error::new_spanned(
-        field,
-        "SdkPart fields require explicit #[sdk(part_child(...))] or a part system marker",
-      ));
-    };
-    child_infos.push(child_info);
+    if let Some(child_info) = parse_part_child_field(field)? {
+      child_infos.push(child_info);
+      continue;
+    }
+
+    if let Some(data_ref_info) = parse_part_data_ref_field(field)? {
+      data_ref_infos.push(data_ref_info);
+      continue;
+    }
+
+    return Err(syn::Error::new_spanned(
+      field,
+      "SdkPart fields require explicit #[sdk(part_child(...))], #[sdk(part_data_ref(...))], or a part system marker",
+    ));
   }
-  let needs_relationships = has_relationships || !child_infos.is_empty();
+  let needs_relationships = has_relationships
+    || has_extended_parts
+    || !child_infos.is_empty()
+    || !data_ref_infos.is_empty();
 
   let mut field_declarations = Vec::new();
   let mut field_unwraps = Vec::new();
@@ -100,49 +117,35 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   if needs_relationships {
     field_declarations.push(quote! {
-      let mut rels_path = String::new();
-    });
-    field_declarations.push(quote! {
       let child_parent_path = crate::common::parent_zip_path(#path_ident);
     });
     field_declarations.push(quote! {
-      let part_target_str = #path_ident
-        .rsplit('/')
-        .next()
-        .unwrap_or_default();
-    });
-    field_declarations.push(quote! {
-      let rels_candidate_path = crate::common::resolve_zip_file_path(
-        &format!("{child_parent_path}_rels/{part_target_str}.rels"),
-      );
-    });
-    field_declarations.push(quote! {
-      let relationships = if let Some(file_path) = #file_path_set_ident.get(&rels_candidate_path) {
-        rels_path = file_path.to_string();
-        Some({
-          use std::io::Read;
-
-          let mut zip_entry = #archive_ident.by_name(file_path)?;
-          let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
-          zip_entry.read_to_end(&mut bytes)?;
-          crate::schemas::opc_relationships::Relationships::from_bytes(&bytes)?
-        })
-      } else {
-        None
-      };
+      let (rels_path, relationships) =
+        crate::common::load_part_relationships(#path_ident, #file_path_set_ident, #archive_ident)?;
     });
     self_field_values.push(quote! { rels_path });
     self_field_values.push(quote! { relationships });
+  }
+
+  if has_extended_parts {
+    field_declarations.push(quote! {
+      let mut extended_parts: Vec<crate::common::ExtendedPart> = vec![];
+    });
+    self_field_values.push(quote! { extended_parts });
   }
 
   self_field_values.push(quote! { inner_path: #path_ident.to_string() });
 
   for child in &child_infos {
     let child_type = &child.ty;
-    let relationship_type_values = relationship_type_match_values(&child.relationship_type);
+    let relationship_type_expr = match &child.relationship_type {
+      PartRelationshipTypeSource::Explicit(value) => quote! { #value },
+      PartRelationshipTypeSource::TypeConst => {
+        quote! { <#child_type as crate::sdk::SdkPart>::relationship_type() }
+      }
+    };
     let child_field_ident = &child.field_ident;
     let child_item_ident = child.field_ident.clone();
-    let child_load_ident: Ident = parse_str(&format!("loaded_{}", child_item_ident))?;
 
     match child.kind {
       PartChildKind::Repeated => {
@@ -150,34 +153,30 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Vec<#child_type> = vec![];
         });
         child_match_arms.push(quote! {
-          #( #relationship_type_values )|* => {
-            let target_path = crate::common::resolve_zip_file_path(
-              &crate::common::resolve_relationship_target_path(
-                &child_parent_path,
-                &relationship.target,
-              ),
-            );
-            if #file_path_set_ident.contains(&target_path) {
-              let inserted = visited.insert(target_path.clone());
-              if inserted {
-                let #child_load_ident = #child_type::new_from_archive(
-                  &child_parent_path,
-                  &target_path,
-                  &relationship.id,
-                  #file_path_set_ident,
-                  #archive_ident,
-                  visited,
-                );
-                visited.remove(&target_path);
-                let #child_load_ident = #child_load_ident?;
-                #child_field_ident.push(#child_load_ident);
-              }
+          relationship_type if crate::common::relationship_type_matches(
+            relationship_type,
+            #relationship_type_expr,
+          ) => {
+            if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+              &child_parent_path,
+              relationship,
+              #file_path_set_ident,
+              #archive_ident,
+              visited,
+            )? {
+              #child_field_ident.push(loaded_child);
             }
           }
         });
         child_save_stmts.push(quote! {
           for #child_item_ident in &self.#child_field_ident {
-            #child_item_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
+            crate::common::save_typed_child_part(
+              #child_item_ident,
+              &child_parent_path,
+              zip,
+              entry_set,
+              visited,
+            )?;
           }
         });
         child_validate_stmts.push(quote! {
@@ -192,28 +191,18 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
         child_match_arms.push(quote! {
-          #( #relationship_type_values )|* => {
-            let target_path = crate::common::resolve_zip_file_path(
-              &crate::common::resolve_relationship_target_path(
-                &child_parent_path,
-                &relationship.target,
-              ),
-            );
-            if #file_path_set_ident.contains(&target_path) {
-              let inserted = visited.insert(target_path.clone());
-              if inserted {
-                let #child_load_ident = #child_type::new_from_archive(
-                  &child_parent_path,
-                  &target_path,
-                  &relationship.id,
-                  #file_path_set_ident,
-                  #archive_ident,
-                  visited,
-                );
-                visited.remove(&target_path);
-                let #child_load_ident = #child_load_ident?;
-                #child_field_ident = Some(std::boxed::Box::new(#child_load_ident));
-              }
+          relationship_type if crate::common::relationship_type_matches(
+            relationship_type,
+            #relationship_type_expr,
+          ) => {
+            if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+              &child_parent_path,
+              relationship,
+              #file_path_set_ident,
+              #archive_ident,
+              visited,
+            )? {
+              #child_field_ident = Some(std::boxed::Box::new(loaded_child));
             }
           }
         });
@@ -225,7 +214,13 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             ))?;
         });
         child_save_stmts.push(quote! {
-          self.#child_field_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
+          crate::common::save_typed_child_part(
+            self.#child_field_ident.as_ref(),
+            &child_parent_path,
+            zip,
+            entry_set,
+            visited,
+          )?;
         });
         child_validate_stmts.push(quote! {
           crate::validator::SdkValidator::validate(self.#child_field_ident.as_ref())?;
@@ -237,34 +232,30 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
         child_match_arms.push(quote! {
-          #( #relationship_type_values )|* => {
-            let target_path = crate::common::resolve_zip_file_path(
-              &crate::common::resolve_relationship_target_path(
-                &child_parent_path,
-                &relationship.target,
-              ),
-            );
-            if #file_path_set_ident.contains(&target_path) {
-              let inserted = visited.insert(target_path.clone());
-              if inserted {
-                let #child_load_ident = #child_type::new_from_archive(
-                  &child_parent_path,
-                  &target_path,
-                  &relationship.id,
-                  #file_path_set_ident,
-                  #archive_ident,
-                  visited,
-                );
-                visited.remove(&target_path);
-                let #child_load_ident = #child_load_ident?;
-                #child_field_ident = Some(std::boxed::Box::new(#child_load_ident));
-              }
+          relationship_type if crate::common::relationship_type_matches(
+            relationship_type,
+            #relationship_type_expr,
+          ) => {
+            if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+              &child_parent_path,
+              relationship,
+              #file_path_set_ident,
+              #archive_ident,
+              visited,
+            )? {
+              #child_field_ident = Some(std::boxed::Box::new(loaded_child));
             }
           }
         });
         child_save_stmts.push(quote! {
           if let Some(#child_item_ident) = &self.#child_field_ident {
-            #child_item_ident.save_zip(&child_parent_path, zip, entry_set, visited)?;
+            crate::common::save_typed_child_part(
+              #child_item_ident.as_ref(),
+              &child_parent_path,
+              zip,
+              entry_set,
+              visited,
+            )?;
           }
         });
         child_validate_stmts.push(quote! {
@@ -277,13 +268,157 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
   }
 
+  for data_ref in &data_ref_infos {
+    let data_ref_type = &data_ref.ty;
+    let relationship_type_expr = match &data_ref.relationship_type {
+      PartRelationshipTypeSource::Explicit(value) => quote! { #value },
+      PartRelationshipTypeSource::TypeConst => {
+        quote! { <#data_ref_type as crate::sdk::SdkDataPartReference>::RELATIONSHIP_TYPE }
+      }
+    };
+    let data_ref_field_ident = &data_ref.field_ident;
+    let data_ref_item_ident = data_ref.field_ident.clone();
+
+    match data_ref.kind {
+      PartChildKind::Repeated => {
+        field_declarations.push(quote! {
+          let mut #data_ref_field_ident: Vec<#data_ref_type> = vec![];
+        });
+        child_match_arms.push(quote! {
+          relationship_type if crate::common::relationship_type_matches(
+            relationship_type,
+            #relationship_type_expr,
+          ) => {
+            if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+              &child_parent_path,
+              relationship,
+              #file_path_set_ident,
+              #archive_ident,
+            )? {
+              #data_ref_field_ident.push(loaded_data_ref);
+            }
+          }
+        });
+        child_save_stmts.push(quote! {
+          for #data_ref_item_ident in &self.#data_ref_field_ident {
+            crate::common::save_data_part_reference(
+              #data_ref_item_ident,
+              &child_parent_path,
+              zip,
+              entry_set,
+            )?;
+          }
+        });
+        child_validate_stmts.push(quote! {
+          for #data_ref_item_ident in &self.#data_ref_field_ident {
+            crate::validator::SdkValidator::validate(#data_ref_item_ident)?;
+          }
+        });
+        self_field_values.push(quote! { #data_ref_field_ident });
+      }
+      PartChildKind::Required => {
+        field_declarations.push(quote! {
+          let mut #data_ref_field_ident: Option<std::boxed::Box<#data_ref_type>> = None;
+        });
+        child_match_arms.push(quote! {
+          relationship_type if crate::common::relationship_type_matches(
+            relationship_type,
+            #relationship_type_expr,
+          ) => {
+            if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+              &child_parent_path,
+              relationship,
+              #file_path_set_ident,
+              #archive_ident,
+            )? {
+              #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
+            }
+          }
+        });
+        field_unwraps.push(quote! {
+          let #data_ref_field_ident = #data_ref_field_ident
+            .ok_or_else(|| crate::common::missing_field(
+              stringify!(#ident),
+              stringify!(#data_ref_field_ident),
+            ))?;
+        });
+        child_save_stmts.push(quote! {
+          crate::common::save_data_part_reference(
+            self.#data_ref_field_ident.as_ref(),
+            &child_parent_path,
+            zip,
+            entry_set,
+          )?;
+        });
+        child_validate_stmts.push(quote! {
+          crate::validator::SdkValidator::validate(self.#data_ref_field_ident.as_ref())?;
+        });
+        self_field_values.push(quote! { #data_ref_field_ident });
+      }
+      PartChildKind::Optional => {
+        field_declarations.push(quote! {
+          let mut #data_ref_field_ident: Option<std::boxed::Box<#data_ref_type>> = None;
+        });
+        child_match_arms.push(quote! {
+          relationship_type if crate::common::relationship_type_matches(
+            relationship_type,
+            #relationship_type_expr,
+          ) => {
+            if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+              &child_parent_path,
+              relationship,
+              #file_path_set_ident,
+              #archive_ident,
+            )? {
+              #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
+            }
+          }
+        });
+        child_save_stmts.push(quote! {
+          if let Some(#data_ref_item_ident) = &self.#data_ref_field_ident {
+            crate::common::save_data_part_reference(
+              #data_ref_item_ident.as_ref(),
+              &child_parent_path,
+              zip,
+              entry_set,
+            )?;
+          }
+        });
+        child_validate_stmts.push(quote! {
+          if let Some(#data_ref_item_ident) = &self.#data_ref_field_ident {
+            crate::validator::SdkValidator::validate(#data_ref_item_ident.as_ref())?;
+          }
+        });
+        self_field_values.push(quote! { #data_ref_field_ident });
+      }
+    }
+  }
+
+  let extended_fallback_arm = if has_extended_parts {
+    quote! {
+      _ => {
+        if let Some(loaded_extended_part) = crate::common::load_extended_part(
+          &child_parent_path,
+          relationship,
+          #file_path_set_ident,
+          #archive_ident,
+          visited,
+        )? {
+          extended_parts.push(loaded_extended_part);
+        }
+      }
+    }
+  } else {
+    quote! { _ => {} }
+  };
+
   if needs_relationships {
     field_declarations.push(quote! {
       if let Some(relationships) = &relationships {
         for relationship in &relationships.relationship {
           match relationship.r#type.as_str() {
             #( #child_match_arms )*
-            _ => {}
+            #extended_fallback_arm
           }
         }
       }
@@ -345,8 +480,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
   }
 
-  let new_from_archive_impl = quote! {
-    pub(crate) fn new_from_archive<R: std::io::Read + std::io::Seek>(
+  let trait_new_from_archive_impl = quote! {
+    fn new_from_archive<R: std::io::Read + std::io::Seek>(
       #parent_path_ident: &str,
       #path_ident: &str,
       #r_id_ident: &str,
@@ -397,26 +532,30 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let relationships_write_tokens = if needs_relationships {
     quote! {
       if let Some(relationships) = &self.relationships {
-        let rels_parent_path = crate::common::parent_zip_path(&self.inner_path);
-        let rels_dir_path = crate::common::resolve_zip_file_path(
-          &format!("{rels_parent_path}_rels"),
-        );
-        if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {
-          zip.add_directory(&rels_dir_path, options)?;
-        }
-        if entry_set.insert(self.rels_path.clone()) {
-          zip.start_file(&self.rels_path, options)?;
-          let xml = relationships.to_xml_bytes()?;
-          zip.write_all(&xml)?;
-        }
+        crate::common::save_part_relationships(
+          &self.inner_path,
+          &self.rels_path,
+          relationships,
+          zip,
+          entry_set,
+        )?;
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let extended_save_tokens = if has_extended_parts {
+    quote! {
+      for part in &self.extended_parts {
+        part.save_zip(&child_parent_path, zip, entry_set, visited)?;
       }
     }
   } else {
     quote! {}
   };
 
-  let save_zip_impl = quote! {
-    pub(crate) fn save_zip<W: std::io::Write + std::io::Seek>(
+  let trait_save_zip_impl = quote! {
+    fn save_zip<W: std::io::Write + std::io::Seek>(
       &self,
       parent_path: &str,
       zip: &mut zip::ZipWriter<W>,
@@ -446,11 +585,12 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       #relationships_write_tokens
       #( #content_write_stmts )*
       #( #child_save_stmts )*
+      #extended_save_tokens
       Ok(())
     }
   };
 
-  let mut impl_items = vec![new_from_archive_impl, save_zip_impl];
+  let mut impl_items = Vec::new();
 
   if has_content_types {
     impl_items.insert(
@@ -471,7 +611,14 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             };
             file_path_set.insert(file_path);
           }
-          Self::new_from_archive("", "", "", &file_path_set, &mut archive, &mut visited)
+          <Self as crate::sdk::SdkPart>::new_from_archive(
+            "",
+            "",
+            "",
+            &file_path_set,
+            &mut archive,
+            &mut visited,
+          )
         }
       },
     );
@@ -502,7 +649,13 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           zip.start_file("[Content_Types].xml", options)?;
           let xml = self.content_types.to_xml_bytes()?;
           zip.write_all(&xml)?;
-          self.save_zip("", &mut zip, &mut entry_set, &mut visited)?;
+          <Self as crate::sdk::SdkPart>::save_zip(
+            self,
+            "",
+            &mut zip,
+            &mut entry_set,
+            &mut visited,
+          )?;
           zip.finish()?;
           Ok(())
         }
@@ -535,7 +688,16 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   };
 
   Ok(quote! {
-    impl crate::sdk::SdkPart for #ident {}
+    impl crate::sdk::SdkPart for #ident {
+      const DESCRIPTOR: crate::sdk::PartDescriptor = crate::sdk::PartDescriptor::new(
+        self::RELATIONSHIP_TYPE,
+        self::PATH_PREFIX,
+      );
+
+      #trait_new_from_archive_impl
+
+      #trait_save_zip_impl
+    }
     #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {

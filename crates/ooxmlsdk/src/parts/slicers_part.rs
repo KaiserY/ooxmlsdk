@@ -8,10 +8,10 @@ pub const RELATIONSHIP_TYPE: &str = "http://schemas.microsoft.com/office/2007/re
 pub const PATH_PREFIX: &str = "../slicers";
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
 pub struct SlicersPart {
-  #[sdk(part_rid)]
   pub r_id: String,
-  #[sdk(part_inner_path)]
+  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
+  pub rels_path: String,
+  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
   pub inner_path: String,
-  #[sdk(part_root)]
   pub root_element: crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers,
 }

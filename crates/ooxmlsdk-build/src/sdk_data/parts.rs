@@ -79,6 +79,7 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
               .iter()
               .find(|part| part.name == child.name)
               .map(|part| part.relationship_type.clone())
+              .or_else(|| data_reference_relationship_type(child.name.as_str()).map(str::to_string))
               .unwrap_or_default(),
             version: part_version_map
               .get(child.name.as_str())
@@ -129,6 +130,21 @@ pub fn gen_parts(gen_context: &Context) -> Vec<Part> {
   parts.sort_by(|left, right| left.module_name.cmp(&right.module_name));
   validate_parts(&parts);
   parts
+}
+
+fn data_reference_relationship_type(name: &str) -> Option<&'static str> {
+  match name {
+    "AudioReferenceRelationship" => {
+      Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio")
+    }
+    "MediaReferenceRelationship" => {
+      Some("http://schemas.microsoft.com/office/2007/relationships/media")
+    }
+    "VideoReferenceRelationship" => {
+      Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/video")
+    }
+    _ => None,
+  }
 }
 
 fn resolve_content_kind(

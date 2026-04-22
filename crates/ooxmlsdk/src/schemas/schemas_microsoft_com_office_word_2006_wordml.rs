@@ -268,7 +268,13 @@ pub struct KeyMapEntry {
   /// Represents the following attribute in the schema: wne:mask
   #[sdk(attr(qname = "wne:mask"))]
   pub mask: Option<crate::simple_type::OnOffValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wne:CT_Fci/wne:fci",
+    qname = "wne:CT_MacroWll/wne:macro",
+    qname = "wne:CT_AcdKeymap/wne:acd",
+    qname = "wne:CT_MacroWll/wne:wll",
+    qname = "wne:CT_LongHexNumber/wne:wch"
+  ))]
   pub xml_children: Option<KeyMapEntryChoice>,
 }
 /// Defines the AllocatedCommand Class.

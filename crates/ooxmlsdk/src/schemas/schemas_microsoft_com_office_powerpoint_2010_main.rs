@@ -643,7 +643,14 @@ pub struct BrowseMode {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p14:laserClr")]
 pub struct LaserColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<LaserColorChoice>,
 }
 /// Defines the DefaultImageDpi Class.
@@ -770,7 +777,15 @@ pub struct RandomIdType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p14:CT_ShowEventRecordList/p14:showEvtLst")]
 pub struct ShowEventRecordList {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p14:CT_TriggerEventRecord/p14:triggerEvt",
+    qname = "p14:CT_MediaPlaybackEventRecord/p14:playEvt",
+    qname = "p14:CT_MediaPlaybackEventRecord/p14:stopEvt",
+    qname = "p14:CT_MediaPlaybackEventRecord/p14:pauseEvt",
+    qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt",
+    qname = "p14:CT_MediaSeekEventRecord/p14:seekEvt",
+    qname = "p14:CT_NullEventRecord/p14:nullEvt"
+  ))]
   pub xml_children: Vec<ShowEventRecordListChoice>,
 }
 /// Defines the NonVisualDrawingProperties Class.
@@ -892,7 +907,15 @@ pub struct ApplicationNonVisualDrawingProperties {
             crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::PlaceholderShape,
         >,
     >,
-    #[sdk(choice)]
+    #[sdk(
+        choice(
+            qname = "a:CT_AudioCD/a:audioCd",
+            qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile",
+            qname = "a:CT_AudioFile/a:audioFile",
+            qname = "a:CT_VideoFile/a:videoFile",
+            qname = "a:CT_QuickTimeFile/a:quickTimeFile"
+        )
+    )]
     pub application_non_visual_drawing_properties_choice: Option<
         ApplicationNonVisualDrawingPropertiesChoice,
     >,

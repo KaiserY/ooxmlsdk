@@ -117,7 +117,14 @@ pub struct ShadowObscured {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillProperties/a14:hiddenFill")]
 pub struct HiddenFillProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub xml_children: Option<HiddenFillPropertiesChoice>,
 }
 /// Defines the HiddenLineProperties Class.
@@ -169,11 +176,23 @@ pub struct HiddenLineProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PenAlignmentValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill"
+  ))]
   pub hidden_line_properties_choice1: Option<HiddenLinePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_PresetLineDashProperties/a:prstDash",
+    qname = "a:CT_DashStopList/a:custDash"
+  ))]
   pub hidden_line_properties_choice2: Option<HiddenLinePropertiesChoice2>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_LineJoinRound/a:round",
+    qname = "a:CT_LineJoinBevel/a:bevel",
+    qname = "a:CT_LineJoinMiterProperties/a:miter"
+  ))]
   pub hidden_line_properties_choice3: Option<HiddenLinePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -195,7 +214,10 @@ pub struct HiddenLineProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectProperties/a14:hiddenEffects")]
 pub struct HiddenEffectsProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub xml_children: Option<HiddenEffectsPropertiesChoice>,
 }
 /// Defines the HiddenScene3D Class.
@@ -1562,7 +1584,35 @@ pub struct ImageEffect {
   /// Represents the following attribute in the schema: :visible
   #[sdk(attr(qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a14:CT_PictureEffectBlur/a14:artisticBlur",
+    qname = "a14:CT_PictureEffectCement/a14:artisticCement",
+    qname = "a14:CT_PictureEffectChalkSketch/a14:artisticChalkSketch",
+    qname = "a14:CT_PictureEffectCrisscrossEtching/a14:artisticCrisscrossEtching",
+    qname = "a14:CT_PictureEffectCutout/a14:artisticCutout",
+    qname = "a14:CT_PictureEffectFilmGrain/a14:artisticFilmGrain",
+    qname = "a14:CT_PictureEffectGlass/a14:artisticGlass",
+    qname = "a14:CT_PictureEffectGlowDiffused/a14:artisticGlowDiffused",
+    qname = "a14:CT_PictureEffectGlowEdges/a14:artisticGlowEdges",
+    qname = "a14:CT_PictureEffectLightScreen/a14:artisticLightScreen",
+    qname = "a14:CT_PictureEffectLineDrawing/a14:artisticLineDrawing",
+    qname = "a14:CT_PictureEffectMarker/a14:artisticMarker",
+    qname = "a14:CT_PictureEffectMosiaicBubbles/a14:artisticMosiaicBubbles",
+    qname = "a14:CT_PictureEffectPaintStrokes/a14:artisticPaintStrokes",
+    qname = "a14:CT_PictureEffectPaintBrush/a14:artisticPaintBrush",
+    qname = "a14:CT_PictureEffectPastelsSmooth/a14:artisticPastelsSmooth",
+    qname = "a14:CT_PictureEffectPencilGrayscale/a14:artisticPencilGrayscale",
+    qname = "a14:CT_PictureEffectPencilSketch/a14:artisticPencilSketch",
+    qname = "a14:CT_PictureEffectPhotocopy/a14:artisticPhotocopy",
+    qname = "a14:CT_PictureEffectPlasticWrap/a14:artisticPlasticWrap",
+    qname = "a14:CT_PictureEffectTexturizer/a14:artisticTexturizer",
+    qname = "a14:CT_PictureEffectWatercolorSponge/a14:artisticWatercolorSponge",
+    qname = "a14:CT_PictureEffectBackgroundRemoval/a14:backgroundRemoval",
+    qname = "a14:CT_PictureEffectBrightnessContrast/a14:brightnessContrast",
+    qname = "a14:CT_PictureEffectColorTemperature/a14:colorTemperature",
+    qname = "a14:CT_PictureEffectSaturation/a14:saturation",
+    qname = "a14:CT_PictureEffectSharpenSoften/a14:sharpenSoften"
+  ))]
   pub xml_children: Option<ImageEffectChoice>,
 }
 /// Defines the ImageLayer Class.

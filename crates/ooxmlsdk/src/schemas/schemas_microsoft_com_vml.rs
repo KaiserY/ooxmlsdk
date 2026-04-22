@@ -846,7 +846,7 @@ pub struct TextBox {
   /// Represents the following attribute in the schema: o:singleclick
   #[sdk(attr(qname = "o:singleclick"))]
   pub single_click: Option<crate::simple_type::TrueFalseValue>,
-  #[sdk(choice(any))]
+  #[sdk(choice(qname = "w:CT_TxbxContent/w:txbxContent", any))]
   pub xml_children: Option<TextBoxChoice>,
 }
 /// Defines the TextPath Class.
@@ -1467,7 +1467,33 @@ pub struct Shape {
   /// Represents the following attribute in the schema: :equationxml
   #[sdk(attr(qname = ":equationxml"))]
   pub equation_xml: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata",
+    qname = "o:CT_Ink/o:ink",
+    qname = "pvml:CT_Empty/pvml:iscomment"
+  ))]
   pub xml_children: Vec<ShapeChoice>,
 }
 /// Shape Template.
@@ -1867,7 +1893,31 @@ pub struct Shapetype {
   /// Represents the following attribute in the schema: o:master
   #[sdk(attr(qname = "o:master"))]
   pub master: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub shapetype_choice: Vec<ShapetypeChoice>,
   /// _
   #[sdk(child(qname = "o:CT_Complex/o:complex"))]
@@ -2120,7 +2170,25 @@ pub struct Group {
   /// Represents the following attribute in the schema: o:tablelimits
   #[sdk(attr(qname = "o:tablelimits"))]
   pub table_limits: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Group/v:group",
+    qname = "v:CT_Shape/v:shape",
+    qname = "v:CT_Shapetype/v:shapetype",
+    qname = "v:CT_Arc/v:arc",
+    qname = "v:CT_Curve/v:curve",
+    qname = "v:CT_Image/v:image",
+    qname = "v:CT_Line/v:line",
+    qname = "v:CT_Oval/v:oval",
+    qname = "v:CT_PolyLine/v:polyline",
+    qname = "v:CT_Rect/v:rect",
+    qname = "v:CT_RoundRect/v:roundrect",
+    qname = "o:CT_Diagram/o:diagram",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "xvml:CT_ClientData/xvml:ClientData"
+  ))]
   pub xml_children: Vec<GroupChoice>,
 }
 /// Document Background.
@@ -2582,7 +2650,31 @@ pub struct Arc {
   /// Represents the following attribute in the schema: :endangle
   #[sdk(attr(qname = ":endangle"))]
   pub end_angle: Option<crate::simple_type::DecimalValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub arc_choice: Vec<ArcChoice>,
 }
 /// Bezier Curve.
@@ -2996,7 +3088,31 @@ pub struct Curve {
   /// Represents the following attribute in the schema: :to
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub curve_choice: Vec<CurveChoice>,
 }
 /// Image File.
@@ -3445,7 +3561,31 @@ pub struct ImageFile {
   /// Represents the following attribute in the schema: o:gfxdata
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub image_file_choice: Vec<ImageFileChoice>,
 }
 /// Line.
@@ -3845,7 +3985,31 @@ pub struct Line {
   /// Represents the following attribute in the schema: :to
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub line_choice: Vec<LineChoice>,
 }
 /// Oval.
@@ -4231,7 +4395,31 @@ pub struct Oval {
   /// Represents the following attribute in the schema: o:gfxdata
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub xml_children: Vec<OvalChoice>,
 }
 /// Multiple Path Line.
@@ -4624,7 +4812,32 @@ pub struct PolyLine {
   /// Represents the following attribute in the schema: :points
   #[sdk(attr(qname = ":points"))]
   pub points: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata",
+    qname = "o:CT_Ink/o:ink"
+  ))]
   pub xml_children: Vec<PolyLineChoice>,
 }
 /// Rectangle.
@@ -5010,7 +5223,31 @@ pub struct Rectangle {
   /// Represents the following attribute in the schema: o:gfxdata
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub xml_children: Vec<RectangleChoice>,
 }
 /// Rounded Rectangle.
@@ -5396,7 +5633,31 @@ pub struct RoundRectangle {
   /// Represents the following attribute in the schema: :arcsize
   #[sdk(attr(qname = ":arcsize"))]
   pub arc_size: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Path/v:path",
+    qname = "v:CT_Formulas/v:formulas",
+    qname = "v:CT_Handles/v:handles",
+    qname = "v:CT_Fill/v:fill",
+    qname = "v:CT_Stroke/v:stroke",
+    qname = "v:CT_Shadow/v:shadow",
+    qname = "v:CT_Textbox/v:textbox",
+    qname = "v:CT_TextPath/v:textpath",
+    qname = "v:CT_ImageData/v:imagedata",
+    qname = "o:CT_Skew/o:skew",
+    qname = "o:CT_Extrusion/o:extrusion",
+    qname = "o:CT_Callout/o:callout",
+    qname = "o:CT_Lock/o:lock",
+    qname = "o:CT_ClipPath/o:clippath",
+    qname = "o:CT_SignatureLine/o:signatureline",
+    qname = "w10:CT_Wrap/w10:wrap",
+    qname = "w10:CT_AnchorLock/w10:anchorlock",
+    qname = "w10:CT_Border/w10:bordertop",
+    qname = "w10:CT_Border/w10:borderbottom",
+    qname = "w10:CT_Border/w10:borderleft",
+    qname = "w10:CT_Border/w10:borderright",
+    qname = "xvml:CT_ClientData/xvml:ClientData",
+    qname = "pvml:CT_Rel/pvml:textdata"
+  ))]
   pub xml_children: Vec<RoundRectangleChoice>,
 }
 /// Shape Handle.

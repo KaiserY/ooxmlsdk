@@ -1110,6 +1110,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               &choice_fields,
               ir,
               field_version_cfg,
+              &HashSet::new(),
             )?);
           }
         }
@@ -1138,6 +1139,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             ir,
             type_graph,
             field_version_cfg,
+            &HashSet::new(),
           )?);
         }
         ContentModelDecl::SequenceAnyOnly => {
@@ -1194,6 +1196,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             ir,
             type_graph,
             field_version_cfg,
+            &HashSet::new(),
           )?);
         }
         ContentModelDecl::GenericChildrenFallback => {
@@ -1202,6 +1205,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               &choice_fields,
               ir,
               field_version_cfg,
+              &HashSet::new(),
             )?);
           } else if !direct_child_fields.is_empty() {
             fields.extend(gen_direct_child_fields_from_decl(
@@ -1220,6 +1224,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               &choice_fields,
               ir,
               field_version_cfg,
+              &HashSet::new(),
             )?);
           }
         }
@@ -1351,6 +1356,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               &choice_fields,
               ir,
               field_version_cfg,
+              &HashSet::new(),
             )?);
           }
         }
@@ -1379,6 +1385,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             ir,
             type_graph,
             field_version_cfg,
+            &HashSet::new(),
           )?);
         }
         ContentModelDecl::MixedChoiceChildren => {
@@ -1406,6 +1413,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             ir,
             type_graph,
             field_version_cfg,
+            &HashSet::new(),
           )?);
         }
         ContentModelDecl::OneSequenceStructured => {
@@ -1433,6 +1441,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             ir,
             type_graph,
             field_version_cfg,
+            &HashSet::new(),
           )?);
         }
         ContentModelDecl::GenericChildrenFallback => {
@@ -1441,6 +1450,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               &choice_fields,
               ir,
               field_version_cfg,
+              &HashSet::new(),
             )?);
           } else if !direct_child_fields.is_empty() || !base_direct_child_fields.is_empty() {
             fields.extend(gen_direct_child_fields_from_decl(
@@ -1496,6 +1506,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               &choice_fields,
               ir,
               field_version_cfg,
+              &HashSet::new(),
             )?);
           }
         }
@@ -2690,6 +2701,7 @@ fn gen_helper_struct_type_decl(
     module,
     type_graph,
     nested_cfg,
+    &HashSet::new(),
   )?;
   let sdk_type_derive = sdk_type_derive_tokens();
 
@@ -3114,6 +3126,54 @@ fn choice_type_accepts_any(module: &SchemaModuleDecl, rust_type: &str) -> bool {
   type_accepts_any_recursive(module, rust_type, &mut HashSet::new())
 }
 
+fn choice_type_specific_start_qname_groups(
+  module: &SchemaModuleDecl,
+  rust_type: &str,
+  version_cfg: VersionCfgContext,
+) -> (Vec<String>, Vec<String>) {
+  let Some(type_decl) = module
+    .types
+    .iter()
+    .find(|type_decl| type_decl.rust_name == rust_type && type_decl.kind == TypeKind::ChoiceEnum)
+  else {
+    return (Vec::new(), Vec::new());
+  };
+
+  let mut unconditional_qnames = Vec::new();
+  let mut feature_gated_qnames = Vec::new();
+  for member in &type_decl.members {
+    let MemberDecl::Variant(variant) = member else {
+      continue;
+    };
+    let target_qnames = if module_version_cfg_attrs(&variant.version, version_cfg).is_empty() {
+      &mut unconditional_qnames
+    } else {
+      &mut feature_gated_qnames
+    };
+
+    match &variant.wire {
+      VariantWireDecl::Child {
+        qnames: variant_qnames,
+      }
+      | VariantWireDecl::Sequence {
+        qnames: variant_qnames,
+      }
+      | VariantWireDecl::TextChild {
+        qnames: variant_qnames,
+      } => {
+        for qname in variant_qnames {
+          if !target_qnames.contains(qname) {
+            target_qnames.push(qname.clone());
+          }
+        }
+      }
+      VariantWireDecl::Any | VariantWireDecl::Text => {}
+    }
+  }
+
+  (unconditional_qnames, feature_gated_qnames)
+}
+
 fn gen_direct_child_fields_from_decl(
   fields: &[&FieldDecl],
   owner_rust_name: &str,
@@ -3263,6 +3323,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
   field_cfg: VersionCfgContext,
+  _choice_dispatch_field_names: &HashSet<String>,
 ) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
 
@@ -3273,6 +3334,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
           std::slice::from_ref(field),
           module,
           field_cfg,
+          &HashSet::new(),
         )?);
       }
       FieldWireDecl::Any => {
@@ -3322,6 +3384,7 @@ fn gen_choice_fields_from_decl(
   fields: &[&FieldDecl],
   module: &SchemaModuleDecl,
   field_cfg: VersionCfgContext,
+  _choice_dispatch_field_names: &HashSet<String>,
 ) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
 
@@ -3331,30 +3394,48 @@ fn gen_choice_fields_from_decl(
     let attrs = module_version_cfg_attrs(&field.version, field_cfg);
     let choice_accepts_text = choice_type_accepts_text(module, &field.type_ref.rust_type);
     let choice_accepts_any = choice_type_accepts_any(module, &field.type_ref.rust_type);
-    let sdk_choice_attr = if choice_accepts_text && choice_accepts_any {
-      quote! { #[sdk(choice(text, any))] }
+    let (choice_qnames, gated_choice_qnames) =
+      choice_type_specific_start_qname_groups(module, &field.type_ref.rust_type, field_cfg);
+    let choice_qname_attrs = choice_qnames
+      .into_iter()
+      .map(|qname| quote! { qname = #qname })
+      .collect::<Vec<_>>();
+    let gated_choice_qname_attrs = gated_choice_qnames
+      .into_iter()
+      .map(|qname| quote! { qname = #qname })
+      .collect::<Vec<_>>();
+    let mut sdk_choice_attrs = Vec::new();
+    if choice_qname_attrs.is_empty() && !choice_accepts_text && !choice_accepts_any {
+      sdk_choice_attrs.push(quote! { #[sdk(choice)] });
+    } else if choice_accepts_text && choice_accepts_any {
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text, any))] });
     } else if choice_accepts_text {
-      quote! { #[sdk(choice(text))] }
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text))] });
     } else if choice_accepts_any {
-      quote! { #[sdk(choice(any))] }
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* any))] });
     } else {
-      quote! { #[sdk(choice)] }
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs),*))] });
+    }
+    if !gated_choice_qname_attrs.is_empty() {
+      sdk_choice_attrs.push(quote! {
+        #[cfg_attr(feature = "microsoft365", sdk(choice(#(#gated_choice_qname_attrs),*)))]
+      });
     };
 
     match field.cardinality {
       Cardinality::Many => tokens.push(quote! {
         #( #attrs )*
-        #sdk_choice_attr
+        #( #sdk_choice_attrs )*
         pub #field_name_ident: Vec<#field_type>,
       }),
       Cardinality::Optional => tokens.push(quote! {
         #( #attrs )*
-        #sdk_choice_attr
+        #( #sdk_choice_attrs )*
         pub #field_name_ident: Option<#field_type>,
       }),
       Cardinality::One => tokens.push(quote! {
         #( #attrs )*
-        #sdk_choice_attr
+        #( #sdk_choice_attrs )*
         pub #field_name_ident: #field_type,
       }),
     }
@@ -4431,6 +4512,169 @@ mod tests {
     ));
     assert!(!generated.contains("pub enum RootChoice1"));
     assert!(!generated.contains("pub enum RootChoice2"));
+  }
+
+  #[test]
+  fn emits_choice_dispatch_marker_for_specific_choice_fields() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "First".to_string(),
+          xml_qname: Some("t:CT_First/t:first".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Second".to_string(),
+          xml_qname: Some("t:CT_Second/t:second".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TFirst".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: VariantWireDecl::Child {
+                qnames: vec!["t:CT_First/t:first".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "First".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TSecond".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: VariantWireDecl::Sequence {
+                qnames: vec!["t:CT_Second/t:second".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "Second".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Holder".to_string(),
+          xml_qname: Some("t:CT_Holder/t:holder".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Composite),
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "holder_choice".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Choice,
+            cardinality: Cardinality::Optional,
+            type_ref: TypeRefDecl {
+              rust_type: "HolderChoice".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("# [sdk (choice (qname ="));
+  }
+
+  #[test]
+  fn omits_feature_gated_choice_qnames_from_parent_field_metadata() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "AlwaysHere".to_string(),
+          xml_qname: Some("t:CT_Always/t:always".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "OfficeOnly".to_string(),
+          xml_qname: Some("t14:CT_OfficeOnly/t14:officeOnly".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Always".to_string(),
+              docs: " _".to_string(),
+              version: String::new(),
+              wire: VariantWireDecl::Child {
+                qnames: vec!["t:CT_Always/t:always".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "AlwaysHere".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Office".to_string(),
+              docs: " _".to_string(),
+              version: "Office2010".to_string(),
+              wire: VariantWireDecl::Child {
+                qnames: vec!["t14:CT_OfficeOnly/t14:officeOnly".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "OfficeOnly".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "Holder".to_string(),
+          xml_qname: Some("t:CT_Holder/t:holder".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Composite),
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "holder_choice".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: FieldWireDecl::Choice,
+            cardinality: Cardinality::Optional,
+            type_ref: TypeRefDecl {
+              rust_type: "HolderChoice".to_string(),
+              module_path: None,
+            },
+            validators: vec![],
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("# [sdk (choice (qname ="));
+    assert!(generated.contains("# [cfg_attr (feature = \"microsoft365\" , sdk (choice (qname ="));
   }
 
   #[test]

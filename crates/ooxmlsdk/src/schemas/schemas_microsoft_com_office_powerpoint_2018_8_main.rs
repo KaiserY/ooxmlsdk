@@ -384,7 +384,18 @@ pub struct Comment {
   /// Represents the following attribute in the schema: :title
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "pc:CT_SlideMonikerList/pc:sldMkLst",
+    qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst",
+    qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst",
+    qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst",
+    qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst",
+    qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst",
+    qname = "oac:CT_TableCellMonikerList/oac:tcMkLst",
+    qname = "oac:CT_TableRowMonikerList/oac:trMkLst",
+    qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst",
+    qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"
+  ))]
   pub comment_choice: Option<CommentChoice>,
   /// _
   #[sdk(child(qname = "a:CT_Point2D/p188:pos"))]

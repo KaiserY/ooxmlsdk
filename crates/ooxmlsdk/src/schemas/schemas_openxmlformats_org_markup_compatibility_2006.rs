@@ -29,7 +29,7 @@ pub struct AlternateContent {
   /// Represents the following attribute in the schema: mc:ProcessContent
   #[sdk(attr(qname = "mc:ProcessContent"))]
   pub mc_process_content: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "mc:CT_Choice/mc:Choice", qname = "mc:CT_Fallback/mc:Fallback"))]
   pub alternate_content_choice: Vec<AlternateContentChoice>,
 }
 /// Defines the Choice Class.

@@ -624,7 +624,10 @@ pub struct NameType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Author")]
 pub struct Author {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "b:CT_NameListType/b:NameList",
+    qname = "b:ST_String255/b:Corporate"
+  ))]
   pub xml_children: Option<AuthorChoice>,
 }
 /// Performer.
@@ -635,7 +638,10 @@ pub struct Author {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Performer")]
 pub struct Performer {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "b:CT_NameListType/b:NameList",
+    qname = "b:ST_String255/b:Corporate"
+  ))]
   pub xml_children: Option<PerformerChoice>,
 }
 /// Defines the NameOrCorporateType Class.
@@ -646,7 +652,10 @@ pub struct Performer {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/")]
 pub struct NameOrCorporateType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "b:CT_NameListType/b:NameList",
+    qname = "b:ST_String255/b:Corporate"
+  ))]
   pub xml_children: Option<NameOrCorporateTypeChoice>,
 }
 /// Contributors List.
@@ -657,7 +666,24 @@ pub struct NameOrCorporateType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_AuthorType/b:Author")]
 pub struct AuthorList {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "b:CT_NameType/b:Artist",
+    qname = "b:CT_NameOrCorporateType/b:Author",
+    qname = "b:CT_NameType/b:BookAuthor",
+    qname = "b:CT_NameType/b:Compiler",
+    qname = "b:CT_NameType/b:Composer",
+    qname = "b:CT_NameType/b:Conductor",
+    qname = "b:CT_NameType/b:Counsel",
+    qname = "b:CT_NameType/b:Director",
+    qname = "b:CT_NameType/b:Editor",
+    qname = "b:CT_NameType/b:Interviewee",
+    qname = "b:CT_NameType/b:Interviewer",
+    qname = "b:CT_NameType/b:Inventor",
+    qname = "b:CT_NameOrCorporateType/b:Performer",
+    qname = "b:CT_NameType/b:ProducerName",
+    qname = "b:CT_NameType/b:Translator",
+    qname = "b:CT_NameType/b:Writer"
+  ))]
   pub xml_children: Vec<AuthorListChoice>,
 }
 /// Source Type.
@@ -674,7 +700,60 @@ pub type SourceType = DataSourceValues;
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_SourceType/b:Source")]
 pub struct Source {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "b:ST_String255/b:AbbreviatedCaseNumber",
+    qname = "b:ST_String255/b:AlbumTitle",
+    qname = "b:CT_AuthorType/b:Author",
+    qname = "b:ST_String255/b:BookTitle",
+    qname = "b:ST_String255/b:Broadcaster",
+    qname = "b:ST_String255/b:BroadcastTitle",
+    qname = "b:ST_String255/b:CaseNumber",
+    qname = "b:ST_String255/b:ChapterNumber",
+    qname = "b:ST_String255/b:City",
+    qname = "b:ST_String255/b:Comments",
+    qname = "b:ST_String255/b:ConferenceName",
+    qname = "b:ST_String255/b:CountryRegion",
+    qname = "b:ST_String255/b:Court",
+    qname = "b:ST_String255/b:Day",
+    qname = "b:ST_String255/b:DayAccessed",
+    qname = "b:ST_String255/b:Department",
+    qname = "b:ST_String255/b:Distributor",
+    qname = "b:ST_String255/b:Edition",
+    qname = "b:ST_String255/b:Guid",
+    qname = "b:ST_String255/b:Institution",
+    qname = "b:ST_String255/b:InternetSiteTitle",
+    qname = "b:ST_String255/b:Issue",
+    qname = "b:ST_String255/b:JournalName",
+    qname = "b:ST_String255/b:LCID",
+    qname = "b:ST_String255/b:Medium",
+    qname = "b:ST_String255/b:Month",
+    qname = "b:ST_String255/b:MonthAccessed",
+    qname = "b:ST_String255/b:NumberVolumes",
+    qname = "b:ST_String255/b:Pages",
+    qname = "b:ST_String255/b:PatentNumber",
+    qname = "b:ST_String255/b:PeriodicalTitle",
+    qname = "b:ST_String255/b:ProductionCompany",
+    qname = "b:ST_String255/b:PublicationTitle",
+    qname = "b:ST_String255/b:Publisher",
+    qname = "b:ST_String255/b:RecordingNumber",
+    qname = "b:ST_String255/b:RefOrder",
+    qname = "b:ST_String255/b:Reporter",
+    qname = "b:ST_SourceType/b:SourceType",
+    qname = "b:ST_String255/b:ShortTitle",
+    qname = "b:ST_String255/b:StandardNumber",
+    qname = "b:ST_String255/b:StateProvince",
+    qname = "b:ST_String255/b:Station",
+    qname = "b:ST_String255/b:Tag",
+    qname = "b:ST_String255/b:Theater",
+    qname = "b:ST_String255/b:ThesisType",
+    qname = "b:ST_String255/b:Title",
+    qname = "b:ST_String255/b:Type",
+    qname = "b:ST_String255/b:URL",
+    qname = "b:ST_String255/b:Version",
+    qname = "b:ST_String255/b:Volume",
+    qname = "b:ST_String255/b:Year",
+    qname = "b:ST_String255/b:YearAccessed"
+  ))]
   pub xml_children: Vec<SourceChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

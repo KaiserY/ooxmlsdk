@@ -412,19 +412,29 @@ pub struct Anchor {
   ///Simple Positioning Coordinates
   #[sdk(child(qname = "a:CT_Point2D/wp:simplePos"))]
   pub simple_position: std::boxed::Box<SimplePosition>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Horizontal Positioning
   #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
-  pub horizontal_position: std::boxed::Box<HorizontalPosition>,
+  pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
   ///Vertical Positioning
   #[sdk(child(qname = "wp:CT_PosV/wp:positionV"))]
-  pub vertical_position: std::boxed::Box<VerticalPosition>,
+  pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
   ///Inline Drawing Object Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
   pub extent: std::boxed::Box<Extent>,
   /// _
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wp:CT_WrapNone/wp:wrapNone",
+    qname = "wp:CT_WrapSquare/wp:wrapSquare",
+    qname = "wp:CT_WrapTight/wp:wrapTight",
+    qname = "wp:CT_WrapThrough/wp:wrapThrough",
+    qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"
+  ))]
   pub anchor_choice: Option<AnchorChoice>,
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wp:docPr"))]
@@ -700,7 +710,14 @@ pub struct HorizontalPosition {
   #[sdk(attr(qname = ":relativeFrom"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub relative_from: HorizontalRelativePositionValues,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wp:ST_AlignH/wp:align",
+    qname = "wp:ST_PositionOffset/wp:posOffset"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "a:ST_Percentage/wp14:pctPosHOffset"))
+  )]
   pub xml_children: Option<HorizontalPositionChoice>,
 }
 /// Vertical Positioning.
@@ -719,7 +736,14 @@ pub struct VerticalPosition {
   #[sdk(attr(qname = ":relativeFrom"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub relative_from: VerticalRelativePositionValues,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wp:ST_AlignV/wp:align",
+    qname = "wp:ST_PositionOffset/wp:posOffset"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "a:ST_Percentage/wp14:pctPosVOffset"))
+  )]
   pub xml_children: Option<VerticalPositionChoice>,
 }
 /// Inline Drawing Object Extents.

@@ -204,7 +204,22 @@ pub struct RevExHeaders {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExStream/xr:revStream")]
 pub struct RevExStream {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xr:CT_RevExFuture/xr:xrrftr",
+    qname = "xr:CT_RevExUnsupported/xr:xrrUspt",
+    qname = "xr:CT_RevExTrimmed/xr:xrrTrim",
+    qname = "xr:CT_RevExRowColumn/xr:xrrrc",
+    qname = "xr:CT_RevExMove/xr:xrrm",
+    qname = "xr:CT_RevExChangeCell/xr:xrrc",
+    qname = "xr:CT_RevExFormatting/xr:xrrf",
+    qname = "xr:CT_RevExDefinedName/xr:xrrDefName",
+    qname = "xr:CT_RevExDelObj/xr:xrrdo",
+    qname = "xr:CT_RevExChgObj/xr:xrrco",
+    qname = "xr:CT_RevExSheetOp/xr:xrrSheet",
+    qname = "xr:CT_RevisionList/xr:xrrList",
+    qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR",
+    qname = "xr:CT_RevGroup/xr:xrrg"
+  ))]
   pub xml_children: Vec<RevExStreamChoice>,
 }
 /// Defines the DifferentialFormatType Class.
@@ -299,7 +314,14 @@ pub struct RevisionPtr {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_StateBasedObject/xr:objectState")]
 pub struct StateBasedObject {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_DataValidation/xr:dataValidation",
+    qname = "x:CT_Hyperlink/xr:hyperlink",
+    qname = "x14:CT_SparklineGroup/xr:sparklineGroup",
+    qname = "x:CT_Comments/xr:comments",
+    qname = "x:CT_AutoFilter/xr:autoFilter",
+    qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
+  ))]
   pub xml_children: Option<StateBasedObjectChoice>,
 }
 /// Defines the RevExHeader Class.
@@ -1229,7 +1251,10 @@ pub struct RevExChgObj {
   /// _
   #[sdk(child(qname = "xr:CT_StateBasedHeader/xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xr:CT_RevisionStateLink/xr:link",
+    qname = "xr:CT_RevisionState/xr:body"
+  ))]
   pub rev_ex_chg_obj_choice: Option<RevExChgObjChoice>,
 }
 /// Defines the RevExSheetOp Class.
@@ -1570,7 +1595,21 @@ pub struct RevGroup {
   /// Represents the following attribute in the schema: :ctx
   #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xr:CT_RevExFuture/xr:xrrftr",
+    qname = "xr:CT_RevExUnsupported/xr:xrrUspt",
+    qname = "xr:CT_RevExTrimmed/xr:xrrTrim",
+    qname = "xr:CT_RevExRowColumn/xr:xrrrc",
+    qname = "xr:CT_RevExMove/xr:xrrm",
+    qname = "xr:CT_RevExChangeCell/xr:xrrc",
+    qname = "xr:CT_RevExFormatting/xr:xrrf",
+    qname = "xr:CT_RevExDefinedName/xr:xrrDefName",
+    qname = "xr:CT_RevExDelObj/xr:xrrdo",
+    qname = "xr:CT_RevExChgObj/xr:xrrco",
+    qname = "xr:CT_RevExSheetOp/xr:xrrSheet",
+    qname = "xr:CT_RevisionList/xr:xrrList",
+    qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"
+  ))]
   pub xml_children: Vec<RevGroupChoice>,
 }
 /// Defines the RevExTest Class.
@@ -1767,7 +1806,13 @@ pub struct RevisionStateLink {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevisionState/xr:body")]
 pub struct RevisionState {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps",
+    qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet",
+    qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings",
+    qname = "xr:CT_FreezePanes/xr:freezePanes",
+    qname = "xr:CT_Outlines/xr:outlines"
+  ))]
   pub xml_children: Option<RevisionStateChoice>,
 }
 /// Defines the RefMap Class.
@@ -1778,7 +1823,13 @@ pub struct RevisionState {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RefMap/xr:refmap")]
 pub struct RefMap {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xr:CT_RefCell/xr:ref",
+    qname = "xr:CT_SheetXluid/xr:sheetUid",
+    qname = "xr:CT_RefOartAnchor/xr:oartAnchor",
+    qname = "xr:CT_RefFuture/xr:future",
+    qname = "xr:CT_RefTest/xr:test"
+  ))]
   pub xml_children: Vec<RefMapChoice>,
 }
 /// Defines the RowColVisualOps Class.

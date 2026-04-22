@@ -87,7 +87,12 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_LiveFeedBackgroundProperties/alf:backgroundProps")]
 pub struct LiveFeedBackgroundProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "alf:CT_BackgroundNormalProperties/alf:Normal",
+    qname = "alf:CT_BackgroundRemovedProperties/alf:Removed",
+    qname = "alf:CT_BackgroundBlurProperties/alf:Blur",
+    qname = "alf:CT_BackgroundCustomProperties/alf:Custom"
+  ))]
   pub live_feed_background_properties_choice: Option<LiveFeedBackgroundPropertiesChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]

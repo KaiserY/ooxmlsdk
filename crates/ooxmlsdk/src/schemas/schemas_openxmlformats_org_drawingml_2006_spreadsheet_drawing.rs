@@ -40,7 +40,17 @@ pub struct TwoCellAnchor {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:CT_Shape/xdr:sp",
+    qname = "xdr:CT_GroupShape/xdr:grpSp",
+    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
+    qname = "xdr:CT_Connector/xdr:cxnSp",
+    qname = "xdr:CT_Picture/xdr:pic"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "xdr14:CT_ContentPart/xdr:contentPart"))
+  )]
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// _
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -60,7 +70,17 @@ pub struct OneCellAnchor {
   /// _
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:CT_Shape/xdr:sp",
+    qname = "xdr:CT_GroupShape/xdr:grpSp",
+    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
+    qname = "xdr:CT_Connector/xdr:cxnSp",
+    qname = "xdr:CT_Picture/xdr:pic"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "xdr14:CT_ContentPart/xdr:contentPart"))
+  )]
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
   /// _
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -80,7 +100,17 @@ pub struct AbsoluteAnchor {
   ///Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:CT_Shape/xdr:sp",
+    qname = "xdr:CT_GroupShape/xdr:grpSp",
+    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
+    qname = "xdr:CT_Connector/xdr:cxnSp",
+    qname = "xdr:CT_Picture/xdr:pic"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "xdr14:CT_ContentPart/xdr:contentPart"))
+  )]
   pub absolute_anchor_choice: Option<AbsoluteAnchorChoice>,
   /// _
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -149,7 +179,17 @@ pub struct GroupShape {
   ///Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:CT_Shape/xdr:sp",
+    qname = "xdr:CT_GroupShape/xdr:grpSp",
+    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
+    qname = "xdr:CT_Connector/xdr:cxnSp",
+    qname = "xdr:CT_Picture/xdr:pic"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "xdr14:CT_ContentPart/xdr14:contentPart"))
+  )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
 }
 /// Graphic Frame.
@@ -315,7 +355,11 @@ pub struct WorksheetDrawing {
   pub xmlns_map: std::collections::HashMap<String, String>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor",
+    qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor",
+    qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor"
+  ))]
   pub worksheet_drawing_choice: Vec<WorksheetDrawingChoice>,
 }
 /// Non-Visual Properties for a Shape.
@@ -355,16 +399,29 @@ pub struct ShapeProperties {
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -483,7 +540,10 @@ pub struct BlipFill {
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SourceRectangle>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TileInfoProperties/a:tile",
+    qname = "a:CT_StretchInfoProperties/a:stretch"
+  ))]
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Properties for a Graphic Frame.
@@ -612,7 +672,12 @@ pub struct ToMarker {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/")]
 pub struct MarkerType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:ST_ColID/xdr:col",
+    qname = "a:ST_Coordinate/xdr:colOff",
+    qname = "xdr:ST_RowID/xdr:row",
+    qname = "a:ST_Coordinate/xdr:rowOff"
+  ))]
   pub xml_children: Vec<MarkerTypeChoice>,
 }
 /// Client Data.
@@ -935,9 +1000,19 @@ pub struct GroupShapeProperties {
   pub transform_group: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]

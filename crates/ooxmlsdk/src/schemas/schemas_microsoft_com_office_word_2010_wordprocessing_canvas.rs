@@ -18,7 +18,13 @@ pub struct WordprocessingCanvas {
   /// _
   #[sdk(child(qname = "a:CT_WholeE2oFormatting/wpc:whole"))]
   pub whole_formatting: Option<std::boxed::Box<WholeFormatting>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wps:CT_WordprocessingShape/wps:wsp",
+    qname = "pic:CT_Picture/pic:pic",
+    qname = "w14:CT_WordContentPart/w14:contentPart",
+    qname = "wpg:CT_WordprocessingGroup/wpg:wgp",
+    qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"
+  ))]
   pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpc:extLst"))]
@@ -32,9 +38,19 @@ pub struct WordprocessingCanvas {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFormatting/wpc:bg")]
 pub struct BackgroundFormatting {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub background_formatting_choice1: Option<BackgroundFormattingChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub background_formatting_choice2: Option<BackgroundFormattingChoice2>,
 }
 /// Defines the WholeFormatting Class.
@@ -50,7 +66,10 @@ pub struct WholeFormatting {
   pub outline: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub whole_formatting_choice: Option<WholeFormattingChoice>,
 }
 /// Defines the GraphicFrameType Class.

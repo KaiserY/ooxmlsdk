@@ -22,7 +22,13 @@ pub struct WordprocessingGroup {
   /// _
   #[sdk(child(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wps:CT_WordprocessingShape/wps:wsp",
+    qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
+    qname = "wpg:CT_GraphicFrame/wpg:graphicFrame",
+    qname = "pic:CT_Picture/pic:pic",
+    qname = "w14:CT_WordContentPart/w14:contentPart"
+  ))]
   pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
@@ -46,7 +52,13 @@ pub struct GroupShape {
   /// _
   #[sdk(child(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "wps:CT_WordprocessingShape/wps:wsp",
+    qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
+    qname = "wpg:CT_GraphicFrame/wpg:graphicFrame",
+    qname = "pic:CT_Picture/pic:pic",
+    qname = "w14:CT_WordContentPart/w14:contentPart"
+  ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
@@ -60,7 +72,17 @@ pub struct GroupShape {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpg:CT_WordprocessingGroup/")]
 pub struct WordprocessingGroupType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr",
+    qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr",
+    qname = "a:CT_GroupShapeProperties/wpg:grpSpPr",
+    qname = "wps:CT_WordprocessingShape/wps:wsp",
+    qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
+    qname = "wpg:CT_GraphicFrame/wpg:graphicFrame",
+    qname = "pic:CT_Picture/pic:pic",
+    qname = "w14:CT_WordContentPart/w14:contentPart",
+    qname = "a:CT_OfficeArtExtensionList/wpg:extLst"
+  ))]
   pub xml_children: Vec<WordprocessingGroupTypeChoice>,
 }
 /// Defines the NonVisualDrawingProperties Class.
@@ -237,9 +259,19 @@ pub struct GroupShapeProperties {
   pub transform_group: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]

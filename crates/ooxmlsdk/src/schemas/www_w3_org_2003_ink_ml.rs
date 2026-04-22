@@ -382,7 +382,15 @@ pub struct Ink {
   #[sdk(attr(qname = ":documentID"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub document_id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "inkml:CT_Annotation/inkml:annotation",
+    qname = "inkml:CT_AnnotationXML/inkml:annotationXML",
+    qname = "inkml:CT_Definitions/inkml:definitions",
+    qname = "inkml:CT_Context/inkml:context",
+    qname = "inkml:CT_Trace/inkml:trace",
+    qname = "inkml:CT_TraceGroup/inkml:traceGroup",
+    qname = "inkml:CT_TraceView/inkml:traceView"
+  ))]
   pub xml_children: Vec<InkChoice>,
 }
 /// Defines the Bind Class.
@@ -505,7 +513,10 @@ pub struct Mapping {
   ///Defines the Bind Class.
   #[sdk(child(qname = "inkml:CT_Bind/inkml:bind"))]
   pub bind: Vec<Bind>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "inkml:CT_Table/inkml:table",
+    qname = "inkml:CT_Matrix/inkml:matrix"
+  ))]
   pub mapping_choice: Option<MappingChoice>,
   ///Defines the Mapping Class.
   #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
@@ -1569,7 +1580,12 @@ pub struct TraceGroup {
   #[sdk(attr(qname = ":brushRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "inkml:CT_Annotation/inkml:annotation",
+    qname = "inkml:CT_AnnotationXML/inkml:annotationXML",
+    qname = "inkml:CT_Trace/inkml:trace",
+    qname = "inkml:CT_TraceGroup/inkml:traceGroup"
+  ))]
   pub xml_children: Vec<TraceGroupChoice>,
 }
 /// Defines the TraceView Class.
@@ -1617,7 +1633,11 @@ pub struct TraceView {
   /// Represents the following attribute in the schema: :to
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "inkml:CT_Annotation/inkml:annotation",
+    qname = "inkml:CT_AnnotationXML/inkml:annotationXML",
+    qname = "inkml:CT_TraceView/inkml:traceView"
+  ))]
   pub xml_children: Vec<TraceViewChoice>,
 }
 /// Defines the Context Class.
@@ -1718,7 +1738,19 @@ pub struct Context {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Definitions/inkml:definitions")]
 pub struct Definitions {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "inkml:CT_Brush/inkml:brush",
+    qname = "inkml:CT_Canvas/inkml:canvas",
+    qname = "inkml:CT_CanvasTransform/inkml:canvasTransform",
+    qname = "inkml:CT_Context/inkml:context",
+    qname = "inkml:CT_InkSource/inkml:inkSource",
+    qname = "inkml:CT_Mapping/inkml:mapping",
+    qname = "inkml:CT_Timestamp/inkml:timestamp",
+    qname = "inkml:CT_Trace/inkml:trace",
+    qname = "inkml:CT_TraceFormat/inkml:traceFormat",
+    qname = "inkml:CT_TraceGroup/inkml:traceGroup",
+    qname = "inkml:CT_TraceView/inkml:traceView"
+  ))]
   pub xml_children: Vec<DefinitionsChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

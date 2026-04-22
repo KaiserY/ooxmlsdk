@@ -72,7 +72,13 @@ pub enum RichFormatPropertyType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichFilterColumn/xlrd2:filterColumn")]
 pub struct RichFilterColumn {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xlrd2:CT_RichFilters/xlrd2:filters",
+    qname = "xlrd2:CT_RichTop10/xlrd2:top10",
+    qname = "xlrd2:CT_CustomRichFilters/xlrd2:customFilters",
+    qname = "xlrd2:CT_DynamicRichFilter/xlrd2:dynamicFilter",
+    qname = "x:CT_ExtensionList/xlrd2:extLst"
+  ))]
   pub xml_children: Option<RichFilterColumnChoice>,
 }
 /// Defines the RichSortCondition Class.
@@ -338,7 +344,10 @@ pub struct CustomRichFilters {
   /// Represents the following attribute in the schema: :and
   #[sdk(attr(qname = ":and"))]
   pub and: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter",
+    qname = "x:CT_ExtensionList/xlrd2:extLst"
+  ))]
   pub custom_rich_filters_choice: Vec<CustomRichFiltersChoice>,
 }
 /// Defines the DynamicRichFilter Class.

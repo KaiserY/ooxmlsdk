@@ -125,7 +125,19 @@ pub struct TaskHistoryEvent {
   /// _
   #[sdk(child(qname = "t:CT_TaskAnchor/t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "t:CT_TaskUser/t:Assign",
+    qname = "t:CT_TaskUser/t:Unassign",
+    qname = "t:CT_TaskCreateEventInfo/t:Create",
+    qname = "t:CT_TaskTitleEventInfo/t:SetTitle",
+    qname = "t:CT_TaskScheduleEventInfo/t:Schedule",
+    qname = "t:CT_TaskProgressEventInfo/t:Progress",
+    qname = "t:CT_TaskPriorityEventInfo/t:Priority",
+    qname = "t:CT_TaskDeleteEventInfo/t:Delete",
+    qname = "t:CT_TaskUndeleteEventInfo/t:Undelete",
+    qname = "t:CT_TaskUnassignAll/t:UnassignAll",
+    qname = "t:CT_TaskUndo/t:Undo"
+  ))]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// _
   #[sdk(child(qname = "oel:CT_ExtensionList/t:extLst"))]

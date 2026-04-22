@@ -128,7 +128,7 @@ pub struct Lattice {
   /// Represents the following attribute in the schema: emma:time-ref-anchor-point
   #[sdk(attr(qname = "emma:time-ref-anchor-point"))]
   pub time_reference_anchor_point: Option<AnchorPointValues>,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "emma:CT_Arc/emma:arc", qname = "emma:CT_Node/emma:node"))]
   pub xml_children: Vec<LatticeChoice>,
 }
 /// Defines the Literal Class.
@@ -344,7 +344,13 @@ pub struct Interpretation {
   /// Represents the following attribute in the schema: emma:uninterpreted
   #[sdk(attr(qname = "emma:uninterpreted"))]
   pub uninterpreted: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "emma:CT_DerivedFrom/emma:derived-from",
+    qname = "emma:CT_Info/emma:info",
+    qname = "emma:CT_Lattice/emma:lattice",
+    qname = "emma:CT_Literal/emma:literal",
+    qname = "msink:CT_CtxNode/msink:context"
+  ))]
   pub xml_children: Vec<InterpretationChoice>,
 }
 /// Defines the OneOf Class.
@@ -547,7 +553,14 @@ pub struct OneOf {
   /// Represents the following attribute in the schema: emma:dialog-turn
   #[sdk(attr(qname = "emma:dialog-turn"))]
   pub dialog_turn: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "emma:CT_DerivedFrom/emma:derived-from",
+    qname = "emma:CT_Info/emma:info",
+    qname = "emma:CT_Interpretation/emma:interpretation",
+    qname = "emma:CT_OneOf/emma:one-of",
+    qname = "emma:CT_Group/emma:group",
+    qname = "emma:CT_Sequence/emma:sequence"
+  ))]
   pub xml_children: Vec<OneOfChoice>,
 }
 /// Defines the Group Class.
@@ -743,7 +756,15 @@ pub struct Group {
   /// Represents the following attribute in the schema: emma:dialog-turn
   #[sdk(attr(qname = "emma:dialog-turn"))]
   pub dialog_turn: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "emma:CT_DerivedFrom/emma:derived-from",
+    qname = "emma:CT_GroupInfo/emma:group-info",
+    qname = "emma:CT_Info/emma:info",
+    qname = "emma:CT_Interpretation/emma:interpretation",
+    qname = "emma:CT_OneOf/emma:one-of",
+    qname = "emma:CT_Group/emma:group",
+    qname = "emma:CT_Sequence/emma:sequence"
+  ))]
   pub xml_children: Vec<GroupChoice>,
 }
 /// Defines the Sequence Class.
@@ -939,7 +960,14 @@ pub struct Sequence {
   /// Represents the following attribute in the schema: emma:dialog-turn
   #[sdk(attr(qname = "emma:dialog-turn"))]
   pub dialog_turn: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "emma:CT_DerivedFrom/emma:derived-from",
+    qname = "emma:CT_Info/emma:info",
+    qname = "emma:CT_Interpretation/emma:interpretation",
+    qname = "emma:CT_OneOf/emma:one-of",
+    qname = "emma:CT_Group/emma:group",
+    qname = "emma:CT_Sequence/emma:sequence"
+  ))]
   pub xml_children: Vec<SequenceChoice>,
 }
 /// Defines the GroupInfo Class.
@@ -969,7 +997,12 @@ pub struct GroupInfo {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Derivation/emma:derivation")]
 pub struct Derivation {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "emma:CT_Interpretation/emma:interpretation",
+    qname = "emma:CT_OneOf/emma:one-of",
+    qname = "emma:CT_Sequence/emma:sequence",
+    qname = "emma:CT_Group/emma:group"
+  ))]
   pub xml_children: Vec<DerivationChoice>,
 }
 /// Defines the Grammar Class.
@@ -1316,7 +1349,17 @@ pub struct Emma {
   /// Represents the following attribute in the schema: :version
   #[sdk(attr(qname = ":version"))]
   pub version: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "emma:CT_Derivation/emma:derivation",
+    qname = "emma:CT_Grammar/emma:grammar",
+    qname = "emma:CT_Model/emma:model",
+    qname = "emma:CT_EndPointInfo/emma:endpoint-info",
+    qname = "emma:CT_Info/emma:info",
+    qname = "emma:CT_Interpretation/emma:interpretation",
+    qname = "emma:CT_OneOf/emma:one-of",
+    qname = "emma:CT_Group/emma:group",
+    qname = "emma:CT_Sequence/emma:sequence"
+  ))]
   pub xml_children: Vec<EmmaChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

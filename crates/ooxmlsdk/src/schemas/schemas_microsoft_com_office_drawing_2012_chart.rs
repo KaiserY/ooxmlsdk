@@ -69,16 +69,29 @@ pub struct ShapeProperties {
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -429,7 +442,11 @@ pub struct BooleanType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Tx/c15:tx")]
 pub struct ChartText {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "c:CT_StrRef/c:strRef",
+    qname = "a:CT_TextBody/c:rich",
+    qname = "c:CT_StrData/c:strLit"
+  ))]
   pub xml_children: Option<ChartTextChoice>,
 }
 /// Defines the LeaderLines Class.
@@ -474,7 +491,13 @@ pub type TextFieldGuid = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxDataSource/c15:cat")]
 pub struct AxisDataSourceType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef",
+    qname = "c:CT_NumRef/c:numRef",
+    qname = "c:CT_NumData/c:numLit",
+    qname = "c:CT_StrRef/c:strRef",
+    qname = "c:CT_StrData/c:strLit"
+  ))]
   pub xml_children: Option<AxisDataSourceTypeChoice>,
 }
 /// Defines the BarChartSeries Class.
@@ -1069,7 +1092,11 @@ pub struct DataLabelFieldTableCache {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/")]
 pub struct StringDataType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "c:CT_UnsignedInt/c:ptCount",
+    qname = "c:CT_StrVal/c:pt",
+    qname = "c:CT_StrDataExtensionList/c:extLst"
+  ))]
   pub xml_children: Vec<StringDataTypeChoice>,
 }
 /// Defines the Explosion Class.
@@ -1126,7 +1153,22 @@ pub struct DataLabel {
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "c:CT_Boolean/c:delete",
+    qname = "c:CT_Layout/c:layout",
+    qname = "c:CT_Tx/c:tx",
+    qname = "c:CT_NumFmt/c:numFmt",
+    qname = "a:CT_ChartShapeProperties/c:spPr",
+    qname = "a:CT_TextBody/c:txPr",
+    qname = "c:CT_DLblPos/c:dLblPos",
+    qname = "c:CT_Boolean/c:showLegendKey",
+    qname = "c:CT_Boolean/c:showVal",
+    qname = "c:CT_Boolean/c:showCatName",
+    qname = "c:CT_Boolean/c:showSerName",
+    qname = "c:CT_Boolean/c:showPercent",
+    qname = "c:CT_Boolean/c:showBubbleSize",
+    qname = "xsd:string/c:separator"
+  ))]
   pub data_label_choice: Option<DataLabelChoice>,
   /// _
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]

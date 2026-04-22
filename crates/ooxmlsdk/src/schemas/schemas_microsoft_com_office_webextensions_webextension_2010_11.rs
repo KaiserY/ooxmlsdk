@@ -240,7 +240,25 @@ pub struct Snapshot {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub compression_state:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
+    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
+    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
+    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
+    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
+    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
+    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
+    qname = "a:CT_BiLevelEffect/a:biLevel",
+    qname = "a:CT_BlurEffect/a:blur",
+    qname = "a:CT_ColorChangeEffect/a:clrChange",
+    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
+    qname = "a:CT_DuotoneEffect/a:duotone",
+    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
+    qname = "a:CT_GrayscaleEffect/a:grayscl",
+    qname = "a:CT_HSLEffect/a:hsl",
+    qname = "a:CT_LuminanceEffect/a:lum",
+    qname = "a:CT_TintEffect/a:tint"
+  ))]
   pub snapshot_choice: Vec<SnapshotChoice>,
   /// _
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]

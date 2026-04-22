@@ -2735,7 +2735,20 @@ pub struct Revisions {
   pub xmlns_map: std::collections::HashMap<String, String>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_RevisionRowColumn/x:rrc",
+    qname = "x:CT_RevisionMove/x:rm",
+    qname = "x:CT_RevisionCustomView/x:rcv",
+    qname = "x:CT_RevisionSheetRename/x:rsnm",
+    qname = "x:CT_RevisionInsertSheet/x:ris",
+    qname = "x:CT_RevisionCellChange/x:rcc",
+    qname = "x:CT_RevisionFormatting/x:rfmt",
+    qname = "x:CT_RevisionAutoFormatting/x:raf",
+    qname = "x:CT_RevisionDefinedName/x:rdn",
+    qname = "x:CT_RevisionComment/x:rcmt",
+    qname = "x:CT_RevisionQueryTableField/x:rqt",
+    qname = "x:CT_RevisionConflict/x:rcft"
+  ))]
   pub xml_children: Vec<RevisionsChoice>,
 }
 /// User List.
@@ -3122,7 +3135,11 @@ pub struct ExternalLink {
   pub xmlns_map: std::collections::HashMap<String, String>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_ExternalBook/x:externalBook",
+    qname = "x:CT_DdeLink/x:ddeLink",
+    qname = "x:CT_OleLink/x:oleLink"
+  ))]
   pub external_link_choice: Option<ExternalLinkChoice>,
   /// _
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -3450,7 +3467,22 @@ pub struct FilterColumn {
   /// Represents the following attribute in the schema: :showButton
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Filters/x:filters",
+    qname = "x:CT_Top10/x:top10",
+    qname = "x:CT_CustomFilters/x:customFilters",
+    qname = "x:CT_DynamicFilter/x:dynamicFilter",
+    qname = "x:CT_ColorFilter/x:colorFilter",
+    qname = "x:CT_IconFilter/x:iconFilter",
+    qname = "x:CT_ExtensionList/x:extLst"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_CustomFilters/x14:customFilters",
+      qname = "x14:CT_IconFilter/x14:iconFilter"
+    ))
+  )]
   pub xml_children: Option<FilterColumnChoice>,
 }
 /// Sort State for Auto Filter.
@@ -3489,7 +3521,11 @@ pub struct SortState {
   /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "x:CT_SortCondition/x:sortCondition"))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x14:CT_SortCondition/x14:sortCondition"))
+  )]
   pub sort_state_choice: Option<SortStateChoice>,
   /// _
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -4299,7 +4335,11 @@ pub struct Tables {
   /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_TableMissing/x:m",
+    qname = "x:CT_XStringElement/x:s",
+    qname = "x:CT_Index/x:x"
+  ))]
   pub xml_children: Vec<TablesChoice>,
 }
 /// Parameter Properties.
@@ -5306,7 +5346,15 @@ pub struct XType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Record/x:r")]
 pub struct PivotCacheRecord {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Missing/x:m",
+    qname = "x:CT_Number/x:n",
+    qname = "x:CT_Boolean/x:b",
+    qname = "x:CT_Error/x:e",
+    qname = "x:CT_String/x:s",
+    qname = "x:CT_DateTime/x:d",
+    qname = "x:CT_Index/x:x"
+  ))]
   pub xml_children: Vec<PivotCacheRecordChoice>,
 }
 /// OLAP KPI.
@@ -5570,7 +5618,12 @@ pub struct Entries {
   /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Missing/x:m",
+    qname = "x:CT_Number/x:n",
+    qname = "x:CT_Error/x:e",
+    qname = "x:CT_String/x:s"
+  ))]
   pub xml_children: Vec<EntriesChoice>,
 }
 /// Sets.
@@ -7285,7 +7338,14 @@ pub struct GroupItems {
   /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Missing/x:m",
+    qname = "x:CT_Number/x:n",
+    qname = "x:CT_Boolean/x:b",
+    qname = "x:CT_Error/x:e",
+    qname = "x:CT_String/x:s",
+    qname = "x:CT_DateTime/x:d"
+  ))]
   pub xml_children: Vec<GroupItemsChoice>,
 }
 /// Page Field.
@@ -7741,7 +7801,12 @@ pub struct CommentText {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Rst/")]
 pub struct RstType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Xstring/x:t",
+    qname = "x:CT_RElt/x:r",
+    qname = "x:CT_PhoneticRun/x:rPh",
+    qname = "x:CT_PhoneticPr/x:phoneticPr"
+  ))]
   pub xml_children: Vec<RstTypeChoice>,
 }
 /// Bold.
@@ -8486,7 +8551,11 @@ pub struct RevisionRowColumn {
   /// Represents the following attribute in the schema: :edge
   #[sdk(attr(qname = ":edge"))]
   pub edge: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_UndoInfo/x:undo",
+    qname = "x:CT_RevisionCellChange/x:rcc",
+    qname = "x:CT_RevisionFormatting/x:rfmt"
+  ))]
   pub xml_children: Vec<RevisionRowColumnChoice>,
 }
 /// Revision Cell Move.
@@ -8546,7 +8615,11 @@ pub struct RevisionMove {
   /// Represents the following attribute in the schema: :sourceSheetId
   #[sdk(attr(qname = ":sourceSheetId"))]
   pub source_sheet_id: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_UndoInfo/x:undo",
+    qname = "x:CT_RevisionCellChange/x:rcc",
+    qname = "x:CT_RevisionFormatting/x:rfmt"
+  ))]
   pub xml_children: Vec<RevisionMoveChoice>,
 }
 /// Revision Custom View.
@@ -9593,7 +9666,12 @@ pub struct CellType {
   /// Represents the following attribute in the schema: :ph
   #[sdk(attr(qname = ":ph"))]
   pub show_phonetic: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_CellFormula/x:f",
+    qname = "x:CT_Xstring/x:v",
+    qname = "x:CT_Rst/x:is",
+    qname = "x:CT_ExtensionList/x:extLst"
+  ))]
   pub xml_children: Vec<CellTypeChoice>,
 }
 /// New Cell Data.
@@ -9757,7 +9835,15 @@ pub struct DifferentialFormat {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/")]
 pub struct DifferentialFormatType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Font/x:font",
+    qname = "x:CT_NumFmt/x:numFmt",
+    qname = "x:CT_Fill/x:fill",
+    qname = "x:CT_CellAlignment/x:alignment",
+    qname = "x:CT_Border/x:border",
+    qname = "x:CT_CellProtection/x:protection",
+    qname = "x:CT_ExtensionList/x:extLst"
+  ))]
   pub xml_children: Vec<DifferentialFormatTypeChoice>,
 }
 /// Sheet Id.
@@ -12574,7 +12660,12 @@ pub struct Mdx {
   /// Represents the following attribute in the schema: :f
   #[sdk(attr(qname = ":f"))]
   pub cube_function: MdxFunctionValues,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_MdxTuple/x:t",
+    qname = "x:CT_MdxSet/x:ms",
+    qname = "x:CT_MdxMemeberProp/x:p",
+    qname = "x:CT_MdxKPI/x:k"
+  ))]
   pub xml_children: Option<MdxChoice>,
 }
 /// Tuple MDX Metadata.
@@ -13150,7 +13241,10 @@ pub struct Font {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Fill/x:fill")]
 pub struct Fill {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_PatternFill/x:patternFill",
+    qname = "x:CT_GradientFill/x:gradientFill"
+  ))]
   pub xml_children: Option<FillChoice>,
 }
 /// Border Properties.
@@ -13762,7 +13856,11 @@ pub struct Value {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
-  #[sdk(choice)]
+  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem"))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x14:CT_OleItem/x14:oleItem"))
+  )]
   pub xml_children: Vec<OleItemsChoice>,
 }
 /// External Workbook.
@@ -14828,7 +14926,12 @@ pub struct ToMarker {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/")]
 pub struct MarkerType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xdr:ST_ColID/xdr:col",
+    qname = "a:ST_Coordinate/xdr:colOff",
+    qname = "xdr:ST_RowID/xdr:row",
+    qname = "a:ST_Coordinate/xdr:rowOff"
+  ))]
   pub xml_children: Vec<MarkerTypeChoice>,
 }
 /// Defines the ConditionalFormattingRuleExtension Class.
@@ -14848,6 +14951,7 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(feature = "microsoft365", sdk(choice(qname = "x:ST_Guid/x14:id")))]
   pub xml_children: Option<ConditionalFormattingRuleExtensionChoice>,
 }
 /// Defines the PivotHierarchyExtension Class.
@@ -14867,6 +14971,10 @@ pub struct PivotHierarchyExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy"))
+  )]
   pub xml_children: Option<PivotHierarchyExtensionChoice>,
 }
 /// Defines the PivotFieldExtension Class.
@@ -14886,6 +14994,10 @@ pub struct PivotFieldExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x14:CT_PivotField/x14:pivotField"))
+  )]
   pub xml_children: Option<PivotFieldExtensionChoice>,
 }
 /// Defines the CacheSourceExtension Class.
@@ -14905,6 +15017,10 @@ pub struct CacheSourceExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x14:CT_SourceConnection/x14:sourceConnection"))
+  )]
   pub xml_children: Option<CacheSourceExtensionChoice>,
 }
 /// OLE Link Item.
@@ -16768,7 +16884,14 @@ pub struct Filters {
   /// Represents the following attribute in the schema: :calendarType
   #[sdk(attr(qname = ":calendarType"))]
   pub calendar_type: Option<CalendarValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Filter/x:filter",
+    qname = "x:CT_DateGroupItem/x:dateGroupItem"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x14:CT_Filter/x14:filter"))
+  )]
   pub xml_children: Option<FiltersChoice>,
 }
 /// Top 10.
@@ -16936,6 +17059,14 @@ pub struct SlicerCacheDefinitionExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables",
+      qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache",
+      qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData"
+    ))
+  )]
   pub xml_children: Option<SlicerCacheDefinitionExtensionChoice>,
 }
 /// Defines the PivotFilterExtension Class.
@@ -16955,6 +17086,13 @@ pub struct PivotFilterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x15:CT_PivotFilter/x15:pivotFilter",
+      qname = "x15:CT_MovingPeriodState/x15:movingPeriodState"
+    ))
+  )]
   pub xml_children: Option<PivotFilterExtensionChoice>,
 }
 /// Defines the QueryTableExtension Class.
@@ -16974,6 +17112,10 @@ pub struct QueryTableExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "x15:CT_QueryTable/x15:queryTable"))
+  )]
   pub xml_children: Option<QueryTableExtensionChoice>,
 }
 /// Defines the DatabaseProperties Class.
@@ -17360,6 +17502,13 @@ pub struct ConnectionExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_Connection/x14:connection",
+      qname = "x15:CT_Connection/x15:connection"
+    ))
+  )]
   pub xml_children: Option<ConnectionExtensionChoice>,
 }
 /// Defines the TextFields Class.
@@ -17487,7 +17636,14 @@ pub struct SharedItems {
   /// Represents the following attribute in the schema: :longText
   #[sdk(attr(qname = ":longText"))]
   pub long_text: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Missing/x:m",
+    qname = "x:CT_Number/x:n",
+    qname = "x:CT_Boolean/x:b",
+    qname = "x:CT_Error/x:e",
+    qname = "x:CT_String/x:s",
+    qname = "x:CT_DateTime/x:d"
+  ))]
   pub xml_children: Vec<SharedItemsChoice>,
 }
 /// Defines the FieldGroup Class.
@@ -17512,7 +17668,10 @@ pub struct FieldGroup {
   /// Represents the following attribute in the schema: :base
   #[sdk(attr(qname = ":base"))]
   pub base: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_RangePr/x:rangePr",
+    qname = "x:CT_DiscretePr/x:discretePr"
+  ))]
   pub field_group_choice: Option<FieldGroupChoice>,
   /// _
   #[sdk(child(qname = "x:CT_GroupItems/x:groupItems"))]
@@ -17547,6 +17706,13 @@ pub struct CacheFieldExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_CacheField/x14:cacheField",
+      qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames"
+    ))
+  )]
   pub xml_children: Option<CacheFieldExtensionChoice>,
 }
 /// Defines the FieldsUsage Class.
@@ -17616,6 +17782,13 @@ pub struct CacheHierarchyExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy",
+      qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy"
+    ))
+  )]
   pub xml_children: Option<CacheHierarchyExtensionChoice>,
 }
 /// Defines the CalculatedMemberExtensionList Class.
@@ -17647,6 +17820,13 @@ pub struct CalculatedMemberExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_CalculatedMember/x14:calculatedMember",
+      qname = "x15:CT_CalculatedMember/x15:calculatedMember"
+    ))
+  )]
   pub xml_children: Option<CalculatedMemberExtensionChoice>,
 }
 /// Defines the DataFieldExtensionList Class.
@@ -17678,6 +17858,13 @@ pub struct DataFieldExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_DataField/x14:dataField",
+      qname = "x15:CT_DataField/x15:dataField"
+    ))
+  )]
   pub xml_children: Option<DataFieldExtensionChoice>,
 }
 /// Defines the PivotFilterExtensionList Class.
@@ -17982,6 +18169,19 @@ pub struct WorksheetExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings",
+      qname = "x14:CT_DataValidations/x14:dataValidations",
+      qname = "x14:CT_SparklineGroups/x14:sparklineGroups",
+      qname = "x14:CT_SlicerRefs/x14:slicerList",
+      qname = "x14:CT_ProtectedRanges/x14:protectedRanges",
+      qname = "x14:CT_IgnoredErrors/x14:ignoredErrors",
+      qname = "x15:CT_WebExtensions/x15:webExtensions",
+      qname = "x15:CT_TimelineRefs/x15:timelineRefs"
+    ))
+  )]
   pub xml_children: Option<WorksheetExtensionChoice>,
 }
 /// Defines the NumberingFormats Class.
@@ -18223,6 +18423,15 @@ pub struct StylesheetExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x:CT_Dxfs/x14:dxfs",
+      qname = "x14:CT_SlicerStyles/x14:slicerStyles",
+      qname = "x:CT_Dxfs/x15:dxfs",
+      qname = "x15:CT_TimelineStyles/x15:timelineStyles"
+    ))
+  )]
   pub xml_children: Option<StylesheetExtensionChoice>,
 }
 /// Defines the Location Class.
@@ -18624,6 +18833,15 @@ pub struct PivotTableDefinitionExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition",
+      qname = "x15:CT_PivotTableData/x15:pivotTableData",
+      qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings",
+      qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo"
+    ))
+  )]
   pub xml_children: Option<PivotTableDefinitionExtensionChoice>,
 }
 /// Defines the CacheSource Class.
@@ -18648,7 +18866,11 @@ pub struct CacheSource {
   /// Represents the following attribute in the schema: :connectionId
   #[sdk(attr(qname = ":connectionId"))]
   pub connection_id: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_WorksheetSource/x:worksheetSource",
+    qname = "x:CT_Consolidation/x:consolidation",
+    qname = "x:CT_CacheSourceExtensionList/x:extLst"
+  ))]
   pub xml_children: Option<CacheSourceChoice>,
 }
 /// Defines the CacheFields Class.
@@ -18858,6 +19080,20 @@ pub struct PivotCacheDefinitionExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition",
+      qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled",
+      qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition",
+      qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion",
+      qname = "xsd:boolean/xxpim:implicitMeasureSupport",
+      qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo",
+      qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo",
+      qname = "xsd:boolean/xlpar:autoRefresh",
+      qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray"
+    ))
+  )]
   pub xml_children: Option<PivotCacheDefinitionExtensionChoice>,
 }
 /// Sheet names of supporting book.
@@ -18990,6 +19226,13 @@ pub struct TableExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_Table/x14:table",
+      qname = "xlmsforms:CT_MsForm/xlmsforms:msForm"
+    ))
+  )]
   pub xml_children: Option<TableExtensionChoice>,
 }
 /// Defines the FileVersion Class.
@@ -19713,6 +19956,25 @@ pub struct WorkbookExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "x14:CT_DefinedNames/x14:definedNames",
+      qname = "x:CT_PivotCaches/x14:pivotCaches",
+      qname = "x14:CT_SlicerCaches/x14:slicerCaches",
+      qname = "x14:CT_SlicerCaches/x15:slicerCaches",
+      qname = "x14:CT_WorkbookPr/x14:workbookPr",
+      qname = "x:CT_PivotCaches/x15:pivotCaches",
+      qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences",
+      qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches",
+      qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs",
+      qname = "x15:CT_WorkbookPr/x15:workbookPr",
+      qname = "x15:CT_DataModel/x15:dataModel",
+      qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService",
+      qname = "xlwcv:CT_Version/xlwcv:version",
+      qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput"
+    ))
+  )]
   pub xml_children: Option<WorkbookExtensionChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

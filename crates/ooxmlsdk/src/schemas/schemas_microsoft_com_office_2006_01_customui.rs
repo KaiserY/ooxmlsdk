@@ -1657,7 +1657,10 @@ pub struct UnsizedSplitButton {
   #[sdk(attr(qname = ":getShowLabel"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_VisibleButton/mso:button",
+    qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
+  ))]
   pub unsized_split_button_choice: Option<UnsizedSplitButtonChoice>,
   ///Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
@@ -1921,7 +1924,17 @@ pub struct UnsizedMenu {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneRegular/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_GalleryRegular/mso:gallery",
+    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
+    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
+    qname = "mso:CT_SplitButtonRegular/mso:splitButton",
+    qname = "mso:CT_MenuRegular/mso:menu",
+    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
+  ))]
   pub unsized_menu_choice: Vec<UnsizedMenuChoice>,
 }
 /// Defines the UnsizedDynamicMenu Class.
@@ -2337,7 +2350,10 @@ pub struct SplitButtonWithTitle {
   #[sdk(attr(qname = ":getShowLabel"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_VisibleButton/mso:button",
+    qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
+  ))]
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
   ///Defines the MenuWithTitle Class.
   #[sdk(child(qname = "mso:CT_MenuWithTitle/mso:menu"))]
@@ -2601,7 +2617,17 @@ pub struct MenuWithTitle {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneRegular/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_GalleryRegular/mso:gallery",
+    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
+    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
+    qname = "mso:CT_SplitButtonWithTitle/mso:splitButton",
+    qname = "mso:CT_MenuWithTitle/mso:menu",
+    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
+  ))]
   pub menu_with_title_choice: Vec<MenuWithTitleChoice>,
 }
 /// Defines the ControlClone Class.
@@ -5270,7 +5296,17 @@ pub struct Menu {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneRegular/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_GalleryRegular/mso:gallery",
+    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
+    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
+    qname = "mso:CT_SplitButtonRegular/mso:splitButton",
+    qname = "mso:CT_MenuRegular/mso:menu",
+    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
+  ))]
   pub menu_choice: Vec<MenuChoice>,
 }
 /// Defines the DynamicMenu Class.
@@ -5716,7 +5752,10 @@ pub struct SplitButton {
   #[sdk(attr(qname = ":getShowLabel"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_VisibleButton/mso:button",
+    qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
+  ))]
   pub split_button_choice: Option<SplitButtonChoice>,
   ///Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
@@ -5810,7 +5849,22 @@ pub struct Box {
   /// Represents the following attribute in the schema: :boxStyle
   #[sdk(attr(qname = ":boxStyle"))]
   pub box_style: Option<BoxStyleValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlClone/mso:control",
+    qname = "mso:CT_LabelControl/mso:labelControl",
+    qname = "mso:CT_Button/mso:button",
+    qname = "mso:CT_ToggleButton/mso:toggleButton",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_EditBox/mso:editBox",
+    qname = "mso:CT_ComboBox/mso:comboBox",
+    qname = "mso:CT_DropDownRegular/mso:dropDown",
+    qname = "mso:CT_Gallery/mso:gallery",
+    qname = "mso:CT_Menu/mso:menu",
+    qname = "mso:CT_DynamicMenu/mso:dynamicMenu",
+    qname = "mso:CT_SplitButton/mso:splitButton",
+    qname = "mso:CT_Box/mso:box",
+    qname = "mso:CT_ButtonGroup/mso:buttonGroup"
+  ))]
   pub xml_children: Vec<BoxChoice>,
 }
 /// Defines the ButtonGroup Class.
@@ -5894,7 +5948,15 @@ pub struct ButtonGroup {
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   #[sdk(string_format(source = 0u32, kind = "qname"))]
   pub insert_before_q: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneRegular/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
+    qname = "mso:CT_GalleryRegular/mso:gallery",
+    qname = "mso:CT_MenuRegular/mso:menu",
+    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu",
+    qname = "mso:CT_SplitButtonRegular/mso:splitButton"
+  ))]
   pub button_group_choice: Vec<ButtonGroupChoice>,
 }
 /// Defines the MenuRoot Class.
@@ -5928,7 +5990,17 @@ pub struct MenuRoot {
   /// Represents the following attribute in the schema: :itemSize
   #[sdk(attr(qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneRegular/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_GalleryRegular/mso:gallery",
+    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
+    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
+    qname = "mso:CT_SplitButtonRegular/mso:splitButton",
+    qname = "mso:CT_MenuRegular/mso:menu",
+    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
+  ))]
   pub menu_root_choice: Vec<MenuRootChoice>,
 }
 /// Defines the CustomUI Class.
@@ -6810,7 +6882,23 @@ pub struct Group {
   #[sdk(attr(qname = ":getKeytip"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlClone/mso:control",
+    qname = "mso:CT_LabelControl/mso:labelControl",
+    qname = "mso:CT_Button/mso:button",
+    qname = "mso:CT_ToggleButton/mso:toggleButton",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_EditBox/mso:editBox",
+    qname = "mso:CT_ComboBox/mso:comboBox",
+    qname = "mso:CT_DropDownRegular/mso:dropDown",
+    qname = "mso:CT_Gallery/mso:gallery",
+    qname = "mso:CT_Menu/mso:menu",
+    qname = "mso:CT_DynamicMenu/mso:dynamicMenu",
+    qname = "mso:CT_SplitButton/mso:splitButton",
+    qname = "mso:CT_Box/mso:box",
+    qname = "mso:CT_ButtonGroup/mso:buttonGroup",
+    qname = "mso:CT_Separator/mso:separator"
+  ))]
   pub group_choice: Vec<GroupChoice>,
   /// _
   #[sdk(child(qname = "mso:CT_DialogLauncher/mso:dialogBoxLauncher"))]
@@ -7082,7 +7170,11 @@ pub struct QuickAccessToolbarControlClone {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/mso:sharedControls")]
 pub struct SharedQatControls {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneQat/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_Separator/mso:separator"
+  ))]
   pub shared_qat_controls_choice: Vec<SharedQatControlsChoice>,
 }
 /// Defines the DocumentSpecificQuickAccessToolbarControls Class.
@@ -7093,7 +7185,11 @@ pub struct SharedQatControls {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/mso:documentControls")]
 pub struct DocumentSpecificQuickAccessToolbarControls {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneQat/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_Separator/mso:separator"
+  ))]
   pub document_specific_quick_access_toolbar_controls_choice:
     Vec<DocumentSpecificQuickAccessToolbarControlsChoice>,
 }
@@ -7105,7 +7201,11 @@ pub struct DocumentSpecificQuickAccessToolbarControls {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/")]
 pub struct QatItemsType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneQat/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_Separator/mso:separator"
+  ))]
   pub xml_children: Vec<QatItemsTypeChoice>,
 }
 /// Defines the Tab Class.
@@ -7331,7 +7431,17 @@ pub struct RepurposedCommand {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_OfficeMenu/mso:officeMenu")]
 pub struct OfficeMenu {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "mso:CT_ControlCloneRegular/mso:control",
+    qname = "mso:CT_ButtonRegular/mso:button",
+    qname = "mso:CT_CheckBox/mso:checkBox",
+    qname = "mso:CT_GalleryRegular/mso:gallery",
+    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
+    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
+    qname = "mso:CT_SplitButtonWithTitle/mso:splitButton",
+    qname = "mso:CT_MenuWithTitle/mso:menu",
+    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
+  ))]
   pub office_menu_choice: Vec<OfficeMenuChoice>,
 }
 /// Defines the QuickAccessToolbar Class.

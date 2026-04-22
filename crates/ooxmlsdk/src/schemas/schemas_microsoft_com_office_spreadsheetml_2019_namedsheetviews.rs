@@ -249,7 +249,17 @@ pub struct FilterColumn {
   /// Represents the following attribute in the schema: :showButton
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:CT_Filters/x:filters",
+    qname = "x:CT_Top10/x:top10",
+    qname = "x14:CT_CustomFilters/x14:customFilters",
+    qname = "x:CT_CustomFilters/x:customFilters",
+    qname = "x:CT_DynamicFilter/x:dynamicFilter",
+    qname = "x:CT_ColorFilter/x:colorFilter",
+    qname = "x14:CT_IconFilter/x14:iconFilter",
+    qname = "x:CT_IconFilter/x:iconFilter",
+    qname = "x:CT_ExtensionList/x:extLst"
+  ))]
   pub xml_children: Option<FilterColumnChoice>,
 }
 /// Defines the SortRule Class.
@@ -282,7 +292,10 @@ pub struct SortRule {
   /// _
   #[sdk(child(qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x14:CT_SortCondition/xnsv:sortCondition",
+    qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
+  ))]
   pub sort_rule_choice: Option<SortRuleChoice>,
 }
 /// Defines the SortCondition Class.

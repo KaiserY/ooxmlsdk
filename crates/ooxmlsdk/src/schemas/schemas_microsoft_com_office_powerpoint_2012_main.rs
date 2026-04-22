@@ -114,7 +114,10 @@ pub struct NotesGuideList {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ExtendedGuideList/")]
 pub struct ExtendedGuideList {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p15:CT_ExtendedGuide/p15:guide",
+    qname = "p:CT_ExtensionList/p15:extLst"
+  ))]
   pub xml_children: Vec<ExtendedGuideListChoice>,
 }
 /// Defines the ChartTrackingReferenceBased Class.
@@ -166,7 +169,14 @@ pub struct ParentCommentIdentifier {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p15:clr")]
 pub struct ColorType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<ColorTypeChoice>,
 }
 /// Defines the ExtensionList Class.

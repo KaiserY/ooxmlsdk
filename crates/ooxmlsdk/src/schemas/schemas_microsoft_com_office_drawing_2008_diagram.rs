@@ -171,16 +171,29 @@ pub struct ShapeProperties {
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -352,9 +365,19 @@ pub struct GroupShapeProperties {
   pub transform_group: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -420,7 +443,7 @@ pub struct GroupShape {
   /// _
   #[sdk(child(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
@@ -440,7 +463,7 @@ pub struct ShapeTree {
   /// _
   #[sdk(child(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
@@ -454,7 +477,13 @@ pub struct ShapeTree {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_GroupShape/")]
 pub struct GroupShapeType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr",
+    qname = "a:CT_GroupShapeProperties/dsp:grpSpPr",
+    qname = "dsp:CT_Shape/dsp:sp",
+    qname = "dsp:CT_GroupShape/dsp:grpSp",
+    qname = "a:CT_OfficeArtExtensionList/dsp:extLst"
+  ))]
   pub xml_children: Vec<GroupShapeTypeChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

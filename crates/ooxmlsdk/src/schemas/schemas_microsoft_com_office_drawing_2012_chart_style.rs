@@ -176,7 +176,14 @@ pub struct ColorStyle {
   /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub color_style_choice: Vec<ColorStyleChoice>,
   /// _
   #[sdk(child(qname = "cs:CT_ColorStyleVariation/cs:variation"))]
@@ -309,7 +316,36 @@ pub struct ChartStyle {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cs:CT_ColorStyleVariation/cs:variation")]
 pub struct ColorStyleVariation {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_PositiveFixedPercentage/a:tint",
+    qname = "a:CT_PositiveFixedPercentage/a:shade",
+    qname = "a:CT_ComplementTransform/a:comp",
+    qname = "a:CT_InverseTransform/a:inv",
+    qname = "a:CT_GrayscaleTransform/a:gray",
+    qname = "a:CT_PositiveFixedPercentage/a:alpha",
+    qname = "a:CT_FixedPercentage/a:alphaOff",
+    qname = "a:CT_PositivePercentage/a:alphaMod",
+    qname = "a:CT_PositiveFixedAngle/a:hue",
+    qname = "a:CT_Angle/a:hueOff",
+    qname = "a:CT_PositivePercentage/a:hueMod",
+    qname = "a:CT_Percentage/a:sat",
+    qname = "a:CT_Percentage/a:satOff",
+    qname = "a:CT_Percentage/a:satMod",
+    qname = "a:CT_Percentage/a:lum",
+    qname = "a:CT_Percentage/a:lumOff",
+    qname = "a:CT_Percentage/a:lumMod",
+    qname = "a:CT_Percentage/a:red",
+    qname = "a:CT_Percentage/a:redOff",
+    qname = "a:CT_Percentage/a:redMod",
+    qname = "a:CT_Percentage/a:green",
+    qname = "a:CT_Percentage/a:greenOff",
+    qname = "a:CT_Percentage/a:greenMod",
+    qname = "a:CT_Percentage/a:blue",
+    qname = "a:CT_Percentage/a:blueOff",
+    qname = "a:CT_Percentage/a:blueMod",
+    qname = "a:CT_GammaTransform/a:gamma",
+    qname = "a:CT_InverseGammaTransform/a:invGamma"
+  ))]
   pub color_style_variation_choice: Vec<ColorStyleVariationChoice>,
 }
 /// Defines the OfficeArtExtensionList Class.
@@ -342,7 +378,36 @@ pub struct StyleColor {
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub val: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_PositiveFixedPercentage/a:tint",
+    qname = "a:CT_PositiveFixedPercentage/a:shade",
+    qname = "a:CT_ComplementTransform/a:comp",
+    qname = "a:CT_InverseTransform/a:inv",
+    qname = "a:CT_GrayscaleTransform/a:gray",
+    qname = "a:CT_PositiveFixedPercentage/a:alpha",
+    qname = "a:CT_FixedPercentage/a:alphaOff",
+    qname = "a:CT_PositivePercentage/a:alphaMod",
+    qname = "a:CT_PositiveFixedAngle/a:hue",
+    qname = "a:CT_Angle/a:hueOff",
+    qname = "a:CT_PositivePercentage/a:hueMod",
+    qname = "a:CT_Percentage/a:sat",
+    qname = "a:CT_Percentage/a:satOff",
+    qname = "a:CT_Percentage/a:satMod",
+    qname = "a:CT_Percentage/a:lum",
+    qname = "a:CT_Percentage/a:lumOff",
+    qname = "a:CT_Percentage/a:lumMod",
+    qname = "a:CT_Percentage/a:red",
+    qname = "a:CT_Percentage/a:redOff",
+    qname = "a:CT_Percentage/a:redMod",
+    qname = "a:CT_Percentage/a:green",
+    qname = "a:CT_Percentage/a:greenOff",
+    qname = "a:CT_Percentage/a:greenMod",
+    qname = "a:CT_Percentage/a:blue",
+    qname = "a:CT_Percentage/a:blueOff",
+    qname = "a:CT_Percentage/a:blueMod",
+    qname = "a:CT_GammaTransform/a:gamma",
+    qname = "a:CT_InverseGammaTransform/a:invGamma"
+  ))]
   pub style_color_choice: Vec<StyleColorChoice>,
 }
 /// Defines the LineReference Class.
@@ -367,7 +432,14 @@ pub struct LineReference {
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub line_reference_choice: Option<LineReferenceChoice>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -395,7 +467,14 @@ pub struct FillReference {
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub fill_reference_choice: Option<FillReferenceChoice>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -423,7 +502,14 @@ pub struct EffectReference {
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub effect_reference_choice: Option<EffectReferenceChoice>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -451,7 +537,15 @@ pub struct StyleReference {
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr",
+    qname = "cs:CT_StyleColor/cs:styleClr"
+  ))]
   pub xml_children: Vec<StyleReferenceChoice>,
 }
 /// Defines the LineWidthScale Class.
@@ -484,7 +578,14 @@ pub struct FontReference {
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub font_reference_choice: Option<FontReferenceChoice>,
   /// _
   #[sdk(child(qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -512,16 +613,29 @@ pub struct ShapeProperties {
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -712,18 +826,34 @@ pub struct TextCharacterPropertiesType {
   pub outline: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub text_character_properties_type_choice1: Option<TextCharacterPropertiesTypeChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub text_character_properties_type_choice2: Option<TextCharacterPropertiesTypeChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   pub a_highlight: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Highlight>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
+    qname = "a:CT_LineProperties/a:uLn"
+  ))]
   pub text_character_properties_type_choice3: Option<TextCharacterPropertiesTypeChoice3>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
+    qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"
+  ))]
   pub text_character_properties_type_choice4: Option<TextCharacterPropertiesTypeChoice4>,
   /// _
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
@@ -926,14 +1056,18 @@ pub struct TextBodyProperties {
   pub preset_text_warp: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetTextWarp>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TextNoAutofit/a:noAutofit",
+    qname = "a:CT_TextNormalAutofit/a:normAutofit",
+    qname = "a:CT_TextShapeAutofit/a:spAutoFit"
+  ))]
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -2870,7 +3004,17 @@ pub struct StyleEntry {
   /// Represents the following attribute in the schema: :mods
   #[sdk(attr(qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "cs:CT_StyleReference/cs:lnRef",
+    qname = "xsd:double/cs:lineWidthScale",
+    qname = "cs:CT_StyleReference/cs:fillRef",
+    qname = "cs:CT_StyleReference/cs:effectRef",
+    qname = "cs:CT_FontReference/cs:fontRef",
+    qname = "a:CT_ShapeProperties/cs:spPr",
+    qname = "a:CT_TextCharacterProperties/cs:defRPr",
+    qname = "a:CT_TextBodyProperties/cs:bodyPr",
+    qname = "a:CT_OfficeArtExtensionList/cs:extLst"
+  ))]
   pub xml_children: Vec<StyleEntryChoice>,
 }
 /// Defines the MarkerLayoutProperties Class.

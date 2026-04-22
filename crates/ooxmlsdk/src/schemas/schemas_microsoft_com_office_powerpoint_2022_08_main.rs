@@ -281,7 +281,16 @@ pub struct TaskHistoryEvent {
   /// _
   #[sdk(child(qname = "p228:CT_TaskAnchor/p228:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p228:CT_TaskAssignUnassignUser/p228:asgn",
+    qname = "p:CT_Empty/p228:add",
+    qname = "p228:CT_TaskTitleEventInfo/p228:title",
+    qname = "p228:CT_TaskScheduleEventInfo/p228:date",
+    qname = "p228:CT_TaskProgressEventInfo/p228:pcntCmplt",
+    qname = "p:CT_Empty/p228:unasgnAll",
+    qname = "p228:CT_TaskUndo/p228:undo",
+    qname = "p228:CT_TaskUnknownRecord/p228:unknown"
+  ))]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionList/p228:extLst"))]

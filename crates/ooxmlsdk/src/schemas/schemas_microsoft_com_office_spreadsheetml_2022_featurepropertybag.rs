@@ -73,7 +73,11 @@ pub struct OpenXmlFeaturePropertyBagsElement {
   /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xfpb:CT_BagExtensions/xfpb:bagExt",
+    qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag",
+    qname = "x:CT_ExtensionList/xfpb:extLst"
+  ))]
   pub xml_children: Vec<OpenXmlFeaturePropertyBagsElementChoice>,
 }
 /// Defines the XfComplement Class.
@@ -266,7 +270,10 @@ pub struct ColumnTotalsRevDxfTableRevDxf {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/")]
 pub struct OpenXmlTableRevDxfElement {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs",
+    qname = "x:CT_Dxf/xfpb:dxf"
+  ))]
   pub xml_children: Vec<OpenXmlTableRevDxfElementChoice>,
 }
 /// Defines the BagExtensions Class.
@@ -317,7 +324,15 @@ pub struct FeaturePropertyBag {
   /// Represents the following attribute in the schema: :att
   #[sdk(attr(qname = ":att"))]
   pub att: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a",
+    qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId",
+    qname = "xfpb:CT_IntFeatureProperty/xfpb:i",
+    qname = "xfpb:CT_StringFeatureProperty/xfpb:s",
+    qname = "xfpb:CT_BoolFeatureProperty/xfpb:b",
+    qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d",
+    qname = "xfpb:CT_RelFeatureProperty/xfpb:rel"
+  ))]
   pub xml_children: Vec<FeaturePropertyBagChoice>,
 }
 /// Defines the ExtensionList Class.
@@ -347,7 +362,14 @@ pub struct ArrayFeatureProperty {
   /// Represents the following attribute in the schema: :k
   #[sdk(attr(qname = ":k"))]
   pub k: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "xsd:unsignedInt/xfpb:bagId",
+    qname = "xsd:integer/xfpb:i",
+    qname = "xsd:string/xfpb:s",
+    qname = "xsd:boolean/xfpb:b",
+    qname = "xsd:double/xfpb:d",
+    qname = "xsd:string/xfpb:rel"
+  ))]
   pub xml_children: Vec<ArrayFeaturePropertyChoice>,
 }
 /// Defines the BagFeatureProperty Class.

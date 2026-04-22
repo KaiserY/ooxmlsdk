@@ -48,7 +48,7 @@ pub struct EmptyType {}
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p232:CT_PlaceholderTypeACB/p232:type")]
 pub struct PlaceholderTypeAcb {
-  #[sdk(choice)]
+  #[sdk(choice(qname = "p:CT_Empty/p232:cameo", qname = "p:CT_Empty/p232:unknown"))]
   pub xml_children: Option<PlaceholderTypeAcbChoice>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]

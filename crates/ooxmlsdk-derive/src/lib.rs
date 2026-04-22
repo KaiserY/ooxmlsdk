@@ -122,6 +122,7 @@ struct SdkChoiceField {
   repeated: bool,
   accepts_text: Option<bool>,
   accepts_any: Option<bool>,
+  specific_qnames: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -212,6 +213,7 @@ struct ParsedSdkTypeFieldAttrs {
   kind: Option<SdkTypeFieldKind>,
   choice_accepts_text: Option<bool>,
   choice_accepts_any: Option<bool>,
+  choice_qnames: Vec<String>,
   validators: Vec<SdkFieldValidator>,
 }
 
@@ -500,6 +502,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   let mut kind = None;
   let mut choice_accepts_text = None;
   let mut choice_accepts_any = None;
+  let mut choice_qnames = Vec::new();
   let mut validators = Vec::new();
 
   for attr in attrs {
@@ -565,18 +568,22 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             } else if nested.path.is_ident("any") {
               accepts_any = true;
               Ok(())
+            } else if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              choice_qnames.push(value.value());
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk choice attribute"))
             }
           })?;
           kind = Some(SdkTypeFieldKind::Choice);
-          choice_accepts_text = Some(accepts_text);
-          choice_accepts_any = Some(accepts_any);
+          choice_accepts_text = Some(choice_accepts_text.unwrap_or(false) || accepts_text);
+          choice_accepts_any = Some(choice_accepts_any.unwrap_or(false) || accepts_any);
         }
         Meta::Path(path) if path.is_ident("choice") => {
           kind = Some(SdkTypeFieldKind::Choice);
-          choice_accepts_text = Some(false);
-          choice_accepts_any = Some(false);
+          choice_accepts_text.get_or_insert(false);
+          choice_accepts_any.get_or_insert(false);
         }
         Meta::NameValue(meta) if meta.path.is_ident("choice_accepts_text") => {
           let value = match &meta.value {
@@ -864,6 +871,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
     kind,
     choice_accepts_text,
     choice_accepts_any,
+    choice_qnames,
     validators,
   })
 }

@@ -96,7 +96,43 @@ pub enum ArrayBaseValues {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Variant/vt:variant")]
 pub struct Variant {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "vt:CT_Variant/vt:variant",
+    qname = "vt:CT_Vector/vt:vector",
+    qname = "vt:CT_Array/vt:array",
+    qname = "xsd:base64Binary/vt:blob",
+    qname = "xsd:base64Binary/vt:oblob",
+    qname = "vt:CT_Empty/vt:empty",
+    qname = "vt:CT_Null/vt:null",
+    qname = "xsd:byte/vt:i1",
+    qname = "xsd:short/vt:i2",
+    qname = "xsd:int/vt:i4",
+    qname = "xsd:long/vt:i8",
+    qname = "xsd:int/vt:int",
+    qname = "xsd:unsignedByte/vt:ui1",
+    qname = "xsd:unsignedShort/vt:ui2",
+    qname = "xsd:unsignedInt/vt:ui4",
+    qname = "xsd:unsignedLong/vt:ui8",
+    qname = "xsd:unsignedInt/vt:uint",
+    qname = "xsd:float/vt:r4",
+    qname = "xsd:double/vt:r8",
+    qname = "xsd:decimal/vt:decimal",
+    qname = "xsd:string/vt:lpstr",
+    qname = "xsd:string/vt:lpwstr",
+    qname = "xsd:string/vt:bstr",
+    qname = "xsd:dateTime/vt:date",
+    qname = "xsd:dateTime/vt:filetime",
+    qname = "xsd:boolean/vt:bool",
+    qname = "vt:ST_Cy/vt:cy",
+    qname = "vt:ST_Error/vt:error",
+    qname = "xsd:base64Binary/vt:stream",
+    qname = "xsd:base64Binary/vt:ostream",
+    qname = "xsd:base64Binary/vt:storage",
+    qname = "xsd:base64Binary/vt:ostorage",
+    qname = "vt:CT_Vstream/vt:vstream",
+    qname = "vt:ST_Clsid/vt:clsid",
+    qname = "vt:CT_Cf/vt:cf"
+  ))]
   pub xml_children: Option<VariantChoice>,
 }
 /// Vector.
@@ -121,7 +157,29 @@ pub struct VtVector {
   /// Represents the following attribute in the schema: :size
   #[sdk(attr(qname = ":size"))]
   pub size: crate::simple_type::UInt32Value,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "vt:CT_Variant/vt:variant",
+    qname = "xsd:byte/vt:i1",
+    qname = "xsd:short/vt:i2",
+    qname = "xsd:int/vt:i4",
+    qname = "xsd:long/vt:i8",
+    qname = "xsd:unsignedByte/vt:ui1",
+    qname = "xsd:unsignedShort/vt:ui2",
+    qname = "xsd:unsignedInt/vt:ui4",
+    qname = "xsd:unsignedLong/vt:ui8",
+    qname = "xsd:float/vt:r4",
+    qname = "xsd:double/vt:r8",
+    qname = "xsd:string/vt:lpstr",
+    qname = "xsd:string/vt:lpwstr",
+    qname = "xsd:string/vt:bstr",
+    qname = "xsd:dateTime/vt:date",
+    qname = "xsd:dateTime/vt:filetime",
+    qname = "xsd:boolean/vt:bool",
+    qname = "vt:ST_Cy/vt:cy",
+    qname = "vt:ST_Error/vt:error",
+    qname = "vt:ST_Clsid/vt:clsid",
+    qname = "vt:CT_Cf/vt:cf"
+  ))]
   pub xml_children: Vec<VtVectorChoice>,
 }
 /// Array.
@@ -153,7 +211,25 @@ pub struct VtArray {
   /// Represents the following attribute in the schema: :baseType
   #[sdk(attr(qname = ":baseType"))]
   pub base_type: ArrayBaseValues,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "vt:CT_Variant/vt:variant",
+    qname = "xsd:byte/vt:i1",
+    qname = "xsd:short/vt:i2",
+    qname = "xsd:int/vt:i4",
+    qname = "xsd:int/vt:int",
+    qname = "xsd:unsignedByte/vt:ui1",
+    qname = "xsd:unsignedShort/vt:ui2",
+    qname = "xsd:unsignedInt/vt:ui4",
+    qname = "xsd:unsignedInt/vt:uint",
+    qname = "xsd:float/vt:r4",
+    qname = "xsd:double/vt:r8",
+    qname = "xsd:decimal/vt:decimal",
+    qname = "xsd:string/vt:bstr",
+    qname = "xsd:dateTime/vt:date",
+    qname = "xsd:boolean/vt:bool",
+    qname = "vt:ST_Error/vt:error",
+    qname = "vt:ST_Cy/vt:cy"
+  ))]
   pub xml_children: Vec<VtArrayChoice>,
 }
 /// Binary Blob.

@@ -1143,7 +1143,10 @@ pub struct ColorMap {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMappingOverride/p:clrMapOvr")]
 pub struct ColorMapOverride {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EmptyElement/a:masterClrMapping",
+    qname = "a:CT_ColorMapping/a:overrideClrMapping"
+  ))]
   pub xml_children: Option<ColorMapOverrideChoice>,
 }
 /// Background Properties.
@@ -1161,9 +1164,18 @@ pub struct BackgroundProperties {
   /// Represents the following attribute in the schema: :shadeToTitle
   #[sdk(attr(qname = ":shadeToTitle"))]
   pub shade_to_title: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill"
+  ))]
   pub background_properties_choice1: Option<BackgroundPropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub background_properties_choice2: Option<BackgroundPropertiesChoice2>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -1184,7 +1196,14 @@ pub struct BackgroundStyleReference {
   /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<BackgroundStyleReferenceChoice>,
 }
 #[cfg(feature = "microsoft365")]
@@ -1300,7 +1319,10 @@ pub struct OleObject {
   /// Represents the following attribute in the schema: :progId
   #[sdk(attr(qname = ":progId"))]
   pub prog_id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_OleObjectEmbed/p:embed",
+    qname = "p:CT_OleObjectLink/p:link"
+  ))]
   pub ole_object_choice: Option<OleObjectChoice>,
   /// _
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
@@ -1522,6 +1544,10 @@ pub struct Slide {
   ///Color Scheme Map Override.
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Slide Transition
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -2043,7 +2069,16 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Empty/p:sldTgt",
+    qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt",
+    qname = "p:CT_TLShapeTargetElement/p:spTgt",
+    qname = "p:CT_TLSubShapeId/p:inkTgt"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"))
+  )]
   pub xml_children: Option<TargetElementChoice>,
 }
 /// Time Node.
@@ -2106,7 +2141,11 @@ pub struct Condition {
   #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
   #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
   pub delay: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLTimeTargetElement/p:tgtEl",
+    qname = "p:CT_TLTriggerTimeNodeID/p:tn",
+    qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
+  ))]
   pub xml_children: Option<ConditionChoice>,
 }
 /// Defines the EndSync Class.
@@ -2136,7 +2175,11 @@ pub struct EndSync {
   #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
   #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
   pub delay: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLTimeTargetElement/p:tgtEl",
+    qname = "p:CT_TLTriggerTimeNodeID/p:tn",
+    qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
+  ))]
   pub xml_children: Option<EndSyncChoice>,
 }
 /// Defines the TimeListConditionalType Class.
@@ -2166,7 +2209,11 @@ pub struct TimeListConditionalType {
   #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
   #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
   pub delay: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLTimeTargetElement/p:tgtEl",
+    qname = "p:CT_TLTriggerTimeNodeID/p:tn",
+    qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
+  ))]
   pub xml_children: Option<TimeListConditionalTypeChoice>,
 }
 /// Parallel Time Node.
@@ -3006,7 +3053,14 @@ pub struct StringVariantValue {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:clrVal")]
 pub struct ColorValue {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<ColorValueChoice>,
 }
 /// Pen Color for Slide Show.
@@ -3017,7 +3071,14 @@ pub struct ColorValue {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:penClr")]
 pub struct PenColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<PenColorChoice>,
 }
 /// Defines the ColorType Class.
@@ -3028,7 +3089,14 @@ pub struct PenColor {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/")]
 pub struct ColorType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<ColorTypeChoice>,
 }
 /// Time Animate Value.
@@ -3259,7 +3327,13 @@ pub struct Progress {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimVariant/p:to")]
 pub struct ToVariantValue {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal",
+    qname = "p:CT_TLAnimVariantIntegerVal/p:intVal",
+    qname = "p:CT_TLAnimVariantFloatVal/p:fltVal",
+    qname = "p:CT_TLAnimVariantStringVal/p:strVal",
+    qname = "a:CT_Color/p:clrVal"
+  ))]
   pub xml_children: Option<ToVariantValueChoice>,
 }
 /// Value.
@@ -3270,7 +3344,13 @@ pub struct ToVariantValue {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimVariant/p:val")]
 pub struct VariantValue {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal",
+    qname = "p:CT_TLAnimVariantIntegerVal/p:intVal",
+    qname = "p:CT_TLAnimVariantFloatVal/p:fltVal",
+    qname = "p:CT_TLAnimVariantStringVal/p:strVal",
+    qname = "a:CT_Color/p:clrVal"
+  ))]
   pub xml_children: Option<VariantValueChoice>,
 }
 /// Defines the TimeListAnimationVariantType Class.
@@ -3281,7 +3361,13 @@ pub struct VariantValue {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimVariant/")]
 pub struct TimeListAnimationVariantType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal",
+    qname = "p:CT_TLAnimVariantIntegerVal/p:intVal",
+    qname = "p:CT_TLAnimVariantFloatVal/p:fltVal",
+    qname = "p:CT_TLAnimVariantStringVal/p:strVal",
+    qname = "a:CT_Color/p:clrVal"
+  ))]
   pub xml_children: Option<TimeListAnimationVariantTypeChoice>,
 }
 /// Common Media Node Properties.
@@ -3385,7 +3471,10 @@ pub struct TemplateList {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub")]
 pub struct BuildSubElement {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_AnimationDgmBuildProperties/a:bldDgm",
+    qname = "a:CT_AnimationChartBuildProperties/a:bldChart"
+  ))]
   pub xml_children: Option<BuildSubElementChoice>,
 }
 /// Build Paragraph.
@@ -3592,7 +3681,10 @@ pub struct BuildGraphics {
   /// Represents the following attribute in the schema: :uiExpand
   #[sdk(attr(qname = ":uiExpand"))]
   pub ui_expand: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Empty/p:bldAsOne",
+    qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub"
+  ))]
   pub xml_children: Option<BuildGraphicsChoice>,
 }
 /// Build List.
@@ -3603,7 +3695,12 @@ pub struct BuildGraphics {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_BuildList/p:bldLst")]
 pub struct BuildList {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLBuildParagraph/p:bldP",
+    qname = "p:CT_TLBuildDiagram/p:bldDgm",
+    qname = "p:CT_TLOleBuildChart/p:bldOleChart",
+    qname = "p:CT_TLGraphicalObjectBuild/p:bldGraphic"
+  ))]
   pub xml_children: Vec<BuildListChoice>,
 }
 /// Defines the ExtensionListWithModification Class.
@@ -3633,7 +3730,10 @@ pub struct ExtensionListWithModification {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLByAnimateColorTransform/p:by")]
 pub struct ByColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLByRgbColorTransform/p:rgb",
+    qname = "p:CT_TLByHslColorTransform/p:hsl"
+  ))]
   pub xml_children: Option<ByColorChoice>,
 }
 /// From.
@@ -3644,7 +3744,14 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<FromColorChoice>,
 }
 /// To.
@@ -3655,7 +3762,14 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<ToColorChoice>,
 }
 /// Defines the Color3Type Class.
@@ -3666,7 +3780,14 @@ pub struct ToColor {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/")]
 pub struct Color3Type {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<Color3TypeChoice>,
 }
 /// Presentation Slide.
@@ -4274,7 +4395,13 @@ pub struct ApplicationNonVisualDrawingProperties {
   ///Placeholder Shape
   #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
   pub placeholder_shape: Option<std::boxed::Box<PlaceholderShape>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_AudioCD/a:audioCd",
+    qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile",
+    qname = "a:CT_AudioFile/a:audioFile",
+    qname = "a:CT_VideoFile/a:videoFile",
+    qname = "a:CT_QuickTimeFile/a:quickTimeFile"
+  ))]
   pub application_non_visual_drawing_properties_choice:
     Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// _
@@ -4325,16 +4452,29 @@ pub struct ShapeProperties {
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -4524,7 +4664,10 @@ pub struct BlipFill {
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SourceRectangle>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TileInfoProperties/a:tile",
+    qname = "a:CT_StretchInfoProperties/a:stretch"
+  ))]
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
@@ -5047,7 +5190,19 @@ pub struct NotesStyle {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/")]
 pub struct TextListStyleType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TextParagraphProperties/a:defPPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl1pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl2pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl3pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl4pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl5pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl6pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl7pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl8pPr",
+    qname = "a:CT_TextParagraphProperties/a:lvl9pPr",
+    qname = "a:CT_OfficeArtExtensionList/a:extLst"
+  ))]
   pub xml_children: Vec<TextListStyleTypeChoice>,
 }
 /// Slide Layout Id.
@@ -5751,6 +5906,14 @@ pub struct SlideExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "p14:CT_LaserTraceList/p14:laserTraceLst",
+      qname = "p14:CT_ShowEventRecordList/p14:showEvtLst",
+      qname = "p188:CT_CommentRelationship/p188:commentRel"
+    ))
+  )]
   pub xml_children: Option<SlideExtensionChoice>,
 }
 /// Defines the CommonSlideDataExtension Class.
@@ -5770,6 +5933,10 @@ pub struct CommonSlideDataExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p14:CT_RandomId/p14:creationId"))
+  )]
   pub xml_children: Option<CommonSlideDataExtensionChoice>,
 }
 /// Defines the ShowPropertiesExtension Class.
@@ -5789,6 +5956,14 @@ pub struct ShowPropertiesExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "p14:CT_BrowseMode/p14:browseMode",
+      qname = "a:CT_Color/p14:laserClr",
+      qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls"
+    ))
+  )]
   pub xml_children: Option<ShowPropertiesExtensionChoice>,
 }
 /// Defines the Picture Class.
@@ -5895,7 +6070,54 @@ pub struct Transition {
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub advance_after_time: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_OrientationTransition/p:blinds",
+    qname = "p:CT_OrientationTransition/p:checker",
+    qname = "p:CT_Empty/p:circle",
+    qname = "p:CT_Empty/p:dissolve",
+    qname = "p:CT_OrientationTransition/p:comb",
+    qname = "p:CT_EightDirectionTransition/p:cover",
+    qname = "p:CT_OptionalBlackTransition/p:cut",
+    qname = "p:CT_Empty/p:diamond",
+    qname = "p:CT_OptionalBlackTransition/p:fade",
+    qname = "p:CT_Empty/p:newsflash",
+    qname = "p:CT_Empty/p:plus",
+    qname = "p:CT_EightDirectionTransition/p:pull",
+    qname = "p:CT_SideDirectionTransition/p:push",
+    qname = "p:CT_Empty/p:random",
+    qname = "p:CT_OrientationTransition/p:randomBar",
+    qname = "p:CT_SplitTransition/p:split",
+    qname = "p:CT_CornerDirectionTransition/p:strips",
+    qname = "p:CT_Empty/p:wedge",
+    qname = "p:CT_WheelTransition/p:wheel",
+    qname = "p:CT_SideDirectionTransition/p:wipe",
+    qname = "p:CT_InOutTransition/p:zoom"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "p:CT_Empty/p14:flash",
+      qname = "p:CT_SideDirectionTransition/p14:vortex",
+      qname = "p14:CT_LeftRightDirectionTransition/p14:switch",
+      qname = "p14:CT_LeftRightDirectionTransition/p14:flip",
+      qname = "p14:CT_RippleTransition/p14:ripple",
+      qname = "p14:CT_GlitterTransition/p14:glitter",
+      qname = "p:CT_Empty/p14:honeycomb",
+      qname = "p14:CT_PrismTransition/p14:prism",
+      qname = "p:CT_OrientationTransition/p14:doors",
+      qname = "p:CT_OrientationTransition/p14:window",
+      qname = "p14:CT_ShredTransition/p14:shred",
+      qname = "p14:CT_LeftRightDirectionTransition/p14:ferris",
+      qname = "p14:CT_FlyThroughTransition/p14:flythrough",
+      qname = "p:CT_InOutTransition/p14:warp",
+      qname = "p14:CT_LeftRightDirectionTransition/p14:gallery",
+      qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor",
+      qname = "p:CT_SideDirectionTransition/p14:pan",
+      qname = "p14:CT_RevealTransition/p14:reveal",
+      qname = "p:CT_WheelTransition/p14:wheelReverse",
+      qname = "p15:CT_PresetTransition/p15:prstTrans"
+    ))
+  )]
   pub transition_choice: Option<TransitionChoice>,
   /// _
   #[sdk(child(qname = "p:CT_TransitionSoundAction/p:sndAc"))]
@@ -5951,7 +6173,10 @@ pub struct Background {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_BackgroundProperties/p:bgPr",
+    qname = "a:CT_StyleMatrixReference/p:bgRef"
+  ))]
   pub xml_children: Option<BackgroundChoice>,
 }
 /// Shape Tree.
@@ -5972,7 +6197,17 @@ pub struct ShapeTree {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Shape/p:sp",
+    qname = "p:CT_GroupShape/p:grpSp",
+    qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
+    qname = "p:CT_Connector/p:cxnSp",
+    qname = "p:CT_Picture/p:pic"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p:CT_ContentPart/p:contentPart"))
+  )]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -5992,7 +6227,17 @@ pub struct GroupShape {
   ///Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Shape/p:sp",
+    qname = "p:CT_GroupShape/p:grpSp",
+    qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
+    qname = "p:CT_Connector/p:cxnSp",
+    qname = "p:CT_Picture/p:pic"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p:CT_ContentPart/p:contentPart"))
+  )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -6006,7 +6251,20 @@ pub struct GroupShape {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/")]
 pub struct GroupShapeType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr",
+    qname = "a:CT_GroupShapeProperties/p:grpSpPr",
+    qname = "p:CT_Shape/p:sp",
+    qname = "p:CT_GroupShape/p:grpSp",
+    qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
+    qname = "p:CT_Connector/p:cxnSp",
+    qname = "p:CT_Picture/p:pic",
+    qname = "p:CT_ExtensionListModify/p:extLst"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p:CT_ContentPart/p:contentPart"))
+  )]
   pub xml_children: Vec<GroupShapeTypeChoice>,
 }
 /// Customer Data List.
@@ -6090,9 +6348,19 @@ pub struct GroupShapeProperties {
   pub transform_group: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -6208,7 +6476,13 @@ pub struct ShapeTarget {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "a:ST_DrawingElementId"))]
   #[sdk(number_type(source = 3u32, union = 0u64, type_name = "a:ST_DrawingElementId"))]
   pub shape_id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Empty/p:bg",
+    qname = "p:CT_TLSubShapeId/p:subSp",
+    qname = "p:CT_TLOleChartTargetElement/p:oleChartEl",
+    qname = "p:CT_TLTextTargetElement/p:txEl",
+    qname = "a:CT_AnimationElementChoice/p:graphicEl"
+  ))]
   pub xml_children: Option<ShapeTargetChoice>,
 }
 /// Ink Target.
@@ -6279,6 +6553,10 @@ pub struct CommentAuthorExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p15:CT_PresenceInfo/p15:presenceInfo"))
+  )]
   pub xml_children: Option<CommentAuthorExtensionChoice>,
 }
 /// Defines the CommentExtension Class.
@@ -6298,6 +6576,10 @@ pub struct CommentExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p15:CT_CommentThreading/p15:threadingInfo"))
+  )]
   pub xml_children: Option<CommentExtensionChoice>,
 }
 /// Defines the SlideLayoutExtension Class.
@@ -6317,6 +6599,10 @@ pub struct SlideLayoutExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
+  )]
   pub xml_children: Option<SlideLayoutExtensionChoice>,
 }
 /// Defines the SlideMasterExtension Class.
@@ -6336,6 +6622,10 @@ pub struct SlideMasterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
+  )]
   pub xml_children: Option<SlideMasterExtensionChoice>,
 }
 /// Defines the HandoutMasterExtension Class.
@@ -6355,6 +6645,10 @@ pub struct HandoutMasterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
+  )]
   pub xml_children: Option<HandoutMasterExtensionChoice>,
 }
 /// Defines the NotesMasterExtension Class.
@@ -6374,6 +6668,10 @@ pub struct NotesMasterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
+  )]
   pub xml_children: Option<NotesMasterExtensionChoice>,
 }
 /// Placeholder Shape.
@@ -6455,6 +6753,10 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "p14:CT_Media/p14:media", qname = "p14:CT_RandomId/p14:modId"))
+  )]
   pub xml_children: Option<ApplicationNonVisualDrawingPropertiesExtensionChoice>,
 }
 /// Defines the Iterate Class.
@@ -6480,7 +6782,10 @@ pub struct Iterate {
   /// Represents the following attribute in the schema: :backwards
   #[sdk(attr(qname = ":backwards"))]
   pub backwards: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLIterateIntervalTime/p:tmAbs",
+    qname = "p:CT_TLIterateIntervalPercentage/p:tmPct"
+  ))]
   pub xml_children: Option<IterateChoice>,
 }
 /// Defines the ChildTimeNodeList Class.
@@ -6491,7 +6796,21 @@ pub struct Iterate {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:childTnLst")]
 pub struct ChildTimeNodeList {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLTimeNodeParallel/p:par",
+    qname = "p:CT_TLTimeNodeSequence/p:seq",
+    qname = "p:CT_TLTimeNodeExclusive/p:excl",
+    qname = "p:CT_TLAnimateBehavior/p:anim",
+    qname = "p:CT_TLAnimateColorBehavior/p:animClr",
+    qname = "p:CT_TLAnimateEffectBehavior/p:animEffect",
+    qname = "p:CT_TLAnimateMotionBehavior/p:animMotion",
+    qname = "p:CT_TLAnimateRotationBehavior/p:animRot",
+    qname = "p:CT_TLAnimateScaleBehavior/p:animScale",
+    qname = "p:CT_TLCommandBehavior/p:cmd",
+    qname = "p:CT_TLSetBehavior/p:set",
+    qname = "p:CT_TLMediaNodeAudio/p:audio",
+    qname = "p:CT_TLMediaNodeVideo/p:video"
+  ))]
   pub xml_children: Vec<ChildTimeNodeListChoice>,
 }
 /// Defines the SubTimeNodeList Class.
@@ -6502,7 +6821,21 @@ pub struct ChildTimeNodeList {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:subTnLst")]
 pub struct SubTimeNodeList {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLTimeNodeParallel/p:par",
+    qname = "p:CT_TLTimeNodeSequence/p:seq",
+    qname = "p:CT_TLTimeNodeExclusive/p:excl",
+    qname = "p:CT_TLAnimateBehavior/p:anim",
+    qname = "p:CT_TLAnimateColorBehavior/p:animClr",
+    qname = "p:CT_TLAnimateEffectBehavior/p:animEffect",
+    qname = "p:CT_TLAnimateMotionBehavior/p:animMotion",
+    qname = "p:CT_TLAnimateRotationBehavior/p:animRot",
+    qname = "p:CT_TLAnimateScaleBehavior/p:animScale",
+    qname = "p:CT_TLCommandBehavior/p:cmd",
+    qname = "p:CT_TLSetBehavior/p:set",
+    qname = "p:CT_TLMediaNodeAudio/p:audio",
+    qname = "p:CT_TLMediaNodeVideo/p:video"
+  ))]
   pub xml_children: Vec<SubTimeNodeListChoice>,
 }
 /// Defines the TimeTypeListType Class.
@@ -6513,7 +6846,21 @@ pub struct SubTimeNodeList {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/")]
 pub struct TimeTypeListType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TLTimeNodeParallel/p:par",
+    qname = "p:CT_TLTimeNodeSequence/p:seq",
+    qname = "p:CT_TLTimeNodeExclusive/p:excl",
+    qname = "p:CT_TLAnimateBehavior/p:anim",
+    qname = "p:CT_TLAnimateColorBehavior/p:animClr",
+    qname = "p:CT_TLAnimateEffectBehavior/p:animEffect",
+    qname = "p:CT_TLAnimateMotionBehavior/p:animMotion",
+    qname = "p:CT_TLAnimateRotationBehavior/p:animRot",
+    qname = "p:CT_TLAnimateScaleBehavior/p:animScale",
+    qname = "p:CT_TLCommandBehavior/p:cmd",
+    qname = "p:CT_TLSetBehavior/p:set",
+    qname = "p:CT_TLMediaNodeAudio/p:audio",
+    qname = "p:CT_TLMediaNodeVideo/p:video"
+  ))]
   pub xml_children: Vec<TimeTypeListTypeChoice>,
 }
 /// Defines the TimeAnimateValueList Class.
@@ -7010,6 +7357,15 @@ pub struct PresentationExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "p14:CT_SectionProperties/p14:sectionPr",
+      qname = "p14:CT_SectionList/p14:sectionLst",
+      qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst",
+      qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst"
+    ))
+  )]
   pub xml_children: Option<PresentationExtensionChoice>,
 }
 /// HTML Publishing Properties.
@@ -7042,7 +7398,11 @@ pub struct HtmlPublishProperties {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Empty/p:sldAll",
+    qname = "p:CT_IndexRange/p:sldRg",
+    qname = "p:CT_CustomShowId/p:custShow"
+  ))]
   pub html_publish_properties_choice: Option<HtmlPublishPropertiesChoice>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -7210,9 +7570,17 @@ pub struct ShowProperties {
   /// Represents the following attribute in the schema: :useTimings
   #[sdk(attr(qname = ":useTimings"))]
   pub use_timings: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Empty/p:present",
+    qname = "p:CT_ShowInfoBrowse/p:browse",
+    qname = "p:CT_ShowInfoKiosk/p:kiosk"
+  ))]
   pub show_properties_choice1: Option<ShowPropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_Empty/p:sldAll",
+    qname = "p:CT_IndexRange/p:sldRg",
+    qname = "p:CT_CustomShowId/p:custShow"
+  ))]
   pub show_properties_choice2: Option<ShowPropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_Color/p:penClr"))]
@@ -7229,7 +7597,14 @@ pub struct ShowProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMRU/p:clrMru")]
 pub struct ColorMostRecentlyUsed {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub color_most_recently_used_choice: Vec<ColorMostRecentlyUsedChoice>,
 }
 /// Defines the PresentationPropertiesExtensionList Class.
@@ -7261,6 +7636,15 @@ pub struct PresentationPropertiesExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(any))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData",
+      qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi",
+      qname = "a14:CT_TextMath/a14:m",
+      qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"
+    ))
+  )]
   pub xml_children: Option<PresentationPropertiesExtensionChoice>,
 }
 /// Defines the HeaderFooter Class.
@@ -7416,7 +7800,7 @@ pub struct OleChartElement {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTextTargetElement/p:txEl")]
 pub struct TextElement {
-  #[sdk(choice)]
+  #[sdk(choice(qname = "p:CT_IndexRange/p:charRg", qname = "p:CT_IndexRange/p:pRg"))]
   pub xml_children: Option<TextElementChoice>,
 }
 /// Graphic Element.
@@ -7427,7 +7811,10 @@ pub struct TextElement {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationElementChoice/p:graphicEl")]
 pub struct GraphicElement {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_AnimationDgmElement/a:dgm",
+    qname = "a:CT_AnimationChartElement/a:chart"
+  ))]
   pub xml_children: Option<GraphicElementChoice>,
 }
 /// Defines the BlindsTransition Class.
@@ -7751,7 +8138,10 @@ pub struct ZoomTransition {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TransitionSoundAction/p:sndAc")]
 pub struct SoundAction {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "p:CT_TransitionStartSoundAction/p:stSnd",
+    qname = "p:CT_Empty/p:endSnd"
+  ))]
   pub xml_children: Option<SoundActionChoice>,
 }
 #[cfg(feature = "microsoft365")]

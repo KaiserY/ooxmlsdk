@@ -22,7 +22,18 @@ pub struct LockedCanvas {
   pub visual_group_shape_properties: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::VisualGroupShapeProperties,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_GvmlTextShape/a:txSp",
+    qname = "a:CT_GvmlShape/a:sp",
+    qname = "a:CT_GvmlConnector/a:cxnSp",
+    qname = "a:CT_GvmlPicture/a:pic",
+    qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
+    qname = "a:CT_GvmlGroupShape/a:grpSp"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "a14:CT_GvmlContentPart/a14:contentPart"))
+  )]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
   /// _
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]

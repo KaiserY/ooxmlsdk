@@ -3119,7 +3119,10 @@ pub struct PivotEdit {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x14:CT_PivotUserEdit/x14:userEdit")]
 pub struct PivotUserEdit {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x:ST_Formula/xne:f",
+    qname = "x14:CT_PivotEditValue/x14:editValue"
+  ))]
   pub xml_children: Option<PivotUserEditChoice>,
 }
 /// Defines the TupleItems Class.
@@ -4070,7 +4073,10 @@ pub struct SlicerCachePivotTables {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x14:CT_SlicerCacheData/x14:data")]
 pub struct SlicerCacheData {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x14:CT_OlapSlicerCache/x14:olap",
+    qname = "x14:CT_TabularSlicerCache/x14:tabular"
+  ))]
   pub xml_children: Option<SlicerCacheDataChoice>,
 }
 /// Defines the SlicerCacheDefinitionExtensionList Class.

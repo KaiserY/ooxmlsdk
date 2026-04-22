@@ -44,12 +44,20 @@ pub struct Model3D {
   ///Future Model3D extensions
   #[sdk(child(qname = "am3d:CT_Model3DExtensionList/am3d:extLst"))]
   pub model3_d_extension_list: Option<Model3DExtensionList>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "am3d:CT_ObjectViewport/am3d:objViewport",
+    qname = "am3d:CT_WindowViewport/am3d:winViewport"
+  ))]
   pub model3_d_choice1: Option<Model3DChoice>,
   /// _
   #[sdk(child(qname = "am3d:CT_AmbientLight/am3d:ambientLight"))]
   pub am3d_ambient_light: Option<std::boxed::Box<AmbientLight>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "am3d:CT_PointLight/am3d:ptLight",
+    qname = "am3d:CT_SpotLight/am3d:spotLight",
+    qname = "am3d:CT_DirectionalLight/am3d:dirLight",
+    qname = "am3d:CT_UnknownLight/am3d:unkLight"
+  ))]
   pub model3_d_choice2: Vec<Model3DChoice2>,
 }
 /// Defines the SxRatio Class.
@@ -748,7 +756,25 @@ pub struct Blip {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub compression_state:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
+    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
+    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
+    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
+    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
+    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
+    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
+    qname = "a:CT_BiLevelEffect/a:biLevel",
+    qname = "a:CT_BlurEffect/a:blur",
+    qname = "a:CT_ColorChangeEffect/a:clrChange",
+    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
+    qname = "a:CT_DuotoneEffect/a:duotone",
+    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
+    qname = "a:CT_GrayscaleEffect/a:grayscl",
+    qname = "a:CT_HSLEffect/a:hsl",
+    qname = "a:CT_LuminanceEffect/a:lum",
+    qname = "a:CT_TintEffect/a:tint"
+  ))]
   pub blip_choice: Vec<BlipChoice>,
   /// _
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
@@ -763,7 +789,14 @@ pub struct Blip {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/am3d:clr")]
 pub struct ColorType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_ScRgbColor/a:scrgbClr",
+    qname = "a:CT_SRgbColor/a:srgbClr",
+    qname = "a:CT_HslColor/a:hslClr",
+    qname = "a:CT_SystemColor/a:sysClr",
+    qname = "a:CT_SchemeColor/a:schemeClr",
+    qname = "a:CT_PresetColor/a:prstClr"
+  ))]
   pub xml_children: Option<ColorTypeChoice>,
 }
 /// Defines the Model3DExtension Class.
@@ -782,7 +815,11 @@ pub struct Model3DExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
+  #[sdk(choice(
+    qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim",
+    qname = "a3danim:CT_PosterFrame/a3danim:posterFrame",
+    any
+  ))]
   pub xml_children: Option<Model3DExtensionChoice>,
 }
 /// Defines the ShapeProperties Class.
@@ -807,16 +844,29 @@ pub struct ShapeProperties {
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_NoFillProperties/a:noFill",
+    qname = "a:CT_SolidColorFillProperties/a:solidFill",
+    qname = "a:CT_GradientFillProperties/a:gradFill",
+    qname = "a:CT_BlipFillProperties/a:blipFill",
+    qname = "a:CT_PatternFillProperties/a:pattFill",
+    qname = "a:CT_GroupFillProperties/a:grpFill"
+  ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// _
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
   >,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_EffectList/a:effectLst",
+    qname = "a:CT_EffectContainer/a:effectDag"
+  ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// _
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -851,7 +901,10 @@ pub struct Model3DCamera {
   /// _
   #[sdk(child(qname = "a:CT_Point3D/am3d:lookAt"))]
   pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "am3d:CT_OrthographicProjection/am3d:orthographic",
+    qname = "am3d:CT_PerspectiveProjection/am3d:perspective"
+  ))]
   pub model3_d_camera_choice: Option<Model3DCameraChoice>,
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/am3d:extLst"))]

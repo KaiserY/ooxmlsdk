@@ -46,7 +46,12 @@ pub struct DiagramAutoBullet {
   /// Represents the following attribute in the schema: :leadZeros
   #[sdk(attr(qname = ":leadZeros"))]
   pub lead_zeros: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_TextNoBullet/a:buNone",
+    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
+    qname = "a:CT_TextCharBullet/a:buChar",
+    qname = "a:CT_TextBlipBullet/a:buBlip"
+  ))]
   pub xml_children: Option<DiagramAutoBulletChoice>,
 }
 /// Defines the NumberDiagramInfo Class.

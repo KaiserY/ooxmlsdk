@@ -59,7 +59,10 @@ pub struct LineSketchStyleProperties {
   /// Represents the following attribute in the schema: :sd
   #[sdk(attr(qname = ":sd"))]
   pub sd: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "a:CT_CustomGeometry2D/a:custGeom",
+    qname = "a:CT_PresetGeometry2D/a:prstGeom"
+  ))]
   pub line_sketch_style_properties_choice: Option<LineSketchStylePropertiesChoice>,
   /// _
   #[sdk(child(qname = "ask:CT_LineSketchTypeProperties/ask:type"))]
@@ -79,7 +82,12 @@ pub struct LineSketchStyleProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_LineSketchTypeProperties/ask:type")]
 pub struct LineSketchTypeProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "ask:CT_Empty/ask:lineSketchNone",
+    qname = "ask:CT_Empty/ask:lineSketchCurved",
+    qname = "ask:CT_Empty/ask:lineSketchFreehand",
+    qname = "ask:CT_Empty/ask:lineSketchScribble"
+  ))]
   pub xml_children: Option<LineSketchTypePropertiesChoice>,
 }
 /// Defines the LineSketchSeed Class.

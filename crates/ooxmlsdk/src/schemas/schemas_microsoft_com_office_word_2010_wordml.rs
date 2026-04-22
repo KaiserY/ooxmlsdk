@@ -523,7 +523,64 @@ pub struct RunConflictInsertion {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub run_conflict_insertion_choice: Vec<RunConflictInsertionChoice>,
 }
 /// Defines the RunConflictDeletion Class.
@@ -577,7 +634,64 @@ pub struct RunConflictDeletion {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub run_conflict_deletion_choice: Vec<RunConflictDeletionChoice>,
 }
 /// Defines the RunTrackChangeType Class.
@@ -631,7 +745,64 @@ pub struct RunTrackChangeType {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub xml_children: Vec<RunTrackChangeTypeChoice>,
 }
 /// Defines the ConflictInsertion Class.
@@ -1141,7 +1312,18 @@ pub struct RgbColorModelHex {
   #[sdk(attr(qname = "w14:val"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_PositiveFixedPercentage/w14:tint",
+    qname = "w14:CT_PositiveFixedPercentage/w14:shade",
+    qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
+    qname = "w14:CT_PositivePercentage/w14:hueMod",
+    qname = "w14:CT_Percentage/w14:sat",
+    qname = "w14:CT_Percentage/w14:satOff",
+    qname = "w14:CT_Percentage/w14:satMod",
+    qname = "w14:CT_Percentage/w14:lum",
+    qname = "w14:CT_Percentage/w14:lumOff",
+    qname = "w14:CT_Percentage/w14:lumMod"
+  ))]
   pub rgb_color_model_hex_choice: Vec<RgbColorModelHexChoice>,
 }
 /// Defines the SchemeColor Class.
@@ -1159,7 +1341,18 @@ pub struct SchemeColor {
   /// Represents the following attribute in the schema: w14:val
   #[sdk(attr(qname = "w14:val"))]
   pub val: SchemeColorValues,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_PositiveFixedPercentage/w14:tint",
+    qname = "w14:CT_PositiveFixedPercentage/w14:shade",
+    qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
+    qname = "w14:CT_PositivePercentage/w14:hueMod",
+    qname = "w14:CT_Percentage/w14:sat",
+    qname = "w14:CT_Percentage/w14:satOff",
+    qname = "w14:CT_Percentage/w14:satMod",
+    qname = "w14:CT_Percentage/w14:lum",
+    qname = "w14:CT_Percentage/w14:lumOff",
+    qname = "w14:CT_Percentage/w14:lumMod"
+  ))]
   pub scheme_color_choice: Vec<SchemeColorChoice>,
 }
 /// Defines the LinearShadeProperties Class.
@@ -1260,7 +1453,10 @@ pub struct EmptyType {}
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w14:CT_SolidColorFillProperties/w14:solidFill")]
 pub struct SolidColorFillProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<SolidColorFillPropertiesChoice>,
 }
 /// Defines the GradientFillProperties Class.
@@ -1274,7 +1470,10 @@ pub struct GradientFillProperties {
   /// _
   #[sdk(child(qname = "w14:CT_GradientStopList/w14:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_LinearShadeProperties/w14:lin",
+    qname = "w14:CT_PathShadeProperties/w14:path"
+  ))]
   pub gradient_fill_properties_choice: Option<GradientFillPropertiesChoice>,
 }
 /// Defines the PresetLineDashProperties Class.
@@ -1339,7 +1538,10 @@ pub struct Glow {
     max_inclusive = true
   ))]
   pub glow_radius: Option<crate::simple_type::Int64Value>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<GlowChoice>,
 }
 /// Defines the Shadow Class.
@@ -1446,7 +1648,10 @@ pub struct Shadow {
   /// Represents the following attribute in the schema: w14:algn
   #[sdk(attr(qname = "w14:algn"))]
   pub alignment: Option<RectangleAlignmentValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<ShadowChoice>,
 }
 /// Defines the Reflection Class.
@@ -1673,12 +1878,20 @@ pub struct TextOutlineEffect {
   /// Represents the following attribute in the schema: w14:algn
   #[sdk(attr(qname = "w14:algn"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Empty/w14:noFill",
+    qname = "w14:CT_SolidColorFillProperties/w14:solidFill",
+    qname = "w14:CT_GradientFillProperties/w14:gradFill"
+  ))]
   pub text_outline_effect_choice1: Option<TextOutlineEffectChoice>,
   /// _
   #[sdk(child(qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
   pub w14_prst_dash: Option<PresetLineDashProperties>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Empty/w14:round",
+    qname = "w:CT_Empty/w14:bevel",
+    qname = "w14:CT_LineJoinMiterProperties/w14:miter"
+  ))]
   pub text_outline_effect_choice3: Option<TextOutlineEffectChoice2>,
 }
 /// Defines the FillTextEffect Class.
@@ -1689,7 +1902,11 @@ pub struct TextOutlineEffect {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w14:CT_FillTextEffect/w14:textFill")]
 pub struct FillTextEffect {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Empty/w14:noFill",
+    qname = "w14:CT_SolidColorFillProperties/w14:solidFill",
+    qname = "w14:CT_GradientFillProperties/w14:gradFill"
+  ))]
   pub xml_children: Option<FillTextEffectChoice>,
 }
 /// Defines the Scene3D Class.
@@ -2105,7 +2322,10 @@ pub struct GradientStop {
     max_inclusive = true
   ))]
   pub stop_position: crate::simple_type::Int32Value,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<GradientStopChoice>,
 }
 /// Defines the FillToRectangle Class.
@@ -2405,7 +2625,10 @@ pub struct BevelType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w14:CT_Color/w14:extrusionClr")]
 pub struct ExtrusionColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<ExtrusionColorChoice>,
 }
 /// Defines the ContourColor Class.
@@ -2416,7 +2639,10 @@ pub struct ExtrusionColor {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w14:CT_Color/w14:contourClr")]
 pub struct ContourColor {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<ContourColorChoice>,
 }
 /// Defines the ColorType Class.
@@ -2427,7 +2653,10 @@ pub struct ContourColor {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w14:CT_Color/")]
 pub struct ColorType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w14:CT_SRgbColor/w14:srgbClr",
+    qname = "w14:CT_SchemeColor/w14:schemeClr"
+  ))]
   pub xml_children: Option<ColorTypeChoice>,
 }
 /// Defines the StyleSet Class.

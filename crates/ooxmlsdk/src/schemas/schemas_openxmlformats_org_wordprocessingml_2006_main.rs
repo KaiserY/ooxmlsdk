@@ -8169,12 +8169,29 @@ pub struct EmbeddedObject {
   #[sdk(attr(qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Group/v:group",
+    qname = "v:CT_Image/v:image",
+    qname = "v:CT_Line/v:line",
+    qname = "v:CT_Oval/v:oval",
+    qname = "v:CT_PolyLine/v:polyline",
+    qname = "v:CT_Rect/v:rect",
+    qname = "v:CT_RoundRect/v:roundrect",
+    qname = "v:CT_Shape/v:shape",
+    qname = "v:CT_Shapetype/v:shapetype",
+    qname = "v:CT_Arc/v:arc",
+    qname = "v:CT_Curve/v:curve",
+    qname = "o:CT_OLEObject/o:OLEObject"
+  ))]
   pub embedded_object_choice1: Vec<EmbeddedObjectChoice>,
   ///DrawingML Object.
   #[sdk(child(qname = "w:CT_Drawing/w:drawing"))]
   pub drawing: Option<std::boxed::Box<Drawing>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Control/w:control",
+    qname = "w:CT_ObjectEmbed/w:objectEmbed",
+    qname = "w:CT_ObjectLink/w:objectLink"
+  ))]
   pub embedded_object_choice2: Option<EmbeddedObjectChoice2>,
 }
 /// VML Object.
@@ -8194,7 +8211,20 @@ pub struct Picture {
   #[sdk(attr(qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Group/v:group",
+    qname = "v:CT_Image/v:image",
+    qname = "v:CT_Line/v:line",
+    qname = "v:CT_Oval/v:oval",
+    qname = "v:CT_PolyLine/v:polyline",
+    qname = "v:CT_Rect/v:rect",
+    qname = "v:CT_RoundRect/v:roundrect",
+    qname = "v:CT_Shape/v:shape",
+    qname = "v:CT_Shapetype/v:shapetype",
+    qname = "v:CT_Arc/v:arc",
+    qname = "v:CT_Curve/v:curve",
+    qname = "o:CT_OLEObject/o:OLEObject"
+  ))]
   pub picture_choice: Vec<PictureChoice>,
   ///Defines the MovieReference Class.
   #[sdk(child(qname = "w:CT_Rel/w:movie"))]
@@ -8232,7 +8262,11 @@ pub struct FieldChar {
   /// Represents the following attribute in the schema: w:dirty
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Base64BinaryText/w:fldData",
+    qname = "w:CT_FFData/w:ffData",
+    qname = "w:CT_TrackChangeNumbering/w:numberingChange"
+  ))]
   pub xml_children: Option<FieldCharChoice>,
 }
 /// Phonetic Guide.
@@ -8351,7 +8385,7 @@ pub struct FootnoteEndnoteReferenceType {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Drawing/w:drawing")]
 pub struct Drawing {
-  #[sdk(choice)]
+  #[sdk(choice(qname = "wp:CT_Anchor/wp:anchor", qname = "wp:CT_Inline/wp:inline"))]
   pub xml_children: Option<DrawingChoice>,
 }
 /// Absolute Position Tab Character.
@@ -10874,7 +10908,7 @@ pub struct InsertedMathControl {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "w:CT_RPr/w:rPr", qname = "w:CT_MathCtrlDel/w:del"))]
   pub inserted_math_control_choice: Option<InsertedMathControlChoice>,
 }
 /// Defines the DeletedMathControl Class.
@@ -10985,7 +11019,11 @@ pub struct MoveFromMathControl {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_RPr/w:rPr",
+    qname = "w:CT_MathCtrlIns/w:ins",
+    qname = "w:CT_MathCtrlDel/w:del"
+  ))]
   pub eg_r_pr_math: Option<MoveFromMathControlChoice>,
 }
 /// Defines the MoveToMathControl Class.
@@ -11040,7 +11078,11 @@ pub struct MoveToMathControl {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_RPr/w:rPr",
+    qname = "w:CT_MathCtrlIns/w:ins",
+    qname = "w:CT_MathCtrlDel/w:del"
+  ))]
   pub eg_r_pr_math: Option<MoveToMathControlChoice>,
 }
 /// Defines the MathControlMoveType Class.
@@ -11095,7 +11137,11 @@ pub struct MathControlMoveType {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_RPr/w:rPr",
+    qname = "w:CT_MathCtrlIns/w:ins",
+    qname = "w:CT_MathCtrlDel/w:del"
+  ))]
   pub xml_children: Vec<MathControlMoveTypeChoice>,
 }
 /// Defines the CustomXmlRuby Class.
@@ -11109,7 +11155,65 @@ pub struct CustomXmlRuby {
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
   pub custom_xml_ruby_choice: Vec<CustomXmlRubyChoice>,
 }
 /// Defines the SimpleFieldRuby Class.
@@ -11144,7 +11248,65 @@ pub struct SimpleFieldRuby {
   /// _
   #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
   pub field_data: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
   pub simple_field_ruby_choice: Vec<SimpleFieldRubyChoice>,
 }
 /// Defines the HyperlinkRuby Class.
@@ -11201,7 +11363,70 @@ pub struct HyperlinkRuby {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<HyperlinkRubyChoice>,
 }
 /// Phonetic Guide Text Run.
@@ -11257,7 +11482,45 @@ pub struct Run {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  #[sdk(choice(text))]
+  #[sdk(choice(
+    qname = "w:CT_Br/w:br",
+    qname = "w:CT_Text/w:t",
+    qname = "w:CT_Text/w:delText",
+    qname = "w:CT_Text/w:instrText",
+    qname = "w:CT_Text/w:delInstrText",
+    qname = "w:CT_Empty/w:noBreakHyphen",
+    qname = "w:CT_Empty/w:softHyphen",
+    qname = "w:CT_Empty/w:dayShort",
+    qname = "w:CT_Empty/w:monthShort",
+    qname = "w:CT_Empty/w:yearShort",
+    qname = "w:CT_Empty/w:dayLong",
+    qname = "w:CT_Empty/w:monthLong",
+    qname = "w:CT_Empty/w:yearLong",
+    qname = "w:CT_Empty/w:annotationRef",
+    qname = "w:CT_Empty/w:footnoteRef",
+    qname = "w:CT_Empty/w:endnoteRef",
+    qname = "w:CT_Empty/w:separator",
+    qname = "w:CT_Empty/w:continuationSeparator",
+    qname = "w:CT_Sym/w:sym",
+    qname = "w:CT_Empty/w:pgNum",
+    qname = "w:CT_Empty/w:cr",
+    qname = "w:CT_Empty/w:tab",
+    qname = "w:CT_Object/w:object",
+    qname = "w:CT_Picture/w:pict",
+    qname = "w:CT_FldChar/w:fldChar",
+    qname = "w:CT_Ruby/w:ruby",
+    qname = "w:CT_FtnEdnRef/w:footnoteReference",
+    qname = "w:CT_FtnEdnRef/w:endnoteReference",
+    qname = "w:CT_Markup/w:commentReference",
+    qname = "w:CT_Drawing/w:drawing",
+    qname = "w:CT_PTab/w:ptab",
+    qname = "w:CT_Empty/w:lastRenderedPageBreak",
+    text
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(qname = "w16se:CT_SymEx/w16se:sym"))
+  )]
   pub run_choice: Vec<RunChoice>,
 }
 /// Defines the SdtRunRuby Class.
@@ -11277,7 +11540,33 @@ pub struct SdtRunRuby {
   /// _
   #[sdk(child(qname = "w:CT_SdtContentRunRuby/w:sdtContent"))]
   pub sdt_content_run_ruby: Option<SdtContentRunRuby>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
+    ))
+  )]
   pub sdt_run_ruby_choice: Vec<SdtRunRubyChoice>,
 }
 /// Defines the ProofError Class.
@@ -11424,7 +11713,64 @@ pub struct InsertedRun {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub inserted_run_choice: Vec<InsertedRunChoice>,
 }
 /// Deleted Run Content.
@@ -11479,7 +11825,64 @@ pub struct DeletedRun {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub deleted_run_choice: Vec<DeletedRunChoice>,
 }
 /// Move Source Run Content.
@@ -11534,7 +11937,64 @@ pub struct MoveFromRun {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub move_from_run_choice: Vec<MoveFromRunChoice>,
 }
 /// Move Destination Run Content.
@@ -11589,7 +12049,64 @@ pub struct MoveToRun {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
+  ))]
   pub move_to_run_choice: Vec<MoveToRunChoice>,
 }
 /// Defines the RunTrackChangeType Class.
@@ -11644,7 +12161,69 @@ pub struct RunTrackChangeType {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel",
+      qname = "w:CT_BdoContentRun/w:bdo",
+      qname = "w:CT_DirContentRun/w:dir"
+    ))
+  )]
   pub xml_children: Vec<RunTrackChangeTypeChoice>,
 }
 #[cfg(feature = "microsoft365")]
@@ -11681,7 +12260,33 @@ pub struct SdtRun {
   ///Inline-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentRun/w:sdtContent"))]
   pub sdt_content_run: Option<SdtContentRun>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
+    ))
+  )]
   pub sdt_run_choice: Vec<SdtRunChoice>,
 }
 /// Defines the CustomXmlBlock Class.
@@ -11702,7 +12307,42 @@ pub struct CustomXmlBlock {
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub custom_xml_block_choice: Vec<CustomXmlBlockChoice>,
 }
 /// Defines the SdtBlock Class.
@@ -11722,7 +12362,33 @@ pub struct SdtBlock {
   ///Block-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentBlock/w:sdtContent"))]
   pub sdt_content_block: Option<SdtContentBlock>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
+    ))
+  )]
   pub sdt_block_choice: Vec<SdtBlockChoice>,
 }
 /// Defines the Paragraph Class.
@@ -11809,7 +12475,68 @@ pub struct Paragraph {
   ///Paragraph Properties
   #[sdk(child(qname = "w:CT_PPr/w:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
   pub paragraph_choice: Vec<ParagraphChoice>,
 }
 /// Defines the Table Class.
@@ -11820,7 +12547,33 @@ pub struct Paragraph {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tbl/w:tbl")]
 pub struct Table {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
+    ))
+  )]
   pub table_choice1: Vec<TableChoice>,
   /// _
   #[sdk(child(qname = "w:CT_TblPr/w:tblPr"))]
@@ -11828,7 +12581,46 @@ pub struct Table {
   /// _
   #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
   pub w_tbl_grid: std::boxed::Box<TableGrid>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Row/w:tr",
+    qname = "w:CT_CustomXmlRow/w:customXml",
+    qname = "w:CT_SdtRow/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub table_choice2: Vec<TableChoice2>,
 }
 /// Table Row.
@@ -11895,7 +12687,41 @@ pub struct TableRow {
   ///Table Row Properties
   #[sdk(child(qname = "w:CT_TrPr/w:trPr"))]
   pub table_row_properties: Option<std::boxed::Box<TableRowProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Tc/w:tc",
+    qname = "w:CT_CustomXmlCell/w:customXml",
+    qname = "w:CT_SdtCell/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub table_row_choice: Vec<TableRowChoice>,
 }
 /// Row-Level Custom XML Element.
@@ -11909,7 +12735,41 @@ pub struct CustomXmlRow {
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Row/w:tr",
+    qname = "w:CT_CustomXmlRow/w:customXml",
+    qname = "w:CT_SdtRow/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub custom_xml_row_choice: Vec<CustomXmlRowChoice>,
 }
 /// Row-Level Structured Document Tag.
@@ -11929,7 +12789,33 @@ pub struct SdtRow {
   ///Row-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentRow/w:sdtContent"))]
   pub sdt_content_row: Option<SdtContentRow>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
+    ))
+  )]
   pub sdt_row_choice: Vec<SdtRowChoice>,
 }
 /// Table Cell.
@@ -11943,7 +12829,43 @@ pub struct TableCell {
   ///Table Cell Properties
   #[sdk(child(qname = "w:CT_TcPr/w:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub table_cell_choice: Vec<TableCellChoice>,
 }
 /// Cell-Level Custom XML Element.
@@ -11957,7 +12879,41 @@ pub struct CustomXmlCell {
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Tc/w:tc",
+    qname = "w:CT_CustomXmlCell/w:customXml",
+    qname = "w:CT_SdtCell/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub custom_xml_cell_choice: Vec<CustomXmlCellChoice>,
 }
 /// Cell-Level Structured Document Tag.
@@ -11977,7 +12933,33 @@ pub struct SdtCell {
   ///Cell-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentCell/w:sdtContent"))]
   pub sdt_content_cell: Option<SdtContentCell>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
+    ))
+  )]
   pub sdt_cell_choice: Vec<SdtCellChoice>,
 }
 /// Defines the CustomXmlRun Class.
@@ -11998,7 +12980,68 @@ pub struct CustomXmlRun {
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
   pub custom_xml_run_choice: Vec<CustomXmlRunChoice>,
 }
 /// Defines the SimpleField Class.
@@ -12033,7 +13076,68 @@ pub struct SimpleField {
   ///Custom Field Data
   #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
   pub field_data: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
   pub simple_field_choice: Vec<SimpleFieldChoice>,
 }
 /// Defines the Hyperlink Class.
@@ -12090,7 +13194,73 @@ pub struct Hyperlink {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel",
+      qname = "w:CT_BdoContentRun/w:bdo",
+      qname = "w:CT_DirContentRun/w:dir"
+    ))
+  )]
   pub xml_children: Vec<HyperlinkChoice>,
 }
 #[cfg(feature = "microsoft365")]
@@ -12109,7 +13279,68 @@ pub struct BidirectionalOverride {
   /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: Option<DirectionValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
   pub xml_children: Vec<BidirectionalOverrideChoice>,
 }
 #[cfg(feature = "microsoft365")]
@@ -12128,7 +13359,68 @@ pub struct BidirectionalEmbedding {
   /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: Option<DirectionValues>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
   pub xml_children: Vec<BidirectionalEmbeddingChoice>,
 }
 /// Anchor for Subdocument Location.
@@ -14157,7 +15449,48 @@ pub struct Recipients {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
 pub struct TextBoxContent {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<TextBoxContentChoice>,
 }
 /// Comments Collection.
@@ -14220,7 +15553,48 @@ pub struct Header {
   pub xmlns_map: std::collections::HashMap<String, String>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<HeaderChoice>,
 }
 /// Footer.
@@ -14235,7 +15609,48 @@ pub struct Footer {
   pub xmlns_map: std::collections::HashMap<String, String>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<FooterChoice>,
 }
 /// Defines the HeaderFooterType Class.
@@ -14246,7 +15661,48 @@ pub struct Footer {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtr/")]
 pub struct HeaderFooterType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<HeaderFooterTypeChoice>,
 }
 /// Document Settings.
@@ -14655,6 +16111,10 @@ pub struct Fonts {
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
   #[sdk(child(qname = "w:CT_Font/w:font"))]
   pub w_font: Vec<Font>,
 }
@@ -14833,7 +16293,11 @@ pub struct PreviousTableCellProperties {
   ///Defines the HideMark Class.
   #[sdk(child(qname = "w:CT_OnOffOnly/w:hideMark"))]
   pub hide_mark: Option<HideMark>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_TrackChange/w:cellIns",
+    qname = "w:CT_TrackChange/w:cellDel",
+    qname = "w:CT_CellMergeTrackChange/w:cellMerge"
+  ))]
   pub eg_cell_markup_elements: Option<PreviousTableCellPropertiesChoice>,
 }
 /// Previous Table Row Properties.
@@ -14844,7 +16308,20 @@ pub struct PreviousTableCellProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBase/w:trPr")]
 pub struct PreviousTableRowProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Cnf/w:cnfStyle",
+    qname = "w:CT_NonZeroDecimalNumber/w:divId",
+    qname = "w:CT_DecimalNumber/w:gridBefore",
+    qname = "w:CT_DecimalNumber/w:gridAfter",
+    qname = "w:CT_TblWidth/w:wBefore",
+    qname = "w:CT_TblWidth/w:wAfter",
+    qname = "w:CT_Height/w:trHeight",
+    qname = "w:CT_OnOff/w:hidden",
+    qname = "w:CT_OnOffOnly/w:cantSplit",
+    qname = "w:CT_OnOffOnly/w:tblHeader",
+    qname = "w:CT_TblWidth/w:tblCellSpacing",
+    qname = "w:CT_TblJc/w:jc"
+  ))]
   pub xml_children: Vec<PreviousTableRowPropertiesChoice>,
 }
 /// Previous Table Properties.
@@ -15310,6 +16787,13 @@ pub struct PreviousParagraphMarkRunProperties {
   pub move_to: Option<MoveTo>,
   #[cfg(feature = "microsoft365")]
   #[sdk(choice)]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:conflictIns",
+      qname = "w:CT_TrackChange/w14:conflictDel"
+    ))
+  )]
   pub previous_paragraph_mark_run_properties_choice:
     Option<PreviousParagraphMarkRunPropertiesChoice>,
   ///Defines the RunStyle Class.
@@ -15691,6 +17175,13 @@ pub struct ParagraphMarkRunProperties {
   pub move_to: Option<MoveTo>,
   #[cfg(feature = "microsoft365")]
   #[sdk(choice)]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:conflictIns",
+      qname = "w:CT_TrackChange/w14:conflictDel"
+    ))
+  )]
   pub paragraph_mark_run_properties_choice: Option<ParagraphMarkRunPropertiesChoice>,
   ///Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
@@ -15916,7 +17407,10 @@ pub struct SectionProperties {
   #[sdk(attr(qname = "w:rsidSect"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_sect: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_HdrFtrRef/w:headerReference",
+    qname = "w:CT_HdrFtrRef/w:footerReference"
+  ))]
   pub eg_hdr_ftr_references: Vec<SectionPropertiesChoice>,
   ///Defines the FootnoteProperties Class.
   #[sdk(child(qname = "w:CT_FtnProps/w:footnotePr"))]
@@ -15998,7 +17492,18 @@ pub type FieldData = crate::simple_type::Base64BinaryValue;
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFData/w:ffData")]
 pub struct FormFieldData {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_FFName/w:name",
+    qname = "w:CT_OnOff/w:enabled",
+    qname = "w:CT_OnOff/w:calcOnExit",
+    qname = "w:CT_MacroName/w:entryMacro",
+    qname = "w:CT_MacroName/w:exitMacro",
+    qname = "w:CT_FFHelpText/w:helpText",
+    qname = "w:CT_FFStatusText/w:statusText",
+    qname = "w:CT_FFCheckBox/w:checkBox",
+    qname = "w:CT_FFDDList/w:ddList",
+    qname = "w:CT_FFTextInput/w:textInput"
+  ))]
   pub xml_children: Vec<FormFieldDataChoice>,
 }
 /// Form Field Name.
@@ -16126,7 +17631,7 @@ pub struct StatusText {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFCheckBox/w:checkBox")]
 pub struct CheckBox {
-  #[sdk(choice)]
+  #[sdk(choice(qname = "w:CT_HpsMeasure/w:size", qname = "w:CT_OnOff/w:sizeAuto"))]
   pub check_box_choice: Option<CheckBoxChoice>,
   /// _
   #[sdk(child(qname = "w:CT_OnOff/w:default"))]
@@ -16560,7 +18065,70 @@ pub struct RubyProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rt")]
 pub struct RubyContent {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<RubyContentChoice>,
 }
 /// Phonetic Guide Base Text.
@@ -16571,7 +18139,70 @@ pub struct RubyContent {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
 pub struct RubyBase {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<RubyBaseChoice>,
 }
 /// Defines the RubyContentType Class.
@@ -16582,7 +18213,70 @@ pub struct RubyBase {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/")]
 pub struct RubyContentType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<RubyContentTypeChoice>,
 }
 /// Custom XML Data Date Storage Format.
@@ -16648,7 +18342,43 @@ pub struct ListItem {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
 pub struct SdtProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_RPr/w:rPr",
+    qname = "w:CT_String/w:alias",
+    qname = "w:CT_Lock/w:lock",
+    qname = "w:CT_Placeholder/w:placeholder",
+    qname = "w:CT_OnOff/w:showingPlcHdr",
+    qname = "w:CT_DataBinding/w:dataBinding",
+    qname = "w:CT_OnOff/w:temporary",
+    qname = "w:CT_DecimalNumber/w:id",
+    qname = "w:CT_String/w:tag",
+    qname = "w:CT_Empty/w:equation",
+    qname = "w:CT_SdtComboBox/w:comboBox",
+    qname = "w:CT_SdtDate/w:date",
+    qname = "w:CT_SdtDocPart/w:docPartObj",
+    qname = "w:CT_SdtDocPart/w:docPartList",
+    qname = "w:CT_SdtDropDownList/w:dropDownList",
+    qname = "w:CT_Empty/w:picture",
+    qname = "w:CT_Empty/w:richText",
+    qname = "w:CT_SdtText/w:text",
+    qname = "w:CT_Empty/w:citation",
+    qname = "w:CT_Empty/w:group",
+    qname = "w:CT_Empty/w:bibliography"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_DataBinding/w15:dataBinding",
+      qname = "w:CT_Color/w15:color",
+      qname = "w15:CT_SdtAppearance/w15:appearance",
+      qname = "w:CT_OnOff/w15:webExtensionLinked",
+      qname = "w:CT_OnOff/w15:webExtensionCreated",
+      qname = "w:CT_Empty/w14:entityPicker",
+      qname = "w14:CT_SdtCheckbox/w14:checkbox",
+      qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection",
+      qname = "w:CT_Empty/w15:repeatingSectionItem"
+    ))
+  )]
   pub xml_children: Vec<SdtPropertiesChoice>,
 }
 /// Structured Document Tag End Character Properties.
@@ -16671,7 +18401,47 @@ pub struct SdtEndCharProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
 pub struct SdtContentBlock {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<SdtContentBlockChoice>,
 }
 /// Inline-Level Structured Document Tag Content.
@@ -16682,7 +18452,73 @@ pub struct SdtContentBlock {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
 pub struct SdtContentRun {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "m:CT_R/m:r",
+    qname = "w:CT_CustomXmlRun/w:customXml",
+    qname = "w:CT_SimpleField/w:fldSimple",
+    qname = "w:CT_Hyperlink/w:hyperlink",
+    qname = "w:CT_SdtRun/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_Rel/w:subDoc"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel",
+      qname = "w:CT_BdoContentRun/w:bdo",
+      qname = "w:CT_DirContentRun/w:dir"
+    ))
+  )]
   pub xml_children: Vec<SdtContentRunChoice>,
 }
 /// Defines the SdtContentRunRuby Class.
@@ -16693,7 +18529,70 @@ pub struct SdtContentRun {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
 pub struct SdtContentRunRuby {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_CustomXmlRuby/w:customXml",
+    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
+    qname = "w:CT_HyperlinkRuby/w:hyperlink",
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_SdtRunRuby/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "m:CT_OMathPara/m:oMathPara",
+    qname = "m:CT_OMath/m:oMath",
+    qname = "m:CT_Acc/m:acc",
+    qname = "m:CT_Bar/m:bar",
+    qname = "m:CT_Box/m:box",
+    qname = "m:CT_BorderBox/m:borderBox",
+    qname = "m:CT_D/m:d",
+    qname = "m:CT_EqArr/m:eqArr",
+    qname = "m:CT_F/m:f",
+    qname = "m:CT_Func/m:func",
+    qname = "m:CT_GroupChr/m:groupChr",
+    qname = "m:CT_LimLow/m:limLow",
+    qname = "m:CT_LimUpp/m:limUpp",
+    qname = "m:CT_M/m:m",
+    qname = "m:CT_Nary/m:nary",
+    qname = "m:CT_Phant/m:phant",
+    qname = "m:CT_Rad/m:rad",
+    qname = "m:CT_SPre/m:sPre",
+    qname = "m:CT_SSub/m:sSub",
+    qname = "m:CT_SSubSup/m:sSubSup",
+    qname = "m:CT_SSup/m:sSup",
+    qname = "m:CT_R/m:r"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<SdtContentRunRubyChoice>,
 }
 /// Cell-Level Structured Document Tag Content.
@@ -16704,7 +18603,46 @@ pub struct SdtContentRunRuby {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
 pub struct SdtContentCell {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Tc/w:tc",
+    qname = "w:CT_CustomXmlCell/w:customXml",
+    qname = "w:CT_SdtCell/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<SdtContentCellChoice>,
 }
 /// Row-Level Structured Document Tag Content.
@@ -16715,7 +18653,46 @@ pub struct SdtContentCell {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
 pub struct SdtContentRow {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Row/w:tr",
+    qname = "w:CT_CustomXmlRow/w:customXml",
+    qname = "w:CT_SdtRow/w:sdt",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<SdtContentRowChoice>,
 }
 /// Custom XML Element Properties.
@@ -16925,7 +18902,11 @@ pub struct TableCellProperties {
   ///Defines the HideMark Class.
   #[sdk(child(qname = "w:CT_OnOffOnly/w:hideMark"))]
   pub hide_mark: Option<HideMark>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_TrackChange/w:cellIns",
+    qname = "w:CT_TrackChange/w:cellDel",
+    qname = "w:CT_CellMergeTrackChange/w:cellMerge"
+  ))]
   pub table_cell_properties_choice: Option<TableCellPropertiesChoice>,
   ///Revision Information for Table Cell Properties.
   #[sdk(child(qname = "w:CT_TcPrChange/w:tcPrChange"))]
@@ -18106,7 +20087,7 @@ pub struct Frameset {
   ///Frameset Layout
   #[sdk(child(qname = "w:CT_FrameLayout/w:frameLayout"))]
   pub frame_layout: Option<FrameLayout>,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "w:CT_Frameset/w:frameset", qname = "w:CT_Frame/w:frame"))]
   pub frameset_choice: Vec<FramesetChoice>,
 }
 /// Single Frame Properties.
@@ -18558,7 +20539,10 @@ pub struct NumberingPictureBullet {
   /// Represents the following attribute in the schema: w:numPicBulletId
   #[sdk(attr(qname = "w:numPicBulletId"))]
   pub numbering_picture_bullet_id: crate::simple_type::Int32Value,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_PictureBulletBase/w:pict",
+    qname = "w:CT_Drawing/w:drawing"
+  ))]
   pub xml_children: Option<NumberingPictureBulletChoice>,
 }
 /// Abstract Numbering Definition.
@@ -18773,7 +20757,13 @@ pub struct TableStyleConditionalFormattingTableProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBaseStyleable/w:trPr")]
 pub struct TableStyleConditionalFormattingTableRowProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_OnOff/w:hidden",
+    qname = "w:CT_OnOffOnly/w:cantSplit",
+    qname = "w:CT_OnOffOnly/w:tblHeader",
+    qname = "w:CT_TblWidth/w:tblCellSpacing",
+    qname = "w:CT_TblJc/w:jc"
+  ))]
   pub xml_children: Vec<TableStyleConditionalFormattingTableRowPropertiesChoice>,
 }
 /// Table Style Conditional Formatting Table Cell Properties.
@@ -19616,7 +21606,20 @@ pub struct Comment {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd"
+  ))]
   pub comment_choice: Vec<CommentChoice>,
 }
 /// Footnote Content.
@@ -19648,7 +21651,43 @@ pub struct Footnote {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::IntegerValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub footnote_choice: Vec<FootnoteChoice>,
 }
 /// Endnote Content.
@@ -19680,7 +21719,43 @@ pub struct Endnote {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::IntegerValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub endnote_choice: Vec<EndnoteChoice>,
 }
 /// Defines the FootnoteEndnoteType Class.
@@ -19712,7 +21787,48 @@ pub struct FootnoteEndnoteType {
     max_inclusive = true
   ))]
   pub id: crate::simple_type::IntegerValue,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<FootnoteEndnoteTypeChoice>,
 }
 /// Entry Insertion Behavior.
@@ -20051,7 +22167,43 @@ pub struct DocPartProperties {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:docPartBody")]
 pub struct DocPartBody {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub doc_part_body_choice: Vec<DocPartBodyChoice>,
   /// _
   #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
@@ -20069,7 +22221,43 @@ pub struct Body {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
+  ))]
   pub body_choice: Vec<BodyChoice>,
   /// _
   #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
@@ -20087,7 +22275,49 @@ pub struct BodyType {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_AltChunk/w:altChunk",
+    qname = "w:CT_CustomXmlBlock/w:customXml",
+    qname = "w:CT_SdtBlock/w:sdt",
+    qname = "w:CT_P/w:p",
+    qname = "w:CT_Tbl/w:tbl",
+    qname = "w:CT_ProofErr/w:proofErr",
+    qname = "w:CT_PermStart/w:permStart",
+    qname = "w:CT_Perm/w:permEnd",
+    qname = "w:CT_Bookmark/w:bookmarkStart",
+    qname = "w:CT_MarkupRange/w:bookmarkEnd",
+    qname = "w:CT_MarkupRange/w:commentRangeStart",
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
+    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
+    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
+    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
+    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
+    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
+    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_RunTrackChange/w:ins",
+    qname = "w:CT_RunTrackChange/w:del",
+    qname = "w:CT_RunTrackChange/w:moveFrom",
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_SectPr/w:sectPr"
+  ))]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
+      qname = "w:CT_ContentPart/w:contentPart",
+      qname = "w:CT_RunTrackChange/w14:conflictIns",
+      qname = "w:CT_RunTrackChange/w14:conflictDel"
+    ))
+  )]
   pub xml_children: Vec<BodyTypeChoice>,
 }
 /// Glossary Document Entry.
@@ -20254,7 +22484,20 @@ pub struct TablePropertyExceptions {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPr/w:trPr")]
 pub struct TableRowProperties {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_Cnf/w:cnfStyle",
+    qname = "w:CT_NonZeroDecimalNumber/w:divId",
+    qname = "w:CT_DecimalNumber/w:gridBefore",
+    qname = "w:CT_DecimalNumber/w:gridAfter",
+    qname = "w:CT_TblWidth/w:wBefore",
+    qname = "w:CT_TblWidth/w:wAfter",
+    qname = "w:CT_Height/w:trHeight",
+    qname = "w:CT_OnOff/w:hidden",
+    qname = "w:CT_OnOffOnly/w:cantSplit",
+    qname = "w:CT_OnOffOnly/w:tblHeader",
+    qname = "w:CT_TblWidth/w:tblCellSpacing",
+    qname = "w:CT_TblJc/w:jc"
+  ))]
   pub table_row_properties_choice1: Vec<TableRowPropertiesChoice>,
   ///Inserted Paragraph.
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
@@ -20267,6 +22510,13 @@ pub struct TableRowProperties {
   pub table_row_properties_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
   #[cfg(feature = "microsoft365")]
   #[sdk(choice)]
+  #[cfg_attr(
+    feature = "microsoft365",
+    sdk(choice(
+      qname = "w:CT_TrackChange/w14:conflictIns",
+      qname = "w:CT_TrackChange/w14:conflictDel"
+    ))
+  )]
   pub table_row_properties_choice2: Option<TableRowPropertiesChoice2>,
 }
 /// Revision Information for Table Row Properties.
@@ -20750,7 +23000,11 @@ pub struct SdtContentDocPartList {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDocPart/")]
 pub struct SdtDocPartType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "w:CT_String/w:docPartGallery",
+    qname = "w:CT_String/w:docPartCategory",
+    qname = "w:CT_OnOff/w:docPartUnique"
+  ))]
   pub xml_children: Vec<SdtDocPartTypeChoice>,
 }
 /// Defines the SdtContentDropDownList Class.
@@ -21752,7 +24006,10 @@ pub struct SaveThroughXslt {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/w:hdrShapeDefaults")]
 pub struct HeaderShapeDefaults {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "o:CT_ShapeDefaults/o:shapedefaults",
+    qname = "o:CT_ShapeLayout/o:shapelayout"
+  ))]
   pub xml_children: Vec<HeaderShapeDefaultsChoice>,
 }
 /// Default Properties for VML Objects in Main Document.
@@ -21763,7 +24020,10 @@ pub struct HeaderShapeDefaults {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/w:shapeDefaults")]
 pub struct ShapeDefaults {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "o:CT_ShapeDefaults/o:shapedefaults",
+    qname = "o:CT_ShapeLayout/o:shapelayout"
+  ))]
   pub xml_children: Vec<ShapeDefaultsChoice>,
 }
 /// Defines the ShapeDefaultsType Class.
@@ -21774,7 +24034,10 @@ pub struct ShapeDefaults {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/")]
 pub struct ShapeDefaultsType {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "o:CT_ShapeDefaults/o:shapedefaults",
+    qname = "o:CT_ShapeLayout/o:shapelayout"
+  ))]
   pub xml_children: Vec<ShapeDefaultsTypeChoice>,
 }
 /// Document-Wide Footnote Properties.
@@ -22234,7 +24497,17 @@ pub struct TargetScreenSize {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PictureBulletBase/w:pict")]
 pub struct PictureBulletBase {
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "v:CT_Group/v:group",
+    qname = "v:CT_Image/v:image",
+    qname = "v:CT_Line/v:line",
+    qname = "v:CT_Oval/v:oval",
+    qname = "v:CT_PolyLine/v:polyline",
+    qname = "v:CT_Rect/v:rect",
+    qname = "v:CT_RoundRect/v:roundrect",
+    qname = "v:CT_Shape/v:shape",
+    qname = "v:CT_Shapetype/v:shapetype"
+  ))]
   pub xml_children: Vec<PictureBulletBaseChoice>,
 }
 /// Defines the Panose1Number Class.

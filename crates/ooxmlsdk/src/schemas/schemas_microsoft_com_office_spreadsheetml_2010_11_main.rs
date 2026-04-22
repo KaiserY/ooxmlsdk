@@ -1170,7 +1170,10 @@ pub struct OleDbPrpoperties {
   /// Represents the following attribute in the schema: :connection
   #[sdk(attr(qname = ":connection"))]
   pub connection: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(
+    qname = "x15:CT_DbTables/x15:dbTables",
+    qname = "x15:CT_DbCommand/x15:dbCommand"
+  ))]
   pub xml_children: Option<OleDbPrpopertiesChoice>,
 }
 /// Defines the DataFeedProperties Class.

@@ -78,7 +78,7 @@ pub struct ActiveXObjectProperty {
   /// Represents the following attribute in the schema: ax:value
   #[sdk(attr(qname = "ax:value"))]
   pub value: Option<crate::simple_type::StringValue>,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "ax:CT_Font/ax:font", qname = "ax:CT_Picture/ax:picture"))]
   pub xml_children: Option<ActiveXObjectPropertyChoice>,
 }
 /// Defines the SharedComFont Class.

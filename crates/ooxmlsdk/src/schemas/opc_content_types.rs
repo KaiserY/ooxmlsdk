@@ -15,7 +15,7 @@ pub struct Types {
   pub xmlns: Option<String>,
   pub xmlns_map: std::collections::HashMap<String, String>,
   pub xml_header: crate::common::XmlHeaderType,
-  #[sdk(choice)]
+  #[sdk(choice(qname = "CT_Default/Default", qname = "CT_Override/Override"))]
   pub xml_children: Vec<TypesChoice>,
 }
 /// Default content type.

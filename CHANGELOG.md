@@ -1,5 +1,22 @@
 # Change Log
 
+## 0.4.1
+
+### New Features
+
+- Simplified generated schema types for single-`any` child content so wildcard XML children are stored more directly and cleanly.
+
+### Performance
+
+- Improved XML attribute parsing by specializing enum, boolean-like, and integer simple-type reads around raw byte fast paths instead of routing common cases through string parsing.
+- Flattened common generated child dispatch paths so direct children, text children, and flat choice groups are handled with less runtime branching in the hot read path.
+- Reduced generated parser overhead for pure-`any` content models by trimming dead fallback scaffolding from common child loops.
+
+### Bug Fixes
+
+- Preserved `mc:AlternateContent` as explicit round-trip content instead of transparently backfilling its inner children into parent typed fields.
+- Kept generated child dispatch stable when `cfg`-gated children are removed from a build, avoiding fallback dispatch mismatches across feature sets.
+
 ## 0.4.0
 
 ### Breaking Changes

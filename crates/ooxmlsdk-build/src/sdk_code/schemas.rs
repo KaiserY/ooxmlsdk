@@ -821,22 +821,6 @@ pub(crate) fn one_sequence_choice_enum_name(
   }
 }
 
-fn one_sequence_choice_enum_name_from_rust_name(
-  rust_name: &str,
-  choice_slot_count: usize,
-  slot_index: usize,
-) -> String {
-  if choice_slot_count <= 1 {
-    format!("{}Choice", rust_name.to_upper_camel_case())
-  } else {
-    format!(
-      "{}Choice{}",
-      rust_name.to_upper_camel_case(),
-      slot_index + 1
-    )
-  }
-}
-
 pub(crate) fn one_sequence_choice_sequence_struct_name(
   schema_type: &SchemaType,
   choice_slot_count: usize,
@@ -1045,7 +1029,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     }
 
     let mut fields: Vec<TokenStream> = vec![];
-    let mut child_choice_enums: Vec<TokenStream> = vec![];
     let items: Vec<TokenStream> = vec![];
 
     fields.extend(gen_support_fields(&type_decl.support));
@@ -1158,33 +1141,22 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           )?);
         }
         ContentModelDecl::SequenceAnyOnly => {
-          let choice_type_name = choice_fields
-            .first()
-            .map(|field| field.type_ref.rust_type.clone())
-            .unwrap_or_else(|| {
-              one_sequence_choice_enum_name_from_rust_name(&type_decl.rust_name, 1, 0)
-            });
-          let child_choice_enum_ident: Ident = parse_str(&choice_type_name)?;
+          let any_field = type_decl.members.iter().find_map(|member| match member {
+            MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
+            _ => None,
+          });
+          let field_type = any_field
+            .map(|field| type_from_decl_ref(&field.type_ref))
+            .transpose()?
+            .unwrap_or_else(|| parse_str("String").expect("String type"));
           let field_attrs = module_version_cfg_attrs(
-            choice_fields
-              .first()
-              .map(|field| field.version.as_str())
-              .unwrap_or(""),
+            any_field.map(|field| field.version.as_str()).unwrap_or(""),
             field_version_cfg,
           );
           fields.push(quote! {
             #( #field_attrs )*
-            #[sdk(choice(any))]
-            pub xml_children: Vec<#child_choice_enum_ident>,
-          });
-
-          child_choice_enums.push(quote! {
-            #( #type_attrs )*
-            #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-            pub enum #child_choice_enum_ident {
-              #[sdk(any)]
-              UnknownXml(String),
-            }
+            #[sdk(any)]
+            pub xml_children: Vec<#field_type>,
           });
         }
         ContentModelDecl::SequenceDirectChildren => {
@@ -1500,33 +1472,22 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           )?);
         }
         ContentModelDecl::SequenceAnyOnly => {
-          let choice_type_name = choice_fields
-            .first()
-            .map(|field| field.type_ref.rust_type.clone())
-            .unwrap_or_else(|| {
-              one_sequence_choice_enum_name_from_rust_name(&type_decl.rust_name, 1, 0)
-            });
-          let child_choice_enum_ident: Ident = parse_str(&choice_type_name)?;
+          let any_field = type_decl.members.iter().find_map(|member| match member {
+            MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
+            _ => None,
+          });
+          let field_type = any_field
+            .map(|field| type_from_decl_ref(&field.type_ref))
+            .transpose()?
+            .unwrap_or_else(|| parse_str("String").expect("String type"));
           let field_attrs = module_version_cfg_attrs(
-            choice_fields
-              .first()
-              .map(|field| field.version.as_str())
-              .unwrap_or(""),
+            any_field.map(|field| field.version.as_str()).unwrap_or(""),
             field_version_cfg,
           );
           fields.push(quote! {
             #( #field_attrs )*
-            #[sdk(choice(any))]
-            pub xml_children: Vec<#child_choice_enum_ident>,
-          });
-
-          child_choice_enums.push(quote! {
-            #( #type_attrs )*
-            #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-            pub enum #child_choice_enum_ident {
-              #[sdk(any)]
-              UnknownXml(String),
-            }
+            #[sdk(any)]
+            pub xml_children: Vec<#field_type>,
           });
         }
         ContentModelDecl::None => {
@@ -1559,14 +1520,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       return Err(format!("{type_decl:?}").into());
     }
 
-    let child_choice_tokens = if !child_choice_enums.is_empty() {
-      quote! {
-        #( #child_choice_enums )*
-      }
-    } else {
-      quote! {}
-    };
-
     token_stream_list.push(quote! {
       #( #type_attrs )*
       #[doc = #summary_doc]
@@ -1580,7 +1533,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         #( #fields )*
       }
       #( #items )*
-      #child_choice_tokens
     });
   }
 
@@ -3681,7 +3633,9 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("UnknownXml (String)"));
+    assert!(generated.contains("# [sdk (any)] pub xml_children : Vec < String >"));
+    assert!(!generated.contains("pub enum ContentTypeSchemaChoice"));
+    assert!(!generated.contains("UnknownXml (String)"));
     assert!(!generated.contains("UnknownXml (std :: boxed :: Box < String >)"));
   }
 
@@ -5918,8 +5872,8 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("pub xml_children : Vec < AnyHolderChoice >"));
-    assert!(generated.contains("pub enum AnyHolderChoice"));
-    assert!(generated.contains("UnknownXml (String)"));
+    assert!(generated.contains("# [sdk (any)] pub xml_children : Vec < String >"));
+    assert!(!generated.contains("pub enum AnyHolderChoice"));
+    assert!(!generated.contains("UnknownXml (String)"));
   }
 }

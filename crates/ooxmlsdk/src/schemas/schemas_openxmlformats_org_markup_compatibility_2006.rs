@@ -64,13 +64,8 @@ pub struct Choice {
   /// Represents the following attribute in the schema: mc:ProcessContent
   #[sdk(attr(qname = "mc:ProcessContent"))]
   pub mc_process_content: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ChoiceChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ChoiceChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the Fallback Class.
 ///
@@ -97,13 +92,8 @@ pub struct Fallback {
   /// Represents the following attribute in the schema: mc:ProcessContent
   #[sdk(attr(qname = "mc:ProcessContent"))]
   pub mc_process_content: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<FallbackChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum FallbackChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
 pub enum AlternateContentChoice {

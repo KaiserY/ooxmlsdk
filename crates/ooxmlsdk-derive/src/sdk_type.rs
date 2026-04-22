@@ -3287,13 +3287,7 @@ fn expand_named_struct(
   let has_text_child_dispatch = !text_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let has_any_dispatch = !any_fields.is_empty();
-  let supports_markup_compatibility = child_fields.iter().any(|field| {
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(&field.qname);
-    tag_prefix == "mc" && local_name == "AlternateContent"
-  });
+  let supports_markup_compatibility = has_child_dispatch || has_choice_dispatch || has_any_dispatch;
   let visit_foreign_child_tokens_borrowed =
     if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
       quote! {
@@ -4591,6 +4585,7 @@ fn expand_named_struct(
   let has_body = !child_fields.is_empty()
     || !text_child_fields.is_empty()
     || !choice_fields.is_empty()
+    || !any_fields.is_empty()
     || text_field.is_some();
   Ok(quote! {
     impl crate::sdk::SdkType for #ident {}

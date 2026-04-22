@@ -2949,6 +2949,25 @@ fn build_generic_children_members(
       .collect::<Vec<_>>(),
   )
   .to_string();
+  if resolved_children.len() == 1
+    && resolved_children[0].kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any
+  {
+    members.push(MemberDecl::Field(FieldDecl {
+      rust_name: "xml_children".to_string(),
+      docs: "Arbitrary child XML elements.".to_string(),
+      version: effective_version(resolved_children[0].version, choice_version.as_str()).to_string(),
+      wire: FieldWireDecl::Any,
+      cardinality: Cardinality::Many,
+      type_ref: TypeRefDecl {
+        rust_type: "String".to_string(),
+        module_path: None,
+      },
+      validators: Vec::new(),
+    }));
+
+    return Ok(Vec::new());
+  }
+
   let choice_field_name = one_sequence_choice_field_name(schema_type, 1, 0);
   let choice_enum_name = one_sequence_choice_enum_name(schema_type, 1, 0);
   members.push(MemberDecl::Field(FieldDecl {
@@ -6148,8 +6167,13 @@ mod tests {
       })
       .unwrap();
     assert_eq!(field.cardinality, Cardinality::Many);
-    assert!(matches!(field.wire, FieldWireDecl::Choice));
-    assert_eq!(field.type_ref.rust_type, "AnyHolderChoice");
+    assert_eq!(field.rust_name, "xml_children");
+    assert!(matches!(field.wire, FieldWireDecl::Any));
+    assert_eq!(field.type_ref.rust_type, "String");
+    assert!(
+      ir.types.iter().all(|ty| ty.rust_name != "AnyHolderChoice"),
+      "single-any holders should not emit wrapper choice enums"
+    );
   }
 
   #[test]

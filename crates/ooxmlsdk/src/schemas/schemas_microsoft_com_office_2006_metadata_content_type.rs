@@ -74,11 +74,6 @@ pub struct ContentTypeSchema {
   /// Represents the following attribute in the schema: ma:versionID
   #[sdk(attr(qname = "ma:versionID"))]
   pub version_id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ContentTypeSchemaChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ContentTypeSchemaChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }

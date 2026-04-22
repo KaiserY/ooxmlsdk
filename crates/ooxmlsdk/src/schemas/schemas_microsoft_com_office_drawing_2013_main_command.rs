@@ -200,13 +200,8 @@ pub struct InkMoniker {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingMonikerList/oac:dgMkLst")]
 pub struct DrawingMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DrawingMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DrawingMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the Transform2D Class.
 ///
@@ -252,13 +247,8 @@ pub struct Transform2D {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GroupShapeMonikerList/oac:grpSpMkLst")]
 pub struct GroupShapeMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<GroupShapeMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum GroupShapeMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the DrawingElementPackage Class.
 ///
@@ -276,13 +266,8 @@ pub struct DrawingElementPackage {}
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst")]
 pub struct DeMkLstDrawingElementMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DeMkLstDrawingElementMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DeMkLstDrawingElementMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the DeMasterMkLstDrawingElementMonikerList Class.
 ///
@@ -292,13 +277,8 @@ pub enum DeMkLstDrawingElementMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deMasterMkLst")]
 pub struct DeMasterMkLstDrawingElementMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DeMasterMkLstDrawingElementMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DeMasterMkLstDrawingElementMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the DeSrcMkLstDrawingElementMonikerList Class.
 ///
@@ -308,13 +288,8 @@ pub enum DeMasterMkLstDrawingElementMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deSrcMkLst")]
 pub struct DeSrcMkLstDrawingElementMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DeSrcMkLstDrawingElementMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DeSrcMkLstDrawingElementMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the DeTgtMkLstDrawingElementMonikerList Class.
 ///
@@ -324,13 +299,8 @@ pub enum DeSrcMkLstDrawingElementMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deTgtMkLst")]
 pub struct DeTgtMkLstDrawingElementMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DeTgtMkLstDrawingElementMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DeTgtMkLstDrawingElementMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the OpenXmlDrawingElementMonikerListElement Class.
 ///
@@ -466,13 +436,8 @@ pub struct ImgLink {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DocumentContextMonikerList/oac:dcMkLst")]
 pub struct DocumentContextMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DocumentContextMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DocumentContextMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the GraphicParentMonikerList Class.
 ///
@@ -482,13 +447,8 @@ pub enum DocumentContextMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GraphicParentMonikerList/oac:graphicParentMkLst")]
 pub struct GraphicParentMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<GraphicParentMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum GraphicParentMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the ShapeMonikerList Class.
 ///
@@ -498,13 +458,8 @@ pub enum GraphicParentMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ShapeMonikerList/oac:spMkLst")]
 pub struct ShapeMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ShapeMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ShapeMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the GraphicFrameMonikerList Class.
 ///
@@ -514,13 +469,8 @@ pub enum ShapeMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GraphicFrameMonikerList/oac:graphicFrameMkLst")]
 pub struct GraphicFrameMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<GraphicFrameMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum GraphicFrameMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the ConnectorMonikerList Class.
 ///
@@ -530,13 +480,8 @@ pub enum GraphicFrameMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ConnectorMonikerList/oac:cxnSpMkLst")]
 pub struct ConnectorMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ConnectorMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ConnectorMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the PictureMonikerList Class.
 ///
@@ -546,13 +491,8 @@ pub enum ConnectorMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_PictureMonikerList/oac:picMkLst")]
 pub struct PictureMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<PictureMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum PictureMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the InkMonikerList Class.
 ///
@@ -562,13 +502,8 @@ pub enum PictureMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_InkMonikerList/oac:inkMkLst")]
 pub struct InkMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<InkMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum InkMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the TextBodyMonikerList Class.
 ///
@@ -578,13 +513,8 @@ pub enum InkMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst")]
 pub struct TextBodyMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<TextBodyMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum TextBodyMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the TextCharRangeMonikerList Class.
 ///
@@ -594,13 +524,8 @@ pub enum TextBodyMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst")]
 pub struct TextCharRangeMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<TextCharRangeMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum TextCharRangeMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the HyperlinkMonikerList Class.
 ///
@@ -610,13 +535,8 @@ pub enum TextCharRangeMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_HyperlinkMonikerList/oac:hlinkMkLst")]
 pub struct HyperlinkMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<HyperlinkMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum HyperlinkMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the Model3DMonikerList Class.
 ///
@@ -626,13 +546,8 @@ pub enum HyperlinkMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Model3DMonikerList/oac:model3DMkLst")]
 pub struct Model3DMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<Model3DMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum Model3DMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the ViewSelectionStgList Class.
 ///
@@ -642,13 +557,8 @@ pub enum Model3DMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ViewSelectionStgList/oac:viewSelLst")]
 pub struct ViewSelectionStgList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ViewSelectionStgListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ViewSelectionStgListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the EditorSelectionStgList Class.
 ///
@@ -658,13 +568,8 @@ pub enum ViewSelectionStgListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_EditorSelectionStgList/oac:editorSelLst")]
 pub struct EditorSelectionStgList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<EditorSelectionStgListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum EditorSelectionStgListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the DrawingSelectionStgList Class.
 ///
@@ -674,13 +579,8 @@ pub enum EditorSelectionStgListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingSelectionStgList/oac:drSelLst")]
 pub struct DrawingSelectionStgList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DrawingSelectionStgListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DrawingSelectionStgListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the TableMonikerList Class.
 ///
@@ -690,13 +590,8 @@ pub enum DrawingSelectionStgListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableMonikerList/oac:tblMkLst")]
 pub struct TableMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<TableMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum TableMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the TableCellMonikerList Class.
 ///
@@ -706,13 +601,8 @@ pub enum TableMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableCellMonikerList/oac:tcMkLst")]
 pub struct TableCellMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<TableCellMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum TableCellMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the TableRowMonikerList Class.
 ///
@@ -722,13 +612,8 @@ pub enum TableCellMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableRowMonikerList/oac:trMkLst")]
 pub struct TableRowMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<TableRowMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum TableRowMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the TableColumnMonikerList Class.
 ///
@@ -738,13 +623,8 @@ pub enum TableRowMonikerListChoice {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")]
 pub struct TableColumnMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<TableColumnMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum TableColumnMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the ModifyNonVisualDrawingProps Class.
 ///
@@ -1357,13 +1237,8 @@ pub struct ModifyNonVisualDrawingShapeProps {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ShapePropsMonikerList/oac:spMkLst")]
 pub struct ShapePropsMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ShapePropsMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ShapePropsMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the ShapeProperties Class.
 ///
@@ -2637,13 +2512,8 @@ pub struct BoundRect {
 #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_SVGBlipMonikerList/oac:svgBlipMkLst")]
 pub struct SvgBlipMonikerList {
-  #[sdk(choice(any))]
-  pub xml_children: Vec<SvgBlipMonikerListChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum SvgBlipMonikerListChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the LinePropertiesType Class.
 ///

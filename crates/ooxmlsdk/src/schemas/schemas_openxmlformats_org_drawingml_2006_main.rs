@@ -2670,13 +2670,8 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ExtensionChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ExtensionChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// RGB Color Model - Percentage Variant.
 ///
@@ -7026,13 +7021,8 @@ pub struct GraphicData {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<GraphicDataChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum GraphicDataChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Diagram to Animate.
 ///

@@ -1576,13 +1576,8 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ExtensionChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ExtensionChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Calculation Chain Info.
 ///
@@ -3998,13 +3993,8 @@ pub struct Schema {
   /// Represents the following attribute in the schema: :Namespace
   #[sdk(attr(qname = ":Namespace"))]
   pub namespace: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<SchemaChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum SchemaChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// XML Mapping Properties.
 ///
@@ -4124,13 +4114,8 @@ pub struct DataBinding {
   /// Represents the following attribute in the schema: :DataBindingLoadMode
   #[sdk(attr(qname = ":DataBindingLoadMode"))]
   pub data_binding_load_mode: crate::simple_type::UInt32Value,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<DataBindingChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum DataBindingChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Connection.
 ///

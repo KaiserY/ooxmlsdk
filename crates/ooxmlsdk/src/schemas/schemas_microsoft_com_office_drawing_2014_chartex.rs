@@ -357,13 +357,8 @@ pub struct Extension2 {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<Extension2Choice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum Extension2Choice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the MinColorSolidColorFillProperties Class.
 ///

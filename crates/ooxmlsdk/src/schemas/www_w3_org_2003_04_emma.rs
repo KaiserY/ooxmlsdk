@@ -88,13 +88,8 @@ pub struct Info {
   #[sdk(string_format(source = 0u32, kind = "ncname"))]
   #[sdk(string_format(source = 0u32, kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<InfoChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum InfoChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the Lattice Class.
 ///
@@ -963,13 +958,8 @@ pub struct GroupInfo {
   #[sdk(attr(qname = ":ref"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub reference: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<GroupInfoChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum GroupInfoChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the Derivation Class.
 ///
@@ -1035,13 +1025,8 @@ pub struct Model {
   #[sdk(attr(qname = ":ref"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub reference: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<ModelChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum ModelChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the EndPointInfo Class.
 ///
@@ -1153,13 +1138,8 @@ pub struct EndPoint {
   /// Represents the following attribute in the schema: emma:mode
   #[sdk(attr(qname = "emma:mode"))]
   pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice(any))]
-  pub xml_children: Vec<EndPointChoice>,
-}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
-pub enum EndPointChoice {
   #[sdk(any)]
-  UnknownXml(String),
+  pub xml_children: Vec<String>,
 }
 /// Defines the Node Class.
 ///

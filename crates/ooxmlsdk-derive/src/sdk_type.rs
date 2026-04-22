@@ -1838,9 +1838,6 @@ fn expand_helper_struct(
         let event_name = event_name.as_ref();
         match event_name {
           #( #direct_child_visit_match_tokens_borrowed )*
-          _ => {}
-        }
-        match event_name {
           #( #child_visit_parse_tokens )*
           _ => Ok(false),
         }
@@ -1855,29 +1852,19 @@ fn expand_helper_struct(
       | -> Result<bool, crate::common::SdkError> {
         let event_name = e.name();
         let event_name = event_name.as_ref();
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_visit_dispatch_tokens_borrowed )*
-          _ => {}
-        }
-        match event_name {
-          #( #flat_choice_visit_match_tokens_borrowed )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_visit_parse_tokens_borrowed )*
-          #( #choice_any_unique_visit_parse_tokens_borrowed )*
-          #choice_match_conflict_tokens
-        }
         let matched: bool = match event_name {
+          #( #direct_child_visit_match_tokens_borrowed )*
+          #( #flat_choice_visit_match_tokens_borrowed )*
           #( #child_visit_parse_tokens )*
           _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_visit_parse_tokens_borrowed )*
+              #( #choice_any_unique_visit_parse_tokens_borrowed )*
+              #choice_match_conflict_tokens
+            }
             let mut matched = false;
             #( #choice_visit_parse_tokens )*
             Ok::<bool, crate::common::SdkError>(matched)
@@ -1908,9 +1895,6 @@ fn expand_helper_struct(
         let event_name = event_name.as_ref();
         match event_name {
           #( #direct_child_visit_match_tokens_io )*
-          _ => {}
-        }
-        match event_name {
           #( #child_visit_parse_tokens )*
           _ => Ok(false),
         }
@@ -1925,29 +1909,19 @@ fn expand_helper_struct(
       | -> Result<bool, crate::common::SdkError> {
         let event_name = e.name();
         let event_name = event_name.as_ref();
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_visit_dispatch_tokens_io )*
-          _ => {}
-        }
-        match event_name {
-          #( #flat_choice_visit_match_tokens_io )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_visit_parse_tokens_io )*
-          #( #choice_any_unique_visit_parse_tokens_io )*
-          #choice_match_conflict_tokens
-        }
         let matched: bool = match event_name {
+          #( #direct_child_visit_match_tokens_io )*
+          #( #flat_choice_visit_match_tokens_io )*
           #( #child_visit_parse_tokens )*
           _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_visit_parse_tokens_io )*
+              #( #choice_any_unique_visit_parse_tokens_io )*
+              #choice_match_conflict_tokens
+            }
             let mut matched = false;
             #( #choice_visit_parse_tokens )*
             Ok::<bool, crate::common::SdkError>(matched)
@@ -1959,11 +1933,8 @@ fn expand_helper_struct(
   };
   let main_dispatch_tokens_borrowed = if !has_choice_dispatch {
     quote! {
-      match event_name {
-        #( #direct_child_match_tokens_borrowed )*
-        _ => {}
-      }
       let matched = match event_name {
+        #( #direct_child_match_tokens_borrowed )*
         #( #child_parse_tokens )*
         _ => false,
       };
@@ -1973,29 +1944,19 @@ fn expand_helper_struct(
     }
   } else {
     quote! {
-      let direct_child_case = match event_name {
-        #( #direct_child_case_arms )*
-        _ => 0usize,
-      };
-      match direct_child_case {
-        #( #direct_child_dispatch_tokens_borrowed )*
-        _ => {}
-      }
-      match event_name {
-        #( #flat_choice_match_tokens_borrowed )*
-        _ => {}
-      }
       #( #choice_match_init_tokens )*
-      {
-        #choice_match_count_decl_tokens
-        #( #choice_match_decl_tokens )*
-        #( #choice_unique_parse_tokens_borrowed )*
-        #( #choice_any_unique_parse_tokens_borrowed )*
-        #choice_match_conflict_tokens
-      }
       let matched = match event_name {
+        #( #direct_child_match_tokens_borrowed )*
+        #( #flat_choice_match_tokens_borrowed )*
         #( #child_parse_tokens )*
         _ => {
+          {
+            #choice_match_count_decl_tokens
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_parse_tokens_borrowed )*
+            #( #choice_any_unique_parse_tokens_borrowed )*
+            #choice_match_conflict_tokens
+          }
           let mut matched = false;
           #( #choice_parse_tokens )*
           matched
@@ -2008,11 +1969,8 @@ fn expand_helper_struct(
   };
   let main_dispatch_tokens_io = if !has_choice_dispatch {
     quote! {
-      match event_name {
-        #( #direct_child_match_tokens_io )*
-        _ => {}
-      }
       let matched = match event_name {
+        #( #direct_child_match_tokens_io )*
         #( #child_parse_tokens )*
         _ => false,
       };
@@ -2022,29 +1980,19 @@ fn expand_helper_struct(
     }
   } else {
     quote! {
-      let direct_child_case = match event_name {
-        #( #direct_child_case_arms )*
-        _ => 0usize,
-      };
-      match direct_child_case {
-        #( #direct_child_dispatch_tokens_io )*
-        _ => {}
-      }
-      match event_name {
-        #( #flat_choice_match_tokens_io )*
-        _ => {}
-      }
       #( #choice_match_init_tokens )*
-      {
-        #choice_match_count_decl_tokens
-        #( #choice_match_decl_tokens )*
-        #( #choice_unique_parse_tokens_io )*
-        #( #choice_any_unique_parse_tokens_io )*
-        #choice_match_conflict_tokens
-      }
       let matched = match event_name {
+        #( #direct_child_match_tokens_io )*
+        #( #flat_choice_match_tokens_io )*
         #( #child_parse_tokens )*
         _ => {
+          {
+            #choice_match_count_decl_tokens
+            #( #choice_match_decl_tokens )*
+            #( #choice_unique_parse_tokens_io )*
+            #( #choice_any_unique_parse_tokens_io )*
+            #choice_match_conflict_tokens
+          }
           let mut matched = false;
           #( #choice_parse_tokens )*
           matched
@@ -3436,6 +3384,42 @@ fn expand_named_struct(
       });
     }
   }
+  let pure_any_parse_tokens_borrowed = if let Some(field) = any_fields.first() {
+    let field_ident = &field.ident;
+    if field.repeated {
+      quote! {
+        let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, next_empty)?;
+        #field_ident.push(xml);
+        continue;
+      }
+    } else {
+      quote! {
+        let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, next_empty)?;
+        #field_ident = Some(xml);
+        continue;
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let pure_any_parse_tokens_io = if let Some(field) = any_fields.first() {
+    let field_ident = &field.ident;
+    if field.repeated {
+      quote! {
+        let xml = crate::common::read_outer_xml_io(xml_reader, e, next_empty)?;
+        #field_ident.push(xml);
+        continue;
+      }
+    } else {
+      quote! {
+        let xml = crate::common::read_outer_xml_io(xml_reader, e, next_empty)?;
+        #field_ident = Some(xml);
+        continue;
+      }
+    }
+  } else {
+    quote! {}
+  };
 
   let choice_match_count_decl_tokens = if !has_runtime_choice_fields {
     quote! {}
@@ -3769,15 +3753,8 @@ fn expand_named_struct(
         | -> Result<bool, crate::common::SdkError> {
           let event_name = e.name();
           let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_io )*
-            _ => {}
-          }
           match event_name {
+            #( #direct_child_visit_match_tokens_io )*
             #( #child_visit_parse_tokens )*
             _ => Ok(false),
           }
@@ -3887,43 +3864,55 @@ fn expand_named_struct(
         };
       }
     };
-  let unmatched_child_tokens_borrowed = quote! {
-    if crate::common::is_foreign_prefixed_child(
-      event_name,
-      #tag_prefix,
-    ) {
-      crate::common::skip_foreign_element_children_borrowed(
-        xml_reader,
-        next_empty,
-      )?;
-    } else {
-      Err(crate::common::unexpected_tag(
-        stringify!(#ident),
-        "known child",
+  let pure_any_dispatch =
+    !has_child_dispatch && !has_choice_dispatch && has_any_dispatch && !has_text_child_dispatch;
+  let unmatched_child_tokens_borrowed = if pure_any_dispatch {
+    quote! {}
+  } else {
+    quote! {
+      if crate::common::is_foreign_prefixed_child(
         event_name,
-      ))?;
+        #tag_prefix,
+      ) {
+        crate::common::skip_foreign_element_children_borrowed(
+          xml_reader,
+          next_empty,
+        )?;
+      } else {
+        Err(crate::common::unexpected_tag(
+          stringify!(#ident),
+          "known child",
+          event_name,
+        ))?;
+      }
     }
   };
-  let unmatched_child_tokens_io = quote! {
-    if crate::common::is_foreign_prefixed_child(
-      event_name,
-      #tag_prefix,
-    ) {
-      crate::common::skip_foreign_element_children_io(
-        xml_reader,
-        next_empty,
-      )?;
-    } else {
-      Err(crate::common::unexpected_tag(
-        stringify!(#ident),
-        "known child",
+  let unmatched_child_tokens_io = if pure_any_dispatch {
+    quote! {}
+  } else {
+    quote! {
+      if crate::common::is_foreign_prefixed_child(
         event_name,
-      ))?;
+        #tag_prefix,
+      ) {
+        crate::common::skip_foreign_element_children_io(
+          xml_reader,
+          next_empty,
+        )?;
+      } else {
+        Err(crate::common::unexpected_tag(
+          stringify!(#ident),
+          "known child",
+          event_name,
+        ))?;
+      }
     }
   };
   let child_choice_dispatch_tokens_borrowed =
     if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
       quote! {}
+    } else if pure_any_dispatch {
+      pure_any_parse_tokens_borrowed
     } else if !has_child_dispatch && !has_any_dispatch {
       quote! {
         match event_name {
@@ -3969,15 +3958,8 @@ fn expand_named_struct(
       }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_borrowed )*
-          _ => {}
-        }
         let matched = match event_name {
+          #( #direct_child_match_tokens_borrowed )*
           #( #child_parse_tokens )*
           _ => false,
         };
@@ -3987,51 +3969,37 @@ fn expand_named_struct(
       }
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_borrowed )*
-          _ => {}
-        }
         match event_name {
+          #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_borrowed )*
-          #( #choice_any_unique_parse_tokens_borrowed )*
-          #choice_match_conflict_tokens
+          _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_parse_tokens_borrowed )*
+              #( #choice_any_unique_parse_tokens_borrowed )*
+              #choice_match_conflict_tokens
+            }
+          }
         }
       }
     } else if !has_any_dispatch {
       quote! {
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_borrowed )*
-          _ => {}
-        }
-        match event_name {
-          #( #flat_choice_match_tokens_borrowed )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_borrowed )*
-          #choice_match_conflict_tokens
-        }
         let matched = match event_name {
+          #( #direct_child_match_tokens_borrowed )*
+          #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens )*
-          _ => false,
+          _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_parse_tokens_borrowed )*
+              #choice_match_conflict_tokens
+            }
+            false
+          },
         };
         if matched {
           continue;
@@ -4039,29 +4007,19 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_borrowed )*
-          _ => {}
-        }
-        match event_name {
-          #( #flat_choice_match_tokens_borrowed )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_borrowed )*
-          #( #choice_any_unique_parse_tokens_borrowed )*
-          #choice_match_conflict_tokens
-        }
         let matched = match event_name {
+          #( #direct_child_match_tokens_borrowed )*
+          #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens )*
           _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_parse_tokens_borrowed )*
+              #( #choice_any_unique_parse_tokens_borrowed )*
+              #choice_match_conflict_tokens
+            }
             let mut matched = false;
             #( #choice_parse_tokens )*
             #( #any_parse_tokens_borrowed )*
@@ -4076,6 +4034,8 @@ fn expand_named_struct(
   let child_choice_dispatch_tokens_io =
     if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
       quote! {}
+    } else if pure_any_dispatch {
+      pure_any_parse_tokens_io
     } else if !has_child_dispatch && !has_any_dispatch {
       quote! {
         match event_name {
@@ -4121,15 +4081,8 @@ fn expand_named_struct(
       }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_io )*
-          _ => {}
-        }
         let matched = match event_name {
+          #( #direct_child_match_tokens_io )*
           #( #child_parse_tokens )*
           _ => false,
         };
@@ -4139,51 +4092,37 @@ fn expand_named_struct(
       }
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_io )*
-          _ => {}
-        }
         match event_name {
+          #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_io )*
-          #( #choice_any_unique_parse_tokens_io )*
-          #choice_match_conflict_tokens
+          _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_parse_tokens_io )*
+              #( #choice_any_unique_parse_tokens_io )*
+              #choice_match_conflict_tokens
+            }
+          }
         }
       }
     } else if !has_any_dispatch {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_io )*
-          _ => {}
-        }
-        match event_name {
-          #( #flat_choice_match_tokens_io )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_io )*
-          #choice_match_conflict_tokens
-        }
         let matched = match event_name {
+          #( #direct_child_match_tokens_io )*
+          #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens )*
-          _ => false,
+          _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_parse_tokens_io )*
+              #choice_match_conflict_tokens
+            }
+            false
+          },
         };
         if matched {
           continue;
@@ -4191,29 +4130,19 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        let direct_child_case = match event_name {
-          #( #direct_child_case_arms )*
-          _ => 0usize,
-        };
-        match direct_child_case {
-          #( #direct_child_dispatch_tokens_io )*
-          _ => {}
-        }
-        match event_name {
-          #( #flat_choice_match_tokens_io )*
-          _ => {}
-        }
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_io )*
-          #( #choice_any_unique_parse_tokens_io )*
-          #choice_match_conflict_tokens
-        }
         let matched = match event_name {
+          #( #direct_child_match_tokens_io )*
+          #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens )*
           _ => {
+            #( #choice_match_init_tokens )*
+            {
+              #choice_match_count_decl_tokens
+              #( #choice_match_decl_tokens )*
+              #( #choice_unique_parse_tokens_io )*
+              #( #choice_any_unique_parse_tokens_io )*
+              #choice_match_conflict_tokens
+            }
             let mut matched = false;
             #( #choice_parse_tokens )*
             #( #any_parse_tokens_io )*

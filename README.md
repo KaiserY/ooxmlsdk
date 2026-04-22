@@ -53,14 +53,14 @@ Most users should keep the default features enabled:
 
 ```toml
 [dependencies]
-ooxmlsdk = "0.4.0"
+ooxmlsdk = "0.4.1"
 ```
 
 If you want the narrower Office 2007-oriented package surface, disable default features and enable only `parts`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.4.0", default-features = false, features = ["parts"] }
+ooxmlsdk = { version = "0.4.1", default-features = false, features = ["parts"] }
 ```
 
 Read and save a package:

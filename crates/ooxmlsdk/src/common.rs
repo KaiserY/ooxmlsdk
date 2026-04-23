@@ -175,6 +175,7 @@ pub fn parse_bool_str(
   xml::parse_bool_str(value, ty, field)
 }
 
+#[inline(always)]
 pub fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
   if actual == canonical {
     return true;
@@ -189,7 +190,8 @@ pub fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
       other => other,
     };
     return actual
-      == format!("http://purl.oclc.org/ooxml/officeDocument/relationships/{alias_suffix}");
+      .strip_prefix("http://purl.oclc.org/ooxml/officeDocument/relationships/")
+      .is_some_and(|actual_suffix| actual_suffix == alias_suffix);
   }
 
   if canonical == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
@@ -318,14 +320,34 @@ pub(crate) fn parent_zip_path(path: &str) -> String {
   path
     .rsplit_once('/')
     .map(|(dir_path, _)| {
-      let resolved = resolve_zip_file_path(&format!("{dir_path}/"));
-      if resolved.is_empty() {
-        resolved
-      } else {
-        format!("{resolved}/")
+      let mut resolved = resolve_zip_file_path(dir_path);
+      if !resolved.is_empty() {
+        resolved.push('/');
       }
+      resolved
     })
     .unwrap_or_default()
+}
+
+#[inline]
+#[cfg(feature = "parts")]
+pub(crate) fn part_relationships_path(path: &str) -> String {
+  let child_parent_path = parent_zip_path(path);
+  let part_target = path.rsplit('/').next().unwrap_or_default();
+  let mut rels_path = String::with_capacity(child_parent_path.len() + part_target.len() + 11);
+  rels_path.push_str(&child_parent_path);
+  rels_path.push_str("_rels/");
+  rels_path.push_str(part_target);
+  rels_path.push_str(".rels");
+  resolve_zip_file_path(&rels_path)
+}
+
+#[inline]
+#[cfg(feature = "parts")]
+pub(crate) fn part_relationships_directory_path(path: &str) -> String {
+  let mut rels_dir_path = parent_zip_path(path);
+  rels_dir_path.push_str("_rels");
+  resolve_zip_file_path(&rels_dir_path)
 }
 
 pub(crate) fn process_foreign_element_children_borrowed<'de, F>(

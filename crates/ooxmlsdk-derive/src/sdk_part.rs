@@ -68,6 +68,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let mut child_match_arms = Vec::new();
   let mut child_save_stmts = Vec::new();
   let mut child_validate_stmts = Vec::new();
+  let mut part_iter_chains = Vec::new();
   let root_type = part_root_type_from_fields(fields);
   let has_root_element = root_type.is_some();
   let content_kind = part_content_kind_from_fields(fields);
@@ -86,10 +87,10 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   } else {
     parse_str::<Ident>("r_id")?
   };
-  let file_path_set_ident = if needs_relationships {
-    parse_str::<Ident>("file_path_set")?
+  let part_index_ident = if has_root_element || content_kind.is_some() {
+    parse_str::<Ident>("part_index")?
   } else {
-    parse_str::<Ident>("_file_path_set")?
+    parse_str::<Ident>("_part_index")?
   };
   let archive_ident =
     if has_content_types || needs_relationships || has_root_element || content_kind.is_some() {
@@ -121,7 +122,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     });
     field_declarations.push(quote! {
       let (rels_path, relationships) =
-        crate::common::load_part_relationships(#path_ident, #file_path_set_ident, #archive_ident)?;
+        crate::common::load_part_relationships(#path_ident, #archive_ident)?;
     });
     self_field_values.push(quote! { rels_path });
     self_field_values.push(quote! { relationships });
@@ -138,6 +139,13 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   for child in &child_infos {
     let child_type = &child.ty;
+    let Some(child_type_name) = terminal_type_ident(child_type) else {
+      return Err(syn::Error::new_spanned(
+        child_type,
+        "failed to resolve child part type name",
+      ));
+    };
+    let child_variant_ident: Ident = parse_str(&child_type_name)?;
     let relationship_type_expr = match &child.relationship_type {
       PartRelationshipTypeSource::Explicit(value) => quote! { #value },
       PartRelationshipTypeSource::TypeConst => {
@@ -160,7 +168,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
               &child_parent_path,
               relationship,
-              #file_path_set_ident,
               #archive_ident,
               visited,
             )? {
@@ -184,6 +191,14 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             crate::validator::SdkValidator::validate(#child_item_ident)?;
           }
         });
+        part_iter_chains.push(quote! {
+          self.#child_field_ident.iter().map(|part| {
+            crate::parts::IdPartPair::new(
+              part.r_id.as_str(),
+              crate::parts::PartRef::#child_variant_ident(part),
+            )
+          })
+        });
         self_field_values.push(quote! { #child_field_ident });
       }
       PartChildKind::Required => {
@@ -198,7 +213,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
               &child_parent_path,
               relationship,
-              #file_path_set_ident,
               #archive_ident,
               visited,
             )? {
@@ -225,6 +239,12 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         child_validate_stmts.push(quote! {
           crate::validator::SdkValidator::validate(self.#child_field_ident.as_ref())?;
         });
+        part_iter_chains.push(quote! {
+          std::iter::once(crate::parts::IdPartPair::new(
+            self.#child_field_ident.r_id.as_str(),
+            crate::parts::PartRef::#child_variant_ident(self.#child_field_ident.as_ref()),
+          ))
+        });
         self_field_values.push(quote! { #child_field_ident });
       }
       PartChildKind::Optional => {
@@ -239,7 +259,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
               &child_parent_path,
               relationship,
-              #file_path_set_ident,
               #archive_ident,
               visited,
             )? {
@@ -262,6 +281,14 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           if let Some(#child_item_ident) = &self.#child_field_ident {
             crate::validator::SdkValidator::validate(#child_item_ident.as_ref())?;
           }
+        });
+        part_iter_chains.push(quote! {
+          self.#child_field_ident.iter().map(|part| {
+            crate::parts::IdPartPair::new(
+              part.r_id.as_str(),
+              crate::parts::PartRef::#child_variant_ident(part.as_ref()),
+            )
+          })
         });
         self_field_values.push(quote! { #child_field_ident });
       }
@@ -292,7 +319,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
               &child_parent_path,
               relationship,
-              #file_path_set_ident,
               #archive_ident,
             )? {
               #data_ref_field_ident.push(loaded_data_ref);
@@ -328,7 +354,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
               &child_parent_path,
               relationship,
-              #file_path_set_ident,
               #archive_ident,
             )? {
               #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
@@ -367,7 +392,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
               &child_parent_path,
               relationship,
-              #file_path_set_ident,
               #archive_ident,
             )? {
               #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
@@ -400,7 +424,6 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         if let Some(loaded_extended_part) = crate::common::load_extended_part(
           &child_parent_path,
           relationship,
-          #file_path_set_ident,
           #archive_ident,
           visited,
         )? {
@@ -430,7 +453,11 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       let root_element = Some({
         use std::io::Read;
 
-        let mut zip_entry = #archive_ident.by_name(#path_ident)?;
+        let mut zip_entry = if let Some(part_index) = #part_index_ident {
+          #archive_ident.by_index(part_index)?
+        } else {
+          #archive_ident.by_name(#path_ident)?
+        };
         let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
         zip_entry.read_to_end(&mut bytes)?;
         #root_type::from_bytes(&bytes)?
@@ -455,7 +482,12 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         });
         field_declarations.push(quote! {
           {
-            let mut file = std::io::BufReader::new(#archive_ident.by_name(#path_ident)?);
+            let zip_entry = if let Some(part_index) = #part_index_ident {
+              #archive_ident.by_index(part_index)?
+            } else {
+              #archive_ident.by_name(#path_ident)?
+            };
+            let mut file = std::io::BufReader::new(zip_entry);
             file.read_to_string(&mut part_content)?;
           }
         });
@@ -470,7 +502,11 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         });
         field_declarations.push(quote! {
           {
-            let mut zip_entry = #archive_ident.by_name(#path_ident)?;
+            let mut zip_entry = if let Some(part_index) = #part_index_ident {
+              #archive_ident.by_index(part_index)?
+            } else {
+              #archive_ident.by_name(#path_ident)?
+            };
             part_content = Vec::with_capacity(zip_entry.size() as usize);
             zip_entry.read_to_end(&mut part_content)?;
           }
@@ -485,9 +521,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       #parent_path_ident: &str,
       #path_ident: &str,
       #r_id_ident: &str,
-      #file_path_set_ident: &std::collections::HashSet<String>,
+      #part_index_ident: Option<usize>,
       #archive_ident: &mut zip::ZipArchive<R>,
-      visited: &mut std::collections::HashSet<String>,
+      visited: &mut std::collections::HashSet<usize>,
     ) -> Result<Self, crate::common::SdkError> {
       #( #field_declarations )*
       #( #field_unwraps )*
@@ -600,22 +636,12 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           reader: R,
         ) -> Result<Self, crate::common::SdkError> {
           let mut archive = zip::ZipArchive::new(reader)?;
-          let mut file_path_set: std::collections::HashSet<String> =
-            std::collections::HashSet::with_capacity(archive.len());
-          let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
-          for i in 0..archive.len() {
-            let file = archive.by_index(i)?;
-            let file_path = match file.enclosed_name() {
-              Some(path) => path.to_string_lossy().to_string(),
-              None => continue,
-            };
-            file_path_set.insert(file_path);
-          }
+          let mut visited: std::collections::HashSet<usize> = std::collections::HashSet::new();
           <Self as crate::sdk::SdkPart>::new_from_archive(
             "",
             "",
             "",
-            &file_path_set,
+            None,
             &mut archive,
             &mut visited,
           )
@@ -687,6 +713,49 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     child_validate_stmts
   };
 
+  let parts_methods = quote! {
+    pub fn parts(&self) -> impl Iterator<Item = crate::parts::IdPartPair<'_>> + '_ {
+      std::iter::empty::<crate::parts::IdPartPair<'_>>()
+        #( .chain(#part_iter_chains) )*
+    }
+
+    pub fn get_parts_of_type<T: crate::sdk::SdkPart + 'static>(
+      &self,
+    ) -> impl Iterator<Item = &T> + '_ {
+      self
+        .parts()
+        .filter_map(|entry| entry.part.downcast_ref::<T>())
+    }
+
+    pub fn get_sub_part_of_type<T: crate::sdk::SdkPart + 'static>(&self) -> Option<&T> {
+      self.get_parts_of_type::<T>().next()
+    }
+
+    pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef<'_>> {
+      self
+        .parts()
+        .find(|entry| entry.relationship_id == relationship_id)
+        .map(|entry| entry.part)
+    }
+
+    pub fn get_part_by_id_as<T: crate::sdk::SdkPart + 'static>(
+      &self,
+      relationship_id: &str,
+    ) -> Option<&T> {
+      self
+        .parts()
+        .find(|entry| entry.relationship_id == relationship_id)
+        .and_then(|entry| entry.part.downcast_ref::<T>())
+    }
+
+    pub fn get_id_of_part<T: crate::sdk::SdkPart + 'static>(&self, part: &T) -> Option<&str> {
+      self.parts().find_map(|entry| {
+        let candidate = entry.part.downcast_ref::<T>()?;
+        std::ptr::eq(candidate, part).then_some(entry.relationship_id)
+      })
+    }
+  };
+
   Ok(quote! {
     impl crate::sdk::SdkPart for #ident {
       const DESCRIPTOR: crate::sdk::PartDescriptor = crate::sdk::PartDescriptor::new(
@@ -715,6 +784,8 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       pub fn is_valid(&self) -> bool {
         self.validate().is_ok()
       }
+
+      #parts_methods
 
       #( #impl_items )*
     }

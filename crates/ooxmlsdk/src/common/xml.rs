@@ -202,7 +202,10 @@ pub fn resolve_relationship_target_path(parent_path: &str, target: &str) -> Stri
   if target.starts_with('/') {
     resolve_zip_file_path(target)
   } else {
-    resolve_zip_file_path(&format!("{parent_path}{target}"))
+    let mut combined = String::with_capacity(parent_path.len() + target.len());
+    combined.push_str(parent_path);
+    combined.push_str(target);
+    resolve_zip_file_path(&combined)
   }
 }
 

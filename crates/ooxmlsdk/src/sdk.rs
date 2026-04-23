@@ -59,9 +59,9 @@ pub trait SdkPart: Sized {
     parent_path: &str,
     path: &str,
     r_id: &str,
-    file_path_set: &std::collections::HashSet<String>,
+    part_index: Option<usize>,
     archive: &mut zip::ZipArchive<R>,
-    visited: &mut std::collections::HashSet<String>,
+    visited: &mut std::collections::HashSet<usize>,
   ) -> Result<Self, crate::common::SdkError>;
 
   fn save_zip<W: std::io::Write + std::io::Seek>(
@@ -90,6 +90,7 @@ pub trait SdkDataPartReference: Sized {
   fn new_from_archive<R: std::io::Read + std::io::Seek>(
     path: &str,
     r_id: &str,
+    part_index: usize,
     archive: &mut zip::ZipArchive<R>,
   ) -> Result<Self, crate::common::SdkError>;
 

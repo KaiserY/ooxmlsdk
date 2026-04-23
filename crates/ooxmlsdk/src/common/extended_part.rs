@@ -21,19 +21,17 @@ impl ExtendedPart {
     path: &str,
     r_id: &str,
     relationship_type: &str,
-    file_path_set: &HashSet<String>,
+    part_index: usize,
     archive: &mut zip::ZipArchive<R>,
-    visited: &mut HashSet<String>,
+    visited: &mut HashSet<usize>,
   ) -> Result<Self, SdkError> {
     let child_parent_path = super::parent_zip_path(path);
-    let part_target_str = path.rsplit('/').next().unwrap_or_default();
-    let rels_candidate_path =
-      super::resolve_zip_file_path(&format!("{child_parent_path}_rels/{part_target_str}.rels"));
+    let rels_candidate_path = super::part_relationships_path(path);
     let mut rels_path = String::new();
-    let relationships = if let Some(file_path) = file_path_set.get(&rels_candidate_path) {
-      rels_path = file_path.to_string();
+    let relationships = if let Some(rels_index) = archive.index_for_name(&rels_candidate_path) {
+      rels_path = rels_candidate_path;
       Some({
-        let mut zip_entry = archive.by_name(file_path)?;
+        let mut zip_entry = archive.by_index(rels_index)?;
         let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
         zip_entry.read_to_end(&mut bytes)?;
         Relationships::from_bytes(&bytes)?
@@ -43,7 +41,7 @@ impl ExtendedPart {
     };
 
     let mut part_content = {
-      let mut zip_entry = archive.by_name(path)?;
+      let mut zip_entry = archive.by_index(part_index)?;
       let mut bytes = Vec::with_capacity(zip_entry.size() as usize);
       zip_entry.read_to_end(&mut bytes)?;
       bytes
@@ -61,11 +59,11 @@ impl ExtendedPart {
           &relationship.target,
         ));
 
-        if !file_path_set.contains(&target_path) {
+        let Some(target_index) = archive.index_for_name(&target_path) else {
           continue;
-        }
+        };
 
-        if !visited.insert(target_path.clone()) {
+        if !visited.insert(target_index) {
           continue;
         }
 
@@ -73,11 +71,11 @@ impl ExtendedPart {
           &target_path,
           &relationship.id,
           relationship.r#type.as_str(),
-          file_path_set,
+          target_index,
           archive,
           visited,
         )?;
-        visited.remove(&target_path);
+        visited.remove(&target_index);
         extended_parts.push(loaded);
       }
     }
@@ -114,18 +112,15 @@ impl ExtendedPart {
     }
 
     let child_parent_path = super::parent_zip_path(&self.inner_path);
-    let dir_path = self
-      .inner_path
-      .rsplit_once('/')
-      .map(|(dir_path, _)| super::resolve_zip_file_path(&format!("{dir_path}/")))
-      .unwrap_or_default();
-    if !dir_path.is_empty() && entry_set.insert(dir_path.clone()) {
-      zip.add_directory(&dir_path, options)?;
+    let dir_path = child_parent_path
+      .strip_suffix('/')
+      .unwrap_or(&child_parent_path);
+    if !dir_path.is_empty() && entry_set.insert(dir_path.to_string()) {
+      zip.add_directory(dir_path, options)?;
     }
 
     if let Some(relationships) = &self.relationships {
-      let rels_parent_path = super::parent_zip_path(&self.inner_path);
-      let rels_dir_path = super::resolve_zip_file_path(&format!("{rels_parent_path}_rels"));
+      let rels_dir_path = super::part_relationships_directory_path(&self.inner_path);
       if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {
         zip.add_directory(&rels_dir_path, options)?;
       }

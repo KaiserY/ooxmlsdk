@@ -40,18 +40,64 @@ pub fn gen_part_module(part: &PartModuleDecl) -> Result<TokenStream> {
 
 pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut mod_list: Vec<ItemMod> = vec![];
+  let mut part_ref_variants: Vec<TokenStream> = vec![];
+  let mut part_ref_downcast_arms: Vec<TokenStream> = vec![];
 
   for part in parts {
     let mod_ident: Ident = parse_str(&part.module_name)?;
     let part_attrs = part_module_attrs(part);
+    let struct_ident: Ident = parse_str(&part.struct_name)?;
+    let part_ty: Type = parse_str(&format!(
+      "crate::parts::{}::{}",
+      part.module_name, part.struct_name
+    ))?;
     mod_list.push(parse2(quote! {
       #( #part_attrs )*
       pub mod #mod_ident;
     })?);
+    part_ref_variants.push(quote! {
+      #( #part_attrs )*
+      #struct_ident(&'a #part_ty),
+    });
+    part_ref_downcast_arms.push(quote! {
+      #( #part_attrs )*
+      PartRef::#struct_ident(part) => {
+        let any: &dyn std::any::Any = *part;
+        any.downcast_ref::<T>()
+      }
+    });
   }
 
   Ok(quote! {
     #( #mod_list )*
+
+    #[derive(Clone, Copy, Debug)]
+    pub enum PartRef<'a> {
+      #( #part_ref_variants )*
+    }
+
+    impl<'a> PartRef<'a> {
+      pub fn downcast_ref<T: crate::sdk::SdkPart + 'static>(&self) -> Option<&'a T> {
+        match self {
+          #( #part_ref_downcast_arms, )*
+        }
+      }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct IdPartPair<'a> {
+      pub relationship_id: &'a str,
+      pub part: PartRef<'a>,
+    }
+
+    impl<'a> IdPartPair<'a> {
+      pub const fn new(relationship_id: &'a str, part: PartRef<'a>) -> Self {
+        Self {
+          relationship_id,
+          part,
+        }
+      }
+    }
   })
 }
 
@@ -164,5 +210,21 @@ mod tests {
       )
     );
     assert!(!rendered.contains("# [sdk (part_child"));
+  }
+
+  #[test]
+  fn generates_part_ref_enum_from_codegen_ir() {
+    let part = PartModuleDecl {
+      module_name: "main_document_part".to_string(),
+      struct_name: "MainDocumentPart".to_string(),
+      ..Default::default()
+    };
+
+    let rendered = gen_parts_mod(&[&part]).unwrap().to_string();
+    assert!(rendered.contains("pub enum PartRef < 'a >"));
+    assert!(rendered.contains(
+      "MainDocumentPart (& 'a crate :: parts :: main_document_part :: MainDocumentPart)"
+    ));
+    assert!(rendered.contains("pub struct IdPartPair < 'a >"));
   }
 }

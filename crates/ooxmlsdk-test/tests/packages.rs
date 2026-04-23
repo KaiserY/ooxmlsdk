@@ -7,8 +7,9 @@ use std::io::Cursor;
 use ooxmlsdk::common::SdkError;
 use ooxmlsdk::parts::alternative_format_import_part::AlternativeFormatImportPart;
 use ooxmlsdk::parts::{
+  header_part::HeaderPart, main_document_part::MainDocumentPart,
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
-  wordprocessing_document::WordprocessingDocument,
+  style_definitions_part::StyleDefinitionsPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::Relationship;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
@@ -378,6 +379,43 @@ fn open_wordprocessing_document_asset_from_openxml_sdk() {
   assert!(package.main_document_part.style_definitions_part.is_some());
   assert!(package.main_document_part.document_settings_part.is_some());
   assert!(main_document_body_child_count(&package.main_document_part.root_element) > 0);
+}
+
+#[test]
+fn wordprocessing_document_container_queries_resolve_root_parts() {
+  let path = test_file_path("Hyperlink.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+
+  let main_document_part = package
+    .get_sub_part_of_type::<MainDocumentPart>()
+    .expect("expected main document part");
+  assert!(std::ptr::eq(
+    main_document_part,
+    package.main_document_part.as_ref()
+  ));
+
+  let main_document_part_id = package
+    .get_id_of_part(main_document_part)
+    .expect("expected main document relationship id");
+  assert_eq!(
+    main_document_part_id,
+    package.main_document_part.r_id.as_str()
+  );
+  assert_eq!(package.get_parts_of_type::<MainDocumentPart>().count(), 1);
+  assert!(
+    package
+      .parts()
+      .any(|entry| entry.relationship_id == main_document_part_id)
+  );
+
+  let resolved_main_document_part = package
+    .get_part_by_id(main_document_part_id)
+    .and_then(|part| part.downcast_ref::<MainDocumentPart>())
+    .expect("expected main document part lookup");
+  assert!(std::ptr::eq(
+    resolved_main_document_part,
+    main_document_part
+  ));
 }
 
 #[test]
@@ -1274,6 +1312,63 @@ fn open_complex01_docx_asset_from_openxml_sdk() {
       .main_document_part
       .numbering_definitions_part
       .is_some()
+  );
+}
+
+#[test]
+fn main_document_part_container_queries_resolve_single_and_repeated_children() {
+  let path = test_file_path("Complex01.docx");
+  let package = WordprocessingDocument::new_from_file(&path).unwrap();
+  let main_document_part = &package.main_document_part;
+
+  let style_definitions_part = main_document_part
+    .get_sub_part_of_type::<StyleDefinitionsPart>()
+    .expect("expected style definitions part");
+  assert!(std::ptr::eq(
+    style_definitions_part,
+    main_document_part
+      .style_definitions_part
+      .as_deref()
+      .expect("expected style definitions field"),
+  ));
+
+  let style_definitions_part_id = main_document_part
+    .get_id_of_part(style_definitions_part)
+    .expect("expected style definitions relationship id");
+  assert_eq!(
+    style_definitions_part_id,
+    style_definitions_part.r_id.as_str()
+  );
+  let resolved_style_definitions_part = main_document_part
+    .get_part_by_id(style_definitions_part_id)
+    .and_then(|part| part.downcast_ref::<StyleDefinitionsPart>())
+    .expect("expected style definitions lookup");
+  assert!(std::ptr::eq(
+    resolved_style_definitions_part,
+    style_definitions_part,
+  ));
+
+  let header_part = main_document_part
+    .header_parts
+    .first()
+    .expect("expected header part");
+  assert_eq!(
+    main_document_part.get_parts_of_type::<HeaderPart>().count(),
+    main_document_part.header_parts.len()
+  );
+  assert!(
+    main_document_part
+      .parts()
+      .map(|entry| entry.relationship_id)
+      .any(|relationship_id| relationship_id == header_part.r_id.as_str())
+  );
+  let resolved_header_part = main_document_part
+    .get_part_by_id_as::<HeaderPart>(&header_part.r_id)
+    .expect("expected header part lookup");
+  assert!(std::ptr::eq(resolved_header_part, header_part));
+  assert_eq!(
+    main_document_part.get_id_of_part(header_part),
+    Some(header_part.r_id.as_str())
   );
 }
 

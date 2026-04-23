@@ -13,9 +13,10 @@ pub struct MediaDataPart {
 impl MediaDataPart {
   pub(crate) fn new_from_archive<R: Read + Seek>(
     path: &str,
+    part_index: usize,
     archive: &mut zip::ZipArchive<R>,
   ) -> Result<Self, SdkError> {
-    let mut zip_entry = archive.by_name(path)?;
+    let mut zip_entry = archive.by_index(part_index)?;
     let mut part_content = Vec::with_capacity(zip_entry.size() as usize);
     zip_entry.read_to_end(&mut part_content)?;
 
@@ -40,13 +41,10 @@ impl MediaDataPart {
       zip.add_directory(&directory_path, options)?;
     }
 
-    let dir_path = self
-      .inner_path
-      .rsplit_once('/')
-      .map(|(dir_path, _)| super::resolve_zip_file_path(&format!("{dir_path}/")))
-      .unwrap_or_default();
-    if !dir_path.is_empty() && entry_set.insert(dir_path.clone()) {
-      zip.add_directory(&dir_path, options)?;
+    let dir_path = super::parent_zip_path(&self.inner_path);
+    let dir_path = dir_path.strip_suffix('/').unwrap_or(&dir_path);
+    if !dir_path.is_empty() && entry_set.insert(dir_path.to_string()) {
+      zip.add_directory(dir_path, options)?;
     }
 
     if entry_set.insert(self.inner_path.clone()) {
@@ -75,11 +73,12 @@ macro_rules! define_media_reference_relationship {
       pub(crate) fn new_from_archive<R: Read + Seek>(
         path: &str,
         r_id: &str,
+        part_index: usize,
         archive: &mut zip::ZipArchive<R>,
       ) -> Result<Self, SdkError> {
         Ok(Self {
           r_id: r_id.to_string(),
-          media_data_part: MediaDataPart::new_from_archive(path, archive)?,
+          media_data_part: MediaDataPart::new_from_archive(path, part_index, archive)?,
         })
       }
 
@@ -99,9 +98,10 @@ macro_rules! define_media_reference_relationship {
       fn new_from_archive<R: Read + Seek>(
         path: &str,
         r_id: &str,
+        part_index: usize,
         archive: &mut zip::ZipArchive<R>,
       ) -> Result<Self, SdkError> {
-        Self::new_from_archive(path, r_id, archive)
+        Self::new_from_archive(path, r_id, part_index, archive)
       }
 
       fn save_zip<W: Write + Seek>(

@@ -1,5 +1,46 @@
 use super::*;
 
+fn build_conditional_chain(
+  branches: &[(proc_macro2::TokenStream, proc_macro2::TokenStream)],
+  fallback: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if branches.is_empty() {
+    return fallback;
+  }
+
+  let mut chain = proc_macro2::TokenStream::new();
+
+  for (index, (condition, body)) in branches.iter().enumerate() {
+    if index == 0 {
+      chain.extend(quote! {
+        if #condition {
+          #body
+        }
+      });
+    } else {
+      chain.extend(quote! {
+        else if #condition {
+          #body
+        }
+      });
+    }
+  }
+
+  chain.extend(quote! {
+    else {
+      #fallback
+    }
+  });
+
+  chain
+}
+
+fn explicit_relationship_type_may_have_alias(value: &str) -> bool {
+  value.starts_with("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+    || value == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
+    || value == "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects"
+}
+
 pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -66,6 +107,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let mut field_unwraps = Vec::new();
   let mut self_field_values = Vec::new();
   let mut child_match_arms = Vec::new();
+  let mut alias_match_branches = Vec::new();
   let mut child_save_stmts = Vec::new();
   let mut child_validate_stmts = Vec::new();
   let mut part_iter_chains = Vec::new();
@@ -146,11 +188,30 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       ));
     };
     let child_variant_ident: Ident = parse_str(&child_type_name)?;
-    let relationship_type_expr = match &child.relationship_type {
+    let relationship_type_pattern = match &child.relationship_type {
       PartRelationshipTypeSource::Explicit(value) => quote! { #value },
       PartRelationshipTypeSource::TypeConst => {
-        quote! { <#child_type as crate::sdk::SdkPart>::relationship_type() }
+        quote! { <#child_type as crate::sdk::SdkPart>::RELATIONSHIP_TYPE }
       }
+    };
+    let alias_match_condition = match &child.relationship_type {
+      PartRelationshipTypeSource::Explicit(value)
+        if explicit_relationship_type_may_have_alias(value) =>
+      {
+        Some(quote! {
+          crate::common::relationship_type_matches_alias(
+            relationship_type,
+            #relationship_type_pattern,
+          )
+        })
+      }
+      PartRelationshipTypeSource::TypeConst => Some(quote! {
+        crate::common::relationship_type_matches_alias(
+          relationship_type,
+          #relationship_type_pattern,
+        )
+      }),
+      _ => None,
     };
     let child_field_ident = &child.field_ident;
     let child_item_ident = child.field_ident.clone();
@@ -160,21 +221,24 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         field_declarations.push(quote! {
           let mut #child_field_ident: Vec<#child_type> = vec![];
         });
+        let load_child_tokens = quote! {
+          if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+            &child_parent_path,
+            relationship,
+            #archive_ident,
+            visited,
+          )? {
+            #child_field_ident.push(loaded_child);
+          }
+        };
         child_match_arms.push(quote! {
-          relationship_type if crate::common::relationship_type_matches(
-            relationship_type,
-            #relationship_type_expr,
-          ) => {
-            if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
-              &child_parent_path,
-              relationship,
-              #archive_ident,
-              visited,
-            )? {
-              #child_field_ident.push(loaded_child);
-            }
+          #relationship_type_pattern => {
+            #load_child_tokens
           }
         });
+        if let Some(alias_match_condition) = alias_match_condition {
+          alias_match_branches.push((alias_match_condition, load_child_tokens.clone()));
+        }
         child_save_stmts.push(quote! {
           for #child_item_ident in &self.#child_field_ident {
             crate::common::save_typed_child_part(
@@ -205,21 +269,24 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         field_declarations.push(quote! {
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
+        let load_child_tokens = quote! {
+          if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+            &child_parent_path,
+            relationship,
+            #archive_ident,
+            visited,
+          )? {
+            #child_field_ident = Some(std::boxed::Box::new(loaded_child));
+          }
+        };
         child_match_arms.push(quote! {
-          relationship_type if crate::common::relationship_type_matches(
-            relationship_type,
-            #relationship_type_expr,
-          ) => {
-            if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
-              &child_parent_path,
-              relationship,
-              #archive_ident,
-              visited,
-            )? {
-              #child_field_ident = Some(std::boxed::Box::new(loaded_child));
-            }
+          #relationship_type_pattern => {
+            #load_child_tokens
           }
         });
+        if let Some(alias_match_condition) = alias_match_condition {
+          alias_match_branches.push((alias_match_condition, load_child_tokens.clone()));
+        }
         field_unwraps.push(quote! {
           let #child_field_ident = #child_field_ident
             .ok_or_else(|| crate::common::missing_field(
@@ -251,21 +318,24 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         field_declarations.push(quote! {
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
+        let load_child_tokens = quote! {
+          if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+            &child_parent_path,
+            relationship,
+            #archive_ident,
+            visited,
+          )? {
+            #child_field_ident = Some(std::boxed::Box::new(loaded_child));
+          }
+        };
         child_match_arms.push(quote! {
-          relationship_type if crate::common::relationship_type_matches(
-            relationship_type,
-            #relationship_type_expr,
-          ) => {
-            if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
-              &child_parent_path,
-              relationship,
-              #archive_ident,
-              visited,
-            )? {
-              #child_field_ident = Some(std::boxed::Box::new(loaded_child));
-            }
+          #relationship_type_pattern => {
+            #load_child_tokens
           }
         });
+        if let Some(alias_match_condition) = alias_match_condition {
+          alias_match_branches.push((alias_match_condition, load_child_tokens.clone()));
+        }
         child_save_stmts.push(quote! {
           if let Some(#child_item_ident) = &self.#child_field_ident {
             crate::common::save_typed_child_part(
@@ -297,11 +367,30 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   for data_ref in &data_ref_infos {
     let data_ref_type = &data_ref.ty;
-    let relationship_type_expr = match &data_ref.relationship_type {
+    let relationship_type_pattern = match &data_ref.relationship_type {
       PartRelationshipTypeSource::Explicit(value) => quote! { #value },
       PartRelationshipTypeSource::TypeConst => {
         quote! { <#data_ref_type as crate::sdk::SdkDataPartReference>::RELATIONSHIP_TYPE }
       }
+    };
+    let alias_match_condition = match &data_ref.relationship_type {
+      PartRelationshipTypeSource::Explicit(value)
+        if explicit_relationship_type_may_have_alias(value) =>
+      {
+        Some(quote! {
+          crate::common::relationship_type_matches_alias(
+            relationship_type,
+            #relationship_type_pattern,
+          )
+        })
+      }
+      PartRelationshipTypeSource::TypeConst => Some(quote! {
+        crate::common::relationship_type_matches_alias(
+          relationship_type,
+          #relationship_type_pattern,
+        )
+      }),
+      _ => None,
     };
     let data_ref_field_ident = &data_ref.field_ident;
     let data_ref_item_ident = data_ref.field_ident.clone();
@@ -311,20 +400,23 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         field_declarations.push(quote! {
           let mut #data_ref_field_ident: Vec<#data_ref_type> = vec![];
         });
+        let load_data_ref_tokens = quote! {
+          if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+            &child_parent_path,
+            relationship,
+            #archive_ident,
+          )? {
+            #data_ref_field_ident.push(loaded_data_ref);
+          }
+        };
         child_match_arms.push(quote! {
-          relationship_type if crate::common::relationship_type_matches(
-            relationship_type,
-            #relationship_type_expr,
-          ) => {
-            if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
-              &child_parent_path,
-              relationship,
-              #archive_ident,
-            )? {
-              #data_ref_field_ident.push(loaded_data_ref);
-            }
+          #relationship_type_pattern => {
+            #load_data_ref_tokens
           }
         });
+        if let Some(alias_match_condition) = alias_match_condition {
+          alias_match_branches.push((alias_match_condition, load_data_ref_tokens.clone()));
+        }
         child_save_stmts.push(quote! {
           for #data_ref_item_ident in &self.#data_ref_field_ident {
             crate::common::save_data_part_reference(
@@ -346,20 +438,23 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         field_declarations.push(quote! {
           let mut #data_ref_field_ident: Option<std::boxed::Box<#data_ref_type>> = None;
         });
+        let load_data_ref_tokens = quote! {
+          if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+            &child_parent_path,
+            relationship,
+            #archive_ident,
+          )? {
+            #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
+          }
+        };
         child_match_arms.push(quote! {
-          relationship_type if crate::common::relationship_type_matches(
-            relationship_type,
-            #relationship_type_expr,
-          ) => {
-            if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
-              &child_parent_path,
-              relationship,
-              #archive_ident,
-            )? {
-              #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
-            }
+          #relationship_type_pattern => {
+            #load_data_ref_tokens
           }
         });
+        if let Some(alias_match_condition) = alias_match_condition {
+          alias_match_branches.push((alias_match_condition, load_data_ref_tokens.clone()));
+        }
         field_unwraps.push(quote! {
           let #data_ref_field_ident = #data_ref_field_ident
             .ok_or_else(|| crate::common::missing_field(
@@ -384,20 +479,23 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         field_declarations.push(quote! {
           let mut #data_ref_field_ident: Option<std::boxed::Box<#data_ref_type>> = None;
         });
+        let load_data_ref_tokens = quote! {
+          if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+            &child_parent_path,
+            relationship,
+            #archive_ident,
+          )? {
+            #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
+          }
+        };
         child_match_arms.push(quote! {
-          relationship_type if crate::common::relationship_type_matches(
-            relationship_type,
-            #relationship_type_expr,
-          ) => {
-            if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
-              &child_parent_path,
-              relationship,
-              #archive_ident,
-            )? {
-              #data_ref_field_ident = Some(std::boxed::Box::new(loaded_data_ref));
-            }
+          #relationship_type_pattern => {
+            #load_data_ref_tokens
           }
         });
+        if let Some(alias_match_condition) = alias_match_condition {
+          alias_match_branches.push((alias_match_condition, load_data_ref_tokens.clone()));
+        }
         child_save_stmts.push(quote! {
           if let Some(#data_ref_item_ident) = &self.#data_ref_field_ident {
             crate::common::save_data_part_reference(
@@ -418,30 +516,40 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
   }
 
-  let extended_fallback_arm = if has_extended_parts {
+  let extended_fallback_tokens = if has_extended_parts {
     quote! {
-      _ => {
-        if let Some(loaded_extended_part) = crate::common::load_extended_part(
-          &child_parent_path,
-          relationship,
-          #archive_ident,
-          visited,
-        )? {
-          extended_parts.push(loaded_extended_part);
-        }
+      if let Some(loaded_extended_part) = crate::common::load_extended_part(
+        &child_parent_path,
+        relationship,
+        #archive_ident,
+        visited,
+      )? {
+        extended_parts.push(loaded_extended_part);
       }
     }
   } else {
-    quote! { _ => {} }
+    quote! {}
   };
 
   if needs_relationships {
+    let alias_fallback_tokens = if alias_match_branches.is_empty() {
+      extended_fallback_tokens
+    } else {
+      let alias_dispatch_chain =
+        build_conditional_chain(&alias_match_branches, extended_fallback_tokens);
+      quote! {
+        let relationship_type = relationship.r#type.as_str();
+        #alias_dispatch_chain
+      }
+    };
     field_declarations.push(quote! {
       if let Some(relationships) = &relationships {
         for relationship in &relationships.relationship {
           match relationship.r#type.as_str() {
             #( #child_match_arms )*
-            #extended_fallback_arm
+            _ => {
+              #alias_fallback_tokens
+            }
           }
         }
       }

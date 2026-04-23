@@ -177,10 +177,11 @@ pub fn parse_bool_str(
 
 #[inline(always)]
 pub fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
-  if actual == canonical {
-    return true;
-  }
+  actual == canonical || relationship_type_matches_alias(actual, canonical)
+}
 
+#[inline(always)]
+pub fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
   if let Some(suffix) =
     canonical.strip_prefix("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
   {

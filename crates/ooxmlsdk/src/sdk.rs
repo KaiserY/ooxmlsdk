@@ -54,6 +54,8 @@ pub trait SdkChoice: Sized {
 #[cfg(feature = "parts")]
 pub trait SdkPart: Sized {
   const DESCRIPTOR: PartDescriptor;
+  const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
+  const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
 
   fn new_from_archive<R: std::io::Read + std::io::Seek>(
     parent_path: &str,
@@ -74,12 +76,12 @@ pub trait SdkPart: Sized {
 
   #[inline(always)]
   fn relationship_type() -> &'static str {
-    Self::DESCRIPTOR.relationship_type
+    Self::RELATIONSHIP_TYPE
   }
 
   #[inline(always)]
   fn path_prefix() -> &'static str {
-    Self::DESCRIPTOR.path_prefix
+    Self::PATH_PREFIX
   }
 }
 

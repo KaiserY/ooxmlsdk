@@ -1,5 +1,15 @@
 use super::*;
 
+struct PackageChildInfo {
+  attrs: Vec<Attribute>,
+  field_ident: Ident,
+  part_ty: Type,
+  variant_ident: Ident,
+  kind: PartChildKind,
+  relationship_type: String,
+  main_accessor_ident: Option<Ident>,
+}
+
 pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -48,6 +58,81 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       #ident: root_elements,
     }
   });
+  let mut child_infos = Vec::new();
+  for field in &fields.named {
+    let Some(field_ident) = field.ident.as_ref() else {
+      continue;
+    };
+    if field_ident == "storage" || field_ident == "main_part_id" || field_ident == "root_elements" {
+      continue;
+    }
+
+    let Some(part_ty) = marker_inner_type(&field.ty, "PartChild") else {
+      return Err(syn::Error::new_spanned(
+        field,
+        "SdkPackage fields require storage, main_part_id, root_elements, or PartChild markers",
+      ));
+    };
+    let Some(attr) = parse_part_child_attr(&field.attrs)? else {
+      return Err(syn::Error::new_spanned(
+        field,
+        "PartChild marker field requires #[sdk(part_child(...))]",
+      ));
+    };
+    child_infos.push(PackageChildInfo {
+      attrs: passthrough_attrs(&field.attrs),
+      field_ident: field_ident.clone(),
+      variant_ident: part_ref_variant_ident(&part_ty)?,
+      part_ty,
+      kind: attr.kind,
+      relationship_type: attr.relationship_type,
+      main_accessor_ident: parse_package_main_accessor(&field.attrs)?,
+    });
+  }
+  let main_child = child_infos
+    .iter()
+    .find(|child| child.main_accessor_ident.is_some());
+  let main_part_relationship_type = main_child.map(|child| {
+    let part_ty = &child.part_ty;
+    quote! {
+      pub const MAIN_PART_RELATIONSHIP_TYPE: &'static str =
+        <#part_ty as crate::sdk::SdkPartHandle>::RELATIONSHIP_TYPE;
+    }
+  });
+  let main_part_method = main_child.map(|child| {
+    let attrs = &child.attrs;
+    let part_ty = &child.part_ty;
+    let accessor_ident = child.main_accessor_ident.as_ref().unwrap();
+    quote! {
+      #( #attrs )*
+      pub fn #accessor_ident(&self) -> Result<#part_ty, crate::common::SdkError> {
+        self
+          .#main_part_id_ident
+          .map(<#part_ty as crate::sdk::SdkPartHandle>::from_part_id)
+          .ok_or_else(|| {
+            crate::common::SdkError::CommonError(
+              concat!("missing main part for ", stringify!(#ident)).to_string(),
+            )
+          })
+      }
+    }
+  });
+  let main_relationship_expr = if main_child.is_some() {
+    quote! {
+      storage
+        .package_relationships()
+        .first_target_part_by_relationship_type(Self::MAIN_PART_RELATIONSHIP_TYPE)
+    }
+  } else {
+    quote! { None }
+  };
+  let package_relationship_methods = package_relationship_method_tokens(&child_infos);
+  let child_field_inits = child_infos.iter().map(|child| {
+    let field_ident = &child.field_ident;
+    quote! {
+      #field_ident: Default::default(),
+    }
+  });
 
   Ok(quote! {
     impl crate::sdk::SdkPackage for #ident {
@@ -68,6 +153,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     }
 
     impl #ident {
+      #main_part_relationship_type
+
       pub fn new<R: std::io::Read + std::io::Seek>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
@@ -103,22 +190,185 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         crate::parts::save_package(self, writer)
       }
 
+      #main_part_method
+
+      #package_relationship_methods
+
       fn new_inner<R: std::io::Read + std::io::Seek>(
         reader: R,
         open_mode: crate::common::PackageOpenMode,
       ) -> Result<Self, crate::common::SdkError> {
         let storage = crate::common::SdkPackageStorage::open(reader, open_mode)?;
-        let main_part_id = storage
-          .package_relationships()
-          .first_target_part_by_relationship_type(Self::MAIN_PART_RELATIONSHIP_TYPE);
+        let main_part_id = #main_relationship_expr;
         #root_elements_local
 
         Ok(Self {
           #storage_ident: storage,
           #main_part_id_ident: main_part_id,
           #root_elements_init
+          #( #child_field_inits )*
         })
       }
     }
   })
+}
+
+fn package_relationship_method_tokens(
+  child_infos: &[PackageChildInfo],
+) -> proc_macro2::TokenStream {
+  let part_ref_branches = child_infos.iter().map(|child| {
+    let attrs = &child.attrs;
+    let part_ty = &child.part_ty;
+    let variant_ident = &child.variant_ident;
+    let relationship_type = &child.relationship_type;
+    quote! {
+      #( #attrs )*
+      if crate::common::relationship_type_matches(relationship_type, #relationship_type) {
+        return Some(crate::parts::PartRef::#variant_ident(
+          <#part_ty as crate::sdk::SdkPartHandle>::from_part_id(part_id),
+        ));
+      }
+    }
+  });
+
+  let accessors = child_infos
+    .iter()
+    .filter(|child| child.main_accessor_ident.is_none())
+    .map(|child| {
+      let attrs = &child.attrs;
+      let method_ident = &child.field_ident;
+      let part_ty = &child.part_ty;
+      let relationship_type = &child.relationship_type;
+      let map_relationship = quote! {
+        |relationship: &crate::common::RelationshipInfo| {
+          if crate::common::relationship_type_matches(
+            relationship.relationship_type(),
+            #relationship_type,
+          ) {
+            relationship
+              .target_part_id()
+              .map(<#part_ty as crate::sdk::SdkPartHandle>::from_part_id)
+          } else {
+            None
+          }
+        }
+      };
+
+      match child.kind {
+        PartChildKind::Repeated => quote! {
+          #( #attrs )*
+          pub fn #method_ident(&self) -> impl Iterator<Item = #part_ty> + '_ {
+            self.relationships().iter().filter_map(#map_relationship)
+          }
+        },
+        PartChildKind::Required | PartChildKind::Optional => quote! {
+          #( #attrs )*
+          pub fn #method_ident(&self) -> Option<#part_ty> {
+            self.relationships().iter().find_map(#map_relationship)
+          }
+        },
+      }
+    });
+
+  quote! {
+    pub fn parts(&self) -> impl Iterator<Item = crate::parts::IdPartPair<'_>> + '_ {
+      self
+        .relationships()
+        .iter()
+        .filter_map(|relationship| {
+          let part = Self::part_ref_from_relationship(relationship)?;
+          Some(crate::parts::IdPartPair::new(relationship.id(), part))
+        })
+    }
+
+    pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
+      let relationship = self.relationships().get(relationship_id)?;
+      Self::part_ref_from_relationship(relationship)
+    }
+
+    fn part_ref_from_relationship(
+      relationship: &crate::common::RelationshipInfo,
+    ) -> Option<crate::parts::PartRef> {
+      let part_id = relationship.target_part_id()?;
+      let relationship_type = relationship.relationship_type();
+      #( #part_ref_branches )*
+      None
+    }
+
+    #( #accessors )*
+  }
+}
+
+fn marker_inner_type(ty: &Type, marker: &str) -> Option<Type> {
+  let Type::Path(type_path) = ty else {
+    return None;
+  };
+  let segment = type_path.path.segments.last()?;
+  if segment.ident != marker {
+    return None;
+  }
+  let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+    return None;
+  };
+  let syn::GenericArgument::Type(inner) = args.args.first()? else {
+    return None;
+  };
+  Some(inner.clone())
+}
+
+fn part_ref_variant_ident(part_ty: &Type) -> syn::Result<Ident> {
+  let Type::Path(TypePath { path, .. }) = part_ty else {
+    return Err(syn::Error::new_spanned(
+      part_ty,
+      "PartChild marker inner type must be a path",
+    ));
+  };
+  path
+    .segments
+    .last()
+    .map(|segment| segment.ident.clone())
+    .ok_or_else(|| syn::Error::new_spanned(part_ty, "PartChild marker inner type is empty"))
+}
+
+fn parse_package_main_accessor(attrs: &[Attribute]) -> syn::Result<Option<Ident>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::List(meta) = meta
+        && meta.path.is_ident("package_main")
+      {
+        let mut accessor = None;
+        meta.parse_nested_meta(|nested| {
+          if nested.path.is_ident("accessor") {
+            let value: LitStr = nested.value()?.parse()?;
+            accessor = Some(value.value());
+            Ok(())
+          } else {
+            Err(nested.error("unsupported sdk package_main attribute"))
+          }
+        })?;
+        let Some(accessor) = accessor else {
+          return Err(syn::Error::new_spanned(
+            meta,
+            "sdk package_main requires accessor",
+          ));
+        };
+        return parse_str(&accessor).map(Some);
+      }
+    }
+  }
+
+  Ok(None)
+}
+
+fn passthrough_attrs(attrs: &[Attribute]) -> Vec<Attribute> {
+  attrs
+    .iter()
+    .filter(|attr| !attr.path().is_ident("sdk"))
+    .cloned()
+    .collect()
 }

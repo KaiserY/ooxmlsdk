@@ -32,14 +32,14 @@ fn gen_package_module(
   path_prefix_stmt: Stmt,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
-  let main_part_method = package_main_part_method_tokens(part, &struct_name_ident)?;
-  let child_methods = child_part_methods_tokens(part, &struct_name_ident, None)?;
+  let marker_fields = package_marker_fields(part)?;
   let package_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
     pub struct #struct_name_ident {
       pub(crate) storage: crate::common::SdkPackageStorage,
       pub(crate) main_part_id: Option<crate::common::PartId>,
       pub(crate) root_elements: Vec<Option<crate::parts::PartRootElement>>,
+      #( #marker_fields )*
     }
   })?;
 
@@ -47,43 +47,49 @@ fn gen_package_module(
     #relationship_type_stmt
     #path_prefix_stmt
     #package_struct
-    #main_part_method
-    #child_methods
   })
 }
 
-fn package_main_part_method_tokens(
-  part: &PartModuleDecl,
-  package_ident: &Ident,
-) -> Result<TokenStream> {
-  let (Some(module_name), Some(struct_name), Some(accessor_name)) = (
-    &part.main_part_module_name,
-    &part.main_part_struct_name,
-    &part.main_part_accessor_name,
-  ) else {
-    return Ok(quote! {});
-  };
+fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
+  let mut fields = Vec::new();
+  let main_part_accessor = part.main_part_accessor_name.as_deref();
 
-  let accessor_ident: Ident = parse_str(accessor_name)?;
-  let part_ty: syn::Type = parse_str(&format!("crate::parts::{module_name}::{struct_name}"))?;
-
-  Ok(quote! {
-    impl #package_ident {
-      pub const MAIN_PART_RELATIONSHIP_TYPE: &'static str =
-        <#part_ty as crate::sdk::SdkPartHandle>::RELATIONSHIP_TYPE;
-
-      pub fn #accessor_ident(&self) -> Result<#part_ty, crate::common::SdkError> {
-        self
-          .main_part_id
-          .map(<#part_ty as crate::sdk::SdkPartHandle>::from_part_id)
-          .ok_or_else(|| {
-            crate::common::SdkError::CommonError(
-              concat!("missing main part for ", stringify!(#package_ident)).to_string(),
-            )
-          })
-      }
+  for field in &part.fields {
+    let PartFieldKind::ChildPart {
+      relationship_type,
+      cardinality,
+    } = &field.kind
+    else {
+      continue;
+    };
+    if relationship_type.is_empty() {
+      continue;
     }
-  })
+
+    let attrs = part_field_attrs(field);
+    let field_ident: Ident = parse_str(&field.rust_name)?;
+    let part_ty: Type = parse_str(&field.rust_type)?;
+    let kind = match cardinality {
+      PartChildCardinality::Optional => "optional",
+      PartChildCardinality::Required => "required",
+      PartChildCardinality::Repeated => "repeated",
+    };
+    let main_attr = if Some(field.rust_name.as_str()) == main_part_accessor {
+      let accessor = field.rust_name.as_str();
+      quote! { #[sdk(package_main(accessor = #accessor))] }
+    } else {
+      quote! {}
+    };
+    fields.push(quote! {
+      #( #attrs )*
+      #main_attr
+      #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
+      #[allow(dead_code)]
+      pub(crate) #field_ident: crate::sdk::PartChild<#part_ty>,
+    });
+  }
+
+  Ok(fields)
 }
 
 fn gen_part_handle_module(
@@ -148,214 +154,6 @@ fn part_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
   }
 
   Ok(fields)
-}
-
-fn child_part_methods_tokens(
-  part: &PartModuleDecl,
-  owner_ident: &Ident,
-  part_self: Option<TokenStream>,
-) -> Result<TokenStream> {
-  let branches = child_part_ref_branches(&part.fields)?;
-  let skip_accessor = part.main_part_accessor_name.as_deref();
-  let accessors = child_part_accessor_tokens(&part.fields, part_self.is_some(), skip_accessor)?;
-  let part_ref_from_relationship = if branches.is_empty() {
-    quote! {
-      fn part_ref_from_relationship(
-        _relationship: &crate::common::RelationshipInfo,
-      ) -> Option<crate::parts::PartRef> {
-        None
-      }
-    }
-  } else {
-    quote! {
-      fn part_ref_from_relationship(
-        relationship: &crate::common::RelationshipInfo,
-      ) -> Option<crate::parts::PartRef> {
-        let part_id = relationship.target_part_id()?;
-        let relationship_type = relationship.relationship_type();
-        #( #branches )*
-        None
-      }
-    }
-  };
-
-  if let Some(part_self) = part_self {
-    return Ok(quote! {
-      impl #owner_ident {
-        pub fn parts<'a, P: crate::sdk::SdkPackage>(
-          self,
-          package: &'a P,
-        ) -> impl Iterator<Item = crate::parts::IdPartPair<'a>> + 'a {
-          self
-            .relationships(package)
-            .into_iter()
-            .flat_map(|relationships| relationships.iter())
-            .filter_map(|relationship| {
-              let part = Self::part_ref_from_relationship(relationship)?;
-              Some(crate::parts::IdPartPair::new(relationship.id(), part))
-            })
-        }
-
-        #[inline]
-        pub fn get_part_by_id<P: crate::sdk::SdkPackage>(
-          #part_self,
-          package: &P,
-          relationship_id: &str,
-        ) -> Option<crate::parts::PartRef> {
-          let relationship = self.relationships(package)?.get(relationship_id)?;
-          Self::part_ref_from_relationship(relationship)
-        }
-
-        #part_ref_from_relationship
-        #( #accessors )*
-      }
-    });
-  }
-
-  Ok(quote! {
-    impl #owner_ident {
-      pub fn parts(&self) -> impl Iterator<Item = crate::parts::IdPartPair<'_>> + '_ {
-        self
-          .relationships()
-          .iter()
-          .filter_map(|relationship| {
-            let part = Self::part_ref_from_relationship(relationship)?;
-            Some(crate::parts::IdPartPair::new(relationship.id(), part))
-          })
-      }
-
-      pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
-        let relationship = self.relationships().get(relationship_id)?;
-        Self::part_ref_from_relationship(relationship)
-      }
-
-      #part_ref_from_relationship
-      #( #accessors )*
-    }
-  })
-}
-
-fn child_part_accessor_tokens(
-  fields: &[PartFieldDecl],
-  is_part_handle: bool,
-  skip_accessor: Option<&str>,
-) -> Result<Vec<TokenStream>> {
-  fields
-    .iter()
-    .filter_map(|field| {
-      let PartFieldKind::ChildPart {
-        relationship_type,
-        cardinality,
-      } = &field.kind
-      else {
-        return None;
-      };
-      if relationship_type.is_empty() || Some(field.rust_name.as_str()) == skip_accessor {
-        return None;
-      }
-      Some((field, relationship_type, *cardinality))
-    })
-    .map(|(field, relationship_type, cardinality)| {
-      let attrs = part_field_attrs(field);
-      let method_ident: Ident = parse_str(&field.rust_name)?;
-      let part_ty: Type = parse_str(&field.rust_type)?;
-      let relationship_iter = if is_part_handle {
-        quote! {
-          self
-            .relationships(package)
-            .into_iter()
-            .flat_map(|relationships| relationships.iter())
-        }
-      } else {
-        quote! {
-          self.relationships().iter()
-        }
-      };
-      let map_relationship = quote! {
-        |relationship: &crate::common::RelationshipInfo| {
-          if crate::common::relationship_type_matches(
-            relationship.relationship_type(),
-            #relationship_type,
-          ) {
-            relationship
-              .target_part_id()
-              .map(<#part_ty as crate::sdk::SdkPartHandle>::from_part_id)
-          } else {
-            None
-          }
-        }
-      };
-
-      if matches!(cardinality, PartChildCardinality::Repeated) {
-        if is_part_handle {
-          Ok(quote! {
-            #( #attrs )*
-            pub fn #method_ident<'a, P: crate::sdk::SdkPackage>(
-              self,
-              package: &'a P,
-            ) -> impl Iterator<Item = #part_ty> + 'a {
-              #relationship_iter.filter_map(#map_relationship)
-            }
-          })
-        } else {
-          Ok(quote! {
-            #( #attrs )*
-            pub fn #method_ident(&self) -> impl Iterator<Item = #part_ty> + '_ {
-              #relationship_iter.filter_map(#map_relationship)
-            }
-          })
-        }
-      } else if is_part_handle {
-        Ok(quote! {
-          #( #attrs )*
-          pub fn #method_ident<P: crate::sdk::SdkPackage>(
-            self,
-            package: &P,
-          ) -> Option<#part_ty> {
-            #relationship_iter.find_map(#map_relationship)
-          }
-        })
-      } else {
-        Ok(quote! {
-          #( #attrs )*
-          pub fn #method_ident(&self) -> Option<#part_ty> {
-            #relationship_iter.find_map(#map_relationship)
-          }
-        })
-      }
-    })
-    .collect()
-}
-
-fn child_part_ref_branches(fields: &[PartFieldDecl]) -> Result<Vec<TokenStream>> {
-  fields
-    .iter()
-    .filter_map(|field| {
-      let PartFieldKind::ChildPart {
-        relationship_type, ..
-      } = &field.kind
-      else {
-        return None;
-      };
-      if relationship_type.is_empty() {
-        return None;
-      }
-      Some((field, relationship_type))
-    })
-    .map(|(field, relationship_type)| {
-      let attrs = part_field_attrs(field);
-      let part_ty: Type = parse_str(&field.rust_type)?;
-      let variant_ident: Ident = parse_str(part_type_ident(&field.rust_type))?;
-      Ok(quote! {
-        #( #attrs )*
-        if crate::common::relationship_type_matches(relationship_type, #relationship_type) {
-          return Some(crate::parts::PartRef::#variant_ident(
-            <#part_ty as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-          ));
-        }
-      })
-    })
-    .collect()
 }
 
 pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
@@ -665,10 +463,6 @@ fn part_field_attrs(field: &PartFieldDecl) -> Vec<syn::Attribute> {
   features_cfg_attrs(&filtered_features)
 }
 
-fn part_type_ident(rust_type: &str) -> &str {
-  rust_type.rsplit("::").next().unwrap_or(rust_type)
-}
-
 fn is_package_part(part: &PartModuleDecl) -> bool {
   part.is_package
     || part.relationship_type.is_empty()
@@ -696,7 +490,7 @@ fn part_root_element_info(part: &PartModuleDecl) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_code::part_codegen_ir::PartModuleDecl;
+  use crate::sdk_code::part_codegen_ir::{PartChildCardinality, PartFieldDecl, PartModuleDecl};
 
   #[test]
   fn generates_part_handle_from_codegen_ir() {
@@ -776,6 +570,17 @@ mod tests {
       main_part_module_name: Some("main_document_part".to_string()),
       main_part_struct_name: Some("MainDocumentPart".to_string()),
       main_part_accessor_name: Some("main_document_part".to_string()),
+      fields: vec![PartFieldDecl {
+        rust_name: "main_document_part".to_string(),
+        rust_type: "crate::parts::main_document_part::MainDocumentPart".to_string(),
+        kind: PartFieldKind::ChildPart {
+          relationship_type:
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+              .to_string(),
+          cardinality: PartChildCardinality::Required,
+        },
+        ..Default::default()
+      }],
       ..Default::default()
     };
 
@@ -786,8 +591,8 @@ mod tests {
     assert!(
       rendered.contains("root_elements : Vec < Option < crate :: parts :: PartRootElement > >")
     );
-    assert!(rendered.contains("MAIN_PART_RELATIONSHIP_TYPE"));
-    assert!(rendered.contains("pub fn main_document_part"));
+    assert!(rendered.contains("package_main"));
+    assert!(rendered.contains("main_document_part : crate :: sdk :: PartChild"));
     assert!(!rendered.contains("ooxmlsdk_derive :: SdkPart"));
   }
 

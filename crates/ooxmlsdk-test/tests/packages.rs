@@ -2,12 +2,16 @@
 
 use std::io::Cursor;
 
+use ooxmlsdk::common::{RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
-  PartRef, PartRootCache, main_document_part::MainDocumentPart,
+  PartRef, PartRootCache, image_part::ImagePart, main_document_part::MainDocumentPart,
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
-  style_definitions_part::StyleDefinitionsPart, wordprocessing_document::WordprocessingDocument,
+  style_definitions_part::StyleDefinitionsPart,
+  wordprocessing_comments_part::WordprocessingCommentsPart,
+  wordprocessing_document::WordprocessingDocument,
 };
-use ooxmlsdk::sdk::SdkPartHandle;
+use ooxmlsdk::schemas::opc_relationships::TargetMode;
+use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
 use ooxmlsdk_test::fixtures;
 
 fn doc_sample(file_name: &str) -> std::path::PathBuf {
@@ -62,6 +66,7 @@ fn package_relationships_resolve_with_container_local_part_factory() {
     main_part.part_id()
   );
   assert_eq!(package.get_parts_of_type::<MainDocumentPart>().count(), 1);
+  assert!(package.try_get_part_by_id("invalidId").is_none());
 }
 
 #[test]
@@ -111,7 +116,149 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
 }
 
 #[test]
+fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: RootElementTest
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("complex0.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let comments_part = main_part.wordprocessing_comments_part(&package).unwrap();
+  let image_part = main_part.image_parts(&package).next().unwrap();
+
+  assert!(main_part.root_element(&mut package).is_ok());
+  assert!(comments_part.root_element(&mut package).is_ok());
+  assert!(package.root_element(image_part.part_id()).is_none());
+  assert_eq!(
+    image_part.data_kind(&package),
+    Some(StoredPartDataKind::Binary)
+  );
+  assert_eq!(
+    main_part.get_id_of_part(&package, comments_part),
+    Some("rId7")
+  );
+  assert_eq!(
+    main_part
+      .get_part_by_id(&package, "rId7")
+      .and_then(PartRef::downcast::<WordprocessingCommentsPart>)
+      .map(|part| part.part_id()),
+    Some(comments_part.part_id())
+  );
+  assert_eq!(
+    main_part
+      .get_parts_of_type::<_, ImagePart>(&package)
+      .count(),
+    13
+  );
+}
+
+#[test]
+fn package_storage_parts_match_openxml_package_get_all_parts_tests() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
+  //   OpenXmlPackageGetAllPartsTestWord
+  //   OpenXmlPackageGetAllPartsTestPowerPoint
+  let word = WordprocessingDocument::new_from_file(doc_sample("complex0.docx")).unwrap();
+  assert_eq!(word.storage().parts().len(), 31);
+  assert_eq!(word.storage().parts().len(), 31);
+
+  let presentation =
+    PresentationDocument::new_from_file(doc_sample("o09_Performance_typical.pptx")).unwrap();
+  let data_parts = presentation
+    .storage()
+    .parts()
+    .iter()
+    .filter(|part| {
+      matches!(
+        part.relationship_type(),
+        Some(
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
+            | "http://schemas.microsoft.com/office/2007/relationships/media"
+            | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video"
+        )
+      )
+    })
+    .count();
+
+  assert_eq!(presentation.storage().parts().len() - data_parts, 65);
+  assert_eq!(data_parts, 1);
+}
+
+#[test]
+fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
+  //   LoadPackageWithMediaReferenceTest
+  let package = PresentationDocument::new_from_file(doc_sample("mediareference.pptx")).unwrap();
+  let presentation_part = package.presentation_part().unwrap();
+  let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
+  assert_eq!(slides.len(), 2);
+
+  let media_part = package
+    .storage()
+    .parts()
+    .iter()
+    .enumerate()
+    .find(|(_, part)| part.path() == "ppt/media/media1.wav")
+    .map(|(index, part)| (ooxmlsdk::common::PartId::from_index(index), part))
+    .unwrap();
+  assert_eq!(media_part.1.content_type(), "audio/wav");
+  assert_eq!(media_part.1.data().kind(), StoredPartDataKind::Binary);
+
+  let mut internal_media_reference_count = 0;
+  let mut external_null_audio_reference_count = 0;
+  for slide in slides {
+    let relationships = slide.relationships(&package).unwrap();
+    for relationship in relationships.iter() {
+      match relationship.relationship_type() {
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
+        | "http://schemas.microsoft.com/office/2007/relationships/media" => {
+          if relationship.target_part_id() == Some(media_part.0) {
+            internal_media_reference_count += 1;
+          } else {
+            assert_eq!(relationship.target(), "NULL");
+            assert!(matches!(relationship.target_mode(), TargetMode::External));
+            assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
+            external_null_audio_reference_count += 1;
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+
+  assert_eq!(internal_media_reference_count, 3);
+  assert_eq!(external_null_audio_reference_count, 1);
+}
+
+#[test]
+fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: HyperlinkRelationshipTest
+  let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationships = main_part.relationships(&package).unwrap();
+
+  let hyperlink_relationships: Vec<_> = relationships
+    .iter()
+    .filter(|relationship| {
+      relationship.relationship_type()
+        == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+    })
+    .collect();
+
+  assert_eq!(hyperlink_relationships.len(), 71);
+
+  let rid15 = relationships.get("rId15").unwrap();
+  assert_eq!(rid15.target(), "#_THIS_WEEK_IN");
+  assert!(matches!(rid15.target_mode(), TargetMode::Internal));
+  assert_eq!(rid15.target_kind(), RelationshipTargetKind::Missing);
+  assert!(rid15.target_part_id().is_none());
+
+  let rid18 = relationships.get("rId18").unwrap();
+  assert_eq!(rid18.target(), "http://www.iaswresearch.org/");
+  assert!(matches!(rid18.target_mode(), TargetMode::External));
+  assert_eq!(rid18.target_kind(), RelationshipTargetKind::External);
+  assert!(rid18.target_part_id().is_none());
+}
+
+#[test]
 fn root_cache_reports_and_unloads_lazy_roots() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: UnloadRootElementTest
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
   let part_id = main_part.part_id();
@@ -131,6 +278,35 @@ fn spreadsheet_child_accessors_resolve_repeated_parts() {
   assert!(workbook_part.relationships(&package).is_some());
   assert!(workbook_part.theme_part(&package).is_some());
   assert!(workbook_part.worksheet_parts(&package).count() >= 1);
+}
+
+#[test]
+fn spreadsheet_sheet_relationship_ids_match_workbook_part_relationships() {
+  // Source: test/DocumentFormat.OpenXml.Tests/XlsxTests01.cs :: X002_XlsxCreation / X003_XlsxCreation_Stream
+  let mut package =
+    SpreadsheetDocument::new_from_file(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let workbook_part = package.workbook_part().unwrap();
+  let sheet_relationship_ids: Vec<String> = workbook_part
+    .root_element(&mut package)
+    .unwrap()
+    .sheets
+    .x_sheet
+    .iter()
+    .map(|sheet| sheet.id.as_str().to_string())
+    .collect();
+  let worksheet_relationship_ids: Vec<&str> = workbook_part
+    .worksheet_parts(&package)
+    .map(|worksheet| workbook_part.get_id_of_part(&package, worksheet).unwrap())
+    .collect();
+
+  assert!(!sheet_relationship_ids.is_empty());
+  assert_eq!(
+    sheet_relationship_ids.len(),
+    worksheet_relationship_ids.len()
+  );
+  for relationship_id in sheet_relationship_ids {
+    assert!(worksheet_relationship_ids.contains(&relationship_id.as_str()));
+  }
 }
 
 #[test]

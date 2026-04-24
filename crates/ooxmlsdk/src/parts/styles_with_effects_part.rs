@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-word.stylesWithEffects+xml";
+pub const TARGET_NAME: &str = "stylesWithEffects";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct StylesWithEffectsPart {
   pub(crate) id: crate::common::PartId,

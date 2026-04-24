@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors";
 pub const PATH_PREFIX: &str = "../graphics";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml";
+pub const TARGET_NAME: &str = "colors";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DiagramColorsPart {
   pub(crate) id: crate::common::PartId,

@@ -6,6 +6,9 @@
 
 pub const RELATIONSHIP_TYPE: &str = "http://schemas.microsoft.com/office/2007/relationships/slicer";
 pub const PATH_PREFIX: &str = "../slicers";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.slicer+xml";
+pub const TARGET_NAME: &str = "slicer";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SlicersPart {
   pub(crate) id: crate::common::PartId,

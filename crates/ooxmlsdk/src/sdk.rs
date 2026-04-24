@@ -3,6 +3,9 @@
 pub struct PartDescriptor {
   pub relationship_type: &'static str,
   pub path_prefix: &'static str,
+  pub content_type: &'static str,
+  pub target_name: &'static str,
+  pub extension: &'static str,
 }
 
 #[cfg(feature = "parts")]
@@ -115,10 +118,19 @@ impl<T> PartialEq for PartRoot<T> {
 
 #[cfg(feature = "parts")]
 impl PartDescriptor {
-  pub const fn new(relationship_type: &'static str, path_prefix: &'static str) -> Self {
+  pub const fn new(
+    relationship_type: &'static str,
+    path_prefix: &'static str,
+    content_type: &'static str,
+    target_name: &'static str,
+    extension: &'static str,
+  ) -> Self {
     Self {
       relationship_type,
       path_prefix,
+      content_type,
+      target_name,
+      extension,
     }
   }
 }
@@ -306,6 +318,9 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   const DESCRIPTOR: PartDescriptor;
   const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
   const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
+  const CONTENT_TYPE: &'static str = Self::DESCRIPTOR.content_type;
+  const TARGET_NAME: &'static str = Self::DESCRIPTOR.target_name;
+  const EXTENSION: &'static str = Self::DESCRIPTOR.extension;
 
   fn from_part_id(part_id: crate::common::PartId) -> Self;
 
@@ -319,6 +334,21 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   #[inline(always)]
   fn path_prefix() -> &'static str {
     Self::PATH_PREFIX
+  }
+
+  #[inline(always)]
+  fn static_content_type() -> &'static str {
+    Self::CONTENT_TYPE
+  }
+
+  #[inline(always)]
+  fn target_name() -> &'static str {
+    Self::TARGET_NAME
+  }
+
+  #[inline(always)]
+  fn extension() -> &'static str {
+    Self::EXTENSION
   }
 
   #[inline]
@@ -369,6 +399,49 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
         ))
       })?
       .add_hyperlink_relationship(relationship_id, target)
+  }
+
+  #[inline]
+  fn add_new_part<P, T>(
+    self,
+    package: &mut P,
+    relationship_id: impl Into<String>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let part_id = package.storage_mut().add_child_part(
+      self.part_id(),
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: T::RELATIONSHIP_TYPE,
+        content_type: T::CONTENT_TYPE,
+        path_prefix: T::PATH_PREFIX,
+        target_name: T::TARGET_NAME,
+        extension: T::EXTENSION,
+      },
+    )?;
+    package.push_root_element_slot();
+    Ok(T::from_part_id(part_id))
+  }
+
+  #[inline]
+  fn add_new_part_auto_id<P, T>(self, package: &mut P) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_new_part::<P, T>(package, relationship_id)
   }
 
   #[inline]
@@ -553,6 +626,9 @@ pub trait SdkPart: Sized {
   const DESCRIPTOR: PartDescriptor;
   const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
   const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
+  const CONTENT_TYPE: &'static str = Self::DESCRIPTOR.content_type;
+  const TARGET_NAME: &'static str = Self::DESCRIPTOR.target_name;
+  const EXTENSION: &'static str = Self::DESCRIPTOR.extension;
 
   fn new_from_archive<R: std::io::Read + std::io::Seek>(
     parent_path: &str,

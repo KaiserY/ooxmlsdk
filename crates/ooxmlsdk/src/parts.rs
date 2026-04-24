@@ -6562,6 +6562,7 @@ pub trait PartRootCache: crate::sdk::SdkPackage {
     &mut self,
     part_id: crate::common::PartId,
   ) -> Option<&mut Option<crate::parts::PartRootElement>>;
+  fn push_root_element_slot(&mut self);
   #[inline]
   fn is_root_element_loaded(&self, part_id: crate::common::PartId) -> bool {
     self.root_element(part_id).is_some()

@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2011/relationships/timelineCache";
 pub const PATH_PREFIX: &str = "timelineCaches";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.timelineCache+xml";
+pub const TARGET_NAME: &str = "timelineCache";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct TimeLineCachePart {
     pub(crate) id: crate::common::PartId,

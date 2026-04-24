@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
 pub const PATH_PREFIX: &str = "charts";
+pub const CONTENT_TYPE: &str = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
+pub const TARGET_NAME: &str = "chart";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartPart {
   pub(crate) id: crate::common::PartId,

@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition";
 pub const PATH_PREFIX: &str = "../pivotCache";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml";
+pub const TARGET_NAME: &str = "pivotCacheDefinition";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PivotTableCacheDefinitionPart {
   pub(crate) id: crate::common::PartId,

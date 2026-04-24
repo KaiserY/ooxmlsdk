@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument";
 pub const PATH_PREFIX: &str = "glossary";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml";
+pub const TARGET_NAME: &str = "document";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct GlossaryDocumentPart {
   pub(crate) id: crate::common::PartId,

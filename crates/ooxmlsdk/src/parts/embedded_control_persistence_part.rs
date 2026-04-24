@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control";
 pub const PATH_PREFIX: &str = "embeddings";
+pub const CONTENT_TYPE: &str = "";
+pub const TARGET_NAME: &str = "control";
+pub const EXTENSION: &str = ".bin";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct EmbeddedControlPersistencePart {
     pub(crate) id: crate::common::PartId,

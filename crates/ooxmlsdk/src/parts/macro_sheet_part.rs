@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet";
 pub const PATH_PREFIX: &str = "macrosheets";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.macrosheet+xml";
+pub const TARGET_NAME: &str = "sheet";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct MacroSheetPart {
   pub(crate) id: crate::common::PartId,

@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable";
 pub const PATH_PREFIX: &str = "../pivotTables";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml";
+pub const TARGET_NAME: &str = "pivotTable";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PivotTablePart {
   pub(crate) id: crate::common::PartId,

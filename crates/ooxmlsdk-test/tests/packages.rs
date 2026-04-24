@@ -4,14 +4,16 @@ use std::io::Cursor;
 
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
-  PartRef, PartRootCache, image_part::ImagePart, main_document_part::MainDocumentPart,
-  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
-  style_definitions_part::StyleDefinitionsPart,
+  PartRef, PartRootCache, header_part::HeaderPart, image_part::ImagePart,
+  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
+  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
-use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{Body, Document};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
+  Body, Document, Header,
+};
 use ooxmlsdk::sdk::SdkPackage;
 use ooxmlsdk_test::fixtures;
 
@@ -518,6 +520,83 @@ fn package_external_relationship_mutation_is_saved() {
   assert_eq!(relationship.target(), target);
   assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
   assert!(matches!(relationship.target_mode(), TargetMode::External));
+}
+
+#[test]
+fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
+  // Source: upstream AddNewPart<HeaderPart> coverage adapted to package-level save/reopen.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = main_part
+    .relationships(&package)
+    .unwrap()
+    .next_relationship_id();
+
+  let header_part = main_part
+    .add_new_part::<_, HeaderPart>(&mut package, relationship_id.as_str())
+    .unwrap();
+  assert_eq!(
+    main_part.get_id_of_part(&package, header_part),
+    Some(relationship_id.as_str())
+  );
+  assert_eq!(
+    header_part.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
+  );
+  assert_eq!(header_part.path(&package), Some("word/header1.xml"));
+  assert!(
+    !package.is_root_element_loaded(header_part.part_id()),
+    "new part should start with an empty lazy root slot"
+  );
+
+  header_part
+    .set_root_element(&mut package, Header::default())
+    .unwrap();
+  assert!(package.is_root_element_loaded(header_part.part_id()));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_header = reopened_main
+    .header_parts(&reopened)
+    .find(|part| reopened_main.get_id_of_part(&reopened, *part) == Some(relationship_id.as_str()))
+    .unwrap();
+
+  assert_eq!(reopened_header.path(&reopened), Some("word/header1.xml"));
+  assert!(reopened_header.root_element(&mut reopened).is_ok());
+}
+
+#[test]
+fn add_new_part_auto_id_skips_existing_relationship_ids() {
+  // Source: upstream AddNewPart<T>() auto relationship-id behavior adapted for Rust handles.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_count = main_part.relationships(&package).unwrap().len();
+
+  let header_part = main_part
+    .add_new_part_auto_id::<_, HeaderPart>(&mut package)
+    .unwrap();
+  let relationship_id = main_part
+    .get_id_of_part(&package, header_part)
+    .unwrap()
+    .to_string();
+  assert!(relationship_id.starts_with("rId"));
+  assert_eq!(
+    main_part.relationships(&package).unwrap().len(),
+    relationship_count + 1
+  );
+
+  assert!(
+    main_part
+      .add_new_part::<_, HeaderPart>(&mut package, relationship_id.as_str())
+      .is_err()
+  );
+  assert_eq!(
+    main_part.relationships(&package).unwrap().len(),
+    relationship_count + 1
+  );
 }
 
 #[test]

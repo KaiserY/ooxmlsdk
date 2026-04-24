@@ -38,6 +38,15 @@ pub enum StoredPartDataKind {
   Binary,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NewPartDescriptor {
+  pub relationship_type: &'static str,
+  pub content_type: &'static str,
+  pub path_prefix: &'static str,
+  pub target_name: &'static str,
+  pub extension: &'static str,
+}
+
 #[derive(Clone, Debug)]
 pub enum StoredPartData {
   Raw {
@@ -81,6 +90,22 @@ pub enum RelationshipTargetKind {
 }
 
 impl RelationshipInfo {
+  fn internal_part(
+    id: String,
+    relationship_type: String,
+    target: String,
+    target_part_id: PartId,
+  ) -> Self {
+    Self {
+      id: id.into_boxed_str(),
+      relationship_type: relationship_type.into_boxed_str(),
+      target: target.into_boxed_str(),
+      target_mode: None,
+      target_kind: RelationshipTargetKind::InternalPart,
+      target_part_id: Some(target_part_id),
+    }
+  }
+
   fn external(
     id: String,
     relationship_type: String,
@@ -213,6 +238,21 @@ impl RelationshipSet {
     target: impl Into<String>,
   ) -> Result<&RelationshipInfo, SdkError> {
     self.add_external_relationship(relationship_id, Self::HYPERLINK_RELATIONSHIP_TYPE, target)
+  }
+
+  pub fn add_internal_part_relationship(
+    &mut self,
+    relationship_id: impl Into<String>,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+    target_part_id: PartId,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    self.push_relationship(RelationshipInfo::internal_part(
+      relationship_id.into(),
+      relationship_type.into(),
+      target.into(),
+      target_part_id,
+    ))
   }
 
   pub fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
@@ -538,6 +578,146 @@ impl SdkPackageStorage {
       .get(relationship_id)?
       .target_part_id()
   }
+
+  pub fn add_child_part(
+    &mut self,
+    source_part_id: PartId,
+    relationship_id: impl Into<String>,
+    descriptor: NewPartDescriptor,
+  ) -> Result<PartId, SdkError> {
+    if descriptor.relationship_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty relationship type".to_string(),
+      ));
+    }
+    if descriptor.content_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty content type".to_string(),
+      ));
+    }
+    if descriptor.target_name.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty target name".to_string(),
+      ));
+    }
+
+    let relationship_id = relationship_id.into();
+    let source_part_path = self
+      .part(source_part_id)
+      .ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {source_part_id:?} is not present in package storage"
+        ))
+      })?
+      .path()
+      .to_string();
+    if self
+      .relationships(source_part_id)
+      .is_some_and(|relationships| relationships.contains_id(&relationship_id))
+    {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {relationship_id} already exists"
+      )));
+    }
+
+    let child_path = self.next_child_part_path(
+      &source_part_path,
+      descriptor.path_prefix,
+      descriptor.target_name,
+      descriptor.extension,
+    );
+    let relationship_target = relationship_target_from_source(&source_part_path, &child_path);
+    let part_id = self.push_part(
+      child_path,
+      descriptor.content_type,
+      Some(descriptor.relationship_type),
+    );
+    self
+      .relationships_mut(source_part_id)
+      .expect("source part was already resolved")
+      .add_internal_part_relationship(
+        relationship_id,
+        descriptor.relationship_type,
+        relationship_target,
+        part_id,
+      )?;
+    Ok(part_id)
+  }
+
+  fn push_part(
+    &mut self,
+    path: String,
+    content_type: &'static str,
+    relationship_type: Option<&'static str>,
+  ) -> PartId {
+    let part_id = PartId::from_index(self.parts.len());
+    let data_kind = data_kind_for_content_type(content_type);
+    self.parts.push(StoredPart {
+      path: path.clone().into_boxed_str(),
+      content_type: content_type.into(),
+      relationship_type: relationship_type.map(Into::into),
+      relationships: RelationshipSet::default(),
+      data: StoredPartData::Raw {
+        kind: data_kind,
+        bytes: Vec::new(),
+      },
+    });
+    self.by_path.insert(path.clone().into_boxed_str(), part_id);
+    self.add_content_type_override(&path, content_type);
+    part_id
+  }
+
+  fn add_content_type_override(&mut self, path: &str, content_type: &str) {
+    let part_name = format!("/{path}");
+    if self.content_types.xml_children.iter().any(|child| {
+      matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
+    }) {
+      return;
+    }
+
+    self
+      .content_types
+      .xml_children
+      .push(TypesChoice::Override(Box::new(
+        crate::schemas::opc_content_types::Override {
+          content_type: content_type.to_string(),
+          part_name,
+        },
+      )));
+  }
+
+  fn next_child_part_path(
+    &self,
+    source_part_path: &str,
+    path_prefix: &str,
+    target_name: &str,
+    extension: &str,
+  ) -> String {
+    let directory_path = child_part_directory_path(source_part_path, path_prefix);
+    let extension = if extension.is_empty() {
+      ".xml"
+    } else {
+      extension
+    };
+    let extension = if extension.starts_with('.') {
+      extension.to_string()
+    } else {
+      format!(".{extension}")
+    };
+
+    for index in 1.. {
+      let path = if directory_path.is_empty() {
+        format!("{target_name}{index}{extension}")
+      } else {
+        format!("{directory_path}{target_name}{index}{extension}")
+      };
+      if !self.by_path.contains_key(path.as_str()) {
+        return path;
+      }
+    }
+
+    unreachable!("usize iteration should always find a free part path")
+  }
 }
 
 struct RawPart {
@@ -545,6 +725,35 @@ struct RawPart {
   content_type: Box<str>,
   data_kind: StoredPartDataKind,
   bytes: Vec<u8>,
+}
+
+fn child_part_directory_path(source_part_path: &str, path_prefix: &str) -> String {
+  let source_parent_path = super::parent_zip_path(source_part_path);
+  let mut path = if path_prefix.is_empty() || path_prefix == "." {
+    source_parent_path
+  } else if path_prefix.starts_with('/') {
+    path_prefix.to_string()
+  } else {
+    let mut path = String::with_capacity(source_parent_path.len() + path_prefix.len() + 1);
+    path.push_str(&source_parent_path);
+    path.push_str(path_prefix);
+    path
+  };
+
+  path = resolve_zip_file_path(&path);
+  if !path.is_empty() && !path.ends_with('/') {
+    path.push('/');
+  }
+  path
+}
+
+fn relationship_target_from_source(source_part_path: &str, child_part_path: &str) -> String {
+  let source_parent_path = super::parent_zip_path(source_part_path);
+  if let Some(relative) = child_part_path.strip_prefix(&source_parent_path) {
+    relative.to_string()
+  } else {
+    format!("/{child_part_path}")
+  }
 }
 
 fn relationship_types_by_part(

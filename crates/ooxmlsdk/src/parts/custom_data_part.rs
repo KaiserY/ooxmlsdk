@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2007/relationships/customData";
 pub const PATH_PREFIX: &str = "customData";
+pub const CONTENT_TYPE: &str = "application/binary";
+pub const TARGET_NAME: &str = "customData";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomDataPart {
   pub(crate) id: crate::common::PartId,

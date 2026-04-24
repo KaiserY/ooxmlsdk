@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+pub const TARGET_NAME: &str = "sharedStrings";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SharedStringTablePart {
   pub(crate) id: crate::common::PartId,

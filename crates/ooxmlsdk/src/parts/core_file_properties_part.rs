@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties";
 pub const PATH_PREFIX: &str = "docProps";
+pub const CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.core-properties+xml";
+pub const TARGET_NAME: &str = "core";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CoreFilePropertiesPart {
   pub(crate) id: crate::common::PartId,

@@ -153,6 +153,11 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         ) -> Option<&mut Option<crate::parts::PartRootElement>> {
           self.#root_elements_ident.get_mut(part_id.index())
         }
+
+        #[inline]
+        fn push_root_element_slot(&mut self) {
+          self.#root_elements_ident.push(None);
+        }
       }
     }
   });

@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue";
 pub const PATH_PREFIX: &str = "richData";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.rdrichvalue+xml";
+pub const TARGET_NAME: &str = "rdrichvalue";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdRichValuePart {
   pub(crate) id: crate::common::PartId,

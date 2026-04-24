@@ -873,6 +873,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       const DESCRIPTOR: crate::sdk::PartDescriptor = crate::sdk::PartDescriptor::new(
         self::RELATIONSHIP_TYPE,
         self::PATH_PREFIX,
+        self::CONTENT_TYPE,
+        self::TARGET_NAME,
+        self::EXTENSION,
       );
 
       #trait_new_from_archive_impl
@@ -990,6 +993,9 @@ fn expand_part_handle(
       const DESCRIPTOR: crate::sdk::PartDescriptor = crate::sdk::PartDescriptor::new(
         self::RELATIONSHIP_TYPE,
         self::PATH_PREFIX,
+        self::CONTENT_TYPE,
+        self::TARGET_NAME,
+        self::EXTENSION,
       );
 
       #[inline]
@@ -1109,6 +1115,35 @@ fn expand_part_handle(
           relationship_id,
           target,
         )
+      }
+
+      #[inline]
+      pub fn add_new_part<P, T>(
+        self,
+        package: &mut P,
+        relationship_id: impl Into<String>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_new_part(
+          self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_new_part_auto_id<P, T>(
+        self,
+        package: &mut P,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_new_part_auto_id(self, package)
       }
 
       #[inline]

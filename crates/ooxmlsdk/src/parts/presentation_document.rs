@@ -6,6 +6,9 @@
 
 pub const RELATIONSHIP_TYPE: &str = "";
 pub const PATH_PREFIX: &str = "";
+pub const CONTENT_TYPE: &str = "";
+pub const TARGET_NAME: &str = "";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
 pub struct PresentationDocument {
   pub(crate) storage: crate::common::SdkPackageStorage,

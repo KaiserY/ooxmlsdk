@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
 pub const PATH_PREFIX: &str = "../notesSlides";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml";
+pub const TARGET_NAME: &str = "notesSlide";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct NotesSlidePart {
     pub(crate) id: crate::common::PartId,

@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
 pub const PATH_PREFIX: &str = "dialogsheets";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml";
+pub const TARGET_NAME: &str = "sheet";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DialogsheetPart {
   pub(crate) id: crate::common::PartId,

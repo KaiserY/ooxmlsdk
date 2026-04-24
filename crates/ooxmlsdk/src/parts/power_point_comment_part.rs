@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2018/10/relationships/comments";
 pub const PATH_PREFIX: &str = "../comments";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-powerpoint.comments+xml";
+pub const TARGET_NAME: &str = "modernComment";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PowerPointCommentPart {
   pub(crate) id: crate::common::PartId,

@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml";
+pub const TARGET_NAME: &str = "webSettings";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebSettingsPart {
   pub(crate) id: crate::common::PartId,

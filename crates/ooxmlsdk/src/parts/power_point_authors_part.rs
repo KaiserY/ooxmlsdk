@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2018/10/relationships/authors";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-powerpoint.authors+xml";
+pub const TARGET_NAME: &str = "authors";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PowerPointAuthorsPart {
   pub(crate) id: crate::common::PartId,

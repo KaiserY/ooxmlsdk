@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2007/relationships/slicerCache";
 pub const PATH_PREFIX: &str = "slicerCaches";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.slicerCache+xml";
+pub const TARGET_NAME: &str = "slicerCache";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SlicerCachePart {
   pub(crate) id: crate::common::PartId,

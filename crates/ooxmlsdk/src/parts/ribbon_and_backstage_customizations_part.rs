@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility";
 pub const PATH_PREFIX: &str = "customUI";
+pub const CONTENT_TYPE: &str = "application/xml";
+pub const TARGET_NAME: &str = "customUI";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RibbonAndBackstageCustomizationsPart {
   pub(crate) id: crate::common::PartId,

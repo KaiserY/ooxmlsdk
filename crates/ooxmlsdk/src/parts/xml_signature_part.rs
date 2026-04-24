@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature";
 pub const PATH_PREFIX: &str = "_xmlsignatures";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml";
+pub const TARGET_NAME: &str = "sig";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct XmlSignaturePart {
   pub(crate) id: crate::common::PartId,

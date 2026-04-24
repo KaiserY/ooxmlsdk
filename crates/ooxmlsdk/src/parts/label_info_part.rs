@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels";
 pub const PATH_PREFIX: &str = "docMetadata";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-office.classificationlabels+xml";
+pub const TARGET_NAME: &str = "LabelInfo";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct LabelInfoPart {
   pub(crate) id: crate::common::PartId,

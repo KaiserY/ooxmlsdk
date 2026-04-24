@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2011/relationships/chartStyle";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-office.chartstyle+xml";
+pub const TARGET_NAME: &str = "style";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartStylePart {
   pub(crate) id: crate::common::PartId,

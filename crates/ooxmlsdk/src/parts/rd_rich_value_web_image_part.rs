@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage";
 pub const PATH_PREFIX: &str = "richData";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.rdrichvaluewebimage+xml";
+pub const TARGET_NAME: &str = "rdRichValueWebImage";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdRichValueWebImagePart {
     pub(crate) id: crate::common::PartId,

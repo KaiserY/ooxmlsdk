@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-office.legacyDiagramText";
+pub const TARGET_NAME: &str = "legacyDiagramText";
+pub const EXTENSION: &str = ".bin";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct LegacyDiagramTextPart {
   pub(crate) id: crate::common::PartId,

@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml";
+pub const TARGET_NAME: &str = "commentsIds";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WordprocessingCommentsIdsPart {
   pub(crate) id: crate::common::PartId,

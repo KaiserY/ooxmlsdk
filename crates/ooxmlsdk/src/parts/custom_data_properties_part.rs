@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2007/relationships/customDataProps";
 pub const PATH_PREFIX: &str = "customData";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.customDataProperties+xml";
+pub const TARGET_NAME: &str = "customDataProps";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomDataPropertiesPart {
   pub(crate) id: crate::common::PartId,

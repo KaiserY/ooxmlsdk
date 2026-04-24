@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
 pub const PATH_PREFIX: &str = "../drawings";
+pub const CONTENT_TYPE: &str = "application/vnd.openxmlformats-officedocument.vmlDrawing";
+pub const TARGET_NAME: &str = "vmldrawing";
+pub const EXTENSION: &str = ".vml";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct VmlDrawingPart {
   pub(crate) id: crate::common::PartId,

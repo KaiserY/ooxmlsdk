@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
 pub const PATH_PREFIX: &str = "../queryTables";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml";
+pub const TARGET_NAME: &str = "queryTable";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct QueryTablePart {
   pub(crate) id: crate::common::PartId,

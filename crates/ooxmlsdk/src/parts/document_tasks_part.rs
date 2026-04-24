@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks";
 pub const PATH_PREFIX: &str = ".";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-office.documenttasks+xml";
+pub const TARGET_NAME: &str = "tasks";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DocumentTasksPart {
   pub(crate) id: crate::common::PartId,

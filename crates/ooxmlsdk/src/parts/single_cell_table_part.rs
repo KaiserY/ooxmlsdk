@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells";
 pub const PATH_PREFIX: &str = "../tables";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml";
+pub const TARGET_NAME: &str = "tableSingleCells";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SingleCellTablePart {
   pub(crate) id: crate::common::PartId,

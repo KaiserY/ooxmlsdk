@@ -19,17 +19,49 @@ pub fn gen_part_module(part: &PartModuleDecl) -> Result<TokenStream> {
     pub const PATH_PREFIX: &str = #path_prefix_str;
   })?;
 
+  let content_type_str = part.content_type.as_str();
+  let content_type_stmt: Stmt = parse2(quote! {
+    pub const CONTENT_TYPE: &str = #content_type_str;
+  })?;
+
+  let target_name_str = part.target_name.as_str();
+  let target_name_stmt: Stmt = parse2(quote! {
+    pub const TARGET_NAME: &str = #target_name_str;
+  })?;
+
+  let extension_str = part.extension.as_str();
+  let extension_stmt: Stmt = parse2(quote! {
+    pub const EXTENSION: &str = #extension_str;
+  })?;
+
   if is_package_part(part) {
-    return gen_package_module(part, relationship_type_stmt, path_prefix_stmt);
+    return gen_package_module(
+      part,
+      relationship_type_stmt,
+      path_prefix_stmt,
+      content_type_stmt,
+      target_name_stmt,
+      extension_stmt,
+    );
   }
 
-  gen_part_handle_module(part, relationship_type_stmt, path_prefix_stmt)
+  gen_part_handle_module(
+    part,
+    relationship_type_stmt,
+    path_prefix_stmt,
+    content_type_stmt,
+    target_name_stmt,
+    extension_stmt,
+  )
 }
 
 fn gen_package_module(
   part: &PartModuleDecl,
   relationship_type_stmt: Stmt,
   path_prefix_stmt: Stmt,
+  content_type_stmt: Stmt,
+  target_name_stmt: Stmt,
+  extension_stmt: Stmt,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = package_marker_fields(part)?;
@@ -46,6 +78,9 @@ fn gen_package_module(
   Ok(quote! {
     #relationship_type_stmt
     #path_prefix_stmt
+    #content_type_stmt
+    #target_name_stmt
+    #extension_stmt
     #package_struct
   })
 }
@@ -91,6 +126,9 @@ fn gen_part_handle_module(
   part: &PartModuleDecl,
   relationship_type_stmt: Stmt,
   path_prefix_stmt: Stmt,
+  content_type_stmt: Stmt,
+  target_name_stmt: Stmt,
+  extension_stmt: Stmt,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = part_marker_fields(part)?;
@@ -105,6 +143,9 @@ fn gen_part_handle_module(
   Ok(quote! {
     #relationship_type_stmt
     #path_prefix_stmt
+    #content_type_stmt
+    #target_name_stmt
+    #extension_stmt
     #part_struct
   })
 }
@@ -362,6 +403,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         &mut self,
         part_id: crate::common::PartId,
       ) -> Option<&mut Option<crate::parts::PartRootElement>>;
+
+      fn push_root_element_slot(&mut self);
 
       #[inline]
       fn is_root_element_loaded(&self, part_id: crate::common::PartId) -> bool {

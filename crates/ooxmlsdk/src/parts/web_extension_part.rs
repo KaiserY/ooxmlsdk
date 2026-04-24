@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2011/relationships/webextension";
 pub const PATH_PREFIX: &str = "../webextensions";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-office.webextension+xml";
+pub const TARGET_NAME: &str = "webextension";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebExtensionPart {
   pub(crate) id: crate::common::PartId,

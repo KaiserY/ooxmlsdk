@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
 pub const PATH_PREFIX: &str = "worksheets";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+pub const TARGET_NAME: &str = "sheet";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorksheetPart {
     pub(crate) id: crate::common::PartId,

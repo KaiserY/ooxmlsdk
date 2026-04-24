@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout";
 pub const PATH_PREFIX: &str = "../graphics";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml";
+pub const TARGET_NAME: &str = "layout";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DiagramLayoutDefinitionPart {
   pub(crate) id: crate::common::PartId,

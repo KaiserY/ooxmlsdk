@@ -7,6 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster";
 pub const PATH_PREFIX: &str = "slideMasters";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml";
+pub const TARGET_NAME: &str = "slideMaster";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SlideMasterPart {
     pub(crate) id: crate::common::PartId,

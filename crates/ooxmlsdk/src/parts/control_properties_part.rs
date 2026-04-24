@@ -7,6 +7,9 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp";
 pub const PATH_PREFIX: &str = "../ctrlProps";
+pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.controlproperties+xml";
+pub const TARGET_NAME: &str = "ctrlProp";
+pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ControlPropertiesPart {
   pub(crate) id: crate::common::PartId,

@@ -4,7 +4,6 @@ struct PackageChildInfo {
   attrs: Vec<Attribute>,
   field_ident: Ident,
   part_ty: Type,
-  variant_ident: Ident,
   kind: PartChildKind,
   relationship_type: String,
   main_accessor_ident: Option<Ident>,
@@ -87,7 +86,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     child_infos.push(PackageChildInfo {
       attrs: passthrough_attrs(&field.attrs),
       field_ident: field_ident.clone(),
-      variant_ident: part_ref_variant_ident(&marker.part_ty)?,
       part_ty: marker.part_ty,
       kind: marker.kind,
       relationship_type,
@@ -134,6 +132,30 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     quote! { None }
   };
   let package_relationship_methods = package_relationship_method_tokens(&child_infos);
+  let root_cache_impl = root_elements_ident.map(|root_elements_ident| {
+    quote! {
+      impl crate::parts::PartRootCache for #ident {
+        #[inline]
+        fn root_element(
+          &self,
+          part_id: crate::common::PartId,
+        ) -> Option<&crate::parts::PartRootElement> {
+          self
+            .#root_elements_ident
+            .get(part_id.index())
+            .and_then(Option::as_ref)
+        }
+
+        #[inline]
+        fn root_element_slot_mut(
+          &mut self,
+          part_id: crate::common::PartId,
+        ) -> Option<&mut Option<crate::parts::PartRootElement>> {
+          self.#root_elements_ident.get_mut(part_id.index())
+        }
+      }
+    }
+  });
   let child_field_inits = child_infos.iter().map(|child| {
     let field_ident = &child.field_ident;
     quote! {
@@ -217,27 +239,14 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         })
       }
     }
+
+    #root_cache_impl
   })
 }
 
 fn package_relationship_method_tokens(
   child_infos: &[PackageChildInfo],
 ) -> proc_macro2::TokenStream {
-  let part_ref_branches = child_infos.iter().map(|child| {
-    let attrs = &child.attrs;
-    let part_ty = &child.part_ty;
-    let variant_ident = &child.variant_ident;
-    let relationship_type = &child.relationship_type;
-    quote! {
-      #( #attrs )*
-      if crate::common::relationship_type_matches(relationship_type, #relationship_type) {
-        return Some(crate::parts::PartRef::#variant_ident(
-          <#part_ty as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-        ));
-      }
-    }
-  });
-
   let accessors = child_infos
     .iter()
     .filter(|child| child.main_accessor_ident.is_none())
@@ -281,50 +290,36 @@ fn package_relationship_method_tokens(
     });
 
   quote! {
+    #[inline]
     pub fn parts(&self) -> impl Iterator<Item = crate::parts::IdPartPair<'_>> + '_ {
-      self
-        .relationships()
-        .iter()
-        .filter_map(|relationship| {
-          let part = Self::part_ref_from_relationship(relationship)?;
-          Some(crate::parts::IdPartPair::new(relationship.id(), part))
-        })
+      crate::sdk::SdkPackage::parts(self)
     }
 
+    #[inline]
     pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
-      let relationship = self.relationships().get(relationship_id)?;
-      Self::part_ref_from_relationship(relationship)
+      crate::sdk::SdkPackage::get_part_by_id(self, relationship_id)
     }
 
     #[inline]
     pub fn try_get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
-      self.get_part_by_id(relationship_id)
+      crate::sdk::SdkPackage::try_get_part_by_id(self, relationship_id)
     }
 
+    #[inline]
     pub fn get_parts_of_type<T: crate::sdk::SdkPartHandle + 'static>(
       &self,
     ) -> impl Iterator<Item = T> + '_ {
-      self.parts().filter_map(|entry| entry.part.downcast::<T>())
+      crate::sdk::SdkPackage::get_parts_of_type(self)
     }
 
+    #[inline]
     pub fn get_sub_part_of_type<T: crate::sdk::SdkPartHandle + 'static>(&self) -> Option<T> {
-      self.get_parts_of_type::<T>().next()
+      crate::sdk::SdkPackage::get_sub_part_of_type(self)
     }
 
+    #[inline]
     pub fn get_id_of_part<T: crate::sdk::SdkPartHandle>(&self, part: T) -> Option<&str> {
-      let target_part_id = part.part_id();
-      self.relationships().iter().find_map(|relationship| {
-        (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
-      })
-    }
-
-    fn part_ref_from_relationship(
-      relationship: &crate::common::RelationshipInfo,
-    ) -> Option<crate::parts::PartRef> {
-      let part_id = relationship.target_part_id()?;
-      let relationship_type = relationship.relationship_type();
-      #( #part_ref_branches )*
-      None
+      crate::sdk::SdkPackage::get_id_of_part(self, part)
     }
 
     #( #accessors )*
@@ -374,20 +369,6 @@ fn part_child_kind_from_type(ty: &Type) -> Option<PartChildKind> {
     "RepeatedPartKind" => Some(PartChildKind::Repeated),
     _ => None,
   }
-}
-
-fn part_ref_variant_ident(part_ty: &Type) -> syn::Result<Ident> {
-  let Type::Path(TypePath { path, .. }) = part_ty else {
-    return Err(syn::Error::new_spanned(
-      part_ty,
-      "PartChild marker inner type must be a path",
-    ));
-  };
-  path
-    .segments
-    .last()
-    .map(|segment| segment.ident.clone())
-    .ok_or_else(|| syn::Error::new_spanned(part_ty, "PartChild marker inner type is empty"))
 }
 
 fn parse_package_main_accessor(attrs: &[Attribute]) -> syn::Result<Option<Ident>> {

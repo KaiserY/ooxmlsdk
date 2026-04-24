@@ -166,7 +166,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut root_accessor_methods: Vec<TokenStream> = vec![];
   let mut root_from_part_id_branches: Vec<TokenStream> = vec![];
   let mut root_to_xml_arms: Vec<TokenStream> = vec![];
-  let mut package_root_cache_impls: Vec<TokenStream> = vec![];
 
   for part in parts {
     let mod_ident: Ident = parse_str(&part.module_name)?;
@@ -181,27 +180,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       pub mod #mod_ident;
     })?);
     if is_package_part(part) {
-      let package_ident: Ident = parse_str(&part.struct_name)?;
-      package_root_cache_impls.push(quote! {
-        #( #part_attrs )*
-        impl crate::parts::PartRootCache for crate::parts::#mod_ident::#package_ident {
-          #[inline]
-          fn root_element(
-            &self,
-            part_id: crate::common::PartId,
-          ) -> Option<&crate::parts::PartRootElement> {
-            self.root_elements.get(part_id.index()).and_then(Option::as_ref)
-          }
-
-          #[inline]
-          fn root_element_slot_mut(
-            &mut self,
-            part_id: crate::common::PartId,
-          ) -> Option<&mut Option<crate::parts::PartRootElement>> {
-            self.root_elements.get_mut(part_id.index())
-          }
-        }
-      });
       continue;
     }
 
@@ -389,8 +367,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         self.root_element_slot_mut(part_id)?.take()
       }
     }
-
-    #( #package_root_cache_impls )*
 
     pub fn save_package<P, W>(
       package: &P,
@@ -626,6 +602,6 @@ mod tests {
     assert!(rendered.contains("pub mod wordprocessing_document"));
     assert!(!rendered.contains("WordprocessingDocument (& 'a"));
     assert!(rendered.contains("MainDocumentPart (crate :: parts"));
-    assert!(rendered.contains("impl crate :: parts :: PartRootCache"));
+    assert!(!rendered.contains("impl crate :: parts :: PartRootCache"));
   }
 }

@@ -5633,54 +5633,6 @@ pub trait PartRootCache: crate::sdk::SdkPackage {
     self.root_element_slot_mut(part_id)?.take()
   }
 }
-impl crate::parts::PartRootCache for crate::parts::presentation_document::PresentationDocument {
-  #[inline]
-  fn root_element(&self, part_id: crate::common::PartId) -> Option<&crate::parts::PartRootElement> {
-    self
-      .root_elements
-      .get(part_id.index())
-      .and_then(Option::as_ref)
-  }
-  #[inline]
-  fn root_element_slot_mut(
-    &mut self,
-    part_id: crate::common::PartId,
-  ) -> Option<&mut Option<crate::parts::PartRootElement>> {
-    self.root_elements.get_mut(part_id.index())
-  }
-}
-impl crate::parts::PartRootCache for crate::parts::spreadsheet_document::SpreadsheetDocument {
-  #[inline]
-  fn root_element(&self, part_id: crate::common::PartId) -> Option<&crate::parts::PartRootElement> {
-    self
-      .root_elements
-      .get(part_id.index())
-      .and_then(Option::as_ref)
-  }
-  #[inline]
-  fn root_element_slot_mut(
-    &mut self,
-    part_id: crate::common::PartId,
-  ) -> Option<&mut Option<crate::parts::PartRootElement>> {
-    self.root_elements.get_mut(part_id.index())
-  }
-}
-impl crate::parts::PartRootCache for crate::parts::wordprocessing_document::WordprocessingDocument {
-  #[inline]
-  fn root_element(&self, part_id: crate::common::PartId) -> Option<&crate::parts::PartRootElement> {
-    self
-      .root_elements
-      .get(part_id.index())
-      .and_then(Option::as_ref)
-  }
-  #[inline]
-  fn root_element_slot_mut(
-    &mut self,
-    part_id: crate::common::PartId,
-  ) -> Option<&mut Option<crate::parts::PartRootElement>> {
-    self.root_elements.get_mut(part_id.index())
-  }
-}
 pub fn save_package<P, W>(package: &P, writer: W) -> Result<(), crate::common::SdkError>
 where
   P: crate::parts::PartRootCache,

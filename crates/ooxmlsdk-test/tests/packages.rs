@@ -1,12 +1,13 @@
 #![cfg(feature = "parts")]
 
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, header_part::HeaderPart, image_part::ImagePart,
   main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
+  ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
+  style_definitions_part::StyleDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -38,6 +39,24 @@ fn empty_body_document() -> Document {
     body: Some(Box::new(Body::default())),
     ..Default::default()
   }
+}
+
+fn empty_package() -> Cursor<Vec<u8>> {
+  let mut buffer = Cursor::new(Vec::new());
+  {
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file("[Content_Types].xml", options).unwrap();
+    zip
+      .write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#,
+      )
+      .unwrap();
+    zip.finish().unwrap();
+  }
+  buffer.set_position(0);
+  buffer
 }
 
 #[test]
@@ -597,6 +616,69 @@ fn add_new_part_auto_id_skips_existing_relationship_ids() {
     main_part.relationships(&package).unwrap().len(),
     relationship_count + 1
   );
+}
+
+#[test]
+fn package_add_new_part_creates_package_relationship() {
+  // Source: upstream WordprocessingDocument.AddNewPart<T>() package-level coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let relationship_id = "rIdSdkRibbon";
+
+  let ribbon_part = package
+    .add_new_part::<RibbonExtensibilityPart>(relationship_id)
+    .unwrap();
+  assert_eq!(package.get_id_of_part(ribbon_part), Some(relationship_id));
+  assert_eq!(ribbon_part.path(&package), Some("customUI/customUI1.xml"));
+  assert_eq!(ribbon_part.content_type(&package), Some("application/xml"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_part = reopened
+    .get_part_by_id(relationship_id)
+    .and_then(PartRef::downcast::<RibbonExtensibilityPart>)
+    .unwrap();
+  assert_eq!(
+    reopened_part.path(&reopened),
+    Some("customUI/customUI1.xml")
+  );
+}
+
+#[test]
+fn add_main_document_part_creates_fixed_main_part_path() {
+  // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  assert!(package.main_document_part().is_err());
+
+  let main_part = package.add_main_document_part().unwrap();
+  assert_eq!(main_part.path(&package), Some("word/document.xml"));
+  assert_eq!(
+    main_part.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml")
+  );
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  assert_eq!(reopened_main.path(&reopened), Some("word/document.xml"));
+  assert_eq!(
+    main_document_body_child_count(reopened_main.root_element(&mut reopened).unwrap()),
+    0
+  );
+}
+
+#[test]
+fn add_main_document_part_errors_when_main_part_exists() {
+  // Source: upstream AddMainDocumentPart duplicate-main-part exception coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+
+  assert!(package.add_main_document_part().is_err());
 }
 
 #[test]

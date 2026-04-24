@@ -24,7 +24,7 @@ pub use error::{
 pub use extended_part::ExtendedPart;
 #[cfg(feature = "parts")]
 pub use package::{
-  NewPartDescriptor, PackageOpenMode, PartId, RelationshipInfo, RelationshipSet,
+  NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, RelationshipInfo, RelationshipSet,
   RelationshipTargetKind, SdkPackageStorage, StoredPart, StoredPartData, StoredPartDataKind,
 };
 #[cfg(feature = "parts")]

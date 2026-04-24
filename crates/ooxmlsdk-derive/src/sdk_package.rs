@@ -107,6 +107,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let field_ident = &child.field_ident;
     let part_ty = &child.part_ty;
     let accessor_ident = child.main_accessor_ident.as_ref().unwrap();
+    let add_accessor_ident: Ident =
+      parse_str(&format!("add_{accessor_ident}")).expect("main part add accessor identifier");
     quote! {
       #( #attrs )*
       pub fn #accessor_ident(&self) -> Result<#part_ty, crate::common::SdkError> {
@@ -119,6 +121,25 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
               concat!("missing main part for ", stringify!(#ident)).to_string(),
             )
           })
+      }
+
+      #( #attrs )*
+      pub fn #add_accessor_ident(&mut self) -> Result<#part_ty, crate::common::SdkError> {
+        let _ = self.#field_ident;
+        if self.#main_part_id_ident.is_some() {
+          return Err(crate::common::SdkError::CommonError(
+            concat!("main part already exists for ", stringify!(#ident)).to_string(),
+          ));
+        }
+
+        let relationship_id = self.relationships().next_relationship_id();
+        let part = crate::sdk::SdkPackage::add_new_part_with_target_mode::<#part_ty>(
+          self,
+          relationship_id,
+          crate::common::NewPartTargetMode::Fixed,
+        )?;
+        self.#main_part_id_ident = Some(part.part_id());
+        Ok(part)
       }
     }
   });
@@ -289,6 +310,27 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         relationship_type: &str,
       ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
         crate::sdk::SdkPackage::relationships_by_type(self, relationship_type)
+      }
+
+      #[inline]
+      pub fn add_new_part<T: crate::sdk::SdkPartHandle>(
+        &mut self,
+        relationship_id: impl Into<String>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_new_part(self, relationship_id)
+      }
+
+      #[inline]
+      pub fn add_new_part_auto_id<T: crate::sdk::SdkPartHandle>(
+        &mut self,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_new_part_auto_id(self)
       }
 
       pub fn save<W: std::io::Write + std::io::Seek>(

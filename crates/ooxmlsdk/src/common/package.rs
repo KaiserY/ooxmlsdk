@@ -47,6 +47,13 @@ pub struct NewPartDescriptor {
   pub extension: &'static str,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum NewPartTargetMode {
+  Fixed,
+  #[default]
+  Indexed,
+}
+
 #[derive(Clone, Debug)]
 pub enum StoredPartData {
   Raw {
@@ -644,6 +651,50 @@ impl SdkPackageStorage {
     Ok(part_id)
   }
 
+  pub fn add_package_part(
+    &mut self,
+    relationship_id: impl Into<String>,
+    descriptor: NewPartDescriptor,
+    target_mode: NewPartTargetMode,
+  ) -> Result<PartId, SdkError> {
+    if descriptor.relationship_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty relationship type".to_string(),
+      ));
+    }
+    if descriptor.content_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty content type".to_string(),
+      ));
+    }
+    if descriptor.target_name.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty target name".to_string(),
+      ));
+    }
+
+    let relationship_id = relationship_id.into();
+    if self.package_relationships.contains_id(&relationship_id) {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {relationship_id} already exists"
+      )));
+    }
+
+    let part_path = self.package_part_path(descriptor, target_mode)?;
+    let part_id = self.push_part(
+      part_path.clone(),
+      descriptor.content_type,
+      Some(descriptor.relationship_type),
+    );
+    self.package_relationships.add_internal_part_relationship(
+      relationship_id,
+      descriptor.relationship_type,
+      part_path,
+      part_id,
+    )?;
+    Ok(part_id)
+  }
+
   fn push_part(
     &mut self,
     path: String,
@@ -718,6 +769,45 @@ impl SdkPackageStorage {
 
     unreachable!("usize iteration should always find a free part path")
   }
+
+  fn package_part_path(
+    &self,
+    descriptor: NewPartDescriptor,
+    target_mode: NewPartTargetMode,
+  ) -> Result<String, SdkError> {
+    let directory_path = package_part_directory_path(descriptor.path_prefix);
+    let extension = normalized_part_extension(descriptor.extension);
+
+    if matches!(target_mode, NewPartTargetMode::Fixed) {
+      let path = if directory_path.is_empty() {
+        format!("{}{}", descriptor.target_name, extension)
+      } else {
+        format!("{directory_path}{}{}", descriptor.target_name, extension)
+      };
+      if self.by_path.contains_key(path.as_str()) {
+        return Err(SdkError::CommonError(format!(
+          "part path {path} already exists"
+        )));
+      }
+      return Ok(path);
+    }
+
+    for index in 1.. {
+      let path = if directory_path.is_empty() {
+        format!("{}{index}{}", descriptor.target_name, extension)
+      } else {
+        format!(
+          "{directory_path}{}{index}{}",
+          descriptor.target_name, extension
+        )
+      };
+      if !self.by_path.contains_key(path.as_str()) {
+        return Ok(path);
+      }
+    }
+
+    unreachable!("usize iteration should always find a free part path")
+  }
 }
 
 struct RawPart {
@@ -745,6 +835,32 @@ fn child_part_directory_path(source_part_path: &str, path_prefix: &str) -> Strin
     path.push('/');
   }
   path
+}
+
+fn package_part_directory_path(path_prefix: &str) -> String {
+  if path_prefix.is_empty() || path_prefix == "." {
+    return String::new();
+  }
+
+  let mut path = resolve_zip_file_path(path_prefix);
+  if !path.is_empty() && !path.ends_with('/') {
+    path.push('/');
+  }
+  path
+}
+
+fn normalized_part_extension(extension: &str) -> String {
+  let extension = if extension.is_empty() {
+    ".xml"
+  } else {
+    extension
+  };
+
+  if extension.starts_with('.') {
+    extension.to_string()
+  } else {
+    format!(".{extension}")
+  }
 }
 
 fn relationship_target_from_source(source_part_path: &str, child_part_path: &str) -> String {

@@ -158,7 +158,7 @@ pub fn build_part_codegen_ir(part: &Part, all_parts: &[Part]) -> PartModuleDecl 
   PartModuleDecl {
     module_name: part.module_name.clone(),
     struct_name: part.name.clone(),
-    content_type: part.content_type.clone(),
+    content_type: part_content_type(part),
     relationship_type: part.relationship_type.clone(),
     path_prefix: part.paths.general.clone(),
     target_name: part.target.clone(),
@@ -173,6 +173,26 @@ pub fn build_part_codegen_ir(part: &Part, all_parts: &[Part]) -> PartModuleDecl 
     version: part.version.clone(),
     features: part.features.clone(),
     fields,
+  }
+}
+
+fn part_content_type(part: &Part) -> String {
+  if !part.content_type.is_empty() {
+    return part.content_type.clone();
+  }
+
+  match part.name.as_str() {
+    "MainDocumentPart" => {
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".to_string()
+    }
+    "WorkbookPart" => {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".to_string()
+    }
+    "PresentationPart" => {
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+        .to_string()
+    }
+    _ => String::new(),
   }
 }
 

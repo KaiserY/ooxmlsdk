@@ -311,6 +311,56 @@ pub trait SdkPackage {
       (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
     })
   }
+
+  #[inline]
+  fn add_new_part<T>(
+    &mut self,
+    relationship_id: impl Into<String>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    self.add_new_part_with_target_mode::<T>(
+      relationship_id,
+      crate::common::NewPartTargetMode::Indexed,
+    )
+  }
+
+  #[inline]
+  fn add_new_part_auto_id<T>(&mut self) -> Result<T, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_new_part::<T>(relationship_id)
+  }
+
+  #[inline]
+  fn add_new_part_with_target_mode<T>(
+    &mut self,
+    relationship_id: impl Into<String>,
+    target_mode: crate::common::NewPartTargetMode,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let part_id = self.storage_mut().add_package_part(
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: T::RELATIONSHIP_TYPE,
+        content_type: T::CONTENT_TYPE,
+        path_prefix: T::PATH_PREFIX,
+        target_name: T::TARGET_NAME,
+        extension: T::EXTENSION,
+      },
+      target_mode,
+    )?;
+    self.push_root_element_slot();
+    Ok(T::from_part_id(part_id))
+  }
 }
 
 #[cfg(feature = "parts")]

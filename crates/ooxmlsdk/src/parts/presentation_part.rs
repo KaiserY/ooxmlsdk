@@ -7,7 +7,8 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 pub const PATH_PREFIX: &str = "ppt";
-pub const CONTENT_TYPE: &str = "";
+pub const CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
 pub const TARGET_NAME: &str = "presentation";
 pub const EXTENSION: &str = "";
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]

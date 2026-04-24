@@ -5762,7 +5762,12 @@ impl PartRootElement {
       .map(PartRootElement::MacroSheetPart)
       .map(Some);
     }
-    if !matches!("", "" | "application/xml" | "text/xml") && part.content_type() == "" {
+    if !matches!(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+      "" | "application/xml" | "text/xml"
+    ) && part.content_type()
+      == "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    {
       return crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document::from_bytes(
                     part.data().bytes(),
                 )
@@ -5887,7 +5892,12 @@ impl PartRootElement {
                 .map(PartRootElement::PowerPointCommentPart)
                 .map(Some);
     }
-    if !matches!("", "" | "application/xml" | "text/xml") && part.content_type() == "" {
+    if !matches!(
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+      "" | "application/xml" | "text/xml"
+    ) && part.content_type()
+      == "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+    {
       return crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation::from_bytes(
                     part.data().bytes(),
                 )
@@ -6414,7 +6424,12 @@ impl PartRootElement {
       .map(PartRootElement::WordprocessingPeoplePart)
       .map(Some);
     }
-    if !matches!("", "" | "application/xml" | "text/xml") && part.content_type() == "" {
+    if !matches!(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "" | "application/xml" | "text/xml"
+    ) && part.content_type()
+      == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+    {
       return crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook::from_bytes(
                     part.data().bytes(),
                 )

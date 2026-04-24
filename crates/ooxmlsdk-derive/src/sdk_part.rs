@@ -1041,6 +1041,43 @@ fn expand_part_handle(
       pub fn data<P: crate::sdk::SdkPackage>(self, package: &P) -> Option<&[u8]> {
         <Self as crate::sdk::SdkPartHandle>::data(self, package)
       }
+
+      #[inline]
+      pub fn external_relationships<P: crate::sdk::SdkPackage>(
+        self,
+        package: &P,
+      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::external_relationships(self, package)
+      }
+
+      #[inline]
+      pub fn hyperlink_relationships<P: crate::sdk::SdkPackage>(
+        self,
+        package: &P,
+      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::hyperlink_relationships(self, package)
+      }
+
+      #[inline]
+      pub fn data_part_reference_relationships<P: crate::sdk::SdkPackage>(
+        self,
+        package: &P,
+      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::data_part_reference_relationships(self, package)
+      }
+
+      #[inline]
+      pub fn relationships_by_type<'a, P: crate::sdk::SdkPackage>(
+        self,
+        package: &'a P,
+        relationship_type: &'a str,
+      ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::relationships_by_type(
+          self,
+          package,
+          relationship_type,
+        )
+      }
     }
 
     #root_method
@@ -1120,6 +1157,7 @@ fn part_handle_child_methods_tokens(
 
   let accessors = child_infos.iter().map(|child| {
     let method_ident = &child.field_ident;
+    let relationship_method_ident = relationship_accessor_ident(method_ident);
     let part_ty = &child.part_ty;
     let relationship_type = &child.relationship_type;
     let map_relationship = quote! {
@@ -1139,10 +1177,19 @@ fn part_handle_child_methods_tokens(
 
     match child.kind {
       PartChildKind::Repeated => quote! {
+        pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
+          self,
+          package: &'a P,
+        ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
+          let _ = self.#method_ident;
+          self.relationships_by_type(package, #relationship_type)
+        }
+
         pub fn #method_ident<'a, P: crate::sdk::SdkPackage>(
           self,
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
+          let _ = self.#method_ident;
           self
             .relationships(package)
             .into_iter()
@@ -1151,10 +1198,19 @@ fn part_handle_child_methods_tokens(
         }
       },
       PartChildKind::Required | PartChildKind::Optional => quote! {
+        pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
+          self,
+          package: &'a P,
+        ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
+          let _ = self.#method_ident;
+          self.relationships_by_type(package, #relationship_type)
+        }
+
         pub fn #method_ident<P: crate::sdk::SdkPackage>(
           self,
           package: &P,
         ) -> Option<#part_ty> {
+          let _ = self.#method_ident;
           self
             .relationships(package)
             .into_iter()
@@ -1254,6 +1310,13 @@ fn part_handle_child_methods_tokens(
       #( #accessors )*
     }
   }
+}
+
+fn relationship_accessor_ident(field_ident: &Ident) -> Ident {
+  Ident::new(
+    &format!("{}_relationships", field_ident),
+    field_ident.span(),
+  )
 }
 
 fn marker_inner_type(ty: &Type, marker: &str) -> Option<Type> {

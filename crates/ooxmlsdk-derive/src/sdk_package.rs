@@ -212,6 +212,31 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         self.#storage_ident.package_relationships()
       }
 
+      #[inline]
+      pub fn external_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::external_relationships(self)
+      }
+
+      #[inline]
+      pub fn hyperlink_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::hyperlink_relationships(self)
+      }
+
+      #[inline]
+      pub fn data_part_reference_relationships(
+        &self,
+      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::data_part_reference_relationships(self)
+      }
+
+      #[inline]
+      pub fn relationships_by_type(
+        &self,
+        relationship_type: &str,
+      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::relationships_by_type(self, relationship_type)
+      }
+
       pub fn save<W: std::io::Write + std::io::Seek>(
         &self,
         writer: W,
@@ -254,6 +279,7 @@ fn package_relationship_method_tokens(
       let attrs = &child.attrs;
       let field_ident = &child.field_ident;
       let method_ident = &child.field_ident;
+      let relationship_method_ident = relationship_accessor_ident(method_ident);
       let part_ty = &child.part_ty;
       let relationship_type = &child.relationship_type;
       let map_relationship = quote! {
@@ -274,12 +300,28 @@ fn package_relationship_method_tokens(
       match child.kind {
         PartChildKind::Repeated => quote! {
           #( #attrs )*
+          pub fn #relationship_method_ident(
+            &self,
+          ) -> impl Iterator<Item = &crate::common::RelationshipInfo> + '_ {
+            let _ = self.#field_ident;
+            self.relationships_by_type(#relationship_type)
+          }
+
+          #( #attrs )*
           pub fn #method_ident(&self) -> impl Iterator<Item = #part_ty> + '_ {
             let _ = self.#field_ident;
             self.relationships().iter().filter_map(#map_relationship)
           }
         },
         PartChildKind::Required | PartChildKind::Optional => quote! {
+          #( #attrs )*
+          pub fn #relationship_method_ident(
+            &self,
+          ) -> impl Iterator<Item = &crate::common::RelationshipInfo> + '_ {
+            let _ = self.#field_ident;
+            self.relationships_by_type(#relationship_type)
+          }
+
           #( #attrs )*
           pub fn #method_ident(&self) -> Option<#part_ty> {
             let _ = self.#field_ident;
@@ -324,6 +366,13 @@ fn package_relationship_method_tokens(
 
     #( #accessors )*
   }
+}
+
+fn relationship_accessor_ident(field_ident: &Ident) -> Ident {
+  Ident::new(
+    &format!("{}_relationships", field_ident),
+    field_ident.span(),
+  )
 }
 
 fn part_child_marker_info(ty: &Type) -> Option<PartChildMarkerInfo> {

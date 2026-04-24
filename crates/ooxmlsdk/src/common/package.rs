@@ -128,6 +128,15 @@ pub struct RelationshipSet {
 }
 
 impl RelationshipSet {
+  pub const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+  pub const AUDIO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
+  pub const MEDIA_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.microsoft.com/office/2007/relationships/media";
+  pub const VIDEO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
+
   #[inline]
   pub fn is_empty(&self) -> bool {
     self.relationships.is_empty()
@@ -149,6 +158,61 @@ impl RelationshipSet {
       .by_id
       .get(relationship_id)
       .and_then(|index| self.relationships.get(*index))
+  }
+
+  #[inline]
+  pub fn contains_id(&self, relationship_id: &str) -> bool {
+    self.by_id.contains_key(relationship_id)
+  }
+
+  #[inline]
+  pub fn by_relationship_type(
+    &self,
+    relationship_type: &str,
+  ) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter().filter(move |relationship| {
+      super::relationship_type_matches(relationship.relationship_type(), relationship_type)
+    })
+  }
+
+  #[inline]
+  pub fn part_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self
+      .relationships
+      .iter()
+      .filter(|relationship| relationship.target_kind() == RelationshipTargetKind::InternalPart)
+  }
+
+  #[inline]
+  pub fn external_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter().filter(|relationship| {
+      relationship.target_kind() == RelationshipTargetKind::External
+        && !super::relationship_type_matches(
+          relationship.relationship_type(),
+          Self::HYPERLINK_RELATIONSHIP_TYPE,
+        )
+    })
+  }
+
+  #[inline]
+  pub fn hyperlink_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.by_relationship_type(Self::HYPERLINK_RELATIONSHIP_TYPE)
+  }
+
+  #[inline]
+  pub fn data_part_reference_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter().filter(|relationship| {
+      super::relationship_type_matches(
+        relationship.relationship_type(),
+        Self::AUDIO_REFERENCE_RELATIONSHIP_TYPE,
+      ) || super::relationship_type_matches(
+        relationship.relationship_type(),
+        Self::MEDIA_REFERENCE_RELATIONSHIP_TYPE,
+      ) || super::relationship_type_matches(
+        relationship.relationship_type(),
+        Self::VIDEO_REFERENCE_RELATIONSHIP_TYPE,
+      )
+    })
   }
 
   #[inline]

@@ -11,7 +11,7 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
-use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
+use ooxmlsdk::sdk::SdkPackage;
 use ooxmlsdk_test::fixtures;
 
 fn doc_sample(file_name: &str) -> std::path::PathBuf {
@@ -79,16 +79,15 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   assert_eq!(
     main_part.get_id_of_part(&package, styles_part),
     main_part
-      .relationships(&package)
-      .unwrap()
-      .iter()
-      .find(|relationship| {
-        ooxmlsdk::common::relationship_type_matches(
-          relationship.relationship_type(),
-          StyleDefinitionsPart::RELATIONSHIP_TYPE,
-        )
-      })
+      .style_definitions_part_relationships(&package)
+      .next()
       .map(|relationship| relationship.id())
+  );
+  assert_eq!(
+    main_part
+      .style_definitions_part_relationships(&package)
+      .count(),
+    1
   );
   assert_eq!(
     main_part
@@ -188,6 +187,12 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
   let presentation_part = package.presentation_part().unwrap();
   let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
   assert_eq!(slides.len(), 2);
+  assert!(
+    presentation_part
+      .slide_parts_relationships(&package)
+      .count()
+      >= 2
+  );
 
   let media_part = package
     .storage()
@@ -203,21 +208,21 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
   let mut internal_media_reference_count = 0;
   let mut external_null_audio_reference_count = 0;
   for slide in slides {
-    let relationships = slide.relationships(&package).unwrap();
-    for relationship in relationships.iter() {
+    for relationship in slide.data_part_reference_relationships(&package) {
+      if relationship.target_part_id() == Some(media_part.0) {
+        internal_media_reference_count += 1;
+      } else {
+        assert_eq!(relationship.target(), "NULL");
+        assert!(matches!(relationship.target_mode(), TargetMode::External));
+        assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
+        external_null_audio_reference_count += 1;
+      }
       match relationship.relationship_type() {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
-        | "http://schemas.microsoft.com/office/2007/relationships/media" => {
-          if relationship.target_part_id() == Some(media_part.0) {
-            internal_media_reference_count += 1;
-          } else {
-            assert_eq!(relationship.target(), "NULL");
-            assert!(matches!(relationship.target_mode(), TargetMode::External));
-            assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
-            external_null_audio_reference_count += 1;
-          }
+        | "http://schemas.microsoft.com/office/2007/relationships/media" => {}
+        other => {
+          panic!("unexpected data part reference relationship type: {other}");
         }
-        _ => {}
       }
     }
   }
@@ -233,15 +238,17 @@ fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test()
   let main_part = package.main_document_part().unwrap();
   let relationships = main_part.relationships(&package).unwrap();
 
-  let hyperlink_relationships: Vec<_> = relationships
-    .iter()
-    .filter(|relationship| {
-      relationship.relationship_type()
-        == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-    })
-    .collect();
+  let hyperlink_relationships: Vec<_> = main_part.hyperlink_relationships(&package).collect();
 
   assert_eq!(hyperlink_relationships.len(), 71);
+  assert_eq!(relationships.hyperlink_relationships().count(), 71);
+  assert!(
+    main_part
+      .external_relationships(&package)
+      .all(|relationship| relationship.relationship_type()
+        != ooxmlsdk::common::RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE)
+  );
+  assert!(relationships.contains_id("rId15"));
 
   let rid15 = relationships.get("rId15").unwrap();
   assert_eq!(rid15.target(), "#_THIS_WEEK_IN");

@@ -173,6 +173,31 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn external_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self.relationships().external_relationships()
+  }
+
+  #[inline]
+  fn hyperlink_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self.relationships().hyperlink_relationships()
+  }
+
+  #[inline]
+  fn data_part_reference_relationships(
+    &self,
+  ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self.relationships().data_part_reference_relationships()
+  }
+
+  #[inline]
+  fn relationships_by_type(
+    &self,
+    relationship_type: &str,
+  ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self.relationships().by_relationship_type(relationship_type)
+  }
+
+  #[inline]
   fn parts(&self) -> impl Iterator<Item = crate::parts::IdPartPair<'_>> + '_
   where
     Self: Sized,
@@ -252,6 +277,51 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   #[inline]
   fn relationships<P: SdkPackage>(self, package: &P) -> Option<&crate::common::RelationshipSet> {
     package.storage().relationships(self.part_id())
+  }
+
+  #[inline]
+  fn external_relationships<P: SdkPackage>(
+    self,
+    package: &P,
+  ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self
+      .relationships(package)
+      .into_iter()
+      .flat_map(crate::common::RelationshipSet::external_relationships)
+  }
+
+  #[inline]
+  fn hyperlink_relationships<P: SdkPackage>(
+    self,
+    package: &P,
+  ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self
+      .relationships(package)
+      .into_iter()
+      .flat_map(crate::common::RelationshipSet::hyperlink_relationships)
+  }
+
+  #[inline]
+  fn data_part_reference_relationships<P: SdkPackage>(
+    self,
+    package: &P,
+  ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+    self
+      .relationships(package)
+      .into_iter()
+      .flat_map(crate::common::RelationshipSet::data_part_reference_relationships)
+  }
+
+  #[inline]
+  fn relationships_by_type<'a, P: SdkPackage>(
+    self,
+    package: &'a P,
+    relationship_type: &'a str,
+  ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> {
+    self
+      .relationships(package)
+      .into_iter()
+      .flat_map(move |relationships| relationships.by_relationship_type(relationship_type))
   }
 
   #[inline]

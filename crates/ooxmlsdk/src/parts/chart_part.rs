@@ -15,40 +15,34 @@ pub struct ChartPart {
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartSpace,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes"
   ))]
   pub(crate) chart_drawing_part:
-    crate::sdk::PartChild<crate::parts::chart_drawing_part::ChartDrawingPart>,
+    crate::sdk::OptionalPart<crate::parts::chart_drawing_part::ChartDrawingPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
   ))]
   pub(crate) embedded_package_part:
-    crate::sdk::PartChild<crate::parts::embedded_package_part::EmbeddedPackagePart>,
+    crate::sdk::OptionalPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride"
   ))]
   pub(crate) theme_override_part:
-    crate::sdk::PartChild<crate::parts::theme_override_part::ThemeOverridePart>,
+    crate::sdk::OptionalPart<crate::parts::theme_override_part::ThemeOverridePart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartStyle"
   ))]
   pub(crate) chart_style_parts:
-    crate::sdk::PartChild<crate::parts::chart_style_part::ChartStylePart>,
+    crate::sdk::RepeatedPart<crate::parts::chart_style_part::ChartStylePart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle"
   ))]
   pub(crate) chart_color_style_parts:
-    crate::sdk::PartChild<crate::parts::chart_color_style_part::ChartColorStylePart>,
+    crate::sdk::RepeatedPart<crate::parts::chart_color_style_part::ChartColorStylePart>,
 }

@@ -16,9 +16,8 @@ pub struct CustomDataPropertiesPart {
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData"
   ))]
   pub(crate) custom_data_part:
-    crate::sdk::PartChild<crate::parts::custom_data_part::CustomDataPart>,
+    crate::sdk::OptionalPart<crate::parts::custom_data_part::CustomDataPart>,
 }

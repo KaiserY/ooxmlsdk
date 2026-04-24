@@ -15,9 +15,9 @@ pub struct PivotTableCacheDefinitionPart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheDefinition,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords"
   ))]
-  pub(crate) pivot_table_cache_records_part:
-    crate::sdk::PartChild<crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart>,
+  pub(crate) pivot_table_cache_records_part: crate::sdk::OptionalPart<
+    crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
+  >,
 }

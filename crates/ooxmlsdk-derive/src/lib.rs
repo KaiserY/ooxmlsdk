@@ -551,6 +551,37 @@ fn parse_part_child_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildAtt
   Ok(None)
 }
 
+fn parse_part_child_relationship_type_attr(attrs: &[Attribute]) -> syn::Result<Option<String>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::List(meta) = meta
+        && meta.path.is_ident("part_child")
+      {
+        let mut relationship_type = None;
+        meta.parse_nested_meta(|nested| {
+          if nested.path.is_ident("relationship_type") {
+            let value: LitStr = nested.value()?.parse()?;
+            relationship_type = Some(value.value());
+            Ok(())
+          } else if nested.path.is_ident("kind") {
+            let _value: LitStr = nested.value()?.parse()?;
+            Ok(())
+          } else {
+            Err(nested.error("unsupported sdk part_child attribute"))
+          }
+        })?;
+        return Ok(relationship_type);
+      }
+    }
+  }
+  Ok(None)
+}
+
 fn parse_part_data_ref_attr(attrs: &[Attribute]) -> syn::Result<Option<PartDataRefAttr>> {
   for attr in attrs {
     if !attr.path().is_ident("sdk") {

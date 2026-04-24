@@ -15,204 +15,175 @@ pub struct GlossaryDocumentPart {
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::GlossaryDocument,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments"
   ))]
-  pub(crate) wordprocessing_comments_part:
-    crate::sdk::PartChild<crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart>,
+  pub(crate) wordprocessing_comments_part: crate::sdk::OptionalPart<
+    crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart,
+  >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings"
   ))]
   pub(crate) document_settings_part:
-    crate::sdk::PartChild<crate::parts::document_settings_part::DocumentSettingsPart>,
+    crate::sdk::OptionalPart<crate::parts::document_settings_part::DocumentSettingsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
   ))]
-  pub(crate) endnotes_part: crate::sdk::PartChild<crate::parts::endnotes_part::EndnotesPart>,
+  pub(crate) endnotes_part: crate::sdk::OptionalPart<crate::parts::endnotes_part::EndnotesPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable"
   ))]
-  pub(crate) font_table_part: crate::sdk::PartChild<crate::parts::font_table_part::FontTablePart>,
+  pub(crate) font_table_part:
+    crate::sdk::OptionalPart<crate::parts::font_table_part::FontTablePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
   ))]
-  pub(crate) footnotes_part: crate::sdk::PartChild<crate::parts::footnotes_part::FootnotesPart>,
+  pub(crate) footnotes_part: crate::sdk::OptionalPart<crate::parts::footnotes_part::FootnotesPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering"
   ))]
   pub(crate) numbering_definitions_part:
-    crate::sdk::PartChild<crate::parts::numbering_definitions_part::NumberingDefinitionsPart>,
+    crate::sdk::OptionalPart<crate::parts::numbering_definitions_part::NumberingDefinitionsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
   ))]
   pub(crate) style_definitions_part:
-    crate::sdk::PartChild<crate::parts::style_definitions_part::StyleDefinitionsPart>,
+    crate::sdk::OptionalPart<crate::parts::style_definitions_part::StyleDefinitionsPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects"
   ))]
   pub(crate) styles_with_effects_part:
-    crate::sdk::PartChild<crate::parts::styles_with_effects_part::StylesWithEffectsPart>,
+    crate::sdk::OptionalPart<crate::parts::styles_with_effects_part::StylesWithEffectsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings"
   ))]
   pub(crate) web_settings_part:
-    crate::sdk::PartChild<crate::parts::web_settings_part::WebSettingsPart>,
+    crate::sdk::OptionalPart<crate::parts::web_settings_part::WebSettingsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer"
   ))]
-  pub(crate) footer_parts: crate::sdk::PartChild<crate::parts::footer_part::FooterPart>,
+  pub(crate) footer_parts: crate::sdk::RepeatedPart<crate::parts::footer_part::FooterPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
   ))]
-  pub(crate) header_parts: crate::sdk::PartChild<crate::parts::header_part::HeaderPart>,
+  pub(crate) header_parts: crate::sdk::RepeatedPart<crate::parts::header_part::HeaderPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings"
   ))]
-  pub(crate) wordprocessing_printer_settings_parts: crate::sdk::PartChild<
+  pub(crate) wordprocessing_printer_settings_parts: crate::sdk::RepeatedPart<
     crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations"
   ))]
   pub(crate) customization_part:
-    crate::sdk::PartChild<crate::parts::customization_part::CustomizationPart>,
+    crate::sdk::OptionalPart<crate::parts::customization_part::CustomizationPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
   ))]
   pub(crate) vba_project_part:
-    crate::sdk::PartChild<crate::parts::vba_project_part::VbaProjectPart>,
+    crate::sdk::OptionalPart<crate::parts::vba_project_part::VbaProjectPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/commentsExtended"
   ))]
-  pub(crate) wordprocessing_comments_ex_part: crate::sdk::PartChild<
+  pub(crate) wordprocessing_comments_ex_part: crate::sdk::OptionalPart<
     crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart,
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/people",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/people"
   ))]
   pub(crate) wordprocessing_people_part:
-    crate::sdk::PartChild<crate::parts::wordprocessing_people_part::WordprocessingPeoplePart>,
+    crate::sdk::OptionalPart<crate::parts::wordprocessing_people_part::WordprocessingPeoplePart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds"
   ))]
-  pub(crate) wordprocessing_comments_ids_part: crate::sdk::PartChild<
+  pub(crate) wordprocessing_comments_ids_part: crate::sdk::OptionalPart<
     crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart,
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks"
   ))]
   pub(crate) document_tasks_part:
-    crate::sdk::PartChild<crate::parts::document_tasks_part::DocumentTasksPart>,
+    crate::sdk::OptionalPart<crate::parts::document_tasks_part::DocumentTasksPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible"
   ))]
-  pub(crate) word_comments_extensible_part:
-    crate::sdk::PartChild<crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart>,
+  pub(crate) word_comments_extensible_part: crate::sdk::OptionalPart<
+    crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart,
+  >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk"
   ))]
-  pub(crate) alternative_format_import_parts: crate::sdk::PartChild<
+  pub(crate) alternative_format_import_parts: crate::sdk::RepeatedPart<
     crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart"
   ))]
-  pub(crate) chart_parts: crate::sdk::PartChild<crate::parts::chart_part::ChartPart>,
+  pub(crate) chart_parts: crate::sdk::RepeatedPart<crate::parts::chart_part::ChartPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx"
   ))]
   pub(crate) extended_chart_parts:
-    crate::sdk::PartChild<crate::parts::extended_chart_part::ExtendedChartPart>,
+    crate::sdk::RepeatedPart<crate::parts::extended_chart_part::ExtendedChartPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors"
   ))]
   pub(crate) diagram_colors_parts:
-    crate::sdk::PartChild<crate::parts::diagram_colors_part::DiagramColorsPart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_colors_part::DiagramColorsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData"
   ))]
   pub(crate) diagram_data_parts:
-    crate::sdk::PartChild<crate::parts::diagram_data_part::DiagramDataPart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_data_part::DiagramDataPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"
   ))]
   pub(crate) diagram_persist_layout_parts:
-    crate::sdk::PartChild<crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout"
   ))]
-  pub(crate) diagram_layout_definition_parts: crate::sdk::PartChild<
+  pub(crate) diagram_layout_definition_parts: crate::sdk::RepeatedPart<
     crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle"
   ))]
   pub(crate) diagram_style_parts:
-    crate::sdk::PartChild<crate::parts::diagram_style_part::DiagramStylePart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_style_part::DiagramStylePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control"
   ))]
-  pub(crate) embedded_control_persistence_parts: crate::sdk::PartChild<
+  pub(crate) embedded_control_persistence_parts: crate::sdk::RepeatedPart<
     crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"
   ))]
   pub(crate) embedded_object_parts:
-    crate::sdk::PartChild<crate::parts::embedded_object_part::EmbeddedObjectPart>,
+    crate::sdk::RepeatedPart<crate::parts::embedded_object_part::EmbeddedObjectPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
   ))]
   pub(crate) embedded_package_parts:
-    crate::sdk::PartChild<crate::parts::embedded_package_part::EmbeddedPackagePart>,
+    crate::sdk::RepeatedPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d"
   ))]
-  pub(crate) model3_d_reference_relationship_parts: crate::sdk::PartChild<
+  pub(crate) model3_d_reference_relationship_parts: crate::sdk::RepeatedPart<
     crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
   >,
 }

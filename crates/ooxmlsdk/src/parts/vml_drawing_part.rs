@@ -11,14 +11,12 @@ pub const PATH_PREFIX: &str = "../drawings";
 pub struct VmlDrawingPart {
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText"
   ))]
   pub(crate) legacy_diagram_text_parts:
-    crate::sdk::PartChild<crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>,
+    crate::sdk::RepeatedPart<crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>,
 }

@@ -15,10 +15,9 @@ pub struct PivotTablePart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
-    kind = "required"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition"
   ))]
-  pub(crate) pivot_table_cache_definition_part: crate::sdk::PartChild<
+  pub(crate) pivot_table_cache_definition_part: crate::sdk::RequiredPart<
     crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
   >,
 }

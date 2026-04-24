@@ -11,9 +11,8 @@ pub const PATH_PREFIX: &str = "_xmlsignatures";
 pub struct DigitalSignatureOriginPart {
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
   ))]
   pub(crate) xml_signature_parts:
-    crate::sdk::PartChild<crate::parts::xml_signature_part::XmlSignaturePart>,
+    crate::sdk::RepeatedPart<crate::parts::xml_signature_part::XmlSignaturePart>,
 }

@@ -11,9 +11,8 @@ pub const PATH_PREFIX: &str = "../customXml";
 pub struct CustomXmlPart {
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps"
   ))]
   pub(crate) custom_xml_properties_part:
-    crate::sdk::PartChild<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>,
+    crate::sdk::OptionalPart<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>,
 }

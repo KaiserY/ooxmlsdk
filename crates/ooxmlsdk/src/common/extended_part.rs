@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Seek};
 
 use crate::schemas::opc_relationships::{Relationships, TargetMode};
 
@@ -89,59 +89,6 @@ impl ExtendedPart {
       part_content: std::mem::take(&mut part_content),
       extended_parts,
     })
-  }
-
-  #[allow(dead_code)]
-  pub(crate) fn save_zip<W: Write + Seek>(
-    &self,
-    parent_path: &str,
-    zip: &mut zip::ZipWriter<W>,
-    entry_set: &mut HashSet<String>,
-    visited: &mut HashSet<String>,
-  ) -> Result<(), SdkError> {
-    if !visited.insert(self.inner_path.clone()) {
-      return Ok(());
-    }
-
-    let options = zip::write::SimpleFileOptions::default()
-      .compression_method(zip::CompressionMethod::Deflated)
-      .unix_permissions(0o755);
-
-    let directory_path = super::resolve_zip_file_path(parent_path);
-    if !directory_path.is_empty() && entry_set.insert(directory_path.clone()) {
-      zip.add_directory(&directory_path, options)?;
-    }
-
-    let child_parent_path = super::parent_zip_path(&self.inner_path);
-    let dir_path = child_parent_path
-      .strip_suffix('/')
-      .unwrap_or(&child_parent_path);
-    if !dir_path.is_empty() && entry_set.insert(dir_path.to_string()) {
-      zip.add_directory(dir_path, options)?;
-    }
-
-    if let Some(relationships) = &self.relationships {
-      let rels_dir_path = super::part_relationships_directory_path(&self.inner_path);
-      if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {
-        zip.add_directory(&rels_dir_path, options)?;
-      }
-      if entry_set.insert(self.rels_path.clone()) {
-        zip.start_file(&self.rels_path, options)?;
-        let xml = relationships.to_xml_bytes()?;
-        zip.write_all(&xml)?;
-      }
-    }
-
-    if entry_set.insert(self.inner_path.clone()) {
-      zip.start_file(&self.inner_path, options)?;
-      zip.write_all(&self.part_content)?;
-    }
-
-    for part in &self.extended_parts {
-      part.save_zip(&child_parent_path, zip, entry_set, visited)?;
-    }
-
-    Ok(())
   }
 }
 

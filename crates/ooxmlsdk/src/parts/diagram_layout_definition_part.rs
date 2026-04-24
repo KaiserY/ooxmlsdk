@@ -15,8 +15,7 @@ pub struct DiagramLayoutDefinitionPart {
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::LayoutDefinition,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

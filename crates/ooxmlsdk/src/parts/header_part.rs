@@ -15,86 +15,73 @@ pub struct HeaderPart {
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk"
   ))]
-  pub(crate) alternative_format_import_parts: crate::sdk::PartChild<
+  pub(crate) alternative_format_import_parts: crate::sdk::RepeatedPart<
     crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart"
   ))]
-  pub(crate) chart_parts: crate::sdk::PartChild<crate::parts::chart_part::ChartPart>,
+  pub(crate) chart_parts: crate::sdk::RepeatedPart<crate::parts::chart_part::ChartPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx"
   ))]
   pub(crate) extended_chart_parts:
-    crate::sdk::PartChild<crate::parts::extended_chart_part::ExtendedChartPart>,
+    crate::sdk::RepeatedPart<crate::parts::extended_chart_part::ExtendedChartPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors"
   ))]
   pub(crate) diagram_colors_parts:
-    crate::sdk::PartChild<crate::parts::diagram_colors_part::DiagramColorsPart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_colors_part::DiagramColorsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData"
   ))]
   pub(crate) diagram_data_parts:
-    crate::sdk::PartChild<crate::parts::diagram_data_part::DiagramDataPart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_data_part::DiagramDataPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"
   ))]
   pub(crate) diagram_persist_layout_parts:
-    crate::sdk::PartChild<crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout"
   ))]
-  pub(crate) diagram_layout_definition_parts: crate::sdk::PartChild<
+  pub(crate) diagram_layout_definition_parts: crate::sdk::RepeatedPart<
     crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle"
   ))]
   pub(crate) diagram_style_parts:
-    crate::sdk::PartChild<crate::parts::diagram_style_part::DiagramStylePart>,
+    crate::sdk::RepeatedPart<crate::parts::diagram_style_part::DiagramStylePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control"
   ))]
-  pub(crate) embedded_control_persistence_parts: crate::sdk::PartChild<
+  pub(crate) embedded_control_persistence_parts: crate::sdk::RepeatedPart<
     crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"
   ))]
   pub(crate) embedded_object_parts:
-    crate::sdk::PartChild<crate::parts::embedded_object_part::EmbeddedObjectPart>,
+    crate::sdk::RepeatedPart<crate::parts::embedded_object_part::EmbeddedObjectPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
   ))]
   pub(crate) embedded_package_parts:
-    crate::sdk::PartChild<crate::parts::embedded_package_part::EmbeddedPackagePart>,
+    crate::sdk::RepeatedPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d"
   ))]
-  pub(crate) model3_d_reference_relationship_parts: crate::sdk::PartChild<
+  pub(crate) model3_d_reference_relationship_parts: crate::sdk::RepeatedPart<
     crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
   >,
 }

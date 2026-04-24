@@ -15,9 +15,8 @@ pub struct WorkbookRevisionHeaderPart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog"
   ))]
   pub(crate) workbook_revision_log_parts:
-    crate::sdk::PartChild<crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>,
+    crate::sdk::RepeatedPart<crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>,
 }

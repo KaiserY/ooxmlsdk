@@ -11,8 +11,7 @@ pub const PATH_PREFIX: &str = ".";
 pub struct VbaProjectPart {
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wordVbaData"
   ))]
-  pub(crate) vba_data_part: crate::sdk::PartChild<crate::parts::vba_data_part::VbaDataPart>,
+  pub(crate) vba_data_part: crate::sdk::OptionalPart<crate::parts::vba_data_part::VbaDataPart>,
 }

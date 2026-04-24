@@ -15,14 +15,13 @@ pub struct DocumentSettingsPart {
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Settings,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData"
   ))]
-  pub(crate) mail_merge_recipient_data_part:
-    crate::sdk::PartChild<crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart>,
+  pub(crate) mail_merge_recipient_data_part: crate::sdk::OptionalPart<
+    crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+  >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

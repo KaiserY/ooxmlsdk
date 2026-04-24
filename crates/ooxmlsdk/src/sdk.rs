@@ -6,10 +6,28 @@ pub struct PartDescriptor {
 }
 
 #[cfg(feature = "parts")]
-pub struct PartChild<T>(std::marker::PhantomData<T>);
+pub enum OptionalPartKind {}
 
 #[cfg(feature = "parts")]
-impl<T> PartChild<T> {
+pub enum RequiredPartKind {}
+
+#[cfg(feature = "parts")]
+pub enum RepeatedPartKind {}
+
+#[cfg(feature = "parts")]
+pub struct PartChild<T, C>(std::marker::PhantomData<(T, C)>);
+
+#[cfg(feature = "parts")]
+pub type OptionalPart<T> = PartChild<T, OptionalPartKind>;
+
+#[cfg(feature = "parts")]
+pub type RequiredPart<T> = PartChild<T, RequiredPartKind>;
+
+#[cfg(feature = "parts")]
+pub type RepeatedPart<T> = PartChild<T, RepeatedPartKind>;
+
+#[cfg(feature = "parts")]
+impl<T, C> PartChild<T, C> {
   #[inline]
   pub const fn new() -> Self {
     Self(std::marker::PhantomData)
@@ -17,34 +35,34 @@ impl<T> PartChild<T> {
 }
 
 #[cfg(feature = "parts")]
-impl<T> Clone for PartChild<T> {
+impl<T, C> Clone for PartChild<T, C> {
   fn clone(&self) -> Self {
     *self
   }
 }
 
 #[cfg(feature = "parts")]
-impl<T> Copy for PartChild<T> {}
+impl<T, C> Copy for PartChild<T, C> {}
 
 #[cfg(feature = "parts")]
-impl<T> std::fmt::Debug for PartChild<T> {
+impl<T, C> std::fmt::Debug for PartChild<T, C> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_tuple("PartChild").finish()
   }
 }
 
 #[cfg(feature = "parts")]
-impl<T> Default for PartChild<T> {
+impl<T, C> Default for PartChild<T, C> {
   fn default() -> Self {
     Self::new()
   }
 }
 
 #[cfg(feature = "parts")]
-impl<T> Eq for PartChild<T> {}
+impl<T, C> Eq for PartChild<T, C> {}
 
 #[cfg(feature = "parts")]
-impl<T> PartialEq for PartChild<T> {
+impl<T, C> PartialEq for PartChild<T, C> {
   fn eq(&self, _other: &Self) -> bool {
     true
   }

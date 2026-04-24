@@ -15,9 +15,8 @@ pub struct CustomizationPart {
     crate::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
-    kind = "optional"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars"
   ))]
   pub(crate) word_attached_toolbars_part:
-    crate::sdk::PartChild<crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>,
+    crate::sdk::OptionalPart<crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>,
 }

@@ -15,8 +15,7 @@ pub struct ViewPropertiesPart {
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide"
   ))]
-  pub(crate) slide_parts: crate::sdk::PartChild<crate::parts::slide_part::SlidePart>,
+  pub(crate) slide_parts: crate::sdk::RepeatedPart<crate::parts::slide_part::SlidePart>,
 }

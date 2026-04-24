@@ -16,9 +16,8 @@ pub struct WebExTaskpanesPart {
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension",
-    kind = "repeated"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension"
   ))]
   pub(crate) web_extension_parts:
-    crate::sdk::PartChild<crate::parts::web_extension_part::WebExtensionPart>,
+    crate::sdk::RepeatedPart<crate::parts::web_extension_part::WebExtensionPart>,
 }

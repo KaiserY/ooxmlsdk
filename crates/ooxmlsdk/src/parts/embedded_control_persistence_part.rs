@@ -12,11 +12,10 @@ pub struct EmbeddedControlPersistencePart {
     pub(crate) id: crate::common::PartId,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
-            kind = "repeated"
+            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary"
         )
     )]
-    pub(crate) embedded_control_persistence_binary_data_parts: crate::sdk::PartChild<
+    pub(crate) embedded_control_persistence_binary_data_parts: crate::sdk::RepeatedPart<
         crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
     >,
 }

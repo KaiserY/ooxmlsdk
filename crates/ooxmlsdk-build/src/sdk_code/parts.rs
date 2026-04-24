@@ -69,11 +69,7 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     let attrs = part_field_attrs(field);
     let field_ident: Ident = parse_str(&field.rust_name)?;
     let part_ty: Type = parse_str(&field.rust_type)?;
-    let kind = match cardinality {
-      PartChildCardinality::Optional => "optional",
-      PartChildCardinality::Required => "required",
-      PartChildCardinality::Repeated => "repeated",
-    };
+    let marker_ty = part_child_marker_type(*cardinality, &part_ty);
     let main_attr = if Some(field.rust_name.as_str()) == main_part_accessor {
       let accessor = field.rust_name.as_str();
       quote! { #[sdk(package_main(accessor = #accessor))] }
@@ -83,9 +79,8 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     fields.push(quote! {
       #( #attrs )*
       #main_attr
-      #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
-      #[allow(dead_code)]
-      pub(crate) #field_ident: crate::sdk::PartChild<#part_ty>,
+      #[sdk(part_child(relationship_type = #relationship_type))]
+      pub(crate) #field_ident: #marker_ty,
     });
   }
 
@@ -141,19 +136,23 @@ fn part_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     let attrs = part_field_attrs(field);
     let field_ident: Ident = parse_str(&field.rust_name)?;
     let part_ty: Type = parse_str(&field.rust_type)?;
-    let kind = match cardinality {
-      PartChildCardinality::Optional => "optional",
-      PartChildCardinality::Required => "required",
-      PartChildCardinality::Repeated => "repeated",
-    };
+    let marker_ty = part_child_marker_type(*cardinality, &part_ty);
     fields.push(quote! {
       #( #attrs )*
-      #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
-      pub(crate) #field_ident: crate::sdk::PartChild<#part_ty>,
+      #[sdk(part_child(relationship_type = #relationship_type))]
+      pub(crate) #field_ident: #marker_ty,
     });
   }
 
   Ok(fields)
+}
+
+fn part_child_marker_type(cardinality: PartChildCardinality, part_ty: &Type) -> TokenStream {
+  match cardinality {
+    PartChildCardinality::Optional => quote! { crate::sdk::OptionalPart<#part_ty> },
+    PartChildCardinality::Required => quote! { crate::sdk::RequiredPart<#part_ty> },
+    PartChildCardinality::Repeated => quote! { crate::sdk::RepeatedPart<#part_ty> },
+  }
 }
 
 pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
@@ -592,7 +591,7 @@ mod tests {
       rendered.contains("root_elements : Vec < Option < crate :: parts :: PartRootElement > >")
     );
     assert!(rendered.contains("package_main"));
-    assert!(rendered.contains("main_document_part : crate :: sdk :: PartChild"));
+    assert!(rendered.contains("main_document_part : crate :: sdk :: RequiredPart"));
     assert!(!rendered.contains("ooxmlsdk_derive :: SdkPart"));
   }
 

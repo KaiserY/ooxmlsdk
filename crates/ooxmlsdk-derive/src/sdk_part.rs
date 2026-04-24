@@ -912,6 +912,11 @@ struct PartHandleChildInfo {
   relationship_type: String,
 }
 
+struct PartChildMarkerInfo {
+  part_ty: Type,
+  kind: PartChildKind,
+}
+
 struct PartHandleRootInfo {
   root_ty: Type,
   accessor_ident: Ident,
@@ -924,7 +929,7 @@ fn is_part_handle_struct(fields: &syn::FieldsNamed) -> bool {
     .any(|field| field.ident.as_ref().is_some_and(|ident| ident == "id"))
     && fields.named.iter().all(|field| {
       field.ident.as_ref().is_some_and(|ident| ident == "id")
-        || marker_inner_type(&field.ty, "PartChild").is_some()
+        || part_child_marker_info(&field.ty).is_some()
         || marker_inner_type(&field.ty, "PartRoot").is_some()
     })
 }
@@ -950,20 +955,20 @@ fn expand_part_handle(
       continue;
     }
 
-    if let Some(part_ty) = marker_inner_type(&field.ty, "PartChild") {
-      let Some(attr) = parse_part_child_attr(&field.attrs)? else {
+    if let Some(marker) = part_child_marker_info(&field.ty) {
+      let Some(relationship_type) = parse_part_child_relationship_type_attr(&field.attrs)? else {
         return Err(syn::Error::new_spanned(
           field,
-          "PartChild marker field requires #[sdk(part_child(...))]",
+          "PartChild marker field requires #[sdk(part_child(relationship_type = ...))]",
         ));
       };
       let field_ident = field.ident.clone().unwrap();
       child_infos.push(PartHandleChildInfo {
-        variant_ident: part_ref_variant_ident(&part_ty)?,
+        variant_ident: part_ref_variant_ident(&marker.part_ty)?,
         field_ident,
-        part_ty,
-        kind: attr.kind,
-        relationship_type: attr.relationship_type,
+        part_ty: marker.part_ty,
+        kind: marker.kind,
+        relationship_type,
       });
       continue;
     }
@@ -1206,6 +1211,51 @@ fn marker_inner_type(ty: &Type, marker: &str) -> Option<Type> {
     return None;
   };
   Some(inner.clone())
+}
+
+fn part_child_marker_info(ty: &Type) -> Option<PartChildMarkerInfo> {
+  let Type::Path(type_path) = ty else {
+    return None;
+  };
+  let segment = type_path.path.segments.last()?;
+  let marker_name = segment.ident.to_string();
+  let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+    return None;
+  };
+  let syn::GenericArgument::Type(part_ty) = args.args.first()? else {
+    return None;
+  };
+
+  let kind = match marker_name.as_str() {
+    "OptionalPart" => PartChildKind::Optional,
+    "RequiredPart" => PartChildKind::Required,
+    "RepeatedPart" => PartChildKind::Repeated,
+    "PartChild" => {
+      let syn::GenericArgument::Type(kind_ty) = args.args.iter().nth(1)? else {
+        return None;
+      };
+      part_child_kind_from_type(kind_ty)?
+    }
+    _ => return None,
+  };
+
+  Some(PartChildMarkerInfo {
+    part_ty: part_ty.clone(),
+    kind,
+  })
+}
+
+fn part_child_kind_from_type(ty: &Type) -> Option<PartChildKind> {
+  let Type::Path(type_path) = ty else {
+    return None;
+  };
+  let segment = type_path.path.segments.last()?;
+  match segment.ident.to_string().as_str() {
+    "OptionalPartKind" => Some(PartChildKind::Optional),
+    "RequiredPartKind" => Some(PartChildKind::Required),
+    "RepeatedPartKind" => Some(PartChildKind::Repeated),
+    _ => None,
+  }
 }
 
 fn part_ref_variant_ident(part_ty: &Type) -> syn::Result<Ident> {

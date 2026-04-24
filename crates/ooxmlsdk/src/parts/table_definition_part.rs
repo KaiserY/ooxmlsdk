@@ -14,9 +14,8 @@ pub struct TableDefinitionPart {
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable"
   ))]
   pub(crate) query_table_parts:
-    crate::sdk::PartChild<crate::parts::query_table_part::QueryTablePart>,
+    crate::sdk::RepeatedPart<crate::parts::query_table_part::QueryTablePart>,
 }

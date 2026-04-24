@@ -15,8 +15,7 @@ pub struct FontTablePart {
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font"
   ))]
-  pub(crate) font_parts: crate::sdk::PartChild<crate::parts::font_part::FontPart>,
+  pub(crate) font_parts: crate::sdk::RepeatedPart<crate::parts::font_part::FontPart>,
 }

@@ -15,26 +15,22 @@ pub struct ChartsheetPart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Chartsheet,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings"
   ))]
-  pub(crate) spreadsheet_printer_settings_parts: crate::sdk::PartChild<
+  pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<
     crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    kind = "optional"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing"
   ))]
-  pub(crate) drawings_part: crate::sdk::PartChild<crate::parts::drawings_part::DrawingsPart>,
+  pub(crate) drawings_part: crate::sdk::OptionalPart<crate::parts::drawings_part::DrawingsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing"
   ))]
   pub(crate) vml_drawing_parts:
-    crate::sdk::PartChild<crate::parts::vml_drawing_part::VmlDrawingPart>,
+    crate::sdk::RepeatedPart<crate::parts::vml_drawing_part::VmlDrawingPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    kind = "repeated"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

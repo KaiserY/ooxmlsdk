@@ -81,6 +81,22 @@ pub enum RelationshipTargetKind {
 }
 
 impl RelationshipInfo {
+  fn external(
+    id: String,
+    relationship_type: String,
+    target: String,
+    target_mode: Option<TargetMode>,
+  ) -> Self {
+    Self {
+      id: id.into_boxed_str(),
+      relationship_type: relationship_type.into_boxed_str(),
+      target: target.into_boxed_str(),
+      target_mode,
+      target_kind: RelationshipTargetKind::External,
+      target_part_id: None,
+    }
+  }
+
   #[inline]
   pub fn id(&self) -> &str {
     &self.id
@@ -163,6 +179,73 @@ impl RelationshipSet {
   #[inline]
   pub fn contains_id(&self, relationship_id: &str) -> bool {
     self.by_id.contains_key(relationship_id)
+  }
+
+  pub fn next_relationship_id(&self) -> String {
+    let next = self
+      .relationships
+      .iter()
+      .filter_map(|relationship| relationship.id().strip_prefix("rId"))
+      .filter_map(|suffix| suffix.parse::<u32>().ok())
+      .max()
+      .unwrap_or_default()
+      + 1;
+    format!("rId{next}")
+  }
+
+  pub fn add_external_relationship(
+    &mut self,
+    relationship_id: impl Into<String>,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    self.push_relationship(RelationshipInfo::external(
+      relationship_id.into(),
+      relationship_type.into(),
+      target.into(),
+      Some(TargetMode::External),
+    ))
+  }
+
+  pub fn add_hyperlink_relationship(
+    &mut self,
+    relationship_id: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    self.add_external_relationship(relationship_id, Self::HYPERLINK_RELATIONSHIP_TYPE, target)
+  }
+
+  pub fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
+    let index = *self.by_id.get(relationship_id)?;
+    let removed = self.relationships.remove(index);
+    self.rebuild_index();
+    Some(removed)
+  }
+
+  pub fn change_relationship_id(
+    &mut self,
+    relationship_id: &str,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<(), SdkError> {
+    let new_relationship_id = new_relationship_id.into();
+    if relationship_id == new_relationship_id {
+      return Ok(());
+    }
+    if self.contains_id(&new_relationship_id) {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {new_relationship_id} already exists"
+      )));
+    }
+
+    let Some(index) = self.by_id.get(relationship_id).copied() else {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {relationship_id} does not exist"
+      )));
+    };
+
+    self.relationships[index].id = new_relationship_id.into_boxed_str();
+    self.rebuild_index();
+    Ok(())
   }
 
   #[inline]
@@ -256,12 +339,38 @@ impl RelationshipSet {
 
     for relationship in relationships.relationship {
       let info = relationship_info(relationship, &source_parent_path, by_path);
-      let index = set.relationships.len();
-      set.by_id.insert(info.id.clone(), index);
-      set.relationships.push(info);
+      set.push_relationship_unchecked(info);
     }
 
     set
+  }
+
+  fn push_relationship(
+    &mut self,
+    relationship: RelationshipInfo,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    if self.contains_id(relationship.id()) {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {} already exists",
+        relationship.id()
+      )));
+    }
+    self.push_relationship_unchecked(relationship);
+    Ok(self.relationships.last().expect("pushed relationship"))
+  }
+
+  fn push_relationship_unchecked(&mut self, relationship: RelationshipInfo) {
+    let index = self.relationships.len();
+    self.by_id.insert(relationship.id.clone(), index);
+    self.relationships.push(relationship);
+  }
+
+  fn rebuild_index(&mut self) {
+    self.by_id.clear();
+    self.by_id.reserve(self.relationships.len());
+    for (index, relationship) in self.relationships.iter().enumerate() {
+      self.by_id.insert(relationship.id.clone(), index);
+    }
   }
 }
 
@@ -293,6 +402,11 @@ impl StoredPart {
   #[inline]
   pub fn relationships(&self) -> &RelationshipSet {
     &self.relationships
+  }
+
+  #[inline]
+  pub fn relationships_mut(&mut self) -> &mut RelationshipSet {
+    &mut self.relationships
   }
 
   #[inline]
@@ -377,6 +491,11 @@ impl SdkPackageStorage {
   }
 
   #[inline]
+  pub fn package_relationships_mut(&mut self) -> &mut RelationshipSet {
+    &mut self.package_relationships
+  }
+
+  #[inline]
   pub fn open_mode(&self) -> PackageOpenMode {
     self.open_mode
   }
@@ -392,6 +511,11 @@ impl SdkPackageStorage {
   }
 
   #[inline]
+  pub fn part_mut(&mut self, part_id: PartId) -> Option<&mut StoredPart> {
+    self.parts.get_mut(part_id.index())
+  }
+
+  #[inline]
   pub fn part_by_path(&self, path: &str) -> Option<(PartId, &StoredPart)> {
     let part_id = *self.by_path.get(path)?;
     self.part(part_id).map(|part| (part_id, part))
@@ -400,6 +524,11 @@ impl SdkPackageStorage {
   #[inline]
   pub fn relationships(&self, part_id: PartId) -> Option<&RelationshipSet> {
     self.part(part_id).map(StoredPart::relationships)
+  }
+
+  #[inline]
+  pub fn relationships_mut(&mut self, part_id: PartId) -> Option<&mut RelationshipSet> {
+    self.part_mut(part_id).map(StoredPart::relationships_mut)
   }
 
   #[inline]

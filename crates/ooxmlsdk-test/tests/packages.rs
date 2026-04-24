@@ -2,7 +2,7 @@
 
 use std::io::Cursor;
 
-use ooxmlsdk::common::{RelationshipTargetKind, StoredPartDataKind};
+use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, image_part::ImagePart, main_document_part::MainDocumentPart,
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
@@ -383,6 +383,141 @@ fn set_root_element_replaces_unloaded_root_cache() {
 
   assert_eq!(main_document_body_child_count(reopened_root), 0);
   assert!(reopened_root.body.is_some());
+}
+
+#[test]
+fn part_hyperlink_relationship_mutation_is_saved() {
+  // Source: adapted from OpenXmlPartContainer hyperlink relationship mutation coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkHyperlink";
+  let target = "https://example.com/ooxmlsdk";
+
+  assert!(
+    !main_part
+      .relationships(&package)
+      .unwrap()
+      .contains_id(relationship_id)
+  );
+
+  let relationship = main_part
+    .add_hyperlink_relationship(&mut package, relationship_id, target)
+    .unwrap();
+  assert_eq!(relationship.id(), relationship_id);
+  assert_eq!(
+    relationship.relationship_type(),
+    RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE
+  );
+  assert_eq!(relationship.target(), target);
+  assert!(matches!(relationship.target_mode(), TargetMode::External));
+  assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_relationship = reopened_main
+    .relationships(&reopened)
+    .unwrap()
+    .get(relationship_id)
+    .unwrap();
+
+  assert_eq!(reopened_relationship.target(), target);
+  assert_eq!(
+    reopened_relationship.relationship_type(),
+    RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE
+  );
+  assert!(matches!(
+    reopened_relationship.target_mode(),
+    TargetMode::External
+  ));
+}
+
+#[test]
+fn part_external_relationship_ids_can_change_and_remove() {
+  // Source: adapted from OpenXmlPartContainer external relationship mutation coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkExternal";
+  let changed_relationship_id = "rIdSdkExternalChanged";
+
+  main_part
+    .add_external_relationship(
+      &mut package,
+      relationship_id,
+      "http://example.com/relationships/custom",
+      "https://example.com/custom",
+    )
+    .unwrap();
+  assert!(
+    main_part
+      .add_external_relationship(
+        &mut package,
+        relationship_id,
+        "http://example.com/relationships/custom",
+        "https://example.com/duplicate",
+      )
+      .is_err()
+  );
+
+  main_part
+    .change_relationship_id(&mut package, relationship_id, changed_relationship_id)
+    .unwrap();
+  assert!(
+    main_part
+      .relationships(&package)
+      .unwrap()
+      .get(relationship_id)
+      .is_none()
+  );
+  assert!(
+    main_part
+      .relationships(&package)
+      .unwrap()
+      .contains_id(changed_relationship_id)
+  );
+
+  let removed = main_part
+    .remove_relationship(&mut package, changed_relationship_id)
+    .unwrap();
+  assert_eq!(removed.id(), changed_relationship_id);
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  assert!(
+    !reopened_main
+      .relationships(&reopened)
+      .unwrap()
+      .contains_id(changed_relationship_id)
+  );
+}
+
+#[test]
+fn package_external_relationship_mutation_is_saved() {
+  // Source: adapted from OpenXmlPackage relationship mutation coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let relationship_id = package.relationships().next_relationship_id();
+  let relationship_type = "http://example.com/package/relationship";
+  let target = "https://example.com/package";
+
+  package
+    .add_external_relationship(relationship_id.as_str(), relationship_type, target)
+    .unwrap();
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let relationship = reopened.relationships().get(&relationship_id).unwrap();
+
+  assert_eq!(relationship.relationship_type(), relationship_type);
+  assert_eq!(relationship.target(), target);
+  assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
+  assert!(matches!(relationship.target_mode(), TargetMode::External));
 }
 
 #[test]

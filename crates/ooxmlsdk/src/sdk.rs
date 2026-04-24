@@ -173,6 +173,53 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn relationships_mut(&mut self) -> &mut crate::common::RelationshipSet {
+    self.storage_mut().package_relationships_mut()
+  }
+
+  #[inline]
+  fn add_external_relationship(
+    &mut self,
+    relationship_id: impl Into<String>,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    self
+      .relationships_mut()
+      .add_external_relationship(relationship_id, relationship_type, target)
+  }
+
+  #[inline]
+  fn add_hyperlink_relationship(
+    &mut self,
+    relationship_id: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    self
+      .relationships_mut()
+      .add_hyperlink_relationship(relationship_id, target)
+  }
+
+  #[inline]
+  fn remove_relationship(
+    &mut self,
+    relationship_id: &str,
+  ) -> Option<crate::common::RelationshipInfo> {
+    self.relationships_mut().remove(relationship_id)
+  }
+
+  #[inline]
+  fn change_relationship_id(
+    &mut self,
+    relationship_id: &str,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<(), crate::common::SdkError> {
+    self
+      .relationships_mut()
+      .change_relationship_id(relationship_id, new_relationship_id)
+  }
+
+  #[inline]
   fn external_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
     self.relationships().external_relationships()
   }
@@ -277,6 +324,78 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   #[inline]
   fn relationships<P: SdkPackage>(self, package: &P) -> Option<&crate::common::RelationshipSet> {
     package.storage().relationships(self.part_id())
+  }
+
+  #[inline]
+  fn relationships_mut<P: SdkPackage>(
+    self,
+    package: &mut P,
+  ) -> Option<&mut crate::common::RelationshipSet> {
+    package.storage_mut().relationships_mut(self.part_id())
+  }
+
+  #[inline]
+  fn add_external_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: impl Into<String>,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    self
+      .relationships_mut(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .add_external_relationship(relationship_id, relationship_type, target)
+  }
+
+  #[inline]
+  fn add_hyperlink_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    self
+      .relationships_mut(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .add_hyperlink_relationship(relationship_id, target)
+  }
+
+  #[inline]
+  fn remove_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: &str,
+  ) -> Option<crate::common::RelationshipInfo> {
+    self.relationships_mut(package)?.remove(relationship_id)
+  }
+
+  #[inline]
+  fn change_relationship_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: &str,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<(), crate::common::SdkError> {
+    self
+      .relationships_mut(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .change_relationship_id(relationship_id, new_relationship_id)
   }
 
   #[inline]

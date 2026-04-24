@@ -212,6 +212,55 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         self.#storage_ident.package_relationships()
       }
 
+      pub fn relationships_mut(&mut self) -> &mut crate::common::RelationshipSet {
+        self.#storage_ident.package_relationships_mut()
+      }
+
+      #[inline]
+      pub fn add_external_relationship(
+        &mut self,
+        relationship_id: impl Into<String>,
+        relationship_type: impl Into<String>,
+        target: impl Into<String>,
+      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::add_external_relationship(
+          self,
+          relationship_id,
+          relationship_type,
+          target,
+        )
+      }
+
+      #[inline]
+      pub fn add_hyperlink_relationship(
+        &mut self,
+        relationship_id: impl Into<String>,
+        target: impl Into<String>,
+      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::add_hyperlink_relationship(self, relationship_id, target)
+      }
+
+      #[inline]
+      pub fn remove_relationship(
+        &mut self,
+        relationship_id: &str,
+      ) -> Option<crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::remove_relationship(self, relationship_id)
+      }
+
+      #[inline]
+      pub fn change_relationship_id(
+        &mut self,
+        relationship_id: &str,
+        new_relationship_id: impl Into<String>,
+      ) -> Result<(), crate::common::SdkError> {
+        crate::sdk::SdkPackage::change_relationship_id(
+          self,
+          relationship_id,
+          new_relationship_id,
+        )
+      }
+
       #[inline]
       pub fn external_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
         crate::sdk::SdkPackage::external_relationships(self)

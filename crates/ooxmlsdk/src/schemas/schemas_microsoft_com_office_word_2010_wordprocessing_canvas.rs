@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpc:wpc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpc:CT_WordprocessingCanvas/wpc:wpc")]
 pub struct WordprocessingCanvas {
   /// _
@@ -35,7 +35,7 @@ pub struct WordprocessingCanvas {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpc:bg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFormatting/wpc:bg")]
 pub struct BackgroundFormatting {
   #[sdk(choice(
@@ -58,7 +58,7 @@ pub struct BackgroundFormatting {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpc:whole.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_WholeE2oFormatting/wpc:whole")]
 pub struct WholeFormatting {
   ///Outline
@@ -77,7 +77,7 @@ pub struct WholeFormatting {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpc:graphicFrame.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpg:CT_GraphicFrame/wpc:graphicFrame")]
 pub struct GraphicFrameType {
     /// _
@@ -111,14 +111,14 @@ pub struct GraphicFrameType {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpc:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/wpc:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingCanvasChoice {
   #[sdk(child(qname = "wps:CT_WordprocessingShape/wps:wsp"))]
     WpsWsp(
@@ -147,7 +147,7 @@ pub enum WordprocessingCanvasChoice {
     #[sdk(child(qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"))]
     WpcGraphicFrame(std::boxed::Box<GraphicFrameType>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFormattingChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -172,7 +172,7 @@ pub enum BackgroundFormattingChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFormattingChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -183,7 +183,7 @@ pub enum BackgroundFormattingChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WholeFormattingChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(

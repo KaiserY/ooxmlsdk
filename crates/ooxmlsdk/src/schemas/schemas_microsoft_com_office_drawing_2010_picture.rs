@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pic14:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/pic14:style")]
 pub struct ShapeStyle {
   /// _
@@ -35,7 +35,7 @@ pub struct ShapeStyle {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pic14:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/pic14:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.

@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xda:dynamicArrayProperties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xda:CT_DynamicArrayProperties/xda:dynamicArrayProperties")]
 pub struct DynamicArrayProperties {
   /// fDynamic
@@ -35,7 +35,7 @@ pub struct DynamicArrayProperties {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xda:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xda:extLst")]
 pub struct ExtensionList {
   ///Extension.

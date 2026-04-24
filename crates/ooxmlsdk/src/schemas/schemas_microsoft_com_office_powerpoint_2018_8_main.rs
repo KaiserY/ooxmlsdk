@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CommentStatus {
   #[sdk(rename = "active")]
   #[default]
@@ -19,7 +19,7 @@ pub enum CommentStatus {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:unknownAnchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor")]
 pub struct CommentUnknownAnchor {}
 /// Defines the TextBodyType Class.
@@ -27,7 +27,7 @@ pub struct CommentUnknownAnchor {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:txBody.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/p188:txBody")]
 pub struct TextBodyType {
   ///Body Properties
@@ -48,7 +48,7 @@ pub struct TextBodyType {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst")]
 pub struct CommentPropertiesExtensionList {
   ///Data for the Windows platform..
@@ -62,11 +62,10 @@ pub struct CommentPropertiesExtensionList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:authorLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_AuthorList/p188:authorLst")]
 pub struct AuthorList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -78,11 +77,10 @@ pub struct AuthorList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:cmLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentList/p188:cmLst")]
 pub struct CommentList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -94,7 +92,7 @@ pub struct CommentList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:commentRel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentRelationship/p188:commentRel")]
 pub struct CommentRelationship {
   /// id
@@ -110,7 +108,7 @@ pub struct CommentRelationship {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p188:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -123,7 +121,7 @@ pub struct ExtensionList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:author.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_Author/p188:author")]
 pub struct Author {
   /// id
@@ -171,7 +169,7 @@ pub struct Author {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:reply.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentReply/p188:reply")]
 pub struct CommentReply {
   /// id
@@ -231,7 +229,7 @@ pub struct CommentReply {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:pos.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/p188:pos")]
 pub struct Point2DType {
   /// X-Axis Coordinate
@@ -268,7 +266,7 @@ pub struct Point2DType {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:replyLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentReplyList/p188:replyLst")]
 pub struct CommentReplyList {
   /// _
@@ -280,7 +278,7 @@ pub struct CommentReplyList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p188:cm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_Comment/p188:cm")]
 pub struct Comment {
   /// id
@@ -410,7 +408,7 @@ pub struct Comment {
   #[sdk(child(qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"))]
   pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {
   #[sdk(child(qname = "pc:CT_SlideMonikerList/pc:sldMkLst"))]
     PcSldMkLst(

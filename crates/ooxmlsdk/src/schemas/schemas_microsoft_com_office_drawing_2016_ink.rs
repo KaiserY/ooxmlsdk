@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtendedBrushPropertyName {
   #[sdk(rename = "inkEffects")]
   #[default]
@@ -16,7 +16,7 @@ pub enum ExtendedBrushPropertyName {
   #[sdk(rename = "scaleFactor")]
   ScaleFactor,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum InkEffectsType {
   #[sdk(rename = "none")]
   #[default]

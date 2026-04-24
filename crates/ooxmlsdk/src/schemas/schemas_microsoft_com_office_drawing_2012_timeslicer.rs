@@ -9,7 +9,7 @@
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is tsle:timeslicer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "tsle:CT_Timeline/tsle:timeslicer")]
 pub struct TimeSlicer {
   /// name
@@ -28,7 +28,7 @@ pub struct TimeSlicer {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is tsle:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/tsle:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.

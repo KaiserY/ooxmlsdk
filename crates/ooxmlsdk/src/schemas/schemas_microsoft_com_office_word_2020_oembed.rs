@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is woe:oembed.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "woe:CT_OEmbed/woe:oembed")]
 pub struct OEmbed {
   /// oEmbedUrl

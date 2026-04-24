@@ -98,7 +98,7 @@ impl RelationshipInfo {
 
   #[inline]
   pub fn target_mode(&self) -> TargetMode {
-    self.target_mode.clone().unwrap_or(TargetMode::Internal)
+    self.target_mode.unwrap_or(TargetMode::Internal)
   }
 
   #[inline]
@@ -116,7 +116,7 @@ impl RelationshipInfo {
       id: self.id().to_string(),
       r#type: self.relationship_type().to_string(),
       target: self.target().to_string(),
-      target_mode: self.target_mode.clone(),
+      target_mode: self.target_mode,
     }
   }
 }
@@ -162,7 +162,10 @@ impl RelationshipSet {
 
   pub(crate) fn to_relationships(&self) -> Relationships {
     Relationships {
-      xmlns: Some("http://schemas.openxmlformats.org/package/2006/relationships".to_string()),
+      xmlns: vec![super::XmlNamespaceDecl::new(
+        "",
+        "http://schemas.openxmlformats.org/package/2006/relationships",
+      )],
       relationship: self
         .relationships
         .iter()
@@ -459,7 +462,7 @@ fn relationship_info(
   by_path: &HashMap<Box<str>, PartId>,
 ) -> RelationshipInfo {
   let target_mode = relationship.target_mode;
-  let effective_target_mode = target_mode.clone().unwrap_or(TargetMode::Internal);
+  let effective_target_mode = target_mode.unwrap_or(TargetMode::Internal);
   let (target_kind, target_part_id) = if matches!(effective_target_mode, TargetMode::Internal) {
     if relationship.target.eq_ignore_ascii_case("NULL") {
       (RelationshipTargetKind::Null, None)

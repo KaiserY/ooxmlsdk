@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:wgp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpg:CT_WordprocessingGroup/wpg:wgp")]
 pub struct WordprocessingGroup {
   /// _
@@ -39,7 +39,7 @@ pub struct WordprocessingGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:grpSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpg:CT_WordprocessingGroup/wpg:grpSp")]
 pub struct GroupShape {
   /// _
@@ -69,7 +69,7 @@ pub struct GroupShape {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpg:CT_WordprocessingGroup/")]
 pub struct WordprocessingGroupType {
   #[sdk(choice(
@@ -90,7 +90,7 @@ pub struct WordprocessingGroupType {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr")]
 pub struct NonVisualDrawingProperties {
     /// Application defined unique identifier.
@@ -153,7 +153,7 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:cNvFrPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr")]
 pub struct NonVisualGraphicFrameProperties {
   ///Graphic Frame Locks
@@ -173,7 +173,7 @@ pub struct NonVisualGraphicFrameProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/wpg:xfrm")]
 pub struct Transform2D {
   /// Rotation
@@ -209,7 +209,7 @@ pub struct Transform2D {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/wpg:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -221,7 +221,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:cNvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProperties {
     /// _
@@ -242,7 +242,7 @@ pub struct NonVisualGroupDrawingShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:grpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
@@ -288,7 +288,7 @@ pub struct GroupShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wpg:graphicFrame.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wpg:CT_GraphicFrame/wpg:graphicFrame")]
 pub struct GraphicFrame {
   /// _
@@ -308,7 +308,7 @@ pub struct GraphicFrame {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingGroupChoice {
   #[sdk(child(qname = "wps:CT_WordprocessingShape/wps:wsp"))]
     WpsWsp(
@@ -333,7 +333,7 @@ pub enum WordprocessingGroupChoice {
         >,
     ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
   #[sdk(child(qname = "wps:CT_WordprocessingShape/wps:wsp"))]
     WpsWsp(
@@ -358,7 +358,7 @@ pub enum GroupShapeChoice {
         >,
     ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingGroupTypeChoice {
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
     WpgCNvPr(std::boxed::Box<NonVisualDrawingProperties>),
@@ -391,7 +391,7 @@ pub enum WordprocessingGroupTypeChoice {
     #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
     WpgExtLst(std::boxed::Box<OfficeArtExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -416,7 +416,7 @@ pub enum GroupShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(

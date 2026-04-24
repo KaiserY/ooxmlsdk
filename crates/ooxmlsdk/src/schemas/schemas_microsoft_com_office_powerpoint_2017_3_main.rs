@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum DisplayLocation {
   #[sdk(rename = "media")]
   #[default]
@@ -17,7 +17,7 @@ pub enum DisplayLocation {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p173:tracksInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p173:CT_TracksInfo/p173:tracksInfo")]
 pub struct TracksInfo {
   /// displayLoc
@@ -36,7 +36,7 @@ pub struct TracksInfo {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p173:track.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p173:CT_Track/p173:track")]
 pub struct Track {
   /// id
@@ -85,7 +85,7 @@ pub struct Track {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p173:trackLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p173:CT_TrackList/p173:trackLst")]
 pub struct TrackList {
   /// _

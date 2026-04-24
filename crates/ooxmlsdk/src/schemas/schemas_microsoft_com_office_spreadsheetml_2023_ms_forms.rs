@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlmsforms:question.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlmsforms:CT_Question/xlmsforms:question")]
 pub struct Question {
   /// id
@@ -28,7 +28,7 @@ pub struct Question {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlmsforms:msForm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlmsforms:CT_MsForm/xlmsforms:msForm")]
 pub struct MsForm {
   /// id
@@ -77,7 +77,7 @@ pub type SyncedQuestionId = crate::simple_type::StringValue;
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlmsforms:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xlmsforms:extLst")]
 pub struct ExtensionList {
   ///Extension.

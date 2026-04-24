@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:relSizeAnchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor")]
 pub struct RelativeAnchorSize {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: std::boxed::Box<FromAnchor>,
@@ -38,7 +37,7 @@ pub struct RelativeAnchorSize {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:absSizeAnchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
   /// _
@@ -65,11 +64,10 @@ pub struct AbsoluteAnchorSize {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:sp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Shape/cdr:sp")]
 pub struct Shape {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Reference to Custom Function
   ///
   /// Available in Office2007 and above.
@@ -116,7 +114,7 @@ pub struct Shape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:grpSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GroupShape/cdr:grpSp")]
 pub struct GroupShape {
   ///Non-Visual Group Shape Properties
@@ -143,7 +141,7 @@ pub struct GroupShape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:graphicFrame.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame")]
 pub struct GraphicFrame {
   /// Reference to Custom Function
@@ -176,7 +174,7 @@ pub struct GraphicFrame {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cxnSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Connector/cdr:cxnSp")]
 pub struct ConnectionShape {
   /// Reference to Custom Function
@@ -209,7 +207,7 @@ pub struct ConnectionShape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:pic.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Picture/cdr:pic")]
 pub struct Picture {
   /// Reference to Custom Function
@@ -244,11 +242,10 @@ pub struct Picture {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/cdr:cNvPr")]
 pub struct NonVisualDrawingProperties {
-    pub xmlns: Option<String>,
-    pub xmlns_map: std::collections::HashMap<String, String>,
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -309,11 +306,10 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cNvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/cdr:cNvSpPr")]
 pub struct NonVisualShapeDrawingProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Box
   ///
   /// Available in Office2007 and above.
@@ -336,11 +332,10 @@ pub struct NonVisualShapeDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:nvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_ShapeNonVisual/cdr:nvSpPr")]
 pub struct NonVisualShapeProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Chart Non Visual Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/cdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
@@ -353,11 +348,10 @@ pub struct NonVisualShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/cdr:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -417,7 +411,7 @@ pub struct ShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/cdr:style")]
 pub struct Style {
   /// _
@@ -443,11 +437,10 @@ pub struct Style {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:txBody.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/cdr:txBody")]
 pub struct TextBody {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -466,7 +459,7 @@ pub struct TextBody {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cNvCxnSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualConnectorProperties/cdr:cNvCxnSpPr")]
 pub struct NonVisualConnectionShapeProperties {
   ///Connection Shape Locks
@@ -494,7 +487,7 @@ pub struct NonVisualConnectionShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:nvCxnSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_ConnectorNonVisual/cdr:nvCxnSpPr")]
 pub struct NonVisualConnectorShapeDrawingProperties {
   ///Chart Non Visual Properties
@@ -509,7 +502,7 @@ pub struct NonVisualConnectorShapeDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cNvPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPictureProperties/cdr:cNvPicPr")]
 pub struct NonVisualPictureDrawingProperties {
     /// preferRelativeResize
@@ -537,7 +530,7 @@ pub struct NonVisualPictureDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:nvPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_PictureNonVisual/cdr:nvPicPr")]
 pub struct NonVisualPictureProperties {
   /// _
@@ -552,7 +545,7 @@ pub struct NonVisualPictureProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:blipFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipFillProperties/cdr:blipFill")]
 pub struct BlipFill {
   /// DPI Setting
@@ -588,7 +581,7 @@ pub struct BlipFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cNvGraphicFramePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/cdr:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
   ///Graphic Frame Locks
@@ -608,7 +601,7 @@ pub struct NonVisualGraphicFrameDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:nvGraphicFramePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GraphicFrameNonVisual/cdr:nvGraphicFramePr")]
 pub struct NonVisualGraphicFrameProperties {
   ///Non-Visual Drawing Properties
@@ -624,7 +617,7 @@ pub struct NonVisualGraphicFrameProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/cdr:xfrm")]
 pub struct Transform {
   /// Rotation
@@ -660,7 +653,7 @@ pub struct Transform {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:cNvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/cdr:cNvGrpSpPr")]
 pub struct NonVisualGroupShapeDrawingProperties {
     /// _
@@ -693,11 +686,10 @@ pub type YPosition = crate::simple_type::DoubleValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:from.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Marker/cdr:from")]
 pub struct FromAnchor {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Relative X Coordinate
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
   pub x_position: crate::simple_type::DoubleValue,
@@ -710,11 +702,10 @@ pub struct FromAnchor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:to.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Marker/cdr:to")]
 pub struct ToAnchor {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Relative X Coordinate
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
   pub x_position: crate::simple_type::DoubleValue,
@@ -727,7 +718,7 @@ pub struct ToAnchor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Marker/")]
 pub struct MarkerType {
   #[sdk(choice(
@@ -741,7 +732,7 @@ pub struct MarkerType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/cdr:ext")]
 pub struct Extent {
   /// Extent Length
@@ -778,7 +769,7 @@ pub struct Extent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:nvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr")]
 pub struct NonVisualGroupShapeProperties {
   ///Chart Non Visual Properties
@@ -794,7 +785,7 @@ pub struct NonVisualGroupShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr:grpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupShapeProperties/cdr:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
@@ -835,7 +826,7 @@ pub struct GroupShapeProperties {
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RelativeAnchorSizeChoice {
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
@@ -855,7 +846,7 @@ pub enum RelativeAnchorSizeChoice {
     >,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AbsoluteAnchorSizeChoice {
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
@@ -875,7 +866,7 @@ pub enum AbsoluteAnchorSizeChoice {
     >,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
@@ -895,7 +886,7 @@ pub enum GroupShapeChoice {
     >,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -906,7 +897,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -931,7 +922,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -942,7 +933,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
   ATile(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tile>),
@@ -951,14 +942,14 @@ pub enum BlipFillChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Stretch>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MarkerTypeChoice {
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
   CdrX(crate::simple_type::DoubleValue),
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
   CdrY(crate::simple_type::DoubleValue),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -983,7 +974,7 @@ pub enum GroupShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(

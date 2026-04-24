@@ -50,6 +50,35 @@ pub enum XmlHeaderType {
   Standalone,
 }
 
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct XmlNamespaceDecl {
+  pub prefix: String,
+  pub uri: String,
+}
+
+impl XmlNamespaceDecl {
+  #[inline]
+  pub fn new(prefix: impl Into<String>, uri: impl Into<String>) -> Self {
+    Self {
+      prefix: prefix.into(),
+      uri: uri.into(),
+    }
+  }
+
+  #[inline]
+  pub fn is_default(&self) -> bool {
+    self.prefix.is_empty()
+  }
+}
+
+#[inline]
+pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) -> Option<&'a str> {
+  declarations
+    .iter()
+    .find(|declaration| declaration.prefix == prefix)
+    .map(|declaration| declaration.uri.as_str())
+}
+
 #[inline(always)]
 pub fn parse_bool_attr(
   attr: &Attribute<'_>,

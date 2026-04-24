@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SupportingPropertyBagValueType {
   #[sdk(rename = "d")]
   #[default]
@@ -20,7 +20,7 @@ pub enum SupportingPropertyBagValueType {
   #[sdk(rename = "spba")]
   Spba,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SupportingPropertyBagArrayValueType {
   #[sdk(rename = "d")]
   #[default]
@@ -34,7 +34,7 @@ pub enum SupportingPropertyBagArrayValueType {
   #[sdk(rename = "spb")]
   Spb,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ArrayValueType {
   #[sdk(rename = "d")]
   #[default]
@@ -52,7 +52,7 @@ pub enum ArrayValueType {
   #[sdk(rename = "a")]
   A,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RichFormatPropertyType {
   #[sdk(rename = "b")]
   #[default]
@@ -69,7 +69,7 @@ pub enum RichFormatPropertyType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:filterColumn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichFilterColumn/xlrd2:filterColumn")]
 pub struct RichFilterColumn {
   #[sdk(choice(
@@ -86,7 +86,7 @@ pub struct RichFilterColumn {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:richSortCondition.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichSortCondition/xlrd2:richSortCondition")]
 pub struct RichSortCondition {
   /// richSortKey
@@ -154,11 +154,10 @@ pub struct RichSortCondition {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:supportingPropertyBags.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBags/xlrd2:supportingPropertyBags")]
 pub struct SupportingPropertyBags {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -173,11 +172,10 @@ pub struct SupportingPropertyBags {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:spbStructures.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagStructures/xlrd2:spbStructures")]
 pub struct SupportingPropertyBagStructures {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// count
@@ -199,11 +197,10 @@ pub struct SupportingPropertyBagStructures {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:arrayData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_ArrayData/xlrd2:arrayData")]
 pub struct ArrayData {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// count
@@ -225,11 +222,10 @@ pub struct ArrayData {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:richStyleSheet.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichStylesheet/xlrd2:richStyleSheet")]
 pub struct RichStylesheet {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -250,11 +246,10 @@ pub struct RichStylesheet {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:rvTypesInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueTypesInfo/xlrd2:rvTypesInfo")]
 pub struct RichValueTypesInfo {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -272,7 +267,7 @@ pub struct RichValueTypesInfo {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:filters.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichFilters/xlrd2:filters")]
 pub struct RichFilters {
   /// _
@@ -290,7 +285,7 @@ pub struct RichFilters {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:top10.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichTop10/xlrd2:top10")]
 pub struct RichTop10 {
   /// key
@@ -334,7 +329,7 @@ pub struct RichTop10 {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:customFilters.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_CustomRichFilters/xlrd2:customFilters")]
 pub struct CustomRichFilters {
   /// and
@@ -355,7 +350,7 @@ pub struct CustomRichFilters {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:dynamicFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_DynamicRichFilter/xlrd2:dynamicFilter")]
 pub struct DynamicRichFilter {
   /// key
@@ -407,7 +402,7 @@ pub struct DynamicRichFilter {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xlrd2:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -419,7 +414,7 @@ pub struct ExtensionList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:filter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichFilter/xlrd2:filter")]
 pub struct RichFilter {
   /// key
@@ -456,7 +451,7 @@ pub struct RichFilter {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:dateGroupItem.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichDateGroupItem/xlrd2:dateGroupItem")]
 pub struct RichDateGroupItem {
   /// key
@@ -522,7 +517,7 @@ pub struct RichDateGroupItem {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:customFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter")]
 pub struct CustomRichFilter {
   /// key
@@ -554,7 +549,7 @@ pub struct CustomRichFilter {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:spbArrays.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagArrayData/xlrd2:spbArrays")]
 pub struct SupportingPropertyBagArrayData {
   /// count
@@ -576,7 +571,7 @@ pub struct SupportingPropertyBagArrayData {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:spbData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagData/xlrd2:spbData")]
 pub struct SupportingPropertyBagData {
   /// count
@@ -598,7 +593,7 @@ pub struct SupportingPropertyBagData {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:spb.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBag/xlrd2:spb")]
 pub struct SupportingPropertyBag {
   /// s
@@ -623,7 +618,7 @@ pub type SupportingPropertyBagValue = crate::simple_type::StringValue;
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:s.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagStructure/xlrd2:s")]
 pub struct SupportingPropertyBagStructure {
   /// _
@@ -635,7 +630,7 @@ pub struct SupportingPropertyBagStructure {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:k.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagKey/xlrd2:k")]
 pub struct SupportingPropertyBagKey {
   /// n
@@ -658,7 +653,7 @@ pub struct SupportingPropertyBagKey {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:a.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagArray/xlrd2:a")]
 pub struct SupportingPropertyBagArray {
   /// count
@@ -677,7 +672,7 @@ pub struct SupportingPropertyBagArray {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:v.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_SupportingPropertyBagArrayValue/xlrd2:v")]
 pub struct SupportingPropertyBagArrayValue {
   /// t
@@ -695,7 +690,7 @@ pub struct SupportingPropertyBagArrayValue {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:a.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_Array/xlrd2:a")]
 pub struct Array {
   /// r
@@ -721,7 +716,7 @@ pub struct Array {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:v.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_ArrayValue/xlrd2:v")]
 pub struct ArrayValue {
   /// t
@@ -739,7 +734,7 @@ pub struct ArrayValue {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:dxfs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxfs/xlrd2:dxfs")]
 pub struct Dxfs {
   /// Format Count
@@ -759,7 +754,7 @@ pub struct Dxfs {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:richProperties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichFormatProperties/xlrd2:richProperties")]
 pub struct RichFormatProperties {
   /// _
@@ -771,7 +766,7 @@ pub struct RichFormatProperties {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:richStyles.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichStyles/xlrd2:richStyles")]
 pub struct RichStyles {
   /// _
@@ -783,7 +778,7 @@ pub struct RichStyles {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:rPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichFormatProperty/xlrd2:rPr")]
 pub struct RichFormatProperty {
   /// n
@@ -806,7 +801,7 @@ pub struct RichFormatProperty {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:rSty.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichStyle/xlrd2:rSty")]
 pub struct RichStyle {
   /// dxfid
@@ -825,7 +820,7 @@ pub struct RichStyle {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:rpv.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichStylePropertyValue/xlrd2:rpv")]
 pub struct RichStylePropertyValue {
   /// i
@@ -843,7 +838,7 @@ pub struct RichStylePropertyValue {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:global.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueGlobalType/xlrd2:global")]
 pub struct RichValueGlobalType {
   /// _
@@ -858,7 +853,7 @@ pub struct RichValueGlobalType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:types.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueTypes/xlrd2:types")]
 pub struct RichValueTypes {
   /// _
@@ -870,7 +865,7 @@ pub struct RichValueTypes {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:type.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueType/xlrd2:type")]
 pub struct RichValueType {
   /// name
@@ -892,7 +887,7 @@ pub struct RichValueType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:keyFlags.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueTypeKeyFlags/xlrd2:keyFlags")]
 pub struct RichValueTypeKeyFlags {
   /// _
@@ -904,7 +899,7 @@ pub struct RichValueTypeKeyFlags {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:key.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueTypeReservedKey/xlrd2:key")]
 pub struct RichValueTypeReservedKey {
   /// name
@@ -923,7 +918,7 @@ pub struct RichValueTypeReservedKey {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd2:flag.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichValueTypeReservedKeyFlag/xlrd2:flag")]
 pub struct RichValueTypeReservedKeyFlag {
   /// name
@@ -941,7 +936,7 @@ pub struct RichValueTypeReservedKeyFlag {
   #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::BooleanValue,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RichFilterColumnChoice {
   #[sdk(child(qname = "xlrd2:CT_RichFilters/xlrd2:filters"))]
   Xlrd2Filters(std::boxed::Box<RichFilters>),
@@ -954,7 +949,7 @@ pub enum RichFilterColumnChoice {
   #[sdk(child(qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   Xlrd2ExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomRichFiltersChoice {
   #[sdk(child(qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter"))]
   Xlrd2CustomFilter(std::boxed::Box<CustomRichFilter>),

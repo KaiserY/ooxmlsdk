@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HorizontalAlignmentValues {
   #[sdk(rename = "left")]
   #[default]
@@ -14,7 +14,7 @@ pub enum HorizontalAlignmentValues {
   #[sdk(rename = "right")]
   Right,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ShapeDelimiterValues {
   #[sdk(rename = "centered")]
   #[default]
@@ -22,7 +22,7 @@ pub enum ShapeDelimiterValues {
   #[sdk(rename = "match")]
   Match,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FractionTypeValues {
   #[sdk(rename = "bar")]
   #[default]
@@ -34,7 +34,7 @@ pub enum FractionTypeValues {
   #[sdk(rename = "noBar")]
   NoBar,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LimitLocationValues {
   #[sdk(rename = "undOvr")]
   #[default]
@@ -42,7 +42,7 @@ pub enum LimitLocationValues {
   #[sdk(rename = "subSup")]
   SubscriptSuperscript,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VerticalJustificationValues {
   #[sdk(rename = "top")]
   #[default]
@@ -50,7 +50,7 @@ pub enum VerticalJustificationValues {
   #[sdk(rename = "bot")]
   Bottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ScriptValues {
   #[sdk(rename = "roman")]
   #[default]
@@ -66,7 +66,7 @@ pub enum ScriptValues {
   #[sdk(rename = "monospace")]
   Monospace,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StyleValues {
   #[sdk(rename = "p")]
   #[default]
@@ -78,7 +78,7 @@ pub enum StyleValues {
   #[sdk(rename = "bi")]
   BoldItalic,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum JustificationValues {
   #[sdk(rename = "left")]
   #[default]
@@ -90,7 +90,7 @@ pub enum JustificationValues {
   #[sdk(rename = "centerGroup")]
   CenterGroup,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BreakBinaryOperatorValues {
   #[sdk(rename = "before")]
   #[default]
@@ -100,7 +100,7 @@ pub enum BreakBinaryOperatorValues {
   #[sdk(rename = "repeat")]
   Repeat,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BreakBinarySubtractionValues {
   #[sdk(rename = "--")]
   #[default]
@@ -110,7 +110,7 @@ pub enum BreakBinarySubtractionValues {
   #[sdk(rename = "+-")]
   PlusMinus,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VerticalAlignmentValues {
   #[sdk(rename = "top")]
   #[default]
@@ -122,7 +122,7 @@ pub enum VerticalAlignmentValues {
   #[sdk(rename = "bot")]
   Bot,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BooleanValues {
   #[sdk(rename = "true")]
   #[default]
@@ -143,7 +143,7 @@ pub enum BooleanValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:scr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Script/m:scr")]
 pub struct Script {
   /// Value
@@ -159,7 +159,7 @@ pub struct Script {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sty.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Style/m:sty")]
 pub struct Style {
   /// Value
@@ -175,7 +175,7 @@ pub struct Style {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:r.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_R/m:r")]
 pub struct Run {
   ///Run Properties
@@ -230,7 +230,7 @@ pub struct Run {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:acc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Acc/m:acc")]
 pub struct Accent {
   ///Accent Properties
@@ -245,7 +245,7 @@ pub struct Accent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:bar.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Bar/m:bar")]
 pub struct Bar {
   ///Bar Properties
@@ -260,7 +260,7 @@ pub struct Bar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:box.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Box/m:box")]
 pub struct Box {
   ///Box Properties
@@ -275,7 +275,7 @@ pub struct Box {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:borderBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BorderBox/m:borderBox")]
 pub struct BorderBox {
   ///Border Box Properties
@@ -290,7 +290,7 @@ pub struct BorderBox {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_D/m:d")]
 pub struct Delimiter {
   ///Delimiter Properties
@@ -305,7 +305,7 @@ pub struct Delimiter {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:eqArr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_EqArr/m:eqArr")]
 pub struct EquationArray {
   ///Equation Array Properties
@@ -320,7 +320,7 @@ pub struct EquationArray {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:f.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_F/m:f")]
 pub struct Fraction {
   ///Fraction Properties
@@ -338,7 +338,7 @@ pub struct Fraction {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:func.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Func/m:func")]
 pub struct MathFunction {
   ///Function Properties
@@ -356,7 +356,7 @@ pub struct MathFunction {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:groupChr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_GroupChr/m:groupChr")]
 pub struct GroupChar {
   ///Group-Character Properties
@@ -371,7 +371,7 @@ pub struct GroupChar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:limLow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLow/m:limLow")]
 pub struct LimitLower {
   ///Lower Limit Properties
@@ -389,7 +389,7 @@ pub struct LimitLower {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:limUpp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimUpp/m:limUpp")]
 pub struct LimitUpper {
   ///Upper Limit Properties
@@ -407,7 +407,7 @@ pub struct LimitUpper {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:m.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_M/m:m")]
 pub struct Matrix {
   ///Matrix Properties
@@ -422,7 +422,7 @@ pub struct Matrix {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:nary.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Nary/m:nary")]
 pub struct Nary {
   ///n-ary Properties
@@ -443,7 +443,7 @@ pub struct Nary {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:phant.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Phant/m:phant")]
 pub struct Phantom {
   ///Phantom Properties
@@ -458,7 +458,7 @@ pub struct Phantom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:rad.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Rad/m:rad")]
 pub struct Radical {
   ///Radical Properties
@@ -476,7 +476,7 @@ pub struct Radical {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sPre.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SPre/m:sPre")]
 pub struct PreSubSuper {
   ///Pre-Sub-Superscript Properties
@@ -497,7 +497,7 @@ pub struct PreSubSuper {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sSub.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSub/m:sSub")]
 pub struct Subscript {
   ///Subscript Properties
@@ -515,7 +515,7 @@ pub struct Subscript {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sSubSup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubSup/m:sSubSup")]
 pub struct SubSuperscript {
   ///Sub-Superscript Properties
@@ -536,7 +536,7 @@ pub struct SubSuperscript {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sSup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSup/m:sSup")]
 pub struct Superscript {
   ///Superscript Properties
@@ -554,7 +554,7 @@ pub struct Superscript {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:oMathPara.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathPara/m:oMathPara")]
 pub struct Paragraph {
   ///Office Math Paragraph Properties
@@ -602,7 +602,7 @@ pub struct Paragraph {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:oMath.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMath/m:oMath")]
 pub struct OfficeMath {
   #[sdk(choice(
@@ -670,7 +670,7 @@ pub struct OfficeMath {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mathPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MathPr/m:mathPr")]
 pub struct MathProperties {
   ///Math Font
@@ -726,7 +726,7 @@ pub struct MathProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:lit.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:lit")]
 pub struct Literal {
   /// value
@@ -742,7 +742,7 @@ pub struct Literal {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:nor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:nor")]
 pub struct NormalText {
   /// value
@@ -758,7 +758,7 @@ pub struct NormalText {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:aln.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:aln")]
 pub struct Alignment {
   /// value
@@ -774,7 +774,7 @@ pub struct Alignment {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:opEmu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:opEmu")]
 pub struct OperatorEmulator {
   /// value
@@ -790,7 +790,7 @@ pub struct OperatorEmulator {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:noBreak.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:noBreak")]
 pub struct NoBreak {
   /// value
@@ -806,7 +806,7 @@ pub struct NoBreak {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:diff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:diff")]
 pub struct Differential {
   /// value
@@ -822,7 +822,7 @@ pub struct Differential {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:hideTop.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideTop")]
 pub struct HideTop {
   /// value
@@ -838,7 +838,7 @@ pub struct HideTop {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:hideBot.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideBot")]
 pub struct HideBottom {
   /// value
@@ -854,7 +854,7 @@ pub struct HideBottom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:hideLeft.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideLeft")]
 pub struct HideLeft {
   /// value
@@ -870,7 +870,7 @@ pub struct HideLeft {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:hideRight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideRight")]
 pub struct HideRight {
   /// value
@@ -886,7 +886,7 @@ pub struct HideRight {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:strikeH.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeH")]
 pub struct StrikeHorizontal {
   /// value
@@ -902,7 +902,7 @@ pub struct StrikeHorizontal {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:strikeV.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeV")]
 pub struct StrikeVertical {
   /// value
@@ -918,7 +918,7 @@ pub struct StrikeVertical {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:strikeBLTR.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeBLTR")]
 pub struct StrikeBottomLeftToTopRight {
   /// value
@@ -934,7 +934,7 @@ pub struct StrikeBottomLeftToTopRight {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:strikeTLBR.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeTLBR")]
 pub struct StrikeTopLeftToBottomRight {
   /// value
@@ -950,7 +950,7 @@ pub struct StrikeTopLeftToBottomRight {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:grow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:grow")]
 pub struct GrowOperators {
   /// value
@@ -966,7 +966,7 @@ pub struct GrowOperators {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:maxDist.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:maxDist")]
 pub struct MaxDistribution {
   /// value
@@ -982,7 +982,7 @@ pub struct MaxDistribution {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:objDist.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:objDist")]
 pub struct ObjectDistribution {
   /// value
@@ -998,7 +998,7 @@ pub struct ObjectDistribution {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:plcHide.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:plcHide")]
 pub struct HidePlaceholder {
   /// value
@@ -1014,7 +1014,7 @@ pub struct HidePlaceholder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:subHide.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:subHide")]
 pub struct HideSubArgument {
   /// value
@@ -1030,7 +1030,7 @@ pub struct HideSubArgument {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:supHide.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:supHide")]
 pub struct HideSuperArgument {
   /// value
@@ -1046,7 +1046,7 @@ pub struct HideSuperArgument {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:show.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:show")]
 pub struct ShowPhantom {
   /// value
@@ -1062,7 +1062,7 @@ pub struct ShowPhantom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:zeroWid.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:zeroWid")]
 pub struct ZeroWidth {
   /// value
@@ -1078,7 +1078,7 @@ pub struct ZeroWidth {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:zeroAsc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:zeroAsc")]
 pub struct ZeroAscent {
   /// value
@@ -1094,7 +1094,7 @@ pub struct ZeroAscent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:zeroDesc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:zeroDesc")]
 pub struct ZeroDescent {
   /// value
@@ -1110,7 +1110,7 @@ pub struct ZeroDescent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:transp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:transp")]
 pub struct Transparent {
   /// value
@@ -1126,7 +1126,7 @@ pub struct Transparent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:degHide.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:degHide")]
 pub struct HideDegree {
   /// value
@@ -1142,7 +1142,7 @@ pub struct HideDegree {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:alnScr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:alnScr")]
 pub struct AlignScripts {
   /// value
@@ -1158,7 +1158,7 @@ pub struct AlignScripts {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:smallFrac.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:smallFrac")]
 pub struct SmallFraction {
   /// value
@@ -1174,7 +1174,7 @@ pub struct SmallFraction {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:dispDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:dispDef")]
 pub struct DisplayDefaults {
   /// value
@@ -1190,7 +1190,7 @@ pub struct DisplayDefaults {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:wrapRight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:wrapRight")]
 pub struct WrapRight {
   /// value
@@ -1206,7 +1206,7 @@ pub struct WrapRight {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/")]
 pub struct OnOffType {
   /// value
@@ -1222,7 +1222,7 @@ pub struct OnOffType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:brk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_ManualBreak/m:brk")]
 pub struct Break {
   /// Index of Operator to Align To
@@ -1259,7 +1259,7 @@ pub struct Break {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:rPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_RPR/m:rPr")]
 pub struct RunProperties {
   ///Literal
@@ -1283,7 +1283,7 @@ pub struct RunProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:t.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Text/m:t")]
 pub struct Text {
   /// space
@@ -1301,7 +1301,7 @@ pub struct Text {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:chr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:chr")]
 pub struct AccentChar {
   /// value
@@ -1318,7 +1318,7 @@ pub struct AccentChar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:begChr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:begChr")]
 pub struct BeginChar {
   /// value
@@ -1335,7 +1335,7 @@ pub struct BeginChar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sepChr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:sepChr")]
 pub struct SeparatorChar {
   /// value
@@ -1352,7 +1352,7 @@ pub struct SeparatorChar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:endChr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:endChr")]
 pub struct EndChar {
   /// value
@@ -1369,7 +1369,7 @@ pub struct EndChar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/")]
 pub struct CharType {
   /// value
@@ -1386,7 +1386,7 @@ pub struct CharType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:ctrlPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_CtrlPr/m:ctrlPr")]
 pub struct ControlProperties {
   #[sdk(choice(
@@ -1403,7 +1403,7 @@ pub struct ControlProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:accPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_AccPr/m:accPr")]
 pub struct AccentProperties {
   ///Accent Character
@@ -1418,7 +1418,7 @@ pub struct AccentProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:e.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:e")]
 pub struct Base {
   ///Argument Properties
@@ -1492,7 +1492,7 @@ pub struct Base {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:num.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:num")]
 pub struct Numerator {
   ///Argument Properties
@@ -1566,7 +1566,7 @@ pub struct Numerator {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:den.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:den")]
 pub struct Denominator {
   ///Argument Properties
@@ -1640,7 +1640,7 @@ pub struct Denominator {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:fName.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:fName")]
 pub struct FunctionName {
   ///Argument Properties
@@ -1714,7 +1714,7 @@ pub struct FunctionName {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:lim.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:lim")]
 pub struct Limit {
   ///Argument Properties
@@ -1788,7 +1788,7 @@ pub struct Limit {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sub.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sub")]
 pub struct SubArgument {
   ///Argument Properties
@@ -1862,7 +1862,7 @@ pub struct SubArgument {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sup")]
 pub struct SuperArgument {
   ///Argument Properties
@@ -1936,7 +1936,7 @@ pub struct SuperArgument {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:deg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:deg")]
 pub struct Degree {
   ///Argument Properties
@@ -2010,7 +2010,7 @@ pub struct Degree {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/")]
 pub struct OfficeMathArgumentType {
   #[sdk(choice(
@@ -2085,7 +2085,7 @@ pub struct OfficeMathArgumentType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:pos.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TopBot/m:pos")]
 pub struct Position {
   /// Value
@@ -2101,7 +2101,7 @@ pub struct Position {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:vertJc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TopBot/m:vertJc")]
 pub struct VerticalJustification {
   /// Value
@@ -2117,7 +2117,7 @@ pub struct VerticalJustification {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TopBot/")]
 pub struct TopBottomType {
   /// Value
@@ -2133,7 +2133,7 @@ pub struct TopBottomType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:barPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BarPr/m:barPr")]
 pub struct BarProperties {
   ///Position (Bar)
@@ -2148,7 +2148,7 @@ pub struct BarProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:boxPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BoxPr/m:boxPr")]
 pub struct BoxProperties {
   ///Operator Emulator
@@ -2175,7 +2175,7 @@ pub struct BoxProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:borderBoxPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BorderBoxPr/m:borderBoxPr")]
 pub struct BorderBoxProperties {
   ///Hide Top Edge
@@ -2211,7 +2211,7 @@ pub struct BorderBoxProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:shp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Shp/m:shp")]
 pub struct Shape {
   /// Value
@@ -2227,7 +2227,7 @@ pub struct Shape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:dPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_DPr/m:dPr")]
 pub struct DelimiterProperties {
   ///Delimiter Beginning Character
@@ -2254,7 +2254,7 @@ pub struct DelimiterProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:baseJc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_YAlign/m:baseJc")]
 pub struct BaseJustification {
   /// Value
@@ -2270,7 +2270,7 @@ pub struct BaseJustification {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:rSpRule.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SpacingRule/m:rSpRule")]
 pub struct RowSpacingRule {
   /// Value
@@ -2293,7 +2293,7 @@ pub struct RowSpacingRule {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:cGpRule.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SpacingRule/m:cGpRule")]
 pub struct ColumnGapRule {
   /// Value
@@ -2316,7 +2316,7 @@ pub struct ColumnGapRule {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SpacingRule/")]
 pub struct SpacingRuleType {
   /// Value
@@ -2339,7 +2339,7 @@ pub struct SpacingRuleType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:rSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_UnSignedShort/m:rSp")]
 pub struct RowSpacing {
   /// val
@@ -2355,7 +2355,7 @@ pub struct RowSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:cGp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_UnSignedShort/m:cGp")]
 pub struct ColumnGap {
   /// val
@@ -2371,7 +2371,7 @@ pub struct ColumnGap {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_UnSignedShort/")]
 pub struct UnsignedShortType {
   /// val
@@ -2387,7 +2387,7 @@ pub struct UnsignedShortType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:eqArrPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_EqArrPr/m:eqArrPr")]
 pub struct EquationArrayProperties {
   ///Equation Array Base Justification
@@ -2414,7 +2414,7 @@ pub struct EquationArrayProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:type.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FType/m:type")]
 pub struct FractionType {
   /// Value
@@ -2430,7 +2430,7 @@ pub struct FractionType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:fPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FPr/m:fPr")]
 pub struct FractionProperties {
   ///Fraction type
@@ -2445,7 +2445,7 @@ pub struct FractionProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:funcPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FuncPr/m:funcPr")]
 pub struct FunctionProperties {
   /// _
@@ -2457,7 +2457,7 @@ pub struct FunctionProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:groupChrPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_GroupChrPr/m:groupChrPr")]
 pub struct GroupCharProperties {
   ///Group Character (Grouping Character)
@@ -2478,7 +2478,7 @@ pub struct GroupCharProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:limLowPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLowPr/m:limLowPr")]
 pub struct LimitLowerProperties {
   /// _
@@ -2490,7 +2490,7 @@ pub struct LimitLowerProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:limUppPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimUppPr/m:limUppPr")]
 pub struct LimitUpperProperties {
   /// _
@@ -2502,7 +2502,7 @@ pub struct LimitUpperProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:count.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Integer64/m:count")]
 pub struct MatrixColumnCount {
   /// val
@@ -2525,7 +2525,7 @@ pub struct MatrixColumnCount {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mcJc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_XAlign/m:mcJc")]
 pub struct MatrixColumnJustification {
   /// Value
@@ -2541,7 +2541,7 @@ pub struct MatrixColumnJustification {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mcPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MCPr/m:mcPr")]
 pub struct MatrixColumnProperties {
   ///Matrix Column Count
@@ -2556,7 +2556,7 @@ pub struct MatrixColumnProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MC/m:mc")]
 pub struct MatrixColumn {
   ///Matrix Column Properties
@@ -2568,7 +2568,7 @@ pub struct MatrixColumn {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:cSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:cSp")]
 pub struct ColumnSpacing {
   /// Value
@@ -2590,7 +2590,7 @@ pub struct ColumnSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:lMargin.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:lMargin")]
 pub struct LeftMargin {
   /// Value
@@ -2612,7 +2612,7 @@ pub struct LeftMargin {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:rMargin.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:rMargin")]
 pub struct RightMargin {
   /// Value
@@ -2634,7 +2634,7 @@ pub struct RightMargin {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:preSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:preSp")]
 pub struct PreSpacing {
   /// Value
@@ -2656,7 +2656,7 @@ pub struct PreSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:postSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:postSp")]
 pub struct PostSpacing {
   /// Value
@@ -2678,7 +2678,7 @@ pub struct PostSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:interSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:interSp")]
 pub struct InterSpacing {
   /// Value
@@ -2700,7 +2700,7 @@ pub struct InterSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:intraSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:intraSp")]
 pub struct IntraSpacing {
   /// Value
@@ -2722,7 +2722,7 @@ pub struct IntraSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:wrapIndent.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:wrapIndent")]
 pub struct WrapIndent {
   /// Value
@@ -2744,7 +2744,7 @@ pub struct WrapIndent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/")]
 pub struct TwipsMeasureType {
   /// Value
@@ -2766,7 +2766,7 @@ pub struct TwipsMeasureType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mcs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MCS/m:mcs")]
 pub struct MatrixColumns {
   /// _
@@ -2778,7 +2778,7 @@ pub struct MatrixColumns {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MPr/m:mPr")]
 pub struct MatrixProperties {
   ///Matrix Base Justification
@@ -2814,7 +2814,7 @@ pub struct MatrixProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MR/m:mr")]
 pub struct MatrixRow {
   /// _
@@ -2826,7 +2826,7 @@ pub struct MatrixRow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:limLoc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/m:limLoc")]
 pub struct LimitLocation {
   /// Value
@@ -2842,7 +2842,7 @@ pub struct LimitLocation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:intLim.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/m:intLim")]
 pub struct IntegralLimitLocation {
   /// Value
@@ -2858,7 +2858,7 @@ pub struct IntegralLimitLocation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:naryLim.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/m:naryLim")]
 pub struct NaryLimitLocation {
   /// Value
@@ -2874,7 +2874,7 @@ pub struct NaryLimitLocation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/")]
 pub struct LimitLocationType {
   /// Value
@@ -2890,7 +2890,7 @@ pub struct LimitLocationType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:naryPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_NaryPr/m:naryPr")]
 pub struct NaryProperties {
   ///n-ary Operator Character
@@ -2917,7 +2917,7 @@ pub struct NaryProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:phantPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_PhantPr/m:phantPr")]
 pub struct PhantomProperties {
   ///Phantom Show
@@ -2944,7 +2944,7 @@ pub struct PhantomProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:radPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_RadPr/m:radPr")]
 pub struct RadicalProperties {
   ///Hide Degree
@@ -2959,7 +2959,7 @@ pub struct RadicalProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sPrePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SPrePr/m:sPrePr")]
 pub struct PreSubSuperProperties {
   /// _
@@ -2971,7 +2971,7 @@ pub struct PreSubSuperProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sSubPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubPr/m:sSubPr")]
 pub struct SubscriptProperties {
   /// _
@@ -2983,7 +2983,7 @@ pub struct SubscriptProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sSubSupPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubSupPr/m:sSubSupPr")]
 pub struct SubSuperscriptProperties {
   ///Align Scripts
@@ -2998,7 +2998,7 @@ pub struct SubSuperscriptProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:sSupPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSupPr/m:sSupPr")]
 pub struct SuperscriptProperties {
   /// _
@@ -3010,7 +3010,7 @@ pub struct SuperscriptProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:argSz.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Integer2/m:argSz")]
 pub struct ArgumentSize {
   /// Value
@@ -3033,7 +3033,7 @@ pub struct ArgumentSize {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:argPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArgPr/m:argPr")]
 pub struct ArgumentProperties {
   ///Argument Size
@@ -3045,7 +3045,7 @@ pub struct ArgumentProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:jc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathJc/m:jc")]
 pub struct Justification {
   /// Value
@@ -3061,7 +3061,7 @@ pub struct Justification {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:defJc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathJc/m:defJc")]
 pub struct DefaultJustification {
   /// Value
@@ -3077,7 +3077,7 @@ pub struct DefaultJustification {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathJc/")]
 pub struct OfficeMathJustificationType {
   /// Value
@@ -3093,7 +3093,7 @@ pub struct OfficeMathJustificationType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:mathFont.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FontFace/m:mathFont")]
 pub struct MathFont {
   /// val
@@ -3110,7 +3110,7 @@ pub struct MathFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:brkBin.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BreakBin/m:brkBin")]
 pub struct BreakBinary {
   /// Value
@@ -3126,7 +3126,7 @@ pub struct BreakBinary {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:brkBinSub.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BreakBinSub/m:brkBinSub")]
 pub struct BreakBinarySubtraction {
   /// Value
@@ -3142,14 +3142,14 @@ pub struct BreakBinarySubtraction {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is m:oMathParaPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathParaPr/m:oMathParaPr")]
 pub struct ParagraphProperties {
   ///Justification
   #[sdk(child(qname = "m:CT_OMathJc/m:jc"))]
   pub justification: Option<Justification>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunChoice {
   #[sdk(child(qname = "w:CT_Br/w:br"))]
     WBr(
@@ -3346,7 +3346,7 @@ pub enum RunChoice {
     #[sdk(child(qname = "m:CT_Text/m:t"))]
     MT(std::boxed::Box<Text>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
     MOMath(std::boxed::Box<OfficeMath>),
@@ -3550,7 +3550,7 @@ pub enum ParagraphChoice {
         >,
     ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -3788,7 +3788,7 @@ pub enum OfficeMathChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -3855,14 +3855,14 @@ pub enum OfficeMathChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<OfficeMathChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MathPropertiesChoice {
   #[sdk(child(qname = "m:CT_TwipsMeasure/m:wrapIndent"))]
   MWrapIndent(std::boxed::Box<WrapIndent>),
   #[sdk(child(qname = "m:CT_OnOff/m:wrapRight"))]
   MWrapRight(std::boxed::Box<WrapRight>),
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct RunPropertiesChoiceSequence {
   ///Script.
   #[sdk(child(qname = "m:CT_Script/m:scr"))]
@@ -3871,14 +3871,14 @@ pub struct RunPropertiesChoiceSequence {
   #[sdk(child(qname = "m:CT_Style/m:sty"))]
   pub style: Option<Style>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice {
   #[sdk(child(qname = "m:CT_OnOff/m:nor"))]
   MNor(std::boxed::Box<NormalText>),
   #[sdk(sequence)]
   Sequence(std::boxed::Box<RunPropertiesChoiceSequence>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ControlPropertiesChoice {
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   EgRPr(
@@ -3911,7 +3911,7 @@ pub enum ControlPropertiesChoice {
     >,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -4149,7 +4149,7 @@ pub enum BaseChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4216,7 +4216,7 @@ pub enum BaseChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<BaseChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -4454,7 +4454,7 @@ pub enum NumeratorChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4521,7 +4521,7 @@ pub enum NumeratorChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<NumeratorChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -4759,7 +4759,7 @@ pub enum DenominatorChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4826,7 +4826,7 @@ pub enum DenominatorChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<DenominatorChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -5064,7 +5064,7 @@ pub enum FunctionNameChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -5131,7 +5131,7 @@ pub enum FunctionNameChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<FunctionNameChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -5369,7 +5369,7 @@ pub enum LimitChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -5436,7 +5436,7 @@ pub enum LimitChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<LimitChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -5674,7 +5674,7 @@ pub enum SubArgumentChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -5741,7 +5741,7 @@ pub enum SubArgumentChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<SubArgumentChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -5979,7 +5979,7 @@ pub enum SuperArgumentChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -6046,7 +6046,7 @@ pub enum SuperArgumentChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<SuperArgumentChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice2 {
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
@@ -6284,7 +6284,7 @@ pub enum DegreeChoice2 {
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(std::boxed::Box<Run>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice {
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -6351,7 +6351,7 @@ pub enum DegreeChoice {
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<DegreeChoice2>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathArgumentTypeChoice {
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
     MArgPr(std::boxed::Box<ArgumentProperties>),

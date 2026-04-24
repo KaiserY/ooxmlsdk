@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ClipboardFormatValues {
   #[sdk(rename = "PictOld")]
   #[default]
@@ -18,7 +18,7 @@ pub enum ClipboardFormatValues {
   #[sdk(rename = "PictScreen")]
   PictureScreen,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ObjectValues {
   #[sdk(rename = "Button")]
   #[default]
@@ -60,7 +60,7 @@ pub enum ObjectValues {
   #[sdk(rename = "Rect")]
   Rectangle,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BooleanEntryWithBlankValues {
   #[sdk(rename = "True")]
   #[default]
@@ -78,7 +78,7 @@ pub enum BooleanEntryWithBlankValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xvml:ClientData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xvml:CT_ClientData/xvml:ClientData")]
 pub struct ClientData {
   /// Object type
@@ -561,7 +561,7 @@ pub type ScriptLanguage = crate::simple_type::IntegerValue;
 ///
 /// When the object is serialized out as xml, it's qualified name is xvml:ScriptLocation.
 pub type ScriptLocation = crate::simple_type::IntegerValue;
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:MoveWithCells"))]
   XvmlMoveWithCells(BooleanEntryWithBlankValues),

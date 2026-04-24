@@ -21,7 +21,7 @@ pub type Value = crate::simple_type::StringValue;
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pRoam:props.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pRoam:CT_RoamingProperty/pRoam:props")]
 pub struct RoamingProperty {
   /// _

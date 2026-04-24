@@ -134,7 +134,7 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
     assert_stable_roundtrip::<SharedStringTable>(fixtures::SPREADSHEET_SHARED_STRING_TABLE_XML);
 
   assert_eq!(
-    parsed.xmlns_map.get("x").map(String::as_str),
+    ooxmlsdk::common::find_xmlns_uri(&parsed.xmlns, "x"),
     Some("http://schemas.openxmlformats.org/spreadsheetml/2006/main")
   );
   let items = shared_string_items(&parsed);

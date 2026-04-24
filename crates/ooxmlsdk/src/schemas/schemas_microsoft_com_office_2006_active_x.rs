@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PersistenceValues {
   #[sdk(rename = "persistPropertyBag")]
   #[default]
@@ -21,7 +21,7 @@ pub enum PersistenceValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ax:ocx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_Ocx/ax:ocx")]
 pub struct ActiveXControlData {
   /// classid
@@ -61,7 +61,7 @@ pub struct ActiveXControlData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ax:ocxPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_OcxPr/ax:ocxPr")]
 pub struct ActiveXObjectProperty {
   /// name
@@ -86,7 +86,7 @@ pub struct ActiveXObjectProperty {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ax:font.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_Font/ax:font")]
 pub struct SharedComFont {
   /// persistence
@@ -112,7 +112,7 @@ pub struct SharedComFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ax:picture.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_Picture/ax:picture")]
 pub struct SharedComPicture {
   /// id
@@ -123,7 +123,7 @@ pub struct SharedComPicture {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ActiveXObjectPropertyChoice {
   #[sdk(child(qname = "ax:CT_Font/ax:font"))]
   AxFont(std::boxed::Box<SharedComFont>),

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum DataSourceValues {
   #[sdk(rename = "ArticleInAPeriodical")]
   #[default]
@@ -47,11 +47,10 @@ pub enum DataSourceValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Sources.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_Sources/b:Sources")]
 pub struct Sources {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// Selected Style
@@ -87,7 +86,7 @@ pub struct Sources {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Person.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_PersonType/b:Person")]
 pub struct Person {
   /// _
@@ -429,7 +428,7 @@ pub type YearAccessed = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:NameList.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameListType/b:NameList")]
 pub struct NameList {
   /// _
@@ -441,7 +440,7 @@ pub struct NameList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Artist.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Artist")]
 pub struct Artist {
   ///Name List
@@ -453,7 +452,7 @@ pub struct Artist {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:BookAuthor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:BookAuthor")]
 pub struct BookAuthor {
   ///Name List
@@ -465,7 +464,7 @@ pub struct BookAuthor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Compiler.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Compiler")]
 pub struct Compiler {
   ///Name List
@@ -477,7 +476,7 @@ pub struct Compiler {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Composer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Composer")]
 pub struct Composer {
   ///Name List
@@ -489,7 +488,7 @@ pub struct Composer {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Conductor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Conductor")]
 pub struct Conductor {
   ///Name List
@@ -501,7 +500,7 @@ pub struct Conductor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Counsel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Counsel")]
 pub struct Counsel {
   ///Name List
@@ -513,7 +512,7 @@ pub struct Counsel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Director.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Director")]
 pub struct Director {
   ///Name List
@@ -525,7 +524,7 @@ pub struct Director {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Editor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Editor")]
 pub struct Editor {
   ///Name List
@@ -537,7 +536,7 @@ pub struct Editor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Interviewee.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Interviewee")]
 pub struct Interviewee {
   ///Name List
@@ -549,7 +548,7 @@ pub struct Interviewee {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Interviewer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Interviewer")]
 pub struct Interviewer {
   ///Name List
@@ -561,7 +560,7 @@ pub struct Interviewer {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Inventor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Inventor")]
 pub struct Inventor {
   ///Name List
@@ -573,7 +572,7 @@ pub struct Inventor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:ProducerName.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:ProducerName")]
 pub struct ProducerName {
   ///Name List
@@ -585,7 +584,7 @@ pub struct ProducerName {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Translator.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Translator")]
 pub struct Translator {
   ///Name List
@@ -597,7 +596,7 @@ pub struct Translator {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Writer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Writer")]
 pub struct Writer {
   ///Name List
@@ -609,7 +608,7 @@ pub struct Writer {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/")]
 pub struct NameType {
   ///Name List
@@ -621,7 +620,7 @@ pub struct NameType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Author.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Author")]
 pub struct Author {
   #[sdk(choice(
@@ -635,7 +634,7 @@ pub struct Author {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Performer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Performer")]
 pub struct Performer {
   #[sdk(choice(
@@ -649,7 +648,7 @@ pub struct Performer {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/")]
 pub struct NameOrCorporateType {
   #[sdk(choice(
@@ -663,7 +662,7 @@ pub struct NameOrCorporateType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Author.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_AuthorType/b:Author")]
 pub struct AuthorList {
   #[sdk(choice(
@@ -697,7 +696,7 @@ pub type SourceType = DataSourceValues;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is b:Source.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_SourceType/b:Source")]
 pub struct Source {
   #[sdk(choice(
@@ -756,28 +755,28 @@ pub struct Source {
   ))]
   pub xml_children: Vec<SourceChoice>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorChoice {
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   BNameList(std::boxed::Box<NameList>),
   #[sdk(text_child(qname = "b:ST_String255/b:Corporate"))]
   BCorporate(crate::simple_type::StringValue),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PerformerChoice {
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   BNameList(std::boxed::Box<NameList>),
   #[sdk(text_child(qname = "b:ST_String255/b:Corporate"))]
   BCorporate(crate::simple_type::StringValue),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NameOrCorporateTypeChoice {
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   BNameList(std::boxed::Box<NameList>),
   #[sdk(text_child(qname = "b:ST_String255/b:Corporate"))]
   BCorporate(crate::simple_type::StringValue),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorListChoice {
   #[sdk(child(qname = "b:CT_NameType/b:Artist"))]
   BArtist(std::boxed::Box<Artist>),
@@ -812,7 +811,7 @@ pub enum AuthorListChoice {
   #[sdk(child(qname = "b:CT_NameType/b:Writer"))]
   BWriter(std::boxed::Box<Writer>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SourceChoice {
   #[sdk(text_child(qname = "b:ST_String255/b:AbbreviatedCaseNumber"))]
   BAbbreviatedCaseNumber(crate::simple_type::StringValue),

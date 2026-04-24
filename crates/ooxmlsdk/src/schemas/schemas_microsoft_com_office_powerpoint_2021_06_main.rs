@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:taskHistoryDetails.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskHistoryDetails/p216:taskHistoryDetails")]
 pub struct TaskHistoryDetails {
   /// id
@@ -36,7 +36,7 @@ pub struct TaskHistoryDetails {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:comment.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_CommentAnchor/p216:comment")]
 pub struct CommentAnchor {
   /// id
@@ -57,7 +57,7 @@ pub struct CommentAnchor {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p216:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -70,7 +70,7 @@ pub struct ExtensionList {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:atrbtn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskAssignUnassignUser/p216:atrbtn")]
 pub struct AtrbtnTaskAssignUnassignUser {
   /// authorId
@@ -87,7 +87,7 @@ pub struct AtrbtnTaskAssignUnassignUser {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:asgn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskAssignUnassignUser/p216:asgn")]
 pub struct AsgnTaskAssignUnassignUser {
   /// authorId
@@ -104,7 +104,7 @@ pub struct AsgnTaskAssignUnassignUser {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:unAsgn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskAssignUnassignUser/p216:unAsgn")]
 pub struct UnAsgnTaskAssignUnassignUser {
   /// authorId
@@ -121,7 +121,7 @@ pub struct UnAsgnTaskAssignUnassignUser {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskAssignUnassignUser/")]
 pub struct OpenXmlTaskAssignUnassignUserElement {
   /// authorId
@@ -138,7 +138,7 @@ pub struct OpenXmlTaskAssignUnassignUserElement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:anchr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskAnchor/p216:anchr")]
 pub struct TaskAnchor {
   /// _
@@ -153,7 +153,7 @@ pub struct TaskAnchor {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:add.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Empty/p216:add")]
 pub struct AddEmpty {}
 /// Defines the UnasgnAllEmpty Class.
@@ -161,7 +161,7 @@ pub struct AddEmpty {}
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:unasgnAll.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Empty/p216:unasgnAll")]
 pub struct UnasgnAllEmpty {}
 /// Defines the EmptyType Class.
@@ -169,7 +169,7 @@ pub struct UnasgnAllEmpty {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Empty/")]
 pub struct EmptyType {}
 /// Defines the TaskTitleEventInfo Class.
@@ -177,7 +177,7 @@ pub struct EmptyType {}
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:title.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskTitleEventInfo/p216:title")]
 pub struct TaskTitleEventInfo {
   /// val
@@ -193,7 +193,7 @@ pub struct TaskTitleEventInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:date.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskScheduleEventInfo/p216:date")]
 pub struct TaskScheduleEventInfo {
   /// stDt
@@ -216,7 +216,7 @@ pub struct TaskScheduleEventInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:pcntCmplt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskProgressEventInfo/p216:pcntCmplt")]
 pub struct TaskProgressEventInfo {
   /// val
@@ -239,7 +239,7 @@ pub struct TaskProgressEventInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:pri.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskPriorityRecord/p216:pri")]
 pub struct TaskPriorityRecord {
   /// val
@@ -262,7 +262,7 @@ pub struct TaskPriorityRecord {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:undo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskUndo/p216:undo")]
 pub struct TaskUndo {
   /// id
@@ -283,7 +283,7 @@ pub struct TaskUndo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:unknown.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskUnknownRecord/p216:unknown")]
 pub struct TaskUnknownRecord {}
 /// Defines the TaskHistoryEvent Class.
@@ -291,7 +291,7 @@ pub struct TaskUnknownRecord {}
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:event.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskHistoryEvent/p216:event")]
 pub struct TaskHistoryEvent {
   /// time
@@ -341,14 +341,14 @@ pub struct TaskHistoryEvent {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p216:history.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p216:CT_TaskHistory/p216:history")]
 pub struct TaskHistory {
   /// _
   #[sdk(child(qname = "p216:CT_TaskHistoryEvent/p216:event"))]
   pub p216_event: Vec<TaskHistoryEvent>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TaskHistoryEventChoice {
   #[sdk(child(qname = "p216:CT_TaskAssignUnassignUser/p216:asgn"))]
   P216Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),

@@ -9,11 +9,10 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w16cid:commentsIds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16cid:CT_CommentsIds/w16cid:commentsIds")]
 pub struct CommentsIds {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -25,7 +24,7 @@ pub struct CommentsIds {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w16cid:commentId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16cid:CT_CommentId/w16cid:commentId")]
 pub struct CommentId {
   /// paraId

@@ -15,7 +15,7 @@ pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc2:hyperlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc2:CT_CommentHyperlink/xltc2:hyperlink")]
 pub struct CommentHyperlink {
   /// startIndex
@@ -48,7 +48,7 @@ pub struct CommentHyperlink {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc2:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xltc2:extLst")]
 pub struct ExtensionList {
   ///Extension.

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ResourceLinkage {
   #[sdk(rename = "embed")]
   #[default]
@@ -14,7 +14,7 @@ pub enum ResourceLinkage {
   #[sdk(rename = "linkAndEmbed")]
   LinkAndEmbed,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum DetachConnection {
   #[sdk(rename = "start")]
   #[default]
@@ -29,7 +29,7 @@ pub enum DetachConnection {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:spMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ShapeMoniker/oac:spMk")]
 pub struct ShapeMoniker {
   /// id
@@ -57,7 +57,7 @@ pub struct ShapeMoniker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:grpSpMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk")]
 pub struct GroupShapeMoniker {
   /// id
@@ -85,7 +85,7 @@ pub struct GroupShapeMoniker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:graphicFrameMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk")]
 pub struct GraphicFrameMoniker {
   /// id
@@ -113,7 +113,7 @@ pub struct GraphicFrameMoniker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cxnSpMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk")]
 pub struct ConnectorMoniker {
   /// id
@@ -141,7 +141,7 @@ pub struct ConnectorMoniker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:picMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_PictureMoniker/oac:picMk")]
 pub struct PictureMoniker {
   /// id
@@ -169,7 +169,7 @@ pub struct PictureMoniker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:inkMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_InkMoniker/oac:inkMk")]
 pub struct InkMoniker {
   /// id
@@ -197,7 +197,7 @@ pub struct InkMoniker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:dgMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingMonikerList/oac:dgMkLst")]
 pub struct DrawingMonikerList {
   #[sdk(any)]
@@ -208,7 +208,7 @@ pub struct DrawingMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/oac:xfrm")]
 pub struct Transform2D {
   /// Rotation
@@ -244,7 +244,7 @@ pub struct Transform2D {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:grpSpMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GroupShapeMonikerList/oac:grpSpMkLst")]
 pub struct GroupShapeMonikerList {
   #[sdk(any)]
@@ -255,7 +255,7 @@ pub struct GroupShapeMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:dePkg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementPackage/oac:dePkg")]
 pub struct DrawingElementPackage {}
 /// Defines the DeMkLstDrawingElementMonikerList Class.
@@ -263,7 +263,7 @@ pub struct DrawingElementPackage {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:deMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst")]
 pub struct DeMkLstDrawingElementMonikerList {
   #[sdk(any)]
@@ -274,7 +274,7 @@ pub struct DeMkLstDrawingElementMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:deMasterMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deMasterMkLst")]
 pub struct DeMasterMkLstDrawingElementMonikerList {
   #[sdk(any)]
@@ -285,7 +285,7 @@ pub struct DeMasterMkLstDrawingElementMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:deSrcMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deSrcMkLst")]
 pub struct DeSrcMkLstDrawingElementMonikerList {
   #[sdk(any)]
@@ -296,7 +296,7 @@ pub struct DeSrcMkLstDrawingElementMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:deTgtMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deTgtMkLst")]
 pub struct DeTgtMkLstDrawingElementMonikerList {
   #[sdk(any)]
@@ -307,7 +307,7 @@ pub struct DeTgtMkLstDrawingElementMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingElementMonikerList/")]
 pub struct OpenXmlDrawingElementMonikerListElement {}
 /// Defines the ImgDataImgData Class.
@@ -339,7 +339,7 @@ pub type OpenXmlImgDataElement = crate::simple_type::Base64BinaryValue;
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:imgUrl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResourceUrl/oac:imgUrl")]
 pub struct ResourceUrl {
   /// src
@@ -364,7 +364,7 @@ pub struct ResourceUrl {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:txBodyPkg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TextBodyPackage/oac:txBodyPkg")]
 pub struct TextBodyPackage {}
 /// Defines the GroupCommand Class.
@@ -372,7 +372,7 @@ pub struct TextBodyPackage {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:grpCmd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GroupCommand/oac:grpCmd")]
 pub struct GroupCommand {
   /// verId
@@ -423,7 +423,7 @@ pub struct GroupCommand {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:imgLink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ImgLink/oac:imgLink")]
 pub struct ImgLink {
   /// tgt
@@ -440,7 +440,7 @@ pub struct ImgLink {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:dcMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DocumentContextMonikerList/oac:dcMkLst")]
 pub struct DocumentContextMonikerList {
   #[sdk(any)]
@@ -451,7 +451,7 @@ pub struct DocumentContextMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:graphicParentMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GraphicParentMonikerList/oac:graphicParentMkLst")]
 pub struct GraphicParentMonikerList {
   #[sdk(any)]
@@ -462,7 +462,7 @@ pub struct GraphicParentMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:spMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ShapeMonikerList/oac:spMkLst")]
 pub struct ShapeMonikerList {
   #[sdk(any)]
@@ -473,7 +473,7 @@ pub struct ShapeMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:graphicFrameMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_GraphicFrameMonikerList/oac:graphicFrameMkLst")]
 pub struct GraphicFrameMonikerList {
   #[sdk(any)]
@@ -484,7 +484,7 @@ pub struct GraphicFrameMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cxnSpMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ConnectorMonikerList/oac:cxnSpMkLst")]
 pub struct ConnectorMonikerList {
   #[sdk(any)]
@@ -495,7 +495,7 @@ pub struct ConnectorMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:picMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_PictureMonikerList/oac:picMkLst")]
 pub struct PictureMonikerList {
   #[sdk(any)]
@@ -506,7 +506,7 @@ pub struct PictureMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:inkMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_InkMonikerList/oac:inkMkLst")]
 pub struct InkMonikerList {
   #[sdk(any)]
@@ -517,7 +517,7 @@ pub struct InkMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:txBodyMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst")]
 pub struct TextBodyMonikerList {
   #[sdk(any)]
@@ -528,7 +528,7 @@ pub struct TextBodyMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:txMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst")]
 pub struct TextCharRangeMonikerList {
   #[sdk(any)]
@@ -539,7 +539,7 @@ pub struct TextCharRangeMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlinkMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_HyperlinkMonikerList/oac:hlinkMkLst")]
 pub struct HyperlinkMonikerList {
   #[sdk(any)]
@@ -550,7 +550,7 @@ pub struct HyperlinkMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:model3DMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Model3DMonikerList/oac:model3DMkLst")]
 pub struct Model3DMonikerList {
   #[sdk(any)]
@@ -561,7 +561,7 @@ pub struct Model3DMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:viewSelLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ViewSelectionStgList/oac:viewSelLst")]
 pub struct ViewSelectionStgList {
   #[sdk(any)]
@@ -572,7 +572,7 @@ pub struct ViewSelectionStgList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:editorSelLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_EditorSelectionStgList/oac:editorSelLst")]
 pub struct EditorSelectionStgList {
   #[sdk(any)]
@@ -583,7 +583,7 @@ pub struct EditorSelectionStgList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:drSelLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_DrawingSelectionStgList/oac:drSelLst")]
 pub struct DrawingSelectionStgList {
   #[sdk(any)]
@@ -594,7 +594,7 @@ pub struct DrawingSelectionStgList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:tblMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableMonikerList/oac:tblMkLst")]
 pub struct TableMonikerList {
   #[sdk(any)]
@@ -605,7 +605,7 @@ pub struct TableMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:tcMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableCellMonikerList/oac:tcMkLst")]
 pub struct TableCellMonikerList {
   #[sdk(any)]
@@ -616,7 +616,7 @@ pub struct TableCellMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:trMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableRowMonikerList/oac:trMkLst")]
 pub struct TableRowMonikerList {
   #[sdk(any)]
@@ -627,7 +627,7 @@ pub struct TableRowMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:gridColMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")]
 pub struct TableColumnMonikerList {
   #[sdk(any)]
@@ -638,7 +638,7 @@ pub struct TableColumnMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualDrawingProps/oac:cNvPr")]
 pub struct ModifyNonVisualDrawingProps {
   /// name
@@ -689,7 +689,7 @@ pub struct ModifyNonVisualDrawingProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyTransformProps/oac:xfrm")]
 pub struct ModifyTransformProps {
   /// x
@@ -775,7 +775,7 @@ pub struct ModifyTransformProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:off.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/oac:off")]
 pub struct Point2DType {
   /// X-Axis Coordinate
@@ -812,7 +812,7 @@ pub struct Point2DType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/oac:pPr")]
 pub struct TextParagraphPropertiesType {
   /// Left Margin
@@ -983,7 +983,7 @@ pub struct TextParagraphPropertiesType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:bodyPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBodyProperties/oac:bodyPr")]
 pub struct TextBodyProperties {
   /// Rotation
@@ -1167,7 +1167,7 @@ pub struct TextBodyProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualDrawingShapeProps/oac:cNvSpPr")]
 pub struct ModifyNonVisualDrawingShapeProps {
   /// noGrp
@@ -1260,7 +1260,7 @@ pub struct ModifyNonVisualDrawingShapeProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:spMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ShapePropsMonikerList/oac:spMkLst")]
 pub struct ShapePropsMonikerList {
   #[sdk(any)]
@@ -1271,7 +1271,7 @@ pub struct ShapePropsMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/oac:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -1333,7 +1333,7 @@ pub struct ShapeProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:xfrm")]
 pub struct XfrmEmpty {}
 /// Defines the GeomEmpty Class.
@@ -1341,7 +1341,7 @@ pub struct XfrmEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:geom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:geom")]
 pub struct GeomEmpty {}
 /// Defines the FillEmpty Class.
@@ -1349,7 +1349,7 @@ pub struct GeomEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:fill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:fill")]
 pub struct FillEmpty {}
 /// Defines the LnEmpty Class.
@@ -1357,7 +1357,7 @@ pub struct FillEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:ln.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:ln")]
 pub struct LnEmpty {}
 /// Defines the EffectEmpty Class.
@@ -1365,7 +1365,7 @@ pub struct LnEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:effect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:effect")]
 pub struct EffectEmpty {}
 /// Defines the Scene3dEmpty Class.
@@ -1373,7 +1373,7 @@ pub struct EffectEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:scene3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:scene3d")]
 pub struct Scene3dEmpty {}
 /// Defines the Sp3dEmpty Class.
@@ -1381,7 +1381,7 @@ pub struct Scene3dEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:sp3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:sp3d")]
 pub struct Sp3dEmpty {}
 /// Defines the ExtLstEmpty Class.
@@ -1389,7 +1389,7 @@ pub struct Sp3dEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:extLst")]
 pub struct ExtLstEmpty {}
 /// Defines the BwModeEmpty Class.
@@ -1397,7 +1397,7 @@ pub struct ExtLstEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:bwMode.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:bwMode")]
 pub struct BwModeEmpty {}
 /// Defines the SrcRectEmpty Class.
@@ -1405,7 +1405,7 @@ pub struct BwModeEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:srcRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:srcRect")]
 pub struct SrcRectEmpty {}
 /// Defines the FillModeEmpty Class.
@@ -1413,7 +1413,7 @@ pub struct SrcRectEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:fillMode.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:fillMode")]
 pub struct FillModeEmpty {}
 /// Defines the DpiEmpty Class.
@@ -1421,7 +1421,7 @@ pub struct FillModeEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:dpi.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:dpi")]
 pub struct DpiEmpty {}
 /// Defines the RotWithShapeEmpty Class.
@@ -1429,7 +1429,7 @@ pub struct DpiEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:rotWithShape.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:rotWithShape")]
 pub struct RotWithShapeEmpty {}
 /// Defines the StCxnEmpty Class.
@@ -1437,7 +1437,7 @@ pub struct RotWithShapeEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:stCxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:stCxn")]
 pub struct StCxnEmpty {}
 /// Defines the EndCxnEmpty Class.
@@ -1445,7 +1445,7 @@ pub struct StCxnEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:endCxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:endCxn")]
 pub struct EndCxnEmpty {}
 /// Defines the NoGrpEmpty Class.
@@ -1453,7 +1453,7 @@ pub struct EndCxnEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noGrp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noGrp")]
 pub struct NoGrpEmpty {}
 /// Defines the NoSelectEmpty Class.
@@ -1461,7 +1461,7 @@ pub struct NoGrpEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noSelect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noSelect")]
 pub struct NoSelectEmpty {}
 /// Defines the NoRotEmpty Class.
@@ -1469,7 +1469,7 @@ pub struct NoSelectEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noRot.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noRot")]
 pub struct NoRotEmpty {}
 /// Defines the NoChangeAspectEmpty Class.
@@ -1477,7 +1477,7 @@ pub struct NoRotEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noChangeAspect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noChangeAspect")]
 pub struct NoChangeAspectEmpty {}
 /// Defines the NoMoveEmpty Class.
@@ -1485,7 +1485,7 @@ pub struct NoChangeAspectEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noMove.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noMove")]
 pub struct NoMoveEmpty {}
 /// Defines the NoResizeEmpty Class.
@@ -1493,7 +1493,7 @@ pub struct NoMoveEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noResize.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noResize")]
 pub struct NoResizeEmpty {}
 /// Defines the NoEditPointsEmpty Class.
@@ -1501,7 +1501,7 @@ pub struct NoResizeEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noEditPoints.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noEditPoints")]
 pub struct NoEditPointsEmpty {}
 /// Defines the NoAdjustHandlesEmpty Class.
@@ -1509,7 +1509,7 @@ pub struct NoEditPointsEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noAdjustHandles.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noAdjustHandles")]
 pub struct NoAdjustHandlesEmpty {}
 /// Defines the NoChangeArrowheadsEmpty Class.
@@ -1517,7 +1517,7 @@ pub struct NoAdjustHandlesEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noChangeArrowheads.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noChangeArrowheads")]
 pub struct NoChangeArrowheadsEmpty {}
 /// Defines the NoChangeShapeTypeEmpty Class.
@@ -1525,7 +1525,7 @@ pub struct NoChangeArrowheadsEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:noChangeShapeType.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:noChangeShapeType")]
 pub struct NoChangeShapeTypeEmpty {}
 /// Defines the LfPrEmpty Class.
@@ -1533,7 +1533,7 @@ pub struct NoChangeShapeTypeEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:lfPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:lfPr")]
 pub struct LfPrEmpty {}
 /// Defines the HlinkClickEmpty Class.
@@ -1541,7 +1541,7 @@ pub struct LfPrEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlinkClick.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:hlinkClick")]
 pub struct HlinkClickEmpty {}
 /// Defines the HlinkHoverEmpty Class.
@@ -1549,7 +1549,7 @@ pub struct HlinkClickEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlinkHover.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/oac:hlinkHover")]
 pub struct HlinkHoverEmpty {}
 /// Defines the OpenXmlEmptyElement Class.
@@ -1557,7 +1557,7 @@ pub struct HlinkHoverEmpty {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_Empty/")]
 pub struct OpenXmlEmptyElement {}
 /// Defines the ResetShapeProperties Class.
@@ -1565,7 +1565,7 @@ pub struct OpenXmlEmptyElement {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetShapeProperties/oac:spPr")]
 pub struct ResetShapeProperties {
   /// _
@@ -1601,7 +1601,7 @@ pub struct ResetShapeProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:lnRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/oac:lnRef")]
 pub struct LnRefStyleMatrixReference {
   /// Style Matrix Index
@@ -1626,7 +1626,7 @@ pub struct LnRefStyleMatrixReference {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:fillRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/oac:fillRef")]
 pub struct FillRefStyleMatrixReference {
   /// Style Matrix Index
@@ -1651,7 +1651,7 @@ pub struct FillRefStyleMatrixReference {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:effectRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/oac:effectRef")]
 pub struct EffectRefStyleMatrixReference {
   /// Style Matrix Index
@@ -1676,7 +1676,7 @@ pub struct EffectRefStyleMatrixReference {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/")]
 pub struct StyleMatrixReferenceType {
   /// Style Matrix Index
@@ -1701,7 +1701,7 @@ pub struct StyleMatrixReferenceType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:fontRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontReference/oac:fontRef")]
 pub struct FontReference {
   /// Identifier
@@ -1728,7 +1728,7 @@ pub struct FontReference {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyShapeStyleProps/oac:style")]
 pub struct ModifyShapeStyleProps {
   /// _
@@ -1761,7 +1761,7 @@ pub type UseBoundsXsdboolean = crate::simple_type::BooleanValue;
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:blipFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipFillProperties/oac:blipFill")]
 pub struct BlipFillProperties {
   /// DPI Setting
@@ -1797,7 +1797,7 @@ pub struct BlipFillProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:fillRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_RelativeRectProps/oac:fillRect")]
 pub struct FillRectRelativeRectProps {
   /// l
@@ -1834,7 +1834,7 @@ pub struct FillRectRelativeRectProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:srcRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_RelativeRectProps/oac:srcRect")]
 pub struct SrcRectRelativeRectProps {
   /// l
@@ -1871,7 +1871,7 @@ pub struct SrcRectRelativeRectProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_RelativeRectProps/")]
 pub struct OpenXmlRelativeRectPropsElement {
   /// l
@@ -1908,7 +1908,7 @@ pub struct OpenXmlRelativeRectPropsElement {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:blipFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetBlipFillProperties/oac:blipFill")]
 pub struct ResetBlipFillProperties {
   /// _
@@ -1929,7 +1929,7 @@ pub struct ResetBlipFillProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr")]
 pub struct ModifyNonVisualGroupDrawingShapeProps {
   /// noGrp
@@ -1987,7 +1987,7 @@ pub struct ModifyNonVisualGroupDrawingShapeProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:grpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupShapeProperties/oac:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
@@ -2033,7 +2033,7 @@ pub struct GroupShapeProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:grpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetGroupShapeProperties/oac:grpSpPr")]
 pub struct ResetGroupShapeProperties {
   /// _
@@ -2060,7 +2060,7 @@ pub struct ResetGroupShapeProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/oac:cNvPr")]
 pub struct NonVisualDrawingProps {
     /// Application defined unique identifier.
@@ -2123,7 +2123,7 @@ pub struct NonVisualDrawingProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProps {
     /// _
@@ -2144,7 +2144,7 @@ pub struct NonVisualGroupDrawingShapeProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvGraphicFramePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualGraphicFrameProps/oac:cNvGraphicFramePr")]
 pub struct ModifyNonVisualGraphicFrameProps {
   /// noGrp
@@ -2195,7 +2195,7 @@ pub struct ModifyNonVisualGraphicFrameProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:stCxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/oac:stCxn")]
 pub struct StCxnConnection {
   /// Identifier
@@ -2218,7 +2218,7 @@ pub struct StCxnConnection {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:endCxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/oac:endCxn")]
 pub struct EndCxnConnection {
   /// Identifier
@@ -2241,7 +2241,7 @@ pub struct EndCxnConnection {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/")]
 pub struct ConnectionType {
   /// Identifier
@@ -2264,7 +2264,7 @@ pub struct ConnectionType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvCxnSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualConnectorProps/oac:cNvCxnSpPr")]
 pub struct ModifyNonVisualConnectorProps {
   /// noGrp
@@ -2349,7 +2349,7 @@ pub struct ModifyNonVisualConnectorProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvCxnSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetNonVisualConnectorProps/oac:cNvCxnSpPr")]
 pub struct ResetNonVisualConnectorProps {
   /// _
@@ -2394,7 +2394,7 @@ pub struct ResetNonVisualConnectorProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:compressPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_CompressPictureProps/oac:compressPicPr")]
 pub struct CompressPictureProps {
   /// removeCrop
@@ -2426,7 +2426,7 @@ pub struct CompressPictureProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualPictureProps/oac:cNvPicPr")]
 pub struct ModifyNonVisualPictureProps {
   /// noGrp
@@ -2519,7 +2519,7 @@ pub struct ModifyNonVisualPictureProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetNonVisualPictureProps/oac:cNvPicPr")]
 pub struct ResetNonVisualPictureProps {
   /// _
@@ -2531,7 +2531,7 @@ pub struct ResetNonVisualPictureProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:bounds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BoundRect/oac:bounds")]
 pub struct BoundRect {
   /// l
@@ -2596,7 +2596,7 @@ pub struct BoundRect {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:svgBlipMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_SVGBlipMonikerList/oac:svgBlipMkLst")]
 pub struct SvgBlipMonikerList {
   #[sdk(any)]
@@ -2607,7 +2607,7 @@ pub struct SvgBlipMonikerList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:lineProps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/oac:lineProps")]
 pub struct LinePropertiesType {
   /// line width
@@ -2686,7 +2686,7 @@ pub struct LinePropertiesType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:cNvInkPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyNonVisualInkProps/oac:cNvInkPr")]
 pub struct ModifyNonVisualInkProps {
   /// noGrp
@@ -2772,7 +2772,7 @@ pub struct ModifyNonVisualInkProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlinkClick.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_HyperlinkProps/oac:hlinkClick")]
 pub struct HlinkClickHyperlinkProps {
   /// source
@@ -2833,7 +2833,7 @@ pub struct HlinkClickHyperlinkProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlinkHover.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_HyperlinkProps/oac:hlinkHover")]
 pub struct HlinkHoverHyperlinkProps {
   /// source
@@ -2894,7 +2894,7 @@ pub struct HlinkHoverHyperlinkProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_HyperlinkProps/")]
 pub struct OpenXmlHyperlinkPropsElement {
   /// source
@@ -2955,7 +2955,7 @@ pub struct OpenXmlHyperlinkPropsElement {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ModifyHyperlinkProps/oac:hlink")]
 pub struct ModifyHyperlinkProps {
   /// _
@@ -2970,7 +2970,7 @@ pub struct ModifyHyperlinkProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:hlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetHyperlinkProps/oac:hlink")]
 pub struct ResetHyperlinkProps {
   /// _
@@ -2985,7 +2985,7 @@ pub struct ResetHyperlinkProps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is oac:context.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_TextCharRangeContext/oac:context")]
 pub struct TextCharRangeContext {
   /// len
@@ -3003,7 +3003,7 @@ pub struct TextCharRangeContext {
   #[sdk(attr(qname = ":hash"))]
   pub hash: crate::simple_type::UInt32Value,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupCommandChoice {
   #[sdk(child(qname = "oac:CT_ShapeMoniker/oac:spMk"))]
   OacSpMk(std::boxed::Box<ShapeMoniker>),
@@ -3018,7 +3018,7 @@ pub enum GroupCommandChoice {
   #[sdk(child(qname = "oac:CT_InkMoniker/oac:inkMk"))]
   OacInkMk(std::boxed::Box<InkMoniker>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(
@@ -3031,7 +3031,7 @@ pub enum TextParagraphPropertiesTypeChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(
@@ -3050,7 +3050,7 @@ pub enum TextParagraphPropertiesTypeChoice2 {
     >,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(
@@ -3061,7 +3061,7 @@ pub enum TextParagraphPropertiesTypeChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletFont>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(
@@ -3084,7 +3084,7 @@ pub enum TextParagraphPropertiesTypeChoice4 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PictureBullet>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
   ANoAutofit(
@@ -3099,7 +3099,7 @@ pub enum TextBodyPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapeAutoFit>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   ASp3d(
@@ -3110,7 +3110,7 @@ pub enum TextBodyPropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FlatText>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -3121,7 +3121,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -3146,7 +3146,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -3157,7 +3157,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LnRefStyleMatrixReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3188,7 +3188,7 @@ pub enum LnRefStyleMatrixReferenceChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillRefStyleMatrixReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3219,7 +3219,7 @@ pub enum FillRefStyleMatrixReferenceChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectRefStyleMatrixReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3250,7 +3250,7 @@ pub enum EffectRefStyleMatrixReferenceChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleMatrixReferenceTypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3281,7 +3281,7 @@ pub enum StyleMatrixReferenceTypeChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3312,7 +3312,7 @@ pub enum FontReferenceChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillPropertiesChoice {
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
   ATile(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tile>),
@@ -3321,7 +3321,7 @@ pub enum BlipFillPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Stretch>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -3346,7 +3346,7 @@ pub enum GroupShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -3357,7 +3357,7 @@ pub enum GroupShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -3374,7 +3374,7 @@ pub enum LinePropertiesTypeChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesTypeChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(
@@ -3385,7 +3385,7 @@ pub enum LinePropertiesTypeChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomDash>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesTypeChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Round>),

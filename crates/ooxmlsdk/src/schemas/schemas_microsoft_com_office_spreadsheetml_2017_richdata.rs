@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RichValueFallbackType {
   #[sdk(rename = "b")]
   #[default]
@@ -16,7 +16,7 @@ pub enum RichValueFallbackType {
   #[sdk(rename = "s")]
   S,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RichValueValueType {
   #[sdk(rename = "d")]
   #[default]
@@ -41,7 +41,7 @@ pub enum RichValueValueType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:rvb.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_RichValueBlock/xlrd:rvb")]
 pub struct RichValueBlock {
   /// i
@@ -57,11 +57,10 @@ pub struct RichValueBlock {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:rvData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_RichValueData/xlrd:rvData")]
 pub struct RichValueData {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// count
@@ -83,11 +82,10 @@ pub struct RichValueData {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:rvStructures.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_RichValueStructures/xlrd:rvStructures")]
 pub struct RichValueStructures {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// count
@@ -109,7 +107,7 @@ pub struct RichValueStructures {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:rv.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_RichValue/xlrd:rv")]
 pub struct RichValue {
   /// s
@@ -131,7 +129,7 @@ pub struct RichValue {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xlrd:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -143,7 +141,7 @@ pub struct ExtensionList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:fb.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_RichValueFallback/xlrd:fb")]
 pub struct RichValueFallback {
   /// t
@@ -167,7 +165,7 @@ pub type Value = crate::simple_type::StringValue;
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:s.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_RichValueStructure/xlrd:s")]
 pub struct RichValueStructure {
   /// t
@@ -186,7 +184,7 @@ pub struct RichValueStructure {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrd:k.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd:CT_Key/xlrd:k")]
 pub struct Key {
   /// n

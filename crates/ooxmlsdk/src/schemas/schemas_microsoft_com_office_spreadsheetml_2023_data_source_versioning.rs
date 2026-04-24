@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxdsv:versionInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxdsv:CT_VersionInfo/xxdsv:versionInfo")]
 pub struct VersionInfo {
   /// _

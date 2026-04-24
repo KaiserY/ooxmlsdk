@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TimelineStyleType {
   #[sdk(rename = "selectionLabel")]
   #[default]
@@ -22,7 +22,7 @@ pub enum TimelineStyleType {
   #[sdk(rename = "selectedTimeBlockSpace")]
   SelectedTimeBlockSpace,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CalculatedMemberNumberFormat {
   #[sdk(rename = "default")]
   #[default]
@@ -32,7 +32,7 @@ pub enum CalculatedMemberNumberFormat {
   #[sdk(rename = "percent")]
   Percent,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SxvCellType {
   #[sdk(rename = "b")]
   #[default]
@@ -48,7 +48,7 @@ pub enum SxvCellType {
   #[sdk(rename = "bl")]
   Blank,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum MovingPeriodStep {
   #[sdk(rename = "year")]
   #[default]
@@ -62,7 +62,7 @@ pub enum MovingPeriodStep {
   #[sdk(rename = "day")]
   Day,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum QuestionType {
   #[sdk(rename = "checkBox")]
   #[default]
@@ -80,7 +80,7 @@ pub enum QuestionType {
   #[sdk(rename = "singleLineOfText")]
   SingleLineOfText,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum QuestionFormat {
   #[sdk(rename = "generalDate")]
   #[default]
@@ -104,7 +104,7 @@ pub enum QuestionFormat {
   #[sdk(rename = "currency")]
   Currency,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SurveyPosition {
   #[sdk(rename = "absolute")]
   #[default]
@@ -123,7 +123,7 @@ pub enum SurveyPosition {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotCaches.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCaches/x15:pivotCaches")]
 pub struct PivotCaches {
   /// _
@@ -136,7 +136,7 @@ pub struct PivotCaches {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineCachePivotCaches.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches")]
 pub struct TimelineCachePivotCaches {
   /// _
@@ -149,7 +149,7 @@ pub struct TimelineCachePivotCaches {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCaches/")]
 pub struct OpenXmlPivotCachesElement {
   ///PivotCache.
@@ -162,7 +162,7 @@ pub struct OpenXmlPivotCachesElement {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTableReferences.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences")]
 pub struct PivotTableReferences {
   /// _
@@ -174,7 +174,7 @@ pub struct PivotTableReferences {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:queryTable.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_QueryTable/x15:queryTable")]
 pub struct QueryTable {
   /// clipped
@@ -204,7 +204,7 @@ pub struct QueryTable {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:webExtensions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_WebExtensions/x15:webExtensions")]
 pub struct WebExtensions {
   /// _
@@ -216,7 +216,7 @@ pub struct WebExtensions {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineCacheRefs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs")]
 pub struct TimelineCacheReferences {
   /// _
@@ -228,7 +228,7 @@ pub struct TimelineCacheReferences {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineRefs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineRefs/x15:timelineRefs")]
 pub struct TimelineReferences {
   /// _
@@ -240,7 +240,7 @@ pub struct TimelineReferences {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:workbookPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_WorkbookPr/x15:workbookPr")]
 pub struct WorkbookProperties {
   /// chartTrackingRefBase
@@ -256,7 +256,7 @@ pub struct WorkbookProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineStyles.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineStyles/x15:timelineStyles")]
 pub struct TimelineStyles {
   /// defaultTimelineStyle
@@ -275,7 +275,7 @@ pub struct TimelineStyles {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dxfs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxfs/x15:dxfs")]
 pub struct DifferentialFormats {
   /// Format Count
@@ -295,7 +295,7 @@ pub struct DifferentialFormats {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:connection.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_Connection/x15:connection")]
 pub struct Connection {
   /// id
@@ -354,7 +354,7 @@ pub struct Connection {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:calculatedMember.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_CalculatedMember/x15:calculatedMember")]
 pub struct CalculatedMember {
   /// measureGroup
@@ -384,7 +384,7 @@ pub struct CalculatedMember {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTableUISettings.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings")]
 pub struct PivotTableUiSettings {
   /// sourceDataName
@@ -413,7 +413,7 @@ pub struct PivotTableUiSettings {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotFilter/x15:pivotFilter")]
 pub struct PivotFilter {
   /// useWholeDay
@@ -429,7 +429,7 @@ pub struct PivotFilter {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:cachedUniqueNames.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames")]
 pub struct CachedUniqueNames {
   /// _
@@ -441,7 +441,7 @@ pub struct CachedUniqueNames {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:cacheHierarchy.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy")]
 pub struct CacheHierarchy {
   /// aggregatedColumn
@@ -457,7 +457,7 @@ pub struct CacheHierarchy {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelinePivotCacheDefinition.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition")]
 pub struct TimelinePivotCacheDefinition {
   /// timelineData
@@ -473,7 +473,7 @@ pub struct TimelinePivotCacheDefinition {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotCacheIdVersion.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion")]
 pub struct PivotCacheIdVersion {
   /// cacheIdSupportedVersion
@@ -496,7 +496,7 @@ pub struct PivotCacheIdVersion {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dataModel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_DataModel/x15:dataModel")]
 pub struct DataModel {
   /// minVersionLoad
@@ -521,7 +521,7 @@ pub struct DataModel {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTableData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotTableData/x15:pivotTableData")]
 pub struct PivotTableData {
   /// rowCount
@@ -554,7 +554,7 @@ pub struct PivotTableData {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotCacheDecoupled.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled")]
 pub struct PivotCacheDecoupled {
   /// decoupled
@@ -570,7 +570,7 @@ pub struct PivotCacheDecoupled {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dataField.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_DataField/x15:dataField")]
 pub struct DataField {
   /// isCountDistinct
@@ -586,7 +586,7 @@ pub struct DataField {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:movingPeriodState.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_MovingPeriodState/x15:movingPeriodState")]
 pub struct MovingPeriodState {
   /// referenceDateBegin
@@ -630,7 +630,7 @@ pub struct MovingPeriodState {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:slicerCaches.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x14:CT_SlicerCaches/x15:slicerCaches")]
 pub struct SlicerCaches {
   /// _
@@ -643,7 +643,7 @@ pub struct SlicerCaches {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:tableSlicerCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache")]
 pub struct TableSlicerCache {
     /// tableId
@@ -694,7 +694,7 @@ pub struct TableSlicerCache {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:slicerCacheHideItemsWithNoData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData")]
 pub struct SlicerCacheHideItemsWithNoData {
   /// count
@@ -713,7 +713,7 @@ pub struct SlicerCacheHideItemsWithNoData {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:slicerCachePivotTables.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables")]
 pub struct SlicerCachePivotTables {
   /// _
@@ -727,7 +727,7 @@ pub struct SlicerCachePivotTables {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:survey.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_Survey/x15:survey")]
 pub struct Survey {
   /// id
@@ -784,11 +784,10 @@ pub struct Survey {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelines.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_Timelines/x15:timelines")]
 pub struct Timelines {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -800,11 +799,10 @@ pub struct Timelines {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineCacheDefinition.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineCacheDefinition/x15:timelineCacheDefinition")]
 pub struct TimelineCacheDefinition {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// name
@@ -836,7 +834,7 @@ pub struct TimelineCacheDefinition {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTableReference.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotTableReference/x15:pivotTableReference")]
 pub struct PivotTableReference {
   /// id
@@ -852,7 +850,7 @@ pub struct PivotTableReference {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:webExtension.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_WebExtension/x15:webExtension")]
 pub struct WebExtension {
   /// appRef
@@ -871,7 +869,7 @@ pub struct WebExtension {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineCacheRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineCacheRef/x15:timelineCacheRef")]
 pub struct TimelineCacheReference {
   /// id
@@ -887,7 +885,7 @@ pub struct TimelineCacheReference {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineRef/x15:timelineRef")]
 pub struct TimelineReference {
   /// id
@@ -903,7 +901,7 @@ pub struct TimelineReference {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineStyle/x15:timelineStyle")]
 pub struct TimelineStyle {
   /// name
@@ -922,7 +920,7 @@ pub struct TimelineStyle {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineStyleElement.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineStyleElement/x15:timelineStyleElement")]
 pub struct TimelineStyleElement {
   /// type
@@ -945,7 +943,7 @@ pub struct TimelineStyleElement {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timelineStyleElements.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineStyleElements/x15:timelineStyleElements")]
 pub struct TimelineStyleElements {
   /// _
@@ -957,7 +955,7 @@ pub struct TimelineStyleElements {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dbTable.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_DbTable/x15:dbTable")]
 pub struct DbTable {
   /// name
@@ -973,7 +971,7 @@ pub struct DbTable {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dbTables.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_DbTables/x15:dbTables")]
 pub struct DbTables {
   /// _
@@ -985,7 +983,7 @@ pub struct DbTables {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dbCommand.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_DbCommand/x15:dbCommand")]
 pub struct DbCommand {
   /// text
@@ -1001,7 +999,7 @@ pub struct DbCommand {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:textPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TextPr/x15:textPr")]
 pub struct TextProperties {
   /// prompt
@@ -1128,7 +1126,7 @@ pub struct TextProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:modelTextPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_ModelTextPr/x15:modelTextPr")]
 pub struct ModelTextProperties {
   /// headers
@@ -1144,7 +1142,7 @@ pub struct ModelTextProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:rangePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_RangePr/x15:rangePr")]
 pub struct RangeProperties {
   /// sourceName
@@ -1160,7 +1158,7 @@ pub struct RangeProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:oledbPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_OledbPr/x15:oledbPr")]
 pub struct OleDbPrpoperties {
   /// connection
@@ -1181,7 +1179,7 @@ pub struct OleDbPrpoperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:dataFeedPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_DataFeedPr/x15:dataFeedPr")]
 pub struct DataFeedProperties {
   /// connection
@@ -1200,7 +1198,7 @@ pub struct DataFeedProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:activeTabTopLevelEntity.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_FieldListActiveTabTopLevelEntity/x15:activeTabTopLevelEntity")]
 pub struct FieldListActiveTabTopLevelEntity {
   /// name
@@ -1223,7 +1221,7 @@ pub struct FieldListActiveTabTopLevelEntity {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/x15:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -1235,7 +1233,7 @@ pub struct ExtensionList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:cachedUniqueName.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_CachedUniqueName/x15:cachedUniqueName")]
 pub struct CachedUniqueName {
   /// index
@@ -1258,7 +1256,7 @@ pub struct CachedUniqueName {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:modelTable.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_ModelTable/x15:modelTable")]
 pub struct ModelTable {
   /// id
@@ -1288,7 +1286,7 @@ pub struct ModelTable {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:modelRelationship.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_ModelRelationship/x15:modelRelationship")]
 pub struct ModelRelationship {
   /// fromTable
@@ -1325,7 +1323,7 @@ pub struct ModelRelationship {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:modelTables.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_ModelTables/x15:modelTables")]
 pub struct ModelTables {
   /// _
@@ -1337,7 +1335,7 @@ pub struct ModelTables {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:modelRelationships.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_ModelRelationships/x15:modelRelationships")]
 pub struct ModelRelationships {
   /// _
@@ -1349,7 +1347,7 @@ pub struct ModelRelationships {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:c.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotValueCell/x15:c")]
 pub struct PivotValueCell {
   /// i
@@ -1384,7 +1382,7 @@ pub type Xstring = crate::simple_type::StringValue;
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:x.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotValueCellExtra/x15:x")]
 pub struct PivotValueCellExtra {
   /// in
@@ -1444,7 +1442,7 @@ pub struct PivotValueCellExtra {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTableServerFormats.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotTableServerFormats/x15:pivotTableServerFormats")]
 pub struct PivotTableServerFormats {
   /// count
@@ -1463,7 +1461,7 @@ pub struct PivotTableServerFormats {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:serverFormat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ServerFormat/x15:serverFormat")]
 pub struct ServerFormat {
   /// Culture
@@ -1486,7 +1484,7 @@ pub struct ServerFormat {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:slicerCacheOlapLevelName.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SlicerCacheOlapLevelName/x15:slicerCacheOlapLevelName")]
 pub struct SlicerCacheOlapLevelName {
   /// uniqueName
@@ -1509,7 +1507,7 @@ pub struct SlicerCacheOlapLevelName {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:surveyPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyElementPr/x15:surveyPr")]
 pub struct SurveyPrSurveyElementPr {
   /// cssClass
@@ -1577,7 +1575,7 @@ pub struct SurveyPrSurveyElementPr {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:titlePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyElementPr/x15:titlePr")]
 pub struct TitlePrSurveyElementPr {
   /// cssClass
@@ -1645,7 +1643,7 @@ pub struct TitlePrSurveyElementPr {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:descriptionPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyElementPr/x15:descriptionPr")]
 pub struct DescriptionPrSurveyElementPr {
   /// cssClass
@@ -1713,7 +1711,7 @@ pub struct DescriptionPrSurveyElementPr {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:questionsPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyElementPr/x15:questionsPr")]
 pub struct QuestionsPrSurveyElementPr {
   /// cssClass
@@ -1781,7 +1779,7 @@ pub struct QuestionsPrSurveyElementPr {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:questionPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyElementPr/x15:questionPr")]
 pub struct QuestionPrSurveyElementPr {
   /// cssClass
@@ -1849,7 +1847,7 @@ pub struct QuestionPrSurveyElementPr {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyElementPr/")]
 pub struct OpenXmlSurveyElementPrElement {
   /// cssClass
@@ -1917,7 +1915,7 @@ pub struct OpenXmlSurveyElementPrElement {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:questions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyQuestions/x15:questions")]
 pub struct SurveyQuestions {
   /// _
@@ -1932,7 +1930,7 @@ pub struct SurveyQuestions {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:question.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_SurveyQuestion/x15:question")]
 pub struct SurveyQuestion {
   /// binding
@@ -2010,7 +2008,7 @@ pub struct SurveyQuestion {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:timeline.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_Timeline/x15:timeline")]
 pub struct Timeline {
   /// name
@@ -2099,7 +2097,7 @@ pub struct Timeline {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTable.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineCachePivotTable/x15:pivotTable")]
 pub struct TimelineCachePivotTable {
   /// tabId
@@ -2122,7 +2120,7 @@ pub struct TimelineCachePivotTable {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:selection.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineRange/x15:selection")]
 pub struct SelectionTimelineRange {
   /// startDate
@@ -2145,7 +2143,7 @@ pub struct SelectionTimelineRange {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:bounds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineRange/x15:bounds")]
 pub struct BoundsTimelineRange {
   /// startDate
@@ -2168,7 +2166,7 @@ pub struct BoundsTimelineRange {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineRange/")]
 pub struct TimelineRange {
   /// startDate
@@ -2191,7 +2189,7 @@ pub struct TimelineRange {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:autoFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_AutoFilter/x15:autoFilter")]
 pub struct AutoFilter {
   /// Cell or Range Reference
@@ -2220,7 +2218,7 @@ pub struct AutoFilter {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotTables.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineCachePivotTables/x15:pivotTables")]
 pub struct TimelineCachePivotTables {
   /// _
@@ -2232,7 +2230,7 @@ pub struct TimelineCachePivotTables {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:state.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_TimelineState/x15:state")]
 pub struct TimelineState {
   /// singleRangeFilterState
@@ -2310,7 +2308,7 @@ pub struct TimelineState {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x15:pivotRow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_PivotRow/x15:pivotRow")]
 pub struct PivotRow {
   /// r
@@ -2331,7 +2329,7 @@ pub struct PivotRow {
   #[sdk(child(qname = "x15:CT_PivotValueCell/x15:c"))]
   pub x15_c: Vec<PivotValueCell>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleDbPrpopertiesChoice {
   #[sdk(child(qname = "x15:CT_DbTables/x15:dbTables"))]
   X15DbTables(std::boxed::Box<DbTables>),

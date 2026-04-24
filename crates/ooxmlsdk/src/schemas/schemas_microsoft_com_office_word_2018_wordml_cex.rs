@@ -9,11 +9,10 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w16cex:commentsExtensible.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16cex:CT_CommentsExtensible/w16cex:commentsExtensible")]
 pub struct CommentsExtensible {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -28,7 +27,7 @@ pub struct CommentsExtensible {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w16cex:commentExtensible.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16cex:CT_CommentExtensible/w16cex:commentExtensible")]
 pub struct CommentExtensible {
   /// durableId
@@ -62,7 +61,7 @@ pub struct CommentExtensible {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w16cex:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16cur:CT_ExtensionList/w16cex:extLst")]
 pub struct ExtensionList {
   /// _

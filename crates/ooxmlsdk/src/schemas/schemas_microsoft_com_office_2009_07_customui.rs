@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum GalleryShowInRibbonValues {
   #[sdk(rename = "false")]
   #[default]
@@ -12,7 +12,7 @@ pub enum GalleryShowInRibbonValues {
   #[sdk(rename = "0")]
   Zero,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SizeValues {
   #[sdk(rename = "normal")]
   #[default]
@@ -20,7 +20,7 @@ pub enum SizeValues {
   #[sdk(rename = "large")]
   Large,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ItemSizeValues {
   #[sdk(rename = "normal")]
   #[default]
@@ -28,7 +28,7 @@ pub enum ItemSizeValues {
   #[sdk(rename = "large")]
   Large,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BoxStyleValues {
   #[sdk(rename = "horizontal")]
   #[default]
@@ -36,7 +36,7 @@ pub enum BoxStyleValues {
   #[sdk(rename = "vertical")]
   Vertical,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TaskSizesValues {
   #[sdk(rename = "largeMediumSmall")]
   #[default]
@@ -52,7 +52,7 @@ pub enum TaskSizesValues {
   #[sdk(rename = "small")]
   Small,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExpandValues {
   #[sdk(rename = "topLeft")]
   #[default]
@@ -74,7 +74,7 @@ pub enum ExpandValues {
   #[sdk(rename = "bottomRight")]
   BottomRight,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StyleValues {
   #[sdk(rename = "normal")]
   #[default]
@@ -84,7 +84,7 @@ pub enum StyleValues {
   #[sdk(rename = "error")]
   Error,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum Style2Values {
   #[sdk(rename = "normal")]
   #[default]
@@ -94,7 +94,7 @@ pub enum Style2Values {
   #[sdk(rename = "large")]
   Large,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LayoutChildrenValues {
   #[sdk(rename = "horizontal")]
   #[default]
@@ -107,7 +107,7 @@ pub enum LayoutChildrenValues {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:control.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ControlCloneRegular/mso14:control")]
 pub struct ControlCloneRegular {
   /// idQ
@@ -332,7 +332,7 @@ pub struct ControlCloneRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ButtonRegular/mso14:button")]
 pub struct ButtonRegular {
   /// onAction
@@ -592,7 +592,7 @@ pub struct ButtonRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:checkBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_CheckBox/mso14:checkBox")]
 pub struct CheckBox {
   /// getPressed
@@ -804,7 +804,7 @@ pub struct CheckBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:gallery.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_GalleryRegular/mso14:gallery")]
 pub struct GalleryRegular {
   /// description
@@ -1246,7 +1246,7 @@ pub struct GalleryRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:toggleButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton")]
 pub struct ToggleButtonRegular {
   /// getPressed
@@ -1514,7 +1514,7 @@ pub struct ToggleButtonRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menuSeparator.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_MenuSeparator/mso14:menuSeparator")]
 pub struct MenuSeparator {
   /// id
@@ -1605,7 +1605,7 @@ pub struct MenuSeparator {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:splitButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_SplitButtonRegular/mso14:splitButton")]
 pub struct SplitButtonRegular {
   /// enabled
@@ -1760,7 +1760,7 @@ pub struct SplitButtonRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_MenuRegular/mso14:menu")]
 pub struct MenuRegular {
   /// itemSize
@@ -2031,7 +2031,7 @@ pub struct MenuRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:dynamicMenu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu")]
 pub struct DynamicMenuRegular {
   /// description
@@ -2298,7 +2298,7 @@ pub struct DynamicMenuRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:splitButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_SplitButtonWithTitle/mso14:splitButton")]
 pub struct SplitButtonWithTitle {
   /// enabled
@@ -2453,7 +2453,7 @@ pub struct SplitButtonWithTitle {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_MenuWithTitle/mso14:menu")]
 pub struct MenuWithTitle {
   /// id
@@ -2724,7 +2724,7 @@ pub struct MenuWithTitle {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menuSeparator.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_MenuSeparatorNoTitle/mso14:menuSeparator")]
 pub struct MenuSeparatorNoTitle {
   /// id
@@ -2799,7 +2799,7 @@ pub struct MenuSeparatorNoTitle {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:control.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ControlClone/mso14:control")]
 pub struct ControlClone {
   /// size
@@ -3055,7 +3055,7 @@ pub struct ControlClone {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:labelControl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_LabelControl/mso14:labelControl")]
 pub struct LabelControl {
   /// id
@@ -3233,7 +3233,7 @@ pub struct LabelControl {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Button/mso14:button")]
 pub struct Button {
   /// size
@@ -3508,7 +3508,7 @@ pub struct Button {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:toggleButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ToggleButton/mso14:toggleButton")]
 pub struct ToggleButton {
   /// size
@@ -3791,7 +3791,7 @@ pub struct ToggleButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:editBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_EditBox/mso14:editBox")]
 pub struct EditBox {
   /// enabled
@@ -4066,7 +4066,7 @@ pub struct EditBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:comboBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ComboBox/mso14:comboBox")]
 pub struct ComboBox {
   /// showItemImage
@@ -4406,7 +4406,7 @@ pub struct ComboBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:dropDown.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_DropDownRegular/mso14:dropDown")]
 pub struct DropDownRegular {
   /// onAction
@@ -4742,7 +4742,7 @@ pub struct DropDownRegular {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:gallery.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Gallery/mso14:gallery")]
 pub struct Gallery {
   /// size
@@ -5199,7 +5199,7 @@ pub struct Gallery {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Menu/mso14:menu")]
 pub struct Menu {
   /// size
@@ -5485,7 +5485,7 @@ pub struct Menu {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:dynamicMenu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_DynamicMenu/mso14:dynamicMenu")]
 pub struct DynamicMenu {
   /// size
@@ -5767,7 +5767,7 @@ pub struct DynamicMenu {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:splitButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_SplitButton/mso14:splitButton")]
 pub struct SplitButton {
   /// size
@@ -5937,7 +5937,7 @@ pub struct SplitButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:box.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Box/mso14:box")]
 pub struct Box {
   /// id
@@ -6051,7 +6051,7 @@ pub struct Box {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:buttonGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ButtonGroup/mso14:buttonGroup")]
 pub struct ButtonGroup {
   /// id
@@ -6152,7 +6152,7 @@ pub struct ButtonGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageMenuButton/mso14:button")]
 pub struct BackstageMenuButton {
   /// description
@@ -6309,7 +6309,7 @@ pub struct BackstageMenuButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:checkBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageMenuCheckBox/mso14:checkBox")]
 pub struct BackstageMenuCheckBox {
   /// description
@@ -6441,7 +6441,7 @@ pub struct BackstageMenuCheckBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageSubMenu/mso14:menu")]
 pub struct BackstageSubMenu {
   /// description
@@ -6586,7 +6586,7 @@ pub struct BackstageSubMenu {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:toggleButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageMenuToggleButton/mso14:toggleButton")]
 pub struct BackstageMenuToggleButton {
   /// image
@@ -6744,7 +6744,7 @@ pub struct BackstageMenuToggleButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageGroupButton/mso14:button")]
 pub struct BackstageGroupButton {
   /// expand
@@ -6931,7 +6931,7 @@ pub struct BackstageGroupButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:checkBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageCheckBox/mso14:checkBox")]
 pub struct BackstageCheckBox {
   /// expand
@@ -7102,7 +7102,7 @@ pub struct BackstageCheckBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:editBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageEditBox/mso14:editBox")]
 pub struct BackstageEditBox {
   /// id
@@ -7255,7 +7255,7 @@ pub struct BackstageEditBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:dropDown.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageDropDown/mso14:dropDown")]
 pub struct BackstageDropDown {
   /// id
@@ -7452,7 +7452,7 @@ pub struct BackstageDropDown {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:radioGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_RadioGroup/mso14:radioGroup")]
 pub struct RadioGroup {
   /// id
@@ -7609,7 +7609,7 @@ pub struct RadioGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:comboBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageComboBox/mso14:comboBox")]
 pub struct BackstageComboBox {
   /// id
@@ -7774,7 +7774,7 @@ pub struct BackstageComboBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:hyperlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Hyperlink/mso14:hyperlink")]
 pub struct Hyperlink {
   /// id
@@ -7970,7 +7970,7 @@ pub struct Hyperlink {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:labelControl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageLabelControl/mso14:labelControl")]
 pub struct BackstageLabelControl {
   /// id
@@ -8074,7 +8074,7 @@ pub struct BackstageLabelControl {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:groupBox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_GroupBox/mso14:groupBox")]
 pub struct GroupBox {
   /// id
@@ -8148,7 +8148,7 @@ pub struct GroupBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:layoutContainer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_LayoutContainer/mso14:layoutContainer")]
 pub struct LayoutContainer {
   /// id
@@ -8220,7 +8220,7 @@ pub struct LayoutContainer {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:imageControl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ImageControl/mso14:imageControl")]
 pub struct ImageControl {
   /// id
@@ -8329,7 +8329,7 @@ pub struct ImageControl {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:group.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageGroup/mso14:group")]
 pub struct BackstageGroup {
   /// id
@@ -8500,7 +8500,7 @@ pub struct BackstageGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:taskGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TaskGroup/mso14:taskGroup")]
 pub struct TaskGroup {
   /// id
@@ -8657,7 +8657,7 @@ pub struct TaskGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_MenuRoot/mso14:menu")]
 pub struct MenuRoot {
   /// title
@@ -8701,11 +8701,10 @@ pub struct MenuRoot {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:customUI.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_CustomUI/mso14:customUI")]
 pub struct CustomUi {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// onLoad
@@ -8742,7 +8741,7 @@ pub struct CustomUi {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:item.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Item/mso14:item")]
 pub struct Item {
   /// id
@@ -8804,7 +8803,7 @@ pub struct Item {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_VisibleButton/mso14:button")]
 pub struct VisibleButton {
   /// onAction
@@ -9049,7 +9048,7 @@ pub struct VisibleButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:toggleButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton")]
 pub struct VisibleToggleButton {
   /// getPressed
@@ -9302,7 +9301,7 @@ pub struct VisibleToggleButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:separator.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Separator/mso14:separator")]
 pub struct Separator {
   /// id
@@ -9392,7 +9391,7 @@ pub struct Separator {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:dialogBoxLauncher.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_DialogLauncher/mso14:dialogBoxLauncher")]
 pub struct DialogBoxLauncher {
   /// _
@@ -9404,7 +9403,7 @@ pub struct DialogBoxLauncher {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:group.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Group/mso14:group")]
 pub struct Group {
   /// id
@@ -9630,7 +9629,7 @@ pub struct Group {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:control.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ControlCloneQat/mso14:control")]
 pub struct ControlCloneQat {
   /// id
@@ -9888,7 +9887,7 @@ pub struct ControlCloneQat {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:sharedControls.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_QatItems/mso14:sharedControls")]
 pub struct SharedControlsQatItems {
   #[sdk(choice(
@@ -9903,7 +9902,7 @@ pub struct SharedControlsQatItems {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:documentControls.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_QatItems/mso14:documentControls")]
 pub struct DocumentControlsQatItems {
   #[sdk(choice(
@@ -9918,7 +9917,7 @@ pub struct DocumentControlsQatItems {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_QatItems/")]
 pub struct QatItemsType {
   #[sdk(choice(
@@ -9933,7 +9932,7 @@ pub struct QatItemsType {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:tab.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Tab/mso14:tab")]
 pub struct Tab {
   /// id
@@ -10069,7 +10068,7 @@ pub struct Tab {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:tabSet.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TabSet/mso14:tabSet")]
 pub struct TabSet {
   /// idMso
@@ -10106,7 +10105,7 @@ pub struct TabSet {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:command.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Command/mso14:command")]
 pub struct Command {
   /// onAction
@@ -10148,7 +10147,7 @@ pub struct Command {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:qat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Qat/mso14:qat")]
 pub struct QuickAccessToolbar {
   /// _
@@ -10163,7 +10162,7 @@ pub struct QuickAccessToolbar {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:tabs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Tabs/mso14:tabs")]
 pub struct Tabs {
   /// _
@@ -10175,7 +10174,7 @@ pub struct Tabs {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:contextualTabs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ContextualTabs/mso14:contextualTabs")]
 pub struct ContextualTabs {
   /// _
@@ -10187,7 +10186,7 @@ pub struct ContextualTabs {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:contextMenu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ContextMenu/mso14:contextMenu")]
 pub struct ContextMenu {
   /// idMso
@@ -10218,7 +10217,7 @@ pub struct ContextMenu {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:item.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageItem/mso14:item")]
 pub struct ItemBackstageItem {
   /// id
@@ -10254,7 +10253,7 @@ pub struct ItemBackstageItem {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:radioButton.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageItem/mso14:radioButton")]
 pub struct RadioButtonBackstageItem {
   /// id
@@ -10290,7 +10289,7 @@ pub struct RadioButtonBackstageItem {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageItem/")]
 pub struct BackstageItemType {
   /// id
@@ -10326,7 +10325,7 @@ pub struct BackstageItemType {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageRegularButton/mso14:button")]
 pub struct BackstageRegularButton {
   /// screentip
@@ -10499,7 +10498,7 @@ pub struct BackstageRegularButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstagePrimaryMenu/mso14:menu")]
 pub struct BackstagePrimaryMenu {
   /// screentip
@@ -10660,7 +10659,7 @@ pub struct BackstagePrimaryMenu {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:menuGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageMenuGroup/mso14:menuGroup")]
 pub struct BackstageMenuGroup {
   /// id
@@ -10727,7 +10726,7 @@ pub struct BackstageMenuGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:primaryItem.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_PrimaryItem/mso14:primaryItem")]
 pub struct PrimaryItem {
   #[sdk(choice(
@@ -10741,7 +10740,7 @@ pub struct PrimaryItem {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:topItems.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_GroupControls/mso14:topItems")]
 pub struct TopItemsGroupControls {
   #[sdk(choice(
@@ -10764,7 +10763,7 @@ pub struct TopItemsGroupControls {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:bottomItems.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_GroupControls/mso14:bottomItems")]
 pub struct BottomItemsGroupControls {
   #[sdk(choice(
@@ -10787,7 +10786,7 @@ pub struct BottomItemsGroupControls {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_GroupControls/")]
 pub struct GroupControlsType {
   #[sdk(choice(
@@ -10810,7 +10809,7 @@ pub struct GroupControlsType {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:category.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TaskGroupCategory/mso14:category")]
 pub struct TaskGroupCategory {
   /// id
@@ -10929,7 +10928,7 @@ pub struct TaskGroupCategory {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:task.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TaskGroupTask/mso14:task")]
 pub struct TaskGroupTask {
   /// id
@@ -11134,7 +11133,7 @@ pub struct TaskGroupTask {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:category.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TaskFormGroupCategory/mso14:category")]
 pub struct TaskFormGroupCategory {
   /// id
@@ -11253,7 +11252,7 @@ pub struct TaskFormGroupCategory {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:task.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TaskFormGroupTask/mso14:task")]
 pub struct TaskFormGroupTask {
   /// id
@@ -11446,7 +11445,7 @@ pub struct TaskFormGroupTask {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:taskFormGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_TaskFormGroup/mso14:taskFormGroup")]
 pub struct TaskFormGroup {
   /// id
@@ -11565,7 +11564,7 @@ pub struct TaskFormGroup {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:firstColumn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageGroups/mso14:firstColumn")]
 pub struct BackstageGroups {
   #[sdk(choice(
@@ -11580,7 +11579,7 @@ pub struct BackstageGroups {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:secondColumn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_SimpleGroups/mso14:secondColumn")]
 pub struct SimpleGroups {
   #[sdk(choice(
@@ -11594,7 +11593,7 @@ pub struct SimpleGroups {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:tab.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageTab/mso14:tab")]
 pub struct BackstageTab {
   /// id
@@ -11839,7 +11838,7 @@ pub struct BackstageTab {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:button.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_BackstageFastCommandButton/mso14:button")]
 pub struct BackstageFastCommandButton {
   /// idMso
@@ -12028,7 +12027,7 @@ pub struct BackstageFastCommandButton {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:commands.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Commands/mso14:commands")]
 pub struct Commands {
   /// _
@@ -12040,7 +12039,7 @@ pub struct Commands {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:ribbon.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Ribbon/mso14:ribbon")]
 pub struct Ribbon {
   /// startFromScratch
@@ -12065,7 +12064,7 @@ pub struct Ribbon {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:backstage.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_Backstage/mso14:backstage")]
 pub struct Backstage {
   /// onShow
@@ -12095,21 +12094,21 @@ pub struct Backstage {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mso14:contextMenus.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso14:CT_ContextMenus/mso14:contextMenus")]
 pub struct ContextMenus {
   /// _
   #[sdk(child(qname = "mso14:CT_ContextMenu/mso14:contextMenu"))]
   pub mso14_context_menu: Vec<ContextMenu>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonRegularChoice {
   #[sdk(child(qname = "mso14:CT_VisibleButton/mso14:button"))]
   Mso14Button(std::boxed::Box<VisibleButton>),
   #[sdk(child(qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuRegularChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneRegular>),
@@ -12130,14 +12129,14 @@ pub enum MenuRegularChoice {
   #[sdk(child(qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"))]
   Mso14DynamicMenu(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonWithTitleChoice {
   #[sdk(child(qname = "mso14:CT_VisibleButton/mso14:button"))]
   Mso14Button(std::boxed::Box<VisibleButton>),
   #[sdk(child(qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuWithTitleChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneRegular>),
@@ -12158,7 +12157,7 @@ pub enum MenuWithTitleChoice {
   #[sdk(child(qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"))]
   Mso14DynamicMenu(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneRegular>),
@@ -12179,14 +12178,14 @@ pub enum MenuChoice {
   #[sdk(child(qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"))]
   Mso14DynamicMenu(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonChoice {
   #[sdk(child(qname = "mso14:CT_VisibleButton/mso14:button"))]
   Mso14Button(std::boxed::Box<VisibleButton>),
   #[sdk(child(qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BoxChoice {
   #[sdk(child(qname = "mso14:CT_ControlClone/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlClone>),
@@ -12217,7 +12216,7 @@ pub enum BoxChoice {
   #[sdk(child(qname = "mso14:CT_ButtonGroup/mso14:buttonGroup"))]
   Mso14ButtonGroup(std::boxed::Box<ButtonGroup>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ButtonGroupChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneRegular>),
@@ -12236,7 +12235,7 @@ pub enum ButtonGroupChoice {
   #[sdk(child(qname = "mso14:CT_Separator/mso14:separator"))]
   Mso14Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupBoxChoice {
   #[sdk(child(qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
@@ -12261,7 +12260,7 @@ pub enum GroupBoxChoice {
   #[sdk(child(qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutContainerChoice {
   #[sdk(child(qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
@@ -12286,7 +12285,7 @@ pub enum LayoutContainerChoice {
   #[sdk(child(qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuRootChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneRegular>),
@@ -12307,7 +12306,7 @@ pub enum MenuRootChoice {
   #[sdk(child(qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"))]
   Mso14DynamicMenu(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
   #[sdk(child(qname = "mso14:CT_ControlClone/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlClone>),
@@ -12340,7 +12339,7 @@ pub enum GroupChoice {
   #[sdk(child(qname = "mso14:CT_Separator/mso14:separator"))]
   Mso14Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SharedControlsQatItemsChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneQat/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneQat>),
@@ -12349,7 +12348,7 @@ pub enum SharedControlsQatItemsChoice {
   #[sdk(child(qname = "mso14:CT_Separator/mso14:separator"))]
   Mso14Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DocumentControlsQatItemsChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneQat/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneQat>),
@@ -12358,7 +12357,7 @@ pub enum DocumentControlsQatItemsChoice {
   #[sdk(child(qname = "mso14:CT_Separator/mso14:separator"))]
   Mso14Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum QatItemsTypeChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneQat/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneQat>),
@@ -12367,7 +12366,7 @@ pub enum QatItemsTypeChoice {
   #[sdk(child(qname = "mso14:CT_Separator/mso14:separator"))]
   Mso14Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ContextMenuChoice {
   #[sdk(child(qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
   Mso14Control(std::boxed::Box<ControlCloneRegular>),
@@ -12388,7 +12387,7 @@ pub enum ContextMenuChoice {
   #[sdk(child(qname = "mso14:CT_MenuSeparatorNoTitle/mso14:menuSeparator"))]
   Mso14MenuSeparator(std::boxed::Box<MenuSeparatorNoTitle>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackstageMenuGroupChoice {
   #[sdk(child(qname = "mso14:CT_BackstageMenuButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageMenuButton>),
@@ -12399,14 +12398,14 @@ pub enum BackstageMenuGroupChoice {
   #[sdk(child(qname = "mso14:CT_BackstageMenuToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<BackstageMenuToggleButton>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PrimaryItemChoice {
   #[sdk(child(qname = "mso14:CT_BackstageRegularButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageRegularButton>),
   #[sdk(child(qname = "mso14:CT_BackstagePrimaryMenu/mso14:menu"))]
   Mso14Menu(std::boxed::Box<BackstagePrimaryMenu>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopItemsGroupControlsChoice {
   #[sdk(child(qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
@@ -12431,7 +12430,7 @@ pub enum TopItemsGroupControlsChoice {
   #[sdk(child(qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomItemsGroupControlsChoice {
   #[sdk(child(qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
@@ -12456,7 +12455,7 @@ pub enum BottomItemsGroupControlsChoice {
   #[sdk(child(qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupControlsTypeChoice {
   #[sdk(child(qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
@@ -12481,7 +12480,7 @@ pub enum GroupControlsTypeChoice {
   #[sdk(child(qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackstageGroupsChoice {
   #[sdk(child(qname = "mso14:CT_TaskFormGroup/mso14:taskFormGroup"))]
   Mso14TaskFormGroup(std::boxed::Box<TaskFormGroup>),
@@ -12490,14 +12489,14 @@ pub enum BackstageGroupsChoice {
   #[sdk(child(qname = "mso14:CT_TaskGroup/mso14:taskGroup"))]
   Mso14TaskGroup(std::boxed::Box<TaskGroup>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleGroupsChoice {
   #[sdk(child(qname = "mso14:CT_BackstageGroup/mso14:group"))]
   Mso14Group(std::boxed::Box<BackstageGroup>),
   #[sdk(child(qname = "mso14:CT_TaskGroup/mso14:taskGroup"))]
   Mso14TaskGroup(std::boxed::Box<TaskGroup>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackstageChoice {
   #[sdk(child(qname = "mso14:CT_BackstageTab/mso14:tab"))]
   Mso14Tab(std::boxed::Box<BackstageTab>),

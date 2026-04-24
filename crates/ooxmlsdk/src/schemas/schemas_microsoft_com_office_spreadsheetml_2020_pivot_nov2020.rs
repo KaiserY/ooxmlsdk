@@ -15,7 +15,7 @@ pub type Xsdboolean = crate::simple_type::BooleanValue;
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxpim:ignorableAfterVersion.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxpim:CT_Ignorable/xxpim:ignorableAfterVersion")]
 pub struct Ignorable {
   /// version
@@ -31,7 +31,7 @@ pub struct Ignorable {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxpim:dataFieldFutureData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxpim:CT_DataFieldFutureData/xxpim:dataFieldFutureData")]
 pub struct DataFieldFutureData {
   /// version

@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxl21:alternateUrls.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls")]
 pub struct ExternalBookAlternateUrls {
   /// driveId
@@ -38,7 +38,7 @@ pub struct ExternalBookAlternateUrls {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxl21:absoluteUrl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxl21:CT_AlternateUrl/xxl21:absoluteUrl")]
 pub struct AbsoluteUrlAlternateUrl {
   /// id
@@ -54,7 +54,7 @@ pub struct AbsoluteUrlAlternateUrl {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxl21:relativeUrl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxl21:CT_AlternateUrl/xxl21:relativeUrl")]
 pub struct RelativeUrlAlternateUrl {
   /// id
@@ -70,7 +70,7 @@ pub struct RelativeUrlAlternateUrl {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxl21:CT_AlternateUrl/")]
 pub struct OpenXmlAlternateUrlElement {
   /// id

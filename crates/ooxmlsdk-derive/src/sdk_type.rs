@@ -2466,16 +2466,15 @@ fn expand_named_struct(
   let xmlns_parse_tokens = if has_xmlns_fields {
     quote! {
       b"xmlns" => {
-        xmlns = Some(crate::common::decode_attr_value(&attr, decoder)?);
+        xmlns.push(crate::common::XmlNamespaceDecl::new(
+          "",
+          crate::common::decode_attr_value(&attr, decoder)?,
+        ));
       }
       key if key.starts_with(b"xmlns:") => {
         let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
         let uri = crate::common::decode_attr_value(&attr, decoder)?;
-        if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri.as_str()) {
-          xmlns_map.entry(canonical_prefix.to_string()).or_insert(uri);
-        } else {
-          xmlns_map.insert(prefix, uri);
-        }
+        xmlns.push(crate::common::XmlNamespaceDecl::new(prefix, uri));
       }
     }
   } else {
@@ -2496,8 +2495,7 @@ fn expand_named_struct(
     } else {
       match (has_xmlns_fields, has_mc_ignorable_field) {
         (true, true) => quote! {
-          let mut xmlns = None;
-          let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+          let mut xmlns = Vec::<crate::common::XmlNamespaceDecl>::new();
           let mut mc_ignorable = None;
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
@@ -2511,8 +2509,7 @@ fn expand_named_struct(
           }
         },
         (true, false) => quote! {
-          let mut xmlns = None;
-          let mut xmlns_map = std::collections::HashMap::<String, String>::new();
+          let mut xmlns = Vec::<crate::common::XmlNamespaceDecl>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
@@ -4636,15 +4633,13 @@ fn expand_named_struct(
 
   let special_namespace_write_tokens = if has_xmlns_fields {
     quote! {
-      if let Some(xmlns) = &self.xmlns {
-        crate::common::write_xmlns_attr(writer, None, xmlns)?;
-      }
-      {
-        let mut xmlns_entries: Vec<_> = self.xmlns_map.iter().collect();
-        xmlns_entries.sort_unstable_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
-        for (k, v) in xmlns_entries {
-          crate::common::write_xmlns_attr(writer, Some(k), v)?;
-        }
+      for declaration in &self.xmlns {
+        let prefix = if declaration.is_default() {
+          None
+        } else {
+          Some(declaration.prefix.as_str())
+        };
+        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_str())?;
       }
     }
   } else {
@@ -4662,7 +4657,6 @@ fn expand_named_struct(
   let special_namespace_init_tokens = if has_xmlns_fields {
     quote! {
       xmlns,
-      xmlns_map,
     }
   } else {
     quote! {}
@@ -4698,7 +4692,7 @@ fn expand_named_struct(
   };
   let to_xml_prefix_tokens = if has_xmlns_fields {
     quote! {
-      if self.xmlns.is_some() {
+      if self.xmlns.iter().any(crate::common::XmlNamespaceDecl::is_default) {
         #tag_prefix
       } else {
         ""

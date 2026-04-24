@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xcalcf:calcFeatures.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xcalcf:CT_CalcFeatures/xcalcf:calcFeatures")]
 pub struct CalcFeatures {
   /// _
@@ -21,7 +21,7 @@ pub struct CalcFeatures {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xcalcf:feature.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xcalcf:CT_CalcFeature/xcalcf:feature")]
 pub struct CalcFeature {
   /// name

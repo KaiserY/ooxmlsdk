@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SdtAppearance {
   #[sdk(rename = "boundingBox")]
   #[default]
@@ -19,7 +19,7 @@ pub enum SdtAppearance {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:color.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Color/w15:color")]
 pub struct Color {
   /// Run Content Color
@@ -69,7 +69,7 @@ pub struct Color {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:dataBinding.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DataBinding/w15:dataBinding")]
 pub struct DataBinding {
   /// XML Namespace Prefix Mappings
@@ -99,7 +99,7 @@ pub struct DataBinding {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:appearance.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_SdtAppearance/w15:appearance")]
 pub struct Appearance {
   /// val
@@ -115,11 +115,10 @@ pub struct Appearance {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:commentsEx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_CommentsEx/w15:commentsEx")]
 pub struct CommentsEx {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -131,11 +130,10 @@ pub struct CommentsEx {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:people.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_People/w15:people")]
 pub struct People {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -147,7 +145,7 @@ pub struct People {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:repeatingSection.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection")]
 pub struct SdtRepeatedSection {
   /// _
@@ -162,7 +160,7 @@ pub struct SdtRepeatedSection {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:repeatingSectionItem.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Empty/w15:repeatingSectionItem")]
 pub struct SdtRepeatedSectionItem {}
 /// Defines the ChartTrackingRefBased Class.
@@ -170,7 +168,7 @@ pub struct SdtRepeatedSectionItem {}
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:chartTrackingRefBased.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:chartTrackingRefBased")]
 pub struct ChartTrackingRefBased {
   /// On/Off Value
@@ -186,7 +184,7 @@ pub struct ChartTrackingRefBased {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:collapsed.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:collapsed")]
 pub struct DefaultCollapsed {
   /// On/Off Value
@@ -202,7 +200,7 @@ pub struct DefaultCollapsed {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:webExtensionLinked.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:webExtensionLinked")]
 pub struct WebExtensionLinked {
   /// On/Off Value
@@ -218,7 +216,7 @@ pub struct WebExtensionLinked {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:webExtensionCreated.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:webExtensionCreated")]
 pub struct WebExtensionCreated {
   /// On/Off Value
@@ -234,7 +232,7 @@ pub struct WebExtensionCreated {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:doNotAllowInsertDeleteSection.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:doNotAllowInsertDeleteSection")]
 pub struct DoNotAllowInsertDeleteSection {
   /// On/Off Value
@@ -250,7 +248,7 @@ pub struct DoNotAllowInsertDeleteSection {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/")]
 pub struct OnOffType {
   /// On/Off Value
@@ -266,7 +264,7 @@ pub struct OnOffType {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:docId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_Guid/w15:docId")]
 pub struct PersistentDocumentId {
   /// val
@@ -288,7 +286,7 @@ pub struct PersistentDocumentId {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:footnoteColumns.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w15:footnoteColumns")]
 pub struct FootnoteColumns {
   /// Decimal Number Value
@@ -304,7 +302,7 @@ pub struct FootnoteColumns {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:commentEx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_CommentEx/w15:commentEx")]
 pub struct CommentEx {
   /// paraId
@@ -336,7 +334,7 @@ pub struct CommentEx {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:person.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_Person/w15:person")]
 pub struct Person {
   /// author
@@ -355,7 +353,7 @@ pub struct Person {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:presenceInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w15:CT_PresenceInfo/w15:presenceInfo")]
 pub struct PresenceInfo {
   /// providerId
@@ -378,7 +376,7 @@ pub struct PresenceInfo {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w15:sectionTitle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w15:sectionTitle")]
 pub struct SectionTitle {
   /// String Value

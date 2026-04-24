@@ -1338,7 +1338,7 @@ fn parse_qname_info(qname: &str) -> QNameInfo {
 }
 
 fn is_xmlns_field(ident: &Ident) -> bool {
-  matches!(ident.to_string().as_str(), "xmlns" | "xmlns_map")
+  ident == "xmlns"
 }
 
 fn is_mc_ignorable_field(ident: &Ident) -> bool {

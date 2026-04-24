@@ -9,7 +9,7 @@
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:prstTrans.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_PresetTransition/p15:prstTrans")]
 pub struct PresetTransition {
   /// prst
@@ -39,7 +39,7 @@ pub struct PresetTransition {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:presenceInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_PresenceInfo/p15:presenceInfo")]
 pub struct PresenceInfo {
   /// userId
@@ -62,7 +62,7 @@ pub struct PresenceInfo {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:threadingInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_CommentThreading/p15:threadingInfo")]
 pub struct ThreadingInfo {
   /// timeZoneBias
@@ -81,7 +81,7 @@ pub struct ThreadingInfo {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:sldGuideLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst")]
 pub struct SlideGuideList {
   /// _
@@ -96,7 +96,7 @@ pub struct SlideGuideList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:notesGuideLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst")]
 pub struct NotesGuideList {
   /// _
@@ -111,7 +111,7 @@ pub struct NotesGuideList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ExtendedGuideList/")]
 pub struct ExtendedGuideList {
   #[sdk(choice(
@@ -125,11 +125,10 @@ pub struct ExtendedGuideList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:chartTrackingRefBased.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased")]
 pub struct ChartTrackingReferenceBased {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// val
   ///
   /// Available in Office2013 and above.
@@ -143,7 +142,7 @@ pub struct ChartTrackingReferenceBased {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:parentCm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ParentCommentIdentifier/p15:parentCm")]
 pub struct ParentCommentIdentifier {
   /// authorId
@@ -166,7 +165,7 @@ pub struct ParentCommentIdentifier {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:clr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p15:clr")]
 pub struct ColorType {
   #[sdk(choice(
@@ -184,7 +183,7 @@ pub struct ColorType {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p15:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -197,7 +196,7 @@ pub struct ExtensionList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p15:guide.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p15:CT_ExtendedGuide/p15:guide")]
 pub struct ExtendedGuide {
   /// id
@@ -244,14 +243,14 @@ pub struct ExtendedGuide {
   #[sdk(child(qname = "p:CT_ExtensionList/p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ExtendedGuideListChoice {
   #[sdk(child(qname = "p15:CT_ExtendedGuide/p15:guide"))]
   P15Guide(std::boxed::Box<ExtendedGuide>),
   #[sdk(child(qname = "p:CT_ExtensionList/p15:extLst"))]
   P15ExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(

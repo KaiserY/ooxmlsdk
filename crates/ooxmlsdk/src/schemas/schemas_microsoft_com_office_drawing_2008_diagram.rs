@@ -9,11 +9,10 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:drawing.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_Drawing/dsp:drawing")]
 pub struct Drawing {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -25,11 +24,10 @@ pub struct Drawing {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:dataModelExt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt")]
 pub struct DataModelExtensionBlock {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// relId
   ///
   /// Available in Office2010 and above.
@@ -51,7 +49,7 @@ pub struct DataModelExtensionBlock {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr")]
 pub struct NonVisualDrawingProperties {
     /// Application defined unique identifier.
@@ -114,7 +112,7 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:cNvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
   /// Text Box
@@ -139,7 +137,7 @@ pub struct NonVisualDrawingShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:nvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr")]
 pub struct ShapeNonVisualProperties {
   /// _
@@ -154,7 +152,7 @@ pub struct ShapeNonVisualProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/dsp:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -216,7 +214,7 @@ pub struct ShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/dsp:style")]
 pub struct ShapeStyle {
   /// _
@@ -242,7 +240,7 @@ pub struct ShapeStyle {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:txBody.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dsp:txBody")]
 pub struct TextBody {
   ///Body Properties
@@ -263,7 +261,7 @@ pub struct TextBody {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:txXfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/dsp:txXfrm")]
 pub struct Transform2D {
   /// Rotation
@@ -299,7 +297,7 @@ pub struct Transform2D {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dsp:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -311,7 +309,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:cNvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProperties {
     /// _
@@ -332,7 +330,7 @@ pub struct NonVisualGroupDrawingShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:nvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr")]
 pub struct GroupShapeNonVisualProperties {
   /// _
@@ -348,7 +346,7 @@ pub struct GroupShapeNonVisualProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:grpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
@@ -394,7 +392,7 @@ pub struct GroupShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:sp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_Shape/dsp:sp")]
 pub struct Shape {
   /// modelId
@@ -434,7 +432,7 @@ pub struct Shape {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:grpSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_GroupShape/dsp:grpSp")]
 pub struct GroupShape {
   /// _
@@ -454,7 +452,7 @@ pub struct GroupShape {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dsp:spTree.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_GroupShape/dsp:spTree")]
 pub struct ShapeTree {
   /// _
@@ -474,7 +472,7 @@ pub struct ShapeTree {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_GroupShape/")]
 pub struct GroupShapeType {
   #[sdk(choice(
@@ -486,7 +484,7 @@ pub struct GroupShapeType {
   ))]
   pub xml_children: Vec<GroupShapeTypeChoice>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -497,7 +495,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -522,7 +520,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -533,7 +531,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -558,7 +556,7 @@ pub enum GroupShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -569,21 +567,21 @@ pub enum GroupShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
   #[sdk(child(qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
   #[sdk(child(qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeTypeChoice {
   #[sdk(child(qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
   DspNvGrpSpPr(std::boxed::Box<GroupShapeNonVisualProperties>),

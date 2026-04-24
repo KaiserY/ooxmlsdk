@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pc2:cmMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pc2:CT_CommentV2MonikerList/pc2:cmMkLst")]
 pub struct CommentV2MonikerList {
   /// _
@@ -26,7 +26,7 @@ pub struct CommentV2MonikerList {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pc2:cmRplyMkLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pc2:CT_CommentReplyV2MonikerList/pc2:cmRplyMkLst")]
 pub struct CommentReplyV2MonikerList {
   /// _
@@ -41,7 +41,7 @@ pub struct CommentReplyV2MonikerList {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pc2:cmMK.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pc2:CT_CommentV2Moniker/pc2:cmMK")]
 pub struct CommentV2Moniker {
   /// id
@@ -62,7 +62,7 @@ pub struct CommentV2Moniker {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is pc2:cmRplyMk.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pc2:CT_CommentReplyV2Moniker/pc2:cmRplyMk")]
 pub struct CommentReplyV2Moniker {
   /// id

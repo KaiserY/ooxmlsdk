@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ds:datastoreItem.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ds:CT_DatastoreItem/ds:datastoreItem")]
 pub struct DataStoreItem {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// Custom XML Data ID
@@ -37,7 +36,7 @@ pub struct DataStoreItem {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ds:schemaRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ds:CT_DatastoreSchemaRef/ds:schemaRef")]
 pub struct SchemaReference {
   /// Target Namespace of Associated XML Schema
@@ -53,7 +52,7 @@ pub struct SchemaReference {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ds:schemaRefs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ds:CT_DatastoreSchemaRefs/ds:schemaRefs")]
 pub struct SchemaReferences {
   /// _

@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mc:AlternateContent.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mc:CT_AlternateContent/mc:AlternateContent")]
 pub struct AlternateContent {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub mc_ignorable: Option<String>,
   /// mc:MustUnderstand
   ///
@@ -37,11 +36,10 @@ pub struct AlternateContent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mc:Choice.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mc:CT_Choice/mc:Choice")]
 pub struct Choice {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub mc_ignorable: Option<String>,
   /// Requires
   ///
@@ -72,11 +70,10 @@ pub struct Choice {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is mc:Fallback.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mc:CT_Fallback/mc:Fallback")]
 pub struct Fallback {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub mc_ignorable: Option<String>,
   /// mc:MustUnderstand
   ///
@@ -95,7 +92,7 @@ pub struct Fallback {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AlternateContentChoice {
   #[sdk(child(qname = "mc:CT_Choice/mc:Choice"))]
   McChoice(std::boxed::Box<Choice>),

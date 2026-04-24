@@ -9,7 +9,7 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is sl:schemaLibrary.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "sl:CT_SchemaLibrary/sl:schemaLibrary")]
 pub struct SchemaLibrary {
   /// _
@@ -21,7 +21,7 @@ pub struct SchemaLibrary {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is sl:schema.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "sl:CT_Schema/sl:schema")]
 pub struct Schema {
   /// Custom XML Schema Namespace

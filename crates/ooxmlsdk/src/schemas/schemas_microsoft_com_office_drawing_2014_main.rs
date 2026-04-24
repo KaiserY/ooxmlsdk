@@ -9,11 +9,10 @@
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a16:creationId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a16:CT_CreationId/a16:creationId")]
 pub struct CreationId {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   ///
   /// Available in Office2016 and above.
@@ -32,7 +31,7 @@ pub struct CreationId {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a16:predDERef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef")]
 pub struct PredecessorDrawingElementReference {
   /// pred
@@ -53,7 +52,7 @@ pub struct PredecessorDrawingElementReference {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a16:cxnDERefs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a16:CT_ConnectableReferences/a16:cxnDERefs")]
 pub struct ConnectableReferences {
   /// st
@@ -86,7 +85,7 @@ pub struct ConnectableReferences {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a16:rowId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a16:CT_Identifier/a16:rowId")]
 pub struct RowIdIdentifier {
   /// val
@@ -102,7 +101,7 @@ pub struct RowIdIdentifier {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a16:colId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a16:CT_Identifier/a16:colId")]
 pub struct ColIdIdentifier {
   /// val
@@ -118,7 +117,7 @@ pub struct ColIdIdentifier {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a16:CT_Identifier/")]
 pub struct OpenXmlIdentifierElement {
   /// val

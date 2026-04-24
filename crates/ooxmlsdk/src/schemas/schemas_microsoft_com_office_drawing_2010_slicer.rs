@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is sle:slicer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "sle:CT_Slicer/sle:slicer")]
 pub struct Slicer {
   /// name
@@ -28,7 +28,7 @@ pub struct Slicer {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is sle:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/sle:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.

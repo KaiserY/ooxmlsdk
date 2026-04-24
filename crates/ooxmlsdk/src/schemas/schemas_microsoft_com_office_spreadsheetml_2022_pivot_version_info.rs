@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxpvi:cacheVersionInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo")]
 pub struct CacheVersionInfo {
   /// _
@@ -24,7 +24,7 @@ pub struct CacheVersionInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xxpvi:pivotVersionInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo")]
 pub struct PivotVersionInfo {
   /// _

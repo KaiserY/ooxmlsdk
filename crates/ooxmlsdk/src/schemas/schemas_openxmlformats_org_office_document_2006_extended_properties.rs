@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ap:Properties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_Properties/ap:Properties")]
 pub struct Properties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   ///Name of Document Template
@@ -241,7 +240,7 @@ pub type HyperlinksChanged = crate::simple_type::BooleanValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ap:HeadingPairs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorVariant/ap:HeadingPairs")]
 pub struct HeadingPairs {
   ///Vector
@@ -255,7 +254,7 @@ pub struct HeadingPairs {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ap:HLinks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorVariant/ap:HLinks")]
 pub struct HyperlinkList {
   ///Vector
@@ -269,7 +268,7 @@ pub struct HyperlinkList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorVariant/")]
 pub struct VectorVariantType {
   ///Vector
@@ -283,7 +282,7 @@ pub struct VectorVariantType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ap:TitlesOfParts.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorLpstr/ap:TitlesOfParts")]
 pub struct TitlesOfParts {
   ///Vector
@@ -297,7 +296,7 @@ pub struct TitlesOfParts {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ap:DigSig.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_DigSigBlob/ap:DigSig")]
 pub struct DigitalSignature {
   ///Binary Blob

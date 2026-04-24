@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ClassificationOutcomeType {
   #[sdk(rename = "none")]
   #[default]
@@ -21,7 +21,7 @@ pub enum ClassificationOutcomeType {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is aclsh:classification.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "aclsh:CT_ClassificationOutcome/aclsh:classification")]
 pub struct ClassificationOutcome {
   /// classificationOutcomeType

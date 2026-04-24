@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum STorageType {
   #[sdk(rename = "sibTrans")]
   #[default]
@@ -17,7 +17,7 @@ pub enum STorageType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm1611:autoBuNodeInfoLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst")]
 pub struct NumberDiagramInfoList {
   /// _
@@ -29,7 +29,7 @@ pub struct NumberDiagramInfoList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm1611:buPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm1611:CT_DiagramAutoBullet/dgm1611:buPr")]
 pub struct DiagramAutoBullet {
   /// prefix
@@ -59,7 +59,7 @@ pub struct DiagramAutoBullet {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm1611:autoBuNodeInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm1611:CT_NumberDiagramInfo/dgm1611:autoBuNodeInfo")]
 pub struct NumberDiagramInfo {
   /// lvl
@@ -81,7 +81,7 @@ pub struct NumberDiagramInfo {
   #[sdk(child(qname = "dgm1611:CT_DiagramAutoBullet/dgm1611:buPr"))]
   pub diagram_auto_bullet: std::boxed::Box<DiagramAutoBullet>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramAutoBulletChoice {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(

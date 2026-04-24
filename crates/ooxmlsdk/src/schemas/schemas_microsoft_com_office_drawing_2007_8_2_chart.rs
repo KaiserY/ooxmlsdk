@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:pivotOptions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_PivotOptions/c14:pivotOptions")]
 pub struct PivotOptions {
   /// _
@@ -33,7 +33,7 @@ pub struct PivotOptions {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:sketchOptions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_SketchOptions/c14:sketchOptions")]
 pub struct SketchOptions {
   /// _
@@ -48,7 +48,7 @@ pub struct SketchOptions {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:invertSolidFillFmt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt")]
 pub struct InvertSolidFillFormat {
   /// _
@@ -60,7 +60,7 @@ pub struct InvertSolidFillFormat {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_Style/c14:style")]
 pub struct Style {
   /// val
@@ -83,7 +83,7 @@ pub struct Style {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c14:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -145,7 +145,7 @@ pub struct ShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:dropZoneFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneFilter")]
 pub struct DropZoneFilter {
   /// val
@@ -161,7 +161,7 @@ pub struct DropZoneFilter {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:dropZoneCategories.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneCategories")]
 pub struct DropZoneCategories {
   /// val
@@ -177,7 +177,7 @@ pub struct DropZoneCategories {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:dropZoneData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneData")]
 pub struct DropZoneData {
   /// val
@@ -193,7 +193,7 @@ pub struct DropZoneData {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:dropZoneSeries.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneSeries")]
 pub struct DropZoneSeries {
   /// val
@@ -209,7 +209,7 @@ pub struct DropZoneSeries {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:dropZonesVisible.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/c14:dropZonesVisible")]
 pub struct DropZonesVisible {
   /// val
@@ -225,7 +225,7 @@ pub struct DropZonesVisible {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:inSketchMode.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/c14:inSketchMode")]
 pub struct InSketchMode {
   /// val
@@ -241,7 +241,7 @@ pub struct InSketchMode {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanFalse/")]
 pub struct BooleanFalseType {
   /// val
@@ -257,7 +257,7 @@ pub struct BooleanFalseType {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c14:showSketchBtn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c14:CT_BooleanTrue/c14:showSketchBtn")]
 pub struct ShowSketchButton {
   /// val
@@ -268,7 +268,7 @@ pub struct ShowSketchButton {
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -279,7 +279,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -304,7 +304,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(

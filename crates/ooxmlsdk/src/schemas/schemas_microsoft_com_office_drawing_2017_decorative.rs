@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is adec:decorative.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "adec:CT_Decorative/adec:decorative")]
 pub struct Decorative {
   /// val

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtensionHandlingBehaviorValues {
   #[sdk(rename = "view")]
   #[default]
@@ -14,7 +14,7 @@ pub enum ExtensionHandlingBehaviorValues {
   #[sdk(rename = "backwardCompatible")]
   BackwardCompatible,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FillTypeValues {
   #[sdk(rename = "solid")]
   #[default]
@@ -30,7 +30,7 @@ pub enum FillTypeValues {
   #[sdk(rename = "frame")]
   Frame,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FillMethodValues {
   #[sdk(rename = "none")]
   #[default]
@@ -44,7 +44,7 @@ pub enum FillMethodValues {
   #[sdk(rename = "linear sigma")]
   Linearsigma,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeLineStyleValues {
   #[sdk(rename = "single")]
   #[default]
@@ -58,7 +58,7 @@ pub enum StrokeLineStyleValues {
   #[sdk(rename = "thickBetweenThin")]
   ThickBetweenThin,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeJoinStyleValues {
   #[sdk(rename = "round")]
   #[default]
@@ -68,7 +68,7 @@ pub enum StrokeJoinStyleValues {
   #[sdk(rename = "miter")]
   Miter,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeEndCapValues {
   #[sdk(rename = "flat")]
   #[default]
@@ -78,7 +78,7 @@ pub enum StrokeEndCapValues {
   #[sdk(rename = "round")]
   Round,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeArrowLengthValues {
   #[sdk(rename = "short")]
   #[default]
@@ -88,7 +88,7 @@ pub enum StrokeArrowLengthValues {
   #[sdk(rename = "long")]
   Long,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeArrowWidthValues {
   #[sdk(rename = "narrow")]
   #[default]
@@ -98,7 +98,7 @@ pub enum StrokeArrowWidthValues {
   #[sdk(rename = "wide")]
   Wide,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeArrowValues {
   #[sdk(rename = "none")]
   #[default]
@@ -114,7 +114,7 @@ pub enum StrokeArrowValues {
   #[sdk(rename = "open")]
   Open,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ImageAspectValues {
   #[sdk(rename = "ignore")]
   #[default]
@@ -124,7 +124,7 @@ pub enum ImageAspectValues {
   #[sdk(rename = "atLeast")]
   AtLeast,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum EditAsValues {
   #[sdk(rename = "canvas")]
   #[default]
@@ -142,7 +142,7 @@ pub enum EditAsValues {
   #[sdk(rename = "bullseye")]
   Bullseye,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ShadowValues {
   #[sdk(rename = "single")]
   #[default]
@@ -158,7 +158,7 @@ pub enum ShadowValues {
   #[sdk(rename = "drawingRelative")]
   DrawingRelative,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrokeFillTypeValues {
   #[sdk(rename = "solid")]
   #[default]
@@ -175,7 +175,7 @@ pub enum StrokeFillTypeValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:path.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Path/v:path")]
 pub struct Path {
   /// Unique Identifier
@@ -290,7 +290,7 @@ pub struct Path {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:formulas.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Formulas/v:formulas")]
 pub struct Formulas {
   /// _
@@ -302,7 +302,7 @@ pub struct Formulas {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:handles.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Handles/v:handles")]
 pub struct ShapeHandles {
   /// _
@@ -314,7 +314,7 @@ pub struct ShapeHandles {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:fill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Fill/v:fill")]
 pub struct Fill {
   /// Unique Identifier
@@ -509,7 +509,7 @@ pub struct Fill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:stroke.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Stroke/v:stroke")]
 pub struct Stroke {
   /// Unique Identifier
@@ -729,7 +729,7 @@ pub struct Stroke {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:shadow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Shadow/v:shadow")]
 pub struct Shadow {
   /// Unique Identifier
@@ -815,7 +815,7 @@ pub struct Shadow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:textbox.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Textbox/v:textbox")]
 pub struct TextBox {
   /// Unique Identifier
@@ -854,7 +854,7 @@ pub struct TextBox {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:textpath.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_TextPath/v:textpath")]
 pub struct TextPath {
   /// Unique Identifier
@@ -919,7 +919,7 @@ pub struct TextPath {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:imagedata.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_ImageData/v:imagedata")]
 pub struct ImageData {
   /// Unique Identifier
@@ -1061,7 +1061,7 @@ pub struct ImageData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:shape.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Shape/v:shape")]
 pub struct Shape {
   /// Unique Identifier
@@ -1501,7 +1501,7 @@ pub struct Shape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:shapetype.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Shapetype/v:shapetype")]
 pub struct Shapetype {
   /// Unique Identifier
@@ -1928,7 +1928,7 @@ pub struct Shapetype {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:group.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Group/v:group")]
 pub struct Group {
   /// Unique Identifier
@@ -2196,7 +2196,7 @@ pub struct Group {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:background.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Background/v:background")]
 pub struct Background {
   /// Unique Identifier
@@ -2263,7 +2263,7 @@ pub struct Background {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:arc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Arc/v:arc")]
 pub struct Arc {
   /// Optional String
@@ -2682,7 +2682,7 @@ pub struct Arc {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:curve.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Curve/v:curve")]
 pub struct Curve {
   /// Unique Identifier
@@ -3120,7 +3120,7 @@ pub struct Curve {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:image.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Image/v:image")]
 pub struct ImageFile {
   /// Unique Identifier
@@ -3593,7 +3593,7 @@ pub struct ImageFile {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:line.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Line/v:line")]
 pub struct Line {
   /// Unique Identifier
@@ -4017,7 +4017,7 @@ pub struct Line {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:oval.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Oval/v:oval")]
 pub struct Oval {
   /// Unique Identifier
@@ -4427,7 +4427,7 @@ pub struct Oval {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:polyline.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_PolyLine/v:polyline")]
 pub struct PolyLine {
   /// Unique Identifier
@@ -4845,7 +4845,7 @@ pub struct PolyLine {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:rect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Rect/v:rect")]
 pub struct Rectangle {
   /// Unique Identifier
@@ -5255,7 +5255,7 @@ pub struct Rectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:roundrect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_RoundRect/v:roundrect")]
 pub struct RoundRectangle {
   /// Unique Identifier
@@ -5665,7 +5665,7 @@ pub struct RoundRectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:h.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_H/v:h")]
 pub struct ShapeHandle {
   /// Handle Position
@@ -5737,7 +5737,7 @@ pub struct ShapeHandle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is v:f.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_F/v:f")]
 pub struct Formula {
   /// Equation
@@ -5748,7 +5748,7 @@ pub struct Formula {
   #[sdk(attr(qname = ":eqn"))]
   pub equation: Option<crate::simple_type::StringValue>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBoxChoice {
   #[sdk(child(qname = "w:CT_TxbxContent/w:txbxContent"))]
   WTxbxContent(
@@ -5759,7 +5759,7 @@ pub enum TextBoxChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -5816,7 +5816,7 @@ pub enum ShapeChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::InkAnnotationFlag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapetypeChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -5867,7 +5867,7 @@ pub enum ShapetypeChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
   #[sdk(child(qname = "v:CT_Group/v:group"))]
   VGroup(std::boxed::Box<Group>),
@@ -5904,7 +5904,7 @@ pub enum GroupChoice {
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
   XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArcChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -5955,7 +5955,7 @@ pub enum ArcChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CurveChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -6006,7 +6006,7 @@ pub enum CurveChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ImageFileChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -6057,7 +6057,7 @@ pub enum ImageFileChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -6108,7 +6108,7 @@ pub enum LineChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OvalChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -6159,7 +6159,7 @@ pub enum OvalChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PolyLineChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -6212,7 +6212,7 @@ pub enum PolyLineChoice {
   #[sdk(child(qname = "o:CT_Ink/o:ink"))]
   OInk(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Ink>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RectangleChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
@@ -6263,7 +6263,7 @@ pub enum RectangleChoice {
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RoundRectangleChoice {
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),

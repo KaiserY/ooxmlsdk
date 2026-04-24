@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BorderValues {
   #[sdk(rename = "none")]
   #[default]
@@ -62,7 +62,7 @@ pub enum BorderValues {
   #[sdk(rename = "HTMLInset")]
   HtmlInset,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum WrapValues {
   #[sdk(rename = "topAndBottom")]
   #[default]
@@ -76,7 +76,7 @@ pub enum WrapValues {
   #[sdk(rename = "through")]
   Through,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum WrapSideValues {
   #[sdk(rename = "both")]
   #[default]
@@ -88,7 +88,7 @@ pub enum WrapSideValues {
   #[sdk(rename = "largest")]
   Largest,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HorizontalAnchorValues {
   #[sdk(rename = "margin")]
   #[default]
@@ -98,7 +98,7 @@ pub enum HorizontalAnchorValues {
   #[sdk(rename = "text")]
   Text,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VerticalAnchorValues {
   #[sdk(rename = "margin")]
   #[default]
@@ -113,7 +113,7 @@ pub enum VerticalAnchorValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w10:bordertop.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:bordertop")]
 pub struct TopBorder {
   /// Border Style
@@ -144,7 +144,7 @@ pub struct TopBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w10:borderleft.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:borderleft")]
 pub struct LeftBorder {
   /// Border Style
@@ -175,7 +175,7 @@ pub struct LeftBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w10:borderright.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:borderright")]
 pub struct RightBorder {
   /// Border Style
@@ -206,7 +206,7 @@ pub struct RightBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w10:borderbottom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:borderbottom")]
 pub struct BottomBorder {
   /// Border Style
@@ -237,7 +237,7 @@ pub struct BottomBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/")]
 pub struct BorderType {
   /// Border Style
@@ -268,7 +268,7 @@ pub struct BorderType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w10:wrap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Wrap/w10:wrap")]
 pub struct TextWrap {
   /// Wrapping type
@@ -305,6 +305,6 @@ pub struct TextWrap {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w10:anchorlock.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_AnchorLock/w10:anchorlock")]
 pub struct AnchorLock {}

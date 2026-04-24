@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is asvg:svgBlip.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "asvg:CT_SVGBlip/asvg:svgBlip")]
 pub struct SvgBlip {
   /// Embedded Picture Reference

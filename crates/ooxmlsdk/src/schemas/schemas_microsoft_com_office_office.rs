@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AlignmentValues {
   #[sdk(rename = "top")]
   #[default]
@@ -20,7 +20,7 @@ pub enum AlignmentValues {
   #[sdk(rename = "right")]
   Right,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ScreenSizeValues {
   #[sdk(rename = "544,376")]
   #[default]
@@ -36,7 +36,7 @@ pub enum ScreenSizeValues {
   #[sdk(rename = "1152,862")]
   Sz1152x862,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum InsetMarginValues {
   #[sdk(rename = "auto")]
   #[default]
@@ -44,7 +44,7 @@ pub enum InsetMarginValues {
   #[sdk(rename = "custom")]
   Custom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ColorModeValues {
   #[sdk(rename = "auto")]
   #[default]
@@ -52,7 +52,7 @@ pub enum ColorModeValues {
   #[sdk(rename = "custom")]
   Custom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtrusionValues {
   #[sdk(rename = "perspective")]
   #[default]
@@ -60,7 +60,7 @@ pub enum ExtrusionValues {
   #[sdk(rename = "parallel")]
   Parallel,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtrusionRenderValues {
   #[sdk(rename = "solid")]
   #[default]
@@ -70,7 +70,7 @@ pub enum ExtrusionRenderValues {
   #[sdk(rename = "boundingCube")]
   BoundingCube,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtrusionPlaneValues {
   #[sdk(rename = "XY")]
   #[default]
@@ -80,7 +80,7 @@ pub enum ExtrusionPlaneValues {
   #[sdk(rename = "YZ")]
   Yz,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AngleValues {
   #[sdk(rename = "any")]
   #[default]
@@ -96,7 +96,7 @@ pub enum AngleValues {
   #[sdk(rename = "auto")]
   Auto,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CalloutPlacementValues {
   #[sdk(rename = "top")]
   #[default]
@@ -108,7 +108,7 @@ pub enum CalloutPlacementValues {
   #[sdk(rename = "user")]
   User,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConnectorValues {
   #[sdk(rename = "none")]
   #[default]
@@ -120,7 +120,7 @@ pub enum ConnectorValues {
   #[sdk(rename = "curved")]
   Curved,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HorizontalRuleAlignmentValues {
   #[sdk(rename = "left")]
   #[default]
@@ -130,7 +130,7 @@ pub enum HorizontalRuleAlignmentValues {
   #[sdk(rename = "center")]
   Center,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConnectValues {
   #[sdk(rename = "none")]
   #[default]
@@ -142,7 +142,7 @@ pub enum ConnectValues {
   #[sdk(rename = "custom")]
   Custom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OleLinkValues {
   #[sdk(rename = "Picture")]
   #[default]
@@ -152,7 +152,7 @@ pub enum OleLinkValues {
   #[sdk(rename = "EnhancedMetaFile")]
   EnhancedMetaFile,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OleValues {
   #[sdk(rename = "Embed")]
   #[default]
@@ -160,7 +160,7 @@ pub enum OleValues {
   #[sdk(rename = "Link")]
   Link,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OleDrawAspectValues {
   #[sdk(rename = "Content")]
   #[default]
@@ -168,7 +168,7 @@ pub enum OleDrawAspectValues {
   #[sdk(rename = "Icon")]
   Icon,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OleUpdateModeValues {
   #[sdk(rename = "Always")]
   #[default]
@@ -176,7 +176,7 @@ pub enum OleUpdateModeValues {
   #[sdk(rename = "OnCall")]
   OnCall,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FillValues {
   #[sdk(rename = "gradientCenter")]
   #[default]
@@ -198,7 +198,7 @@ pub enum FillValues {
   #[sdk(rename = "background")]
   Background,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RuleValues {
   #[sdk(rename = "arc")]
   #[default]
@@ -208,7 +208,7 @@ pub enum RuleValues {
   #[sdk(rename = "connector")]
   Connector,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BlackAndWhiteModeValues {
   #[sdk(rename = "color")]
   #[default]
@@ -239,7 +239,7 @@ pub enum BlackAndWhiteModeValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:shapedefaults.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_ShapeDefaults/o:shapedefaults")]
 pub struct ShapeDefaults {
   /// VML Extension Handling Behavior
@@ -351,7 +351,7 @@ pub struct ShapeDefaults {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:shapelayout.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_ShapeLayout/o:shapelayout")]
 pub struct ShapeLayout {
   /// VML Extension Handling Behavior
@@ -376,7 +376,7 @@ pub struct ShapeLayout {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:signatureline.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_SignatureLine/o:signatureline")]
 pub struct SignatureLine {
   /// VML Extension Handling Behavior
@@ -486,7 +486,7 @@ pub struct SignatureLine {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:ink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Ink/o:ink")]
 pub struct Ink {
   /// Ink Data
@@ -509,7 +509,7 @@ pub struct Ink {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:diagram.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Diagram/o:diagram")]
 pub struct Diagram {
   /// VML Extension Handling Behavior
@@ -591,7 +591,7 @@ pub struct Diagram {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:skew.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Skew/o:skew")]
 pub struct Skew {
   /// VML Extension Handling Behavior
@@ -642,7 +642,7 @@ pub struct Skew {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:extrusion.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Extrusion/o:extrusion")]
 pub struct Extrusion {
   /// VML Extension Handling Behavior
@@ -868,7 +868,7 @@ pub struct Extrusion {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:callout.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Callout/o:callout")]
 pub struct Callout {
   /// VML Extension Handling Behavior
@@ -975,7 +975,7 @@ pub struct Callout {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:lock.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Lock/o:lock")]
 pub struct Lock {
   /// VML Extension Handling Behavior
@@ -1068,7 +1068,7 @@ pub struct Lock {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:OLEObject.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_OLEObject/o:OLEObject")]
 pub struct OleObject {
   /// OLE Object Type
@@ -1135,7 +1135,7 @@ pub struct OleObject {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:complex.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Complex/o:complex")]
 pub struct Complex {
   /// VML Extension Handling Behavior
@@ -1151,7 +1151,7 @@ pub struct Complex {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:left.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_StrokeChild/o:left")]
 pub struct LeftStroke {
   /// VML Extension Handling Behavior
@@ -1350,7 +1350,7 @@ pub struct LeftStroke {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:top.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_StrokeChild/o:top")]
 pub struct TopStroke {
   /// VML Extension Handling Behavior
@@ -1549,7 +1549,7 @@ pub struct TopStroke {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:right.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_StrokeChild/o:right")]
 pub struct RightStroke {
   /// VML Extension Handling Behavior
@@ -1748,7 +1748,7 @@ pub struct RightStroke {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:bottom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_StrokeChild/o:bottom")]
 pub struct BottomStroke {
   /// VML Extension Handling Behavior
@@ -1947,7 +1947,7 @@ pub struct BottomStroke {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:column.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_StrokeChild/o:column")]
 pub struct ColumnStroke {
   /// VML Extension Handling Behavior
@@ -2146,7 +2146,7 @@ pub struct ColumnStroke {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_StrokeChild/")]
 pub struct StrokeChildType {
   /// VML Extension Handling Behavior
@@ -2345,7 +2345,7 @@ pub struct StrokeChildType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:clippath.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_ClipPath/o:clippath")]
 pub struct ClipPath {
   /// Path Definition
@@ -2361,7 +2361,7 @@ pub struct ClipPath {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:fill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Fill/o:fill")]
 pub struct FillExtendedProperties {
   /// VML Extension Handling Behavior
@@ -2384,7 +2384,7 @@ pub struct FillExtendedProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:idmap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_IdMap/o:idmap")]
 pub struct ShapeIdMap {
   /// VML Extension Handling Behavior
@@ -2407,7 +2407,7 @@ pub struct ShapeIdMap {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:regrouptable.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_RegroupTable/o:regrouptable")]
 pub struct RegroupTable {
   /// VML Extension Handling Behavior
@@ -2426,7 +2426,7 @@ pub struct RegroupTable {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:rules.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Rules/o:rules")]
 pub struct Rules {
   /// VML Extension Handling Behavior
@@ -2445,7 +2445,7 @@ pub struct Rules {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:entry.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Entry/o:entry")]
 pub struct Entry {
   /// New Group ID
@@ -2468,7 +2468,7 @@ pub struct Entry {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:r.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_R/o:r")]
 pub struct Rule {
   /// Rule ID
@@ -2509,7 +2509,7 @@ pub struct Rule {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:relationtable.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_RelationTable/o:relationtable")]
 pub struct RelationTable {
   /// VML Extension Handling Behavior
@@ -2528,7 +2528,7 @@ pub struct RelationTable {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:rel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Relation/o:rel")]
 pub struct Relation {
   /// VML Extension Handling Behavior
@@ -2586,7 +2586,7 @@ pub type FieldCodes = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:proxy.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_Proxy/o:proxy")]
 pub struct Proxy {
   /// Start Point Connection Flag
@@ -2624,7 +2624,7 @@ pub struct Proxy {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:colormru.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_ColorMru/o:colormru")]
 pub struct ColorMostRecentlyUsed {
   /// VML Extension Handling Behavior
@@ -2647,7 +2647,7 @@ pub struct ColorMostRecentlyUsed {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is o:colormenu.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:CT_ColorMenu/o:colormenu")]
 pub struct ColorMenu {
   /// VML Extension Handling Behavior

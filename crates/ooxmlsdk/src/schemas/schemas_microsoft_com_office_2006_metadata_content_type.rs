@@ -9,7 +9,7 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ct:contentTypeSchema.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ct:CT_ContentTypeSchema/ct:contentTypeSchema")]
 pub struct ContentTypeSchema {
   /// _

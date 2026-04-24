@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum KnownContextNodeTypeValues {
   #[sdk(rename = "root")]
   #[default]
@@ -54,7 +54,7 @@ pub enum KnownContextNodeTypeValues {
   #[sdk(rename = "mixedDrawing")]
   MixedDrawing,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LinkDirectionValues {
   #[sdk(rename = "to")]
   #[default]
@@ -64,7 +64,7 @@ pub enum LinkDirectionValues {
   #[sdk(rename = "with")]
   With,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum KnownSemanticTypeValues {
   #[sdk(rename = "none")]
   #[default]
@@ -95,7 +95,7 @@ pub enum KnownSemanticTypeValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is msink:context.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxNode/msink:context")]
 pub struct ContextNode {
   /// id
@@ -334,7 +334,7 @@ pub struct ContextNode {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is msink:property.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_Property/msink:property")]
 pub struct ContextNodeProperty {
   /// type
@@ -357,7 +357,7 @@ pub struct ContextNodeProperty {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is msink:sourceLink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxLink/msink:sourceLink")]
 pub struct SourceLink {
   /// direction
@@ -386,7 +386,7 @@ pub struct SourceLink {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is msink:destinationLink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxLink/msink:destinationLink")]
 pub struct DestinationLink {
   /// direction
@@ -415,7 +415,7 @@ pub struct DestinationLink {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxLink/")]
 pub struct ContextLinkType {
   /// direction

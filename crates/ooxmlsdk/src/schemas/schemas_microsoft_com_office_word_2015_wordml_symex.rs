@@ -9,7 +9,7 @@
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is w16se:sym.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16se:CT_SymEx/w16se:sym")]
 pub struct SymEx {
   /// font

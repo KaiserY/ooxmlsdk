@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is op:Properties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "op:CT_Properties/op:Properties")]
 pub struct Properties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -25,7 +24,7 @@ pub struct Properties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is op:property.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "op:CT_Property/op:property")]
 pub struct CustomDocumentProperty {
   /// Format ID
@@ -98,7 +97,7 @@ pub struct CustomDocumentProperty {
   ))]
   pub xml_children: Option<CustomDocumentPropertyChoice>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomDocumentPropertyChoice {
   #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
     VtVector(

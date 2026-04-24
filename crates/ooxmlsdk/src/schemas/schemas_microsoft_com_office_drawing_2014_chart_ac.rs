@@ -9,7 +9,7 @@
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16ac:multiLvlStrLit.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrData/c16ac:multiLvlStrLit")]
 pub struct MultiLvlStrData {
   /// _

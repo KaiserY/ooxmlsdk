@@ -9,7 +9,7 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:Normal.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_BackgroundNormalProperties/alf:Normal")]
 pub struct BackgroundNormalProperties {
   /// _
@@ -21,7 +21,7 @@ pub struct BackgroundNormalProperties {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:Removed.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_BackgroundRemovedProperties/alf:Removed")]
 pub struct BackgroundRemovedProperties {
   /// _
@@ -33,7 +33,7 @@ pub struct BackgroundRemovedProperties {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:Blur.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_BackgroundBlurProperties/alf:Blur")]
 pub struct BackgroundBlurProperties {
   /// _
@@ -45,7 +45,7 @@ pub struct BackgroundBlurProperties {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:Custom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_BackgroundCustomProperties/alf:Custom")]
 pub struct BackgroundCustomProperties {
   /// _
@@ -57,7 +57,7 @@ pub struct BackgroundCustomProperties {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:liveFeedProps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps")]
 pub struct LiveFeedProperties {
   /// _
@@ -72,7 +72,7 @@ pub struct LiveFeedProperties {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/alf:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -84,7 +84,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is alf:backgroundProps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "alf:CT_LiveFeedBackgroundProperties/alf:backgroundProps")]
 pub struct LiveFeedBackgroundProperties {
   #[sdk(choice(
@@ -98,7 +98,7 @@ pub struct LiveFeedBackgroundProperties {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub alf_ext_lst: Option<OfficeArtExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LiveFeedBackgroundPropertiesChoice {
   #[sdk(child(qname = "alf:CT_BackgroundNormalProperties/alf:Normal"))]
   AlfNormal(std::boxed::Box<BackgroundNormalProperties>),

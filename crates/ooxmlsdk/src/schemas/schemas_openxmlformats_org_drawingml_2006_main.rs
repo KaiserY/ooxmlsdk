@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FontCollectionIndexValues {
   #[sdk(rename = "major")]
   #[default]
@@ -14,7 +14,7 @@ pub enum FontCollectionIndexValues {
   #[sdk(rename = "none")]
   None,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ColorSchemeIndexValues {
   #[sdk(rename = "dk1")]
   #[default]
@@ -42,7 +42,7 @@ pub enum ColorSchemeIndexValues {
   #[sdk(rename = "folHlink")]
   FollowedHyperlink,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SystemColorValues {
   #[sdk(rename = "scrollBar")]
   #[default]
@@ -106,7 +106,7 @@ pub enum SystemColorValues {
   #[sdk(rename = "menuBar")]
   MenuBar,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SchemeColorValues {
   #[sdk(rename = "bg1")]
   #[default]
@@ -144,7 +144,7 @@ pub enum SchemeColorValues {
   #[sdk(rename = "lt2")]
   Light2,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RectangleAlignmentValues {
   #[sdk(rename = "tl")]
   #[default]
@@ -166,7 +166,7 @@ pub enum RectangleAlignmentValues {
   #[sdk(rename = "br")]
   BottomRight,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BlackWhiteModeValues {
   #[sdk(rename = "clr")]
   #[default]
@@ -192,7 +192,7 @@ pub enum BlackWhiteModeValues {
   #[sdk(rename = "hidden")]
   Hidden,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ChartBuildStepValues {
   #[sdk(rename = "category")]
   #[default]
@@ -208,7 +208,7 @@ pub enum ChartBuildStepValues {
   #[sdk(rename = "gridLegend")]
   GridLegend,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum DiagramBuildStepValues {
   #[sdk(rename = "sp")]
   #[default]
@@ -216,13 +216,13 @@ pub enum DiagramBuildStepValues {
   #[sdk(rename = "bg")]
   Background,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AnimationBuildValues {
   #[sdk(rename = "allAtOnce")]
   #[default]
   AllAtOnce,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AnimationDiagramOnlyBuildValues {
   #[sdk(rename = "one")]
   #[default]
@@ -232,7 +232,7 @@ pub enum AnimationDiagramOnlyBuildValues {
   #[sdk(rename = "lvlAtOnce")]
   LevelAtOnce,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AnimationChartOnlyBuildValues {
   #[sdk(rename = "series")]
   #[default]
@@ -244,7 +244,7 @@ pub enum AnimationChartOnlyBuildValues {
   #[sdk(rename = "categoryEl")]
   CategoryElement,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PresetCameraValues {
   #[sdk(rename = "legacyObliqueTopLeft")]
   #[default]
@@ -372,7 +372,7 @@ pub enum PresetCameraValues {
   #[sdk(rename = "perspectiveRelaxedModerately")]
   PerspectiveRelaxedModerately,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LightRigDirectionValues {
   #[sdk(rename = "tl")]
   #[default]
@@ -392,7 +392,7 @@ pub enum LightRigDirectionValues {
   #[sdk(rename = "br")]
   BottomRight,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LightRigValues {
   #[sdk(rename = "legacyFlat1")]
   #[default]
@@ -450,7 +450,7 @@ pub enum LightRigValues {
   #[sdk(rename = "brightRoom")]
   BrightRoom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BevelPresetValues {
   #[sdk(rename = "relaxedInset")]
   #[default]
@@ -478,7 +478,7 @@ pub enum BevelPresetValues {
   #[sdk(rename = "artDeco")]
   ArtDeco,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PresetMaterialTypeValues {
   #[sdk(rename = "legacyMatte")]
   #[default]
@@ -512,7 +512,7 @@ pub enum PresetMaterialTypeValues {
   #[sdk(rename = "softmetal")]
   SoftMetal,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PresetShadowValues {
   #[sdk(rename = "shdw1")]
   #[default]
@@ -556,7 +556,7 @@ pub enum PresetShadowValues {
   #[sdk(rename = "shdw20")]
   FrontBottomShadow,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PathShadeValues {
   #[sdk(rename = "shape")]
   #[default]
@@ -566,7 +566,7 @@ pub enum PathShadeValues {
   #[sdk(rename = "rect")]
   Rectangle,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TileFlipValues {
   #[sdk(rename = "none")]
   #[default]
@@ -578,7 +578,7 @@ pub enum TileFlipValues {
   #[sdk(rename = "xy")]
   HorizontalAndVertical,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BlipCompressionValues {
   #[sdk(rename = "email")]
   #[default]
@@ -592,7 +592,7 @@ pub enum BlipCompressionValues {
   #[sdk(rename = "none")]
   None,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PresetPatternValues {
   #[sdk(rename = "pct5")]
   #[default]
@@ -704,7 +704,7 @@ pub enum PresetPatternValues {
   #[sdk(rename = "zigZag")]
   ZigZag,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BlendModeValues {
   #[sdk(rename = "over")]
   #[default]
@@ -718,7 +718,7 @@ pub enum BlendModeValues {
   #[sdk(rename = "lighten")]
   Lighten,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum EffectContainerValues {
   #[sdk(rename = "sib")]
   #[default]
@@ -726,7 +726,7 @@ pub enum EffectContainerValues {
   #[sdk(rename = "tree")]
   Tree,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ShapeTypeValues {
   #[sdk(rename = "line")]
   #[default]
@@ -1104,7 +1104,7 @@ pub enum ShapeTypeValues {
   #[sdk(rename = "chartPlus")]
   ChartPlus,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextShapeValues {
   #[sdk(rename = "textNoShape")]
   #[default]
@@ -1190,7 +1190,7 @@ pub enum TextShapeValues {
   #[sdk(rename = "textCascadeDown")]
   TextCascadeDown,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PathFillModeValues {
   #[sdk(rename = "none")]
   #[default]
@@ -1206,7 +1206,7 @@ pub enum PathFillModeValues {
   #[sdk(rename = "darkenLess")]
   DarkenLess,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LineEndValues {
   #[sdk(rename = "none")]
   #[default]
@@ -1222,7 +1222,7 @@ pub enum LineEndValues {
   #[sdk(rename = "arrow")]
   Arrow,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LineEndWidthValues {
   #[sdk(rename = "sm")]
   #[default]
@@ -1232,7 +1232,7 @@ pub enum LineEndWidthValues {
   #[sdk(rename = "lg")]
   Large,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LineEndLengthValues {
   #[sdk(rename = "sm")]
   #[default]
@@ -1242,7 +1242,7 @@ pub enum LineEndLengthValues {
   #[sdk(rename = "lg")]
   Large,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PresetLineDashValues {
   #[sdk(rename = "solid")]
   #[default]
@@ -1268,7 +1268,7 @@ pub enum PresetLineDashValues {
   #[sdk(rename = "sysDashDotDot")]
   SystemDashDotDot,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LineCapValues {
   #[sdk(rename = "rnd")]
   #[default]
@@ -1278,7 +1278,7 @@ pub enum LineCapValues {
   #[sdk(rename = "flat")]
   Flat,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PenAlignmentValues {
   #[sdk(rename = "ctr")]
   #[default]
@@ -1286,7 +1286,7 @@ pub enum PenAlignmentValues {
   #[sdk(rename = "in")]
   Insert,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CompoundLineValues {
   #[sdk(rename = "sng")]
   #[default]
@@ -1300,7 +1300,7 @@ pub enum CompoundLineValues {
   #[sdk(rename = "tri")]
   Triple,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BooleanStyleValues {
   #[sdk(rename = "on")]
   #[default]
@@ -1310,7 +1310,7 @@ pub enum BooleanStyleValues {
   #[sdk(rename = "def")]
   Default,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextVerticalOverflowValues {
   #[sdk(rename = "overflow")]
   #[default]
@@ -1320,7 +1320,7 @@ pub enum TextVerticalOverflowValues {
   #[sdk(rename = "clip")]
   Clip,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextHorizontalOverflowValues {
   #[sdk(rename = "overflow")]
   #[default]
@@ -1328,7 +1328,7 @@ pub enum TextHorizontalOverflowValues {
   #[sdk(rename = "clip")]
   Clip,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextVerticalValues {
   #[sdk(rename = "horz")]
   #[default]
@@ -1346,7 +1346,7 @@ pub enum TextVerticalValues {
   #[sdk(rename = "wordArtVertRtl")]
   WordArtLeftToRight,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextWrappingValues {
   #[sdk(rename = "none")]
   #[default]
@@ -1354,7 +1354,7 @@ pub enum TextWrappingValues {
   #[sdk(rename = "square")]
   Square,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAnchoringTypeValues {
   #[sdk(rename = "t")]
   #[default]
@@ -1364,7 +1364,7 @@ pub enum TextAnchoringTypeValues {
   #[sdk(rename = "b")]
   Bottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAutoNumberSchemeValues {
   #[sdk(rename = "alphaLcParenBoth")]
   #[default]
@@ -1450,7 +1450,7 @@ pub enum TextAutoNumberSchemeValues {
   #[sdk(rename = "hindiAlpha1Period")]
   HindiAlpha1Period,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextUnderlineValues {
   #[sdk(rename = "none")]
   #[default]
@@ -1490,7 +1490,7 @@ pub enum TextUnderlineValues {
   #[sdk(rename = "wavyDbl")]
   WavyDouble,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextStrikeValues {
   #[sdk(rename = "noStrike")]
   #[default]
@@ -1500,7 +1500,7 @@ pub enum TextStrikeValues {
   #[sdk(rename = "dblStrike")]
   DoubleStrike,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextCapsValues {
   #[sdk(rename = "none")]
   #[default]
@@ -1510,7 +1510,7 @@ pub enum TextCapsValues {
   #[sdk(rename = "all")]
   All,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextTabAlignmentValues {
   #[sdk(rename = "l")]
   #[default]
@@ -1522,7 +1522,7 @@ pub enum TextTabAlignmentValues {
   #[sdk(rename = "dec")]
   Decimal,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAlignmentTypeValues {
   #[sdk(rename = "l")]
   #[default]
@@ -1540,7 +1540,7 @@ pub enum TextAlignmentTypeValues {
   #[sdk(rename = "thaiDist")]
   ThaiDistributed,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextFontAlignmentValues {
   #[sdk(rename = "auto")]
   #[default]
@@ -1554,7 +1554,7 @@ pub enum TextFontAlignmentValues {
   #[sdk(rename = "b")]
   Bottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PresetColorValues {
   #[sdk(rename = "aliceBlue")]
   #[default]
@@ -1993,7 +1993,7 @@ pub enum PresetColorValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:audioCd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioCD/a:audioCd")]
 pub struct AudioFromCd {
   ///Audio Start Time
@@ -2011,7 +2011,7 @@ pub struct AudioFromCd {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:wavAudioFile.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile")]
 pub struct WaveAudioFile {
   /// Embedded Audio File Relationship ID
@@ -2041,7 +2041,7 @@ pub struct WaveAudioFile {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:snd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EmbeddedWAVAudioFile/a:snd")]
 pub struct HyperlinkSound {
   /// Embedded Audio File Relationship ID
@@ -2071,7 +2071,7 @@ pub struct HyperlinkSound {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EmbeddedWAVAudioFile/")]
 pub struct EmbeddedWavAudioFileType {
   /// Embedded Audio File Relationship ID
@@ -2101,7 +2101,7 @@ pub struct EmbeddedWavAudioFileType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:audioFile.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioFile/a:audioFile")]
 pub struct AudioFromFile {
   /// Linked Relationship ID
@@ -2120,7 +2120,7 @@ pub struct AudioFromFile {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:videoFile.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_VideoFile/a:videoFile")]
 pub struct VideoFromFile {
   /// Linked Relationship ID
@@ -2139,7 +2139,7 @@ pub struct VideoFromFile {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:quickTimeFile.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_QuickTimeFile/a:quickTimeFile")]
 pub struct QuickTimeFromFile {
   /// Linked Relationship ID
@@ -2158,7 +2158,7 @@ pub struct QuickTimeFromFile {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tint.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveFixedPercentage/a:tint")]
 pub struct Tint {
   /// Value
@@ -2181,7 +2181,7 @@ pub struct Tint {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:shade.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveFixedPercentage/a:shade")]
 pub struct Shade {
   /// Value
@@ -2204,7 +2204,7 @@ pub struct Shade {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alpha.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveFixedPercentage/a:alpha")]
 pub struct Alpha {
   /// Value
@@ -2227,7 +2227,7 @@ pub struct Alpha {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveFixedPercentage/")]
 pub struct PositiveFixedPercentageType {
   /// Value
@@ -2250,7 +2250,7 @@ pub struct PositiveFixedPercentageType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:comp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ComplementTransform/a:comp")]
 pub struct Complement {}
 /// Inverse.
@@ -2258,7 +2258,7 @@ pub struct Complement {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:inv.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_InverseTransform/a:inv")]
 pub struct Inverse {}
 /// Gray.
@@ -2266,7 +2266,7 @@ pub struct Inverse {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gray.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GrayscaleTransform/a:gray")]
 pub struct Gray {}
 /// Alpha Offset.
@@ -2274,7 +2274,7 @@ pub struct Gray {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FixedPercentage/a:alphaOff")]
 pub struct AlphaOffset {
   /// Value
@@ -2297,7 +2297,7 @@ pub struct AlphaOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositivePercentage/a:alphaMod")]
 pub struct AlphaModulation {
   /// Value
@@ -2314,7 +2314,7 @@ pub struct AlphaModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hueMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositivePercentage/a:hueMod")]
 pub struct HueModulation {
   /// Value
@@ -2331,7 +2331,7 @@ pub struct HueModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositivePercentage/")]
 pub struct PositivePercentageType {
   /// Value
@@ -2348,7 +2348,7 @@ pub struct PositivePercentageType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hue.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveFixedAngle/a:hue")]
 pub struct Hue {
   /// Value
@@ -2371,7 +2371,7 @@ pub struct Hue {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hueOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Angle/a:hueOff")]
 pub struct HueOffset {
   /// Value
@@ -2387,7 +2387,7 @@ pub struct HueOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:sat")]
 pub struct Saturation {
   /// Value
@@ -2403,7 +2403,7 @@ pub struct Saturation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:satOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:satOff")]
 pub struct SaturationOffset {
   /// Value
@@ -2419,7 +2419,7 @@ pub struct SaturationOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:satMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:satMod")]
 pub struct SaturationModulation {
   /// Value
@@ -2435,7 +2435,7 @@ pub struct SaturationModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lum.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:lum")]
 pub struct Luminance {
   /// Value
@@ -2451,7 +2451,7 @@ pub struct Luminance {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lumOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:lumOff")]
 pub struct LuminanceOffset {
   /// Value
@@ -2467,7 +2467,7 @@ pub struct LuminanceOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lumMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:lumMod")]
 pub struct LuminanceModulation {
   /// Value
@@ -2483,7 +2483,7 @@ pub struct LuminanceModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:red.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:red")]
 pub struct Red {
   /// Value
@@ -2499,7 +2499,7 @@ pub struct Red {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:redOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:redOff")]
 pub struct RedOffset {
   /// Value
@@ -2515,7 +2515,7 @@ pub struct RedOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:redMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:redMod")]
 pub struct RedModulation {
   /// Value
@@ -2531,7 +2531,7 @@ pub struct RedModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:green.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:green")]
 pub struct Green {
   /// Value
@@ -2547,7 +2547,7 @@ pub struct Green {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:greenOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:greenOff")]
 pub struct GreenOffset {
   /// Value
@@ -2563,7 +2563,7 @@ pub struct GreenOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:greenMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:greenMod")]
 pub struct GreenModulation {
   /// Value
@@ -2579,7 +2579,7 @@ pub struct GreenModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blue.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:blue")]
 pub struct Blue {
   /// Value
@@ -2595,7 +2595,7 @@ pub struct Blue {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blueOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:blueOff")]
 pub struct BlueOffset {
   /// Value
@@ -2611,7 +2611,7 @@ pub struct BlueOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blueMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:blueMod")]
 pub struct BlueModulation {
   /// Value
@@ -2627,7 +2627,7 @@ pub struct BlueModulation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/")]
 pub struct PercentageType {
   /// Value
@@ -2643,7 +2643,7 @@ pub struct PercentageType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gamma.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GammaTransform/a:gamma")]
 pub struct Gamma {}
 /// Inverse Gamma.
@@ -2651,7 +2651,7 @@ pub struct Gamma {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:invGamma.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_InverseGammaTransform/a:invGamma")]
 pub struct InverseGamma {}
 /// Extension.
@@ -2659,7 +2659,7 @@ pub struct InverseGamma {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtension/a:ext")]
 pub struct Extension {
   /// URI
@@ -2678,7 +2678,7 @@ pub struct Extension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:scrgbClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ScRgbColor/a:scrgbClr")]
 pub struct RgbColorModelPercentage {
   /// Red
@@ -2739,7 +2739,7 @@ pub struct RgbColorModelPercentage {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:srgbClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SRgbColor/a:srgbClr")]
 pub struct RgbColorModelHex {
   /// Value
@@ -2803,7 +2803,7 @@ pub struct RgbColorModelHex {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hslClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_HslColor/a:hslClr")]
 pub struct HslColor {
   /// Hue
@@ -2871,7 +2871,7 @@ pub struct HslColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sysClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SystemColor/a:sysClr")]
 pub struct SystemColor {
   /// Value
@@ -2927,7 +2927,7 @@ pub struct SystemColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:schemeClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SchemeColor/a:schemeClr")]
 pub struct SchemeColor {
   /// Value
@@ -2975,7 +2975,7 @@ pub struct SchemeColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:prstClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PresetColor/a:prstClr")]
 pub struct PresetColor {
   /// Value
@@ -3023,7 +3023,7 @@ pub struct PresetColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sp3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Shape3D/a:sp3d")]
 pub struct Shape3DType {
   /// Shape Depth
@@ -3097,7 +3097,7 @@ pub struct Shape3DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:flatTx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FlatText/a:flatTx")]
 pub struct FlatText {
   /// Z Coordinate
@@ -3120,7 +3120,7 @@ pub struct FlatText {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lin.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LinearShadeProperties/a:lin")]
 pub struct LinearGradientFill {
   /// Angle
@@ -3150,7 +3150,7 @@ pub struct LinearGradientFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:path.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PathShadeProperties/a:path")]
 pub struct PathGradientFill {
   /// Gradient Fill Path
@@ -3170,7 +3170,7 @@ pub struct PathGradientFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tile.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TileInfoProperties/a:tile")]
 pub struct Tile {
   /// Horizontal Offset
@@ -3237,7 +3237,7 @@ pub struct Tile {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:stretch.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StretchInfoProperties/a:stretch")]
 pub struct Stretch {
   ///Fill Rectangle
@@ -3249,18 +3249,17 @@ pub struct Stretch {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:noFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NoFillProperties/a:noFill")]
 pub struct NoFill {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
 }
 /// Defines the SolidFill Class.
 ///
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:solidFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SolidColorFillProperties/a:solidFill")]
 pub struct SolidFill {
   #[sdk(choice(
@@ -3278,7 +3277,7 @@ pub struct SolidFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gradFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GradientFillProperties/a:gradFill")]
 pub struct GradientFill {
   /// Tile Flip
@@ -3313,7 +3312,7 @@ pub struct GradientFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blipFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipFillProperties/a:blipFill")]
 pub struct BlipFill {
   /// DPI Setting
@@ -3347,7 +3346,7 @@ pub struct BlipFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:pattFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PatternFillProperties/a:pattFill")]
 pub struct PatternFill {
   /// Preset Pattern
@@ -3370,7 +3369,7 @@ pub struct PatternFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:grpFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupFillProperties/a:grpFill")]
 pub struct GroupFill {}
 /// Effect Container.
@@ -3378,7 +3377,7 @@ pub struct GroupFill {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cont.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectContainer/a:cont")]
 pub struct EffectContainer {
   /// Effect Container Type
@@ -3436,7 +3435,7 @@ pub struct EffectContainer {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effectDag.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectContainer/a:effectDag")]
 pub struct EffectDag {
   /// Effect Container Type
@@ -3494,7 +3493,7 @@ pub struct EffectDag {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectContainer/")]
 pub struct EffectContainerType {
   /// Effect Container Type
@@ -3552,7 +3551,7 @@ pub struct EffectContainerType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectReference/a:effect")]
 pub struct Effect {
   /// Reference
@@ -3569,7 +3568,7 @@ pub struct Effect {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaBiLevel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel")]
 pub struct AlphaBiLevel {
   /// Threshold
@@ -3592,7 +3591,7 @@ pub struct AlphaBiLevel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaCeiling.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling")]
 pub struct AlphaCeiling {}
 /// Alpha Floor Effect.
@@ -3600,7 +3599,7 @@ pub struct AlphaCeiling {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaFloor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaFloorEffect/a:alphaFloor")]
 pub struct AlphaFloor {}
 /// Alpha Inverse Effect.
@@ -3608,7 +3607,7 @@ pub struct AlphaFloor {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaInv.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaInverseEffect/a:alphaInv")]
 pub struct AlphaInverse {
   #[sdk(choice(
@@ -3626,7 +3625,7 @@ pub struct AlphaInverse {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaMod.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaModulateEffect/a:alphaMod")]
 pub struct AlphaModulationEffect {
   /// _
@@ -3638,7 +3637,7 @@ pub struct AlphaModulationEffect {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaModFix.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix")]
 pub struct AlphaModulationFixed {
   /// Amount
@@ -3655,7 +3654,7 @@ pub struct AlphaModulationFixed {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaOutset.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaOutsetEffect/a:alphaOutset")]
 pub struct AlphaOutset {
   /// Radius
@@ -3678,7 +3677,7 @@ pub struct AlphaOutset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:alphaRepl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl")]
 pub struct AlphaReplace {
   /// Alpha
@@ -3701,7 +3700,7 @@ pub struct AlphaReplace {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:biLevel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BiLevelEffect/a:biLevel")]
 pub struct BiLevel {
   /// Threshold
@@ -3724,7 +3723,7 @@ pub struct BiLevel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blend.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlendEffect/a:blend")]
 pub struct Blend {
   /// Blend Mode
@@ -3744,7 +3743,7 @@ pub struct Blend {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blur.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlurEffect/a:blur")]
 pub struct Blur {
   /// Radius
@@ -3774,7 +3773,7 @@ pub struct Blur {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:clrChange.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorChangeEffect/a:clrChange")]
 pub struct ColorChange {
   /// Consider Alpha Values
@@ -3796,7 +3795,7 @@ pub struct ColorChange {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:clrRepl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorReplaceEffect/a:clrRepl")]
 pub struct ColorReplacement {
   #[sdk(choice(
@@ -3814,7 +3813,7 @@ pub struct ColorReplacement {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:duotone.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DuotoneEffect/a:duotone")]
 pub struct Duotone {
   #[sdk(choice(
@@ -3832,7 +3831,7 @@ pub struct Duotone {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillEffect/a:fill")]
 pub struct Fill {
   #[sdk(choice(
@@ -3850,7 +3849,7 @@ pub struct Fill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fillOverlay.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillOverlayEffect/a:fillOverlay")]
 pub struct FillOverlay {
   /// Blend
@@ -3876,7 +3875,7 @@ pub struct FillOverlay {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:glow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GlowEffect/a:glow")]
 pub struct Glow {
   /// Radius
@@ -3908,7 +3907,7 @@ pub struct Glow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:grayscl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GrayscaleEffect/a:grayscl")]
 pub struct Grayscale {}
 /// Hue Saturation Luminance Effect.
@@ -3916,7 +3915,7 @@ pub struct Grayscale {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hsl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_HSLEffect/a:hsl")]
 pub struct Hsl {
   /// Hue
@@ -3967,7 +3966,7 @@ pub struct Hsl {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:innerShdw.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_InnerShadowEffect/a:innerShdw")]
 pub struct InnerShadow {
   /// Blur Radius
@@ -4027,7 +4026,7 @@ pub struct InnerShadow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lum.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LuminanceEffect/a:lum")]
 pub struct LuminanceEffect {
   /// Brightness
@@ -4064,7 +4063,7 @@ pub struct LuminanceEffect {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:outerShdw.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OuterShadowEffect/a:outerShdw")]
 pub struct OuterShadow {
   /// Blur Radius
@@ -4181,7 +4180,7 @@ pub struct OuterShadow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:prstShdw.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PresetShadowEffect/a:prstShdw")]
 pub struct PresetShadow {
   /// Preset Shadow
@@ -4235,7 +4234,7 @@ pub struct PresetShadow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:reflection.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ReflectionEffect/a:reflection")]
 pub struct Reflection {
   /// Blur Radius
@@ -4413,7 +4412,7 @@ pub struct Reflection {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:relOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RelativeOffsetEffect/a:relOff")]
 pub struct RelativeOffset {
   /// Offset X
@@ -4436,7 +4435,7 @@ pub struct RelativeOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:softEdge.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SoftEdgesEffect/a:softEdge")]
 pub struct SoftEdge {
   /// Radius
@@ -4459,7 +4458,7 @@ pub struct SoftEdge {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tint.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TintEffect/a:tint")]
 pub struct TintEffect {
   /// Hue
@@ -4496,7 +4495,7 @@ pub struct TintEffect {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TransformEffect/a:xfrm")]
 pub struct TransformEffect {
   /// Horizontal Ratio
@@ -4575,11 +4574,10 @@ pub struct TransformEffect {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effectLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectList/a:effectLst")]
 pub struct EffectList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Blur Effect
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   pub blur: Option<Blur>,
@@ -4610,7 +4608,7 @@ pub struct EffectList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:custGeom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_CustomGeometry2D/a:custGeom")]
 pub struct CustomGeometry {
   ///Adjust Value List
@@ -4637,11 +4635,10 @@ pub struct CustomGeometry {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:prstGeom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PresetGeometry2D/a:prstGeom")]
 pub struct PresetGeometry {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Preset Shape
   ///
   /// Available in Office2007 and above.
@@ -4659,7 +4656,7 @@ pub struct PresetGeometry {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:prstTxWarp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PresetTextShape/a:prstTxWarp")]
 pub struct PresetTextWarp {
   /// Preset Warp Shape
@@ -4679,7 +4676,7 @@ pub struct PresetTextWarp {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:round.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineJoinRound/a:round")]
 pub struct Round {}
 /// Line Join Bevel.
@@ -4687,7 +4684,7 @@ pub struct Round {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bevel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineJoinBevel/a:bevel")]
 pub struct LineJoinBevel {}
 /// Miter Line Join.
@@ -4695,7 +4692,7 @@ pub struct LineJoinBevel {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:miter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineJoinMiterProperties/a:miter")]
 pub struct Miter {
   /// Miter Join Limit
@@ -4712,7 +4709,7 @@ pub struct Miter {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:prstDash.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PresetLineDashProperties/a:prstDash")]
 pub struct PresetDash {
   /// Value
@@ -4729,7 +4726,7 @@ pub struct PresetDash {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:custDash.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DashStopList/a:custDash")]
 pub struct CustomDash {
   /// _
@@ -4741,7 +4738,7 @@ pub struct CustomDash {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillProperties/a:fill")]
 pub struct FillProperties {
   #[sdk(choice(
@@ -4759,7 +4756,7 @@ pub struct FillProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fillRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/a:fillRef")]
 pub struct FillReference {
   /// Style Matrix Index
@@ -4784,7 +4781,7 @@ pub struct FillReference {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effectRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/a:effectRef")]
 pub struct EffectReference {
   /// Style Matrix Index
@@ -4809,7 +4806,7 @@ pub struct EffectReference {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/a:lnRef")]
 pub struct LineReference {
   /// Style Matrix Index
@@ -4834,7 +4831,7 @@ pub struct LineReference {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/")]
 pub struct StyleMatrixReferenceType {
   /// Style Matrix Index
@@ -4859,7 +4856,7 @@ pub struct StyleMatrixReferenceType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectProperties/a:effect")]
 pub struct EffectPropertiesType {
   #[sdk(choice(
@@ -4873,7 +4870,7 @@ pub struct EffectPropertiesType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:font.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/a:font")]
 pub struct Fonts {
   ///Latin Font
@@ -4897,7 +4894,7 @@ pub struct Fonts {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:majorFont.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/a:majorFont")]
 pub struct MajorFont {
   ///Latin Font
@@ -4921,7 +4918,7 @@ pub struct MajorFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:minorFont.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/a:minorFont")]
 pub struct MinorFont {
   ///Latin Font
@@ -4945,7 +4942,7 @@ pub struct MinorFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/")]
 pub struct FontCollectionType {
   #[sdk(choice(
@@ -4962,7 +4959,7 @@ pub struct FontCollectionType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fontRef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontReference/a:fontRef")]
 pub struct FontReference {
   /// Identifier
@@ -4988,7 +4985,7 @@ pub struct FontReference {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:noAutofit.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextNoAutofit/a:noAutofit")]
 pub struct NoAutoFit {}
 /// Normal AutoFit.
@@ -4996,7 +4993,7 @@ pub struct NoAutoFit {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:normAutofit.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextNormalAutofit/a:normAutofit")]
 pub struct NormalAutoFit {
   /// Font Scale
@@ -5033,18 +5030,17 @@ pub struct NormalAutoFit {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spAutoFit.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextShapeAutofit/a:spAutoFit")]
 pub struct ShapeAutoFit {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
 }
 /// Follow Text.
 ///
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buClrTx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBulletColorFollowText/a:buClrTx")]
 pub struct BulletColorText {}
 /// Color Specified.
@@ -5052,7 +5048,7 @@ pub struct BulletColorText {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:buClr")]
 pub struct BulletColor {
   #[sdk(choice(
@@ -5070,7 +5066,7 @@ pub struct BulletColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extrusionClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:extrusionClr")]
 pub struct ExtrusionColor {
   #[sdk(choice(
@@ -5088,7 +5084,7 @@ pub struct ExtrusionColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:contourClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:contourClr")]
 pub struct ContourColor {
   #[sdk(choice(
@@ -5106,7 +5102,7 @@ pub struct ContourColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:clrFrom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:clrFrom")]
 pub struct ColorFrom {
   #[sdk(choice(
@@ -5124,7 +5120,7 @@ pub struct ColorFrom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:clrTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:clrTo")]
 pub struct ColorTo {
   #[sdk(choice(
@@ -5142,7 +5138,7 @@ pub struct ColorTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fgClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:fgClr")]
 pub struct ForegroundColor {
   #[sdk(choice(
@@ -5160,7 +5156,7 @@ pub struct ForegroundColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bgClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:bgClr")]
 pub struct BackgroundColor {
   #[sdk(choice(
@@ -5178,7 +5174,7 @@ pub struct BackgroundColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:highlight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:highlight")]
 pub struct Highlight {
   #[sdk(choice(
@@ -5196,7 +5192,7 @@ pub struct Highlight {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/")]
 pub struct ColorType {
   #[sdk(choice(
@@ -5214,7 +5210,7 @@ pub struct ColorType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buSzTx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx")]
 pub struct BulletSizeText {}
 /// Bullet Size Percentage.
@@ -5222,7 +5218,7 @@ pub struct BulletSizeText {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buSzPct.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBulletSizePercent/a:buSzPct")]
 pub struct BulletSizePercentage {
   /// Value
@@ -5245,7 +5241,7 @@ pub struct BulletSizePercentage {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buSzPts.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBulletSizePoint/a:buSzPts")]
 pub struct BulletSizePoints {
   /// Value
@@ -5268,7 +5264,7 @@ pub struct BulletSizePoints {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buFontTx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx")]
 pub struct BulletFontText {}
 /// Specified.
@@ -5276,7 +5272,7 @@ pub struct BulletFontText {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buFont.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/a:buFont")]
 pub struct BulletFont {
   /// Text Typeface
@@ -5314,11 +5310,10 @@ pub struct BulletFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:latin.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/a:latin")]
 pub struct LatinFont {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Typeface
   ///
   /// Available in Office2007 and above.
@@ -5354,11 +5349,10 @@ pub struct LatinFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ea.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/a:ea")]
 pub struct EastAsianFont {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Typeface
   ///
   /// Available in Office2007 and above.
@@ -5394,11 +5388,10 @@ pub struct EastAsianFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/a:cs")]
 pub struct ComplexScriptFont {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Typeface
   ///
   /// Available in Office2007 and above.
@@ -5434,7 +5427,7 @@ pub struct ComplexScriptFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sym.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/a:sym")]
 pub struct SymbolFont {
   /// Text Typeface
@@ -5472,7 +5465,7 @@ pub struct SymbolFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/")]
 pub struct TextFontType {
   /// Text Typeface
@@ -5510,7 +5503,7 @@ pub struct TextFontType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buNone.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextNoBullet/a:buNone")]
 pub struct NoBullet {}
 /// Auto-Numbered Bullet.
@@ -5518,7 +5511,7 @@ pub struct NoBullet {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buAutoNum.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextAutonumberBullet/a:buAutoNum")]
 pub struct AutoNumberedBullet {
   /// Bullet Autonumbering Type
@@ -5549,7 +5542,7 @@ pub struct AutoNumberedBullet {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buChar.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextCharBullet/a:buChar")]
 pub struct CharacterBullet {
   /// Bullet Character
@@ -5565,7 +5558,7 @@ pub struct CharacterBullet {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:buBlip.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBlipBullet/a:buBlip")]
 pub struct PictureBullet {
   ///Blip
@@ -5577,7 +5570,7 @@ pub struct PictureBullet {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:uLnTx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx")]
 pub struct UnderlineFollowsText {}
 /// Underline Stroke.
@@ -5585,7 +5578,7 @@ pub struct UnderlineFollowsText {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:uLn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:uLn")]
 pub struct Underline {
   /// line width
@@ -5659,11 +5652,10 @@ pub struct Underline {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ln.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:ln")]
 pub struct Outline {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   ///
   /// Available in Office2007 and above.
@@ -5735,7 +5727,7 @@ pub struct Outline {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnL.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:lnL")]
 pub struct LeftBorderLineProperties {
   /// line width
@@ -5809,7 +5801,7 @@ pub struct LeftBorderLineProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnR.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:lnR")]
 pub struct RightBorderLineProperties {
   /// line width
@@ -5883,7 +5875,7 @@ pub struct RightBorderLineProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnT.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:lnT")]
 pub struct TopBorderLineProperties {
   /// line width
@@ -5957,7 +5949,7 @@ pub struct TopBorderLineProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnB.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:lnB")]
 pub struct BottomBorderLineProperties {
   /// line width
@@ -6031,7 +6023,7 @@ pub struct BottomBorderLineProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnTlToBr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:lnTlToBr")]
 pub struct TopLeftToBottomRightBorderLineProperties {
   /// line width
@@ -6108,7 +6100,7 @@ pub struct TopLeftToBottomRightBorderLineProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnBlToTr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a:lnBlToTr")]
 pub struct BottomLeftToTopRightBorderLineProperties {
   /// line width
@@ -6185,7 +6177,7 @@ pub struct BottomLeftToTopRightBorderLineProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/")]
 pub struct LinePropertiesType {
   /// line width
@@ -6247,7 +6239,7 @@ pub struct LinePropertiesType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:uFillTx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx")]
 pub struct UnderlineFillText {}
 /// Underline Fill.
@@ -6255,7 +6247,7 @@ pub struct UnderlineFillText {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:uFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill")]
 pub struct UnderlineFill {
   #[sdk(choice(
@@ -6273,11 +6265,10 @@ pub struct UnderlineFill {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:r.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RegularTextRun/a:r")]
 pub struct Run {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Text Character Properties
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -6290,7 +6281,7 @@ pub struct Run {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:br.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextLineBreak/a:br")]
 pub struct Break {
   ///Text Run Properties
@@ -6302,7 +6293,7 @@ pub struct Break {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fld.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextField/a:fld")]
 pub struct Field {
   /// Field ID
@@ -6339,11 +6330,10 @@ pub struct Field {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:graphic.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GraphicalObject/a:graphic")]
 pub struct Graphic {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Graphic Object Data
   #[sdk(child(qname = "a:CT_GraphicalObjectData/a:graphicData"))]
   pub graphic_data: std::boxed::Box<GraphicData>,
@@ -6353,11 +6343,10 @@ pub struct Graphic {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:blip.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Blip/a:blip")]
 pub struct Blip {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Embedded Picture Reference
   ///
   /// Available in Office2007 and above.
@@ -6409,11 +6398,10 @@ pub struct Blip {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:theme.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeStyleSheet/a:theme")]
 pub struct Theme {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// name
@@ -6457,11 +6445,10 @@ pub struct Theme {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:themeOverride.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BaseStylesOverride/a:themeOverride")]
 pub struct ThemeOverride {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   ///Color Scheme
@@ -6479,7 +6466,7 @@ pub struct ThemeOverride {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:themeManager.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EmptyElement/a:themeManager")]
 pub struct ThemeManager {}
 /// Master Color Mapping.
@@ -6487,7 +6474,7 @@ pub struct ThemeManager {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:masterClrMapping.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EmptyElement/a:masterClrMapping")]
 pub struct MasterColorMapping {}
 /// Defines the EmptyType Class.
@@ -6495,7 +6482,7 @@ pub struct MasterColorMapping {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EmptyElement/")]
 pub struct EmptyType {}
 /// Table.
@@ -6503,7 +6490,7 @@ pub struct EmptyType {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tbl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Table/a:tbl")]
 pub struct Table {
   ///Table Properties
@@ -6521,11 +6508,10 @@ pub struct Table {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tblStyleLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyleList/a:tblStyleLst")]
 pub struct TableStyleList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// Default
@@ -6553,7 +6539,7 @@ pub struct TableStyleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/a:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -6565,7 +6551,7 @@ pub struct ExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:st.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioCDTime/a:st")]
 pub struct StartTime {
   /// Track
@@ -6588,7 +6574,7 @@ pub struct StartTime {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:end.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioCDTime/a:end")]
 pub struct EndTime {
   /// Track
@@ -6611,7 +6597,7 @@ pub struct EndTime {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioCDTime/")]
 pub struct AudioCdTimeType {
   /// Track
@@ -6634,7 +6620,7 @@ pub struct AudioCdTimeType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:custClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_CustomColor/a:custClr")]
 pub struct CustomColor {
   /// Name
@@ -6659,7 +6645,7 @@ pub struct CustomColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:font.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SupplementalFont/a:font")]
 pub struct SupplementalFont {
   /// Script
@@ -6682,7 +6668,7 @@ pub struct SupplementalFont {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:scene3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scene3D/a:scene3d")]
 pub struct Scene3DType {
   ///Camera
@@ -6703,7 +6689,7 @@ pub struct Scene3DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effectStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectStyleItem/a:effectStyle")]
 pub struct EffectStyle {
   #[sdk(choice(
@@ -6723,7 +6709,7 @@ pub struct EffectStyle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fillStyleLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillStyleList/a:fillStyleLst")]
 pub struct FillStyleList {
   #[sdk(choice(
@@ -6741,7 +6727,7 @@ pub struct FillStyleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnStyleLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineStyleList/a:lnStyleLst")]
 pub struct LineStyleList {
   /// _
@@ -6753,7 +6739,7 @@ pub struct LineStyleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:effectStyleLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectStyleList/a:effectStyleLst")]
 pub struct EffectStyleList {
   /// _
@@ -6765,7 +6751,7 @@ pub struct EffectStyleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bgFillStyleLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFillStyleList/a:bgFillStyleLst")]
 pub struct BackgroundFillStyleList {
   #[sdk(choice(
@@ -6783,7 +6769,7 @@ pub struct BackgroundFillStyleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:clrScheme.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorScheme/a:clrScheme")]
 pub struct ColorScheme {
   /// Name
@@ -6838,7 +6824,7 @@ pub struct ColorScheme {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fontScheme.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontScheme/a:fontScheme")]
 pub struct FontScheme {
   /// Name
@@ -6863,7 +6849,7 @@ pub struct FontScheme {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fmtScheme.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrix/a:fmtScheme")]
 pub struct FormatScheme {
   /// Name
@@ -6891,7 +6877,7 @@ pub struct FormatScheme {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:dk1.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:dk1")]
 pub struct Dark1Color {
   #[sdk(choice(
@@ -6908,7 +6894,7 @@ pub struct Dark1Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lt1.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:lt1")]
 pub struct Light1Color {
   #[sdk(choice(
@@ -6925,7 +6911,7 @@ pub struct Light1Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:dk2.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:dk2")]
 pub struct Dark2Color {
   #[sdk(choice(
@@ -6942,7 +6928,7 @@ pub struct Dark2Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lt2.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:lt2")]
 pub struct Light2Color {
   #[sdk(choice(
@@ -6959,7 +6945,7 @@ pub struct Light2Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:accent1.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent1")]
 pub struct Accent1Color {
   #[sdk(choice(
@@ -6976,7 +6962,7 @@ pub struct Accent1Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:accent2.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent2")]
 pub struct Accent2Color {
   #[sdk(choice(
@@ -6993,7 +6979,7 @@ pub struct Accent2Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:accent3.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent3")]
 pub struct Accent3Color {
   #[sdk(choice(
@@ -7010,7 +6996,7 @@ pub struct Accent3Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:accent4.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent4")]
 pub struct Accent4Color {
   #[sdk(choice(
@@ -7027,7 +7013,7 @@ pub struct Accent4Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:accent5.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent5")]
 pub struct Accent5Color {
   #[sdk(choice(
@@ -7044,7 +7030,7 @@ pub struct Accent5Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:accent6.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent6")]
 pub struct Accent6Color {
   #[sdk(choice(
@@ -7061,7 +7047,7 @@ pub struct Accent6Color {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:hlink")]
 pub struct Hyperlink {
   #[sdk(choice(
@@ -7078,7 +7064,7 @@ pub struct Hyperlink {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:folHlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:folHlink")]
 pub struct FollowedHyperlinkColor {
   #[sdk(choice(
@@ -7095,7 +7081,7 @@ pub struct FollowedHyperlinkColor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/")]
 pub struct Color2Type {
   #[sdk(choice(
@@ -7112,7 +7098,7 @@ pub struct Color2Type {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/a:sx")]
 pub struct ScaleX {
   /// Numerator
@@ -7135,7 +7121,7 @@ pub struct ScaleX {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sy.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/a:sy")]
 pub struct ScaleY {
   /// Numerator
@@ -7158,7 +7144,7 @@ pub struct ScaleY {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/")]
 pub struct RatioType {
   /// Numerator
@@ -7181,11 +7167,10 @@ pub struct RatioType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:off.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/a:off")]
 pub struct Offset {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// X-Axis Coordinate
   ///
   /// Available in Office2007 and above.
@@ -7220,7 +7205,7 @@ pub struct Offset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:chOff.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/a:chOff")]
 pub struct ChildOffset {
   /// X-Axis Coordinate
@@ -7257,7 +7242,7 @@ pub struct ChildOffset {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/")]
 pub struct Point2DType {
   /// X-Axis Coordinate
@@ -7294,11 +7279,10 @@ pub struct Point2DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/a:ext")]
 pub struct Extents {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extent Length
   ///
   /// Available in Office2007 and above.
@@ -7333,7 +7317,7 @@ pub struct Extents {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:chExt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/a:chExt")]
 pub struct ChildExtents {
   /// Extent Length
@@ -7370,7 +7354,7 @@ pub struct ChildExtents {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/")]
 pub struct PositiveSize2DType {
   /// Extent Length
@@ -7407,11 +7391,10 @@ pub struct PositiveSize2DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spLocks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeLocking/a:spLocks")]
 pub struct ShapeLocks {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Disallow Shape Grouping
   ///
   /// Available in Office2007 and above.
@@ -7498,7 +7481,7 @@ pub struct ShapeLocks {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cxnSpLocks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ConnectorLocking/a:cxnSpLocks")]
 pub struct ConnectionShapeLocks {
   /// Disallow Shape Grouping
@@ -7580,7 +7563,7 @@ pub struct ConnectionShapeLocks {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:stCxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/a:stCxn")]
 pub struct StartConnection {
   /// Identifier
@@ -7603,7 +7586,7 @@ pub struct StartConnection {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:endCxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/a:endCxn")]
 pub struct EndConnection {
   /// Identifier
@@ -7626,7 +7609,7 @@ pub struct EndConnection {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/")]
 pub struct ConnectionType {
   /// Identifier
@@ -7649,11 +7632,10 @@ pub struct ConnectionType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:graphicFrameLocks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks")]
 pub struct GraphicFrameLocks {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Disallow Shape Grouping
   ///
   /// Available in Office2007 and above.
@@ -7705,11 +7687,10 @@ pub struct GraphicFrameLocks {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:graphicData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GraphicalObjectData/a:graphicData")]
 pub struct GraphicData {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Uniform Resource Identifier
   ///
   /// Available in Office2007 and above.
@@ -7726,7 +7707,7 @@ pub struct GraphicData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:dgm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationDgmElement/a:dgm")]
 pub struct Diagram {
   /// Identifier
@@ -7755,7 +7736,7 @@ pub struct Diagram {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:chart.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationChartElement/a:chart")]
 pub struct Chart {
   /// Series Index
@@ -7786,7 +7767,7 @@ pub struct Chart {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bldDgm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationDgmBuildProperties/a:bldDgm")]
 pub struct BuildDiagram {
   /// Build
@@ -7813,7 +7794,7 @@ pub struct BuildDiagram {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bldChart.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationChartBuildProperties/a:bldChart")]
 pub struct BuildChart {
   /// Build
@@ -7847,11 +7828,10 @@ pub struct BuildChart {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:txBody.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/a:txBody")]
 pub struct TextBody {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<BodyProperties>,
@@ -7867,7 +7847,7 @@ pub struct TextBody {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:useSpRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect")]
 pub struct UseShapeRectangle {}
 /// Defines the Transform2D Class.
@@ -7875,11 +7855,10 @@ pub struct UseShapeRectangle {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/a:xfrm")]
 pub struct Transform2D {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -7913,7 +7892,7 @@ pub struct Transform2D {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/a:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
@@ -7966,7 +7945,7 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cNvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/a:cNvSpPr")]
 pub struct NonVisualShapeDrawingProperties {
   /// Text Box
@@ -7988,7 +7967,7 @@ pub struct NonVisualShapeDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:nvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlShapeNonVisual/a:nvSpPr")]
 pub struct NonVisualShapeProperties {
   /// _
@@ -8003,7 +7982,7 @@ pub struct NonVisualShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/a:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -8054,7 +8033,7 @@ pub struct ShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:txSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlTextShape/a:txSp")]
 pub struct TextShape {
   ///Shape Text Body
@@ -8074,7 +8053,7 @@ pub struct TextShape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/a:style")]
 pub struct ShapeStyle {
   /// _
@@ -8095,7 +8074,7 @@ pub struct ShapeStyle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cNvCxnSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualConnectorProperties/a:cNvCxnSpPr")]
 pub struct NonVisualConnectorShapeDrawingProperties {
   ///Connection Shape Locks
@@ -8116,7 +8095,7 @@ pub struct NonVisualConnectorShapeDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:nvCxnSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlConnectorNonVisual/a:nvCxnSpPr")]
 pub struct NonVisualConnectionShapeProperties {
   ///Non-Visual Drawing Properties
@@ -8132,7 +8111,7 @@ pub struct NonVisualConnectionShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cNvPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPictureProperties/a:cNvPicPr")]
 pub struct NonVisualPictureDrawingProperties {
   /// preferRelativeResize
@@ -8154,7 +8133,7 @@ pub struct NonVisualPictureDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:nvPicPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlPictureNonVisual/a:nvPicPr")]
 pub struct NonVisualPictureProperties {
   /// _
@@ -8169,7 +8148,7 @@ pub struct NonVisualPictureProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cNvGraphicFramePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/a:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
   ///Graphic Frame Locks
@@ -8184,7 +8163,7 @@ pub struct NonVisualGraphicFrameDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:nvGraphicFramePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGraphicFrameNonVisual/a:nvGraphicFramePr")]
 pub struct NonVisualGraphicFrameProperties {
   /// _
@@ -8200,7 +8179,7 @@ pub struct NonVisualGraphicFrameProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cNvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/a:cNvGrpSpPr")]
 pub struct NonVisualGroupShapeDrawingProperties {
   /// _
@@ -8216,7 +8195,7 @@ pub struct NonVisualGroupShapeDrawingProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:rot.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SphereCoords/a:rot")]
 pub struct Rotation {
   /// Latitude
@@ -8267,7 +8246,7 @@ pub struct Rotation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:camera.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Camera/a:camera")]
 pub struct Camera {
   /// Preset Camera Type
@@ -8309,7 +8288,7 @@ pub struct Camera {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lightRig.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LightRig/a:lightRig")]
 pub struct LightRig {
   /// Rig Preset
@@ -8337,7 +8316,7 @@ pub struct LightRig {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:backdrop.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Backdrop/a:backdrop")]
 pub struct Backdrop {
   ///Anchor Point
@@ -8358,7 +8337,7 @@ pub struct Backdrop {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:anchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point3D/a:anchor")]
 pub struct Anchor {
   /// X-Coordinate in 3D
@@ -8409,7 +8388,7 @@ pub struct Anchor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:norm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/a:norm")]
 pub struct Normal {
   /// Distance along X-axis in 3D
@@ -8460,7 +8439,7 @@ pub struct Normal {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:up.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/a:up")]
 pub struct UpVector {
   /// Distance along X-axis in 3D
@@ -8511,7 +8490,7 @@ pub struct UpVector {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/")]
 pub struct Vector3DType {
   /// Distance along X-axis in 3D
@@ -8562,7 +8541,7 @@ pub struct Vector3DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bevelT.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bevel/a:bevelT")]
 pub struct BevelTop {
   /// Width
@@ -8607,7 +8586,7 @@ pub struct BevelTop {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bevelB.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bevel/a:bevelB")]
 pub struct BevelBottom {
   /// Width
@@ -8652,7 +8631,7 @@ pub struct BevelBottom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bevel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bevel/a:bevel")]
 pub struct Bevel {
   /// Width
@@ -8697,7 +8676,7 @@ pub struct Bevel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bevel/")]
 pub struct BevelType {
   /// Width
@@ -8742,7 +8721,7 @@ pub struct BevelType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fillToRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RelativeRect/a:fillToRect")]
 pub struct FillToRectangle {
   /// Left Offset
@@ -8779,7 +8758,7 @@ pub struct FillToRectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tileRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RelativeRect/a:tileRect")]
 pub struct TileRectangle {
   /// Left Offset
@@ -8816,7 +8795,7 @@ pub struct TileRectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:fillRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RelativeRect/a:fillRect")]
 pub struct FillRectangle {
   /// Left Offset
@@ -8853,7 +8832,7 @@ pub struct FillRectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:srcRect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RelativeRect/a:srcRect")]
 pub struct SourceRectangle {
   /// Left Offset
@@ -8890,7 +8869,7 @@ pub struct SourceRectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RelativeRect/")]
 pub struct RelativeRectangleType {
   /// Left Offset
@@ -8927,7 +8906,7 @@ pub struct RelativeRectangleType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GradientStop/a:gs")]
 pub struct GradientStop {
   /// Position
@@ -8959,7 +8938,7 @@ pub struct GradientStop {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gsLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GradientStopList/a:gsLst")]
 pub struct GradientStopList {
   /// _
@@ -8971,7 +8950,7 @@ pub struct GradientStopList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GeomGuide/a:gd")]
 pub struct ShapeGuide {
   /// Shape Guide Name
@@ -8995,7 +8974,7 @@ pub struct ShapeGuide {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:pos.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AdjPoint2D/a:pos")]
 pub struct Position {
   /// X-Coordinate
@@ -9036,7 +9015,7 @@ pub struct Position {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:pt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AdjPoint2D/a:pt")]
 pub struct Point {
   /// X-Coordinate
@@ -9077,7 +9056,7 @@ pub struct Point {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AdjPoint2D/")]
 pub struct AdjustPoint2DType {
   /// X-Coordinate
@@ -9118,7 +9097,7 @@ pub struct AdjustPoint2DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ahXY.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_XYAdjustHandle/a:ahXY")]
 pub struct AdjustHandleXy {
   /// Horizontal Adjustment Guide
@@ -9210,7 +9189,7 @@ pub struct AdjustHandleXy {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ahPolar.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PolarAdjustHandle/a:ahPolar")]
 pub struct AdjustHandlePolar {
   /// Radial Adjustment Guide
@@ -9288,7 +9267,7 @@ pub struct AdjustHandlePolar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ConnectionSite/a:cxn")]
 pub struct ConnectionSite {
   /// Connection Site Angle
@@ -9309,7 +9288,7 @@ pub struct ConnectionSite {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:close.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DClose/a:close")]
 pub struct CloseShapePath {}
 /// Move Path To.
@@ -9317,7 +9296,7 @@ pub struct CloseShapePath {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:moveTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DMoveTo/a:moveTo")]
 pub struct MoveTo {
   ///Move end point
@@ -9329,7 +9308,7 @@ pub struct MoveTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DLineTo/a:lnTo")]
 pub struct LineTo {
   ///Line end point
@@ -9341,7 +9320,7 @@ pub struct LineTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:arcTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DArcTo/a:arcTo")]
 pub struct ArcTo {
   /// Shape Arc Width Radius
@@ -9400,7 +9379,7 @@ pub struct ArcTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:quadBezTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DQuadBezierTo/a:quadBezTo")]
 pub struct QuadraticBezierCurveTo {
   /// _
@@ -9412,7 +9391,7 @@ pub struct QuadraticBezierCurveTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cubicBezTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DCubicBezierTo/a:cubicBezTo")]
 pub struct CubicBezierCurveTo {
   /// _
@@ -9424,7 +9403,7 @@ pub struct CubicBezierCurveTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:path.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2D/a:path")]
 pub struct Path {
   /// Path Width
@@ -9492,11 +9471,10 @@ pub struct Path {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:avLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GeomGuideList/a:avLst")]
 pub struct AdjustValueList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "a:CT_GeomGuide/a:gd"))]
   pub a_gd: Vec<ShapeGuide>,
@@ -9506,7 +9484,7 @@ pub struct AdjustValueList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gdLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GeomGuideList/a:gdLst")]
 pub struct ShapeGuideList {
   /// _
@@ -9518,7 +9496,7 @@ pub struct ShapeGuideList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GeomGuideList/")]
 pub struct GeometryGuideListType {
   ///Shape Guide.
@@ -9530,7 +9508,7 @@ pub struct GeometryGuideListType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ahLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AdjustHandleList/a:ahLst")]
 pub struct AdjustHandleList {
   #[sdk(choice(
@@ -9544,7 +9522,7 @@ pub struct AdjustHandleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cxnLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ConnectionSiteList/a:cxnLst")]
 pub struct ConnectionSiteList {
   /// _
@@ -9556,7 +9534,7 @@ pub struct ConnectionSiteList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:rect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GeomRect/a:rect")]
 pub struct Rectangle {
   /// Left
@@ -9629,7 +9607,7 @@ pub struct Rectangle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:pathLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DList/a:pathLst")]
 pub struct PathList {
   /// _
@@ -9641,7 +9619,7 @@ pub struct PathList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DashStop/a:ds")]
 pub struct DashStop {
   /// Dash Length
@@ -9666,7 +9644,7 @@ pub struct DashStop {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupTransform2D/a:xfrm")]
 pub struct TransformGroup {
   /// Rotation
@@ -9708,11 +9686,10 @@ pub struct TransformGroup {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bodyPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBodyProperties/a:bodyPr")]
 pub struct BodyProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -9882,11 +9859,10 @@ pub struct BodyProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lstStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/a:lstStyle")]
 pub struct ListStyle {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<std::boxed::Box<DefaultParagraphProperties>>,
@@ -9926,7 +9902,7 @@ pub struct ListStyle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/a:spDef")]
 pub struct ShapeDefault {
   ///Visual Properties
@@ -9950,7 +9926,7 @@ pub struct ShapeDefault {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/a:lnDef")]
 pub struct LineDefault {
   ///Visual Properties
@@ -9974,7 +9950,7 @@ pub struct LineDefault {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:txDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/a:txDef")]
 pub struct TextDefault {
   ///Visual Properties
@@ -9998,7 +9974,7 @@ pub struct TextDefault {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/")]
 pub struct DefaultShapeDefinitionType {
   #[sdk(choice(
@@ -10015,7 +9991,7 @@ pub struct DefaultShapeDefinitionType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:overrideClrMapping.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMapping/a:overrideClrMapping")]
 pub struct OverrideColorMapping {
   /// Background 1
@@ -10123,7 +10099,7 @@ pub struct OverrideColorMapping {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:clrMap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMapping/a:clrMap")]
 pub struct ColorMap {
   /// Background 1
@@ -10231,7 +10207,7 @@ pub struct ColorMap {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMapping/")]
 pub struct ColorMappingType {
   /// Background 1
@@ -10339,7 +10315,7 @@ pub struct ColorMappingType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extraClrScheme.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorSchemeAndMapping/a:extraClrScheme")]
 pub struct ExtraColorScheme {
   /// _
@@ -10354,7 +10330,7 @@ pub struct ExtraColorScheme {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:themeElements.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BaseStyles/a:themeElements")]
 pub struct ThemeElements {
   /// _
@@ -10375,7 +10351,7 @@ pub struct ThemeElements {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cell3D.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Cell3D/a:cell3D")]
 pub struct Cell3DProperties {
   /// Preset Material
@@ -10401,7 +10377,7 @@ pub struct Cell3DProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tcPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableCellProperties/a:tcPr")]
 pub struct TableCellProperties {
   /// Left Margin
@@ -10504,7 +10480,7 @@ pub struct TableCellProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableCell/a:tc")]
 pub struct TableCell {
   /// Row Span
@@ -10550,7 +10526,7 @@ pub struct TableCell {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tableStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyle/a:tableStyle")]
 pub struct TableStyle {
   /// Style ID
@@ -10623,7 +10599,7 @@ pub struct TableStyle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tblStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyle/a:tblStyle")]
 pub struct TableStyleEntry {
   /// Style ID
@@ -10696,7 +10672,7 @@ pub struct TableStyleEntry {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyle/")]
 pub struct TableStyleType {
   /// Style ID
@@ -10748,7 +10724,7 @@ pub type TableStyleId = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:gridCol.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableCol/a:gridCol")]
 pub struct GridColumn {
   /// Width
@@ -10774,7 +10750,7 @@ pub struct GridColumn {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tblPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableProperties/a:tblPr")]
 pub struct TableProperties {
   /// Right-to-Left
@@ -10854,7 +10830,7 @@ pub struct TableProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tblGrid.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableGrid/a:tblGrid")]
 pub struct TableGrid {
   /// _
@@ -10866,7 +10842,7 @@ pub struct TableGrid {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableRow/a:tr")]
 pub struct TableRow {
   /// Height
@@ -10895,7 +10871,7 @@ pub struct TableRow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:left.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:left")]
 pub struct LeftBorder {
   #[sdk(choice(
@@ -10909,7 +10885,7 @@ pub struct LeftBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:right.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:right")]
 pub struct RightBorder {
   #[sdk(choice(
@@ -10923,7 +10899,7 @@ pub struct RightBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:top.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:top")]
 pub struct TopBorder {
   #[sdk(choice(
@@ -10937,7 +10913,7 @@ pub struct TopBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:bottom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:bottom")]
 pub struct BottomBorder {
   #[sdk(choice(
@@ -10951,7 +10927,7 @@ pub struct BottomBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:insideH.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:insideH")]
 pub struct InsideHorizontalBorder {
   #[sdk(choice(
@@ -10965,7 +10941,7 @@ pub struct InsideHorizontalBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:insideV.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:insideV")]
 pub struct InsideVerticalBorder {
   #[sdk(choice(
@@ -10979,7 +10955,7 @@ pub struct InsideVerticalBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tl2br.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:tl2br")]
 pub struct TopLeftToBottomRightBorder {
   #[sdk(choice(
@@ -10993,7 +10969,7 @@ pub struct TopLeftToBottomRightBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tr2bl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:tr2bl")]
 pub struct TopRightToBottomLeftBorder {
   #[sdk(choice(
@@ -11007,7 +10983,7 @@ pub struct TopRightToBottomLeftBorder {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/")]
 pub struct ThemeableLineStyleType {
   #[sdk(choice(
@@ -11021,7 +10997,7 @@ pub struct ThemeableLineStyleType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tcBdr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableCellBorderStyle/a:tcBdr")]
 pub struct TableCellBorders {
   ///Left Border
@@ -11057,7 +11033,7 @@ pub struct TableCellBorders {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tcTxStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle")]
 pub struct TableCellTextStyle {
   /// Bold
@@ -11099,7 +11075,7 @@ pub struct TableCellTextStyle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tcStyle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyleCellStyle/a:tcStyle")]
 pub struct TableCellStyle {
   ///Table Cell Borders
@@ -11119,7 +11095,7 @@ pub struct TableCellStyle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tblBg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableBackgroundStyle/a:tblBg")]
 pub struct TableBackground {
   #[sdk(choice(
@@ -11138,7 +11114,7 @@ pub struct TableBackground {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:wholeTbl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:wholeTbl")]
 pub struct WholeTable {
   ///Table Cell Text Style
@@ -11153,7 +11129,7 @@ pub struct WholeTable {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:band1H.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band1H")]
 pub struct Band1Horizontal {
   ///Table Cell Text Style
@@ -11168,7 +11144,7 @@ pub struct Band1Horizontal {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:band2H.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band2H")]
 pub struct Band2Horizontal {
   ///Table Cell Text Style
@@ -11183,7 +11159,7 @@ pub struct Band2Horizontal {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:band1V.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band1V")]
 pub struct Band1Vertical {
   ///Table Cell Text Style
@@ -11198,7 +11174,7 @@ pub struct Band1Vertical {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:band2V.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band2V")]
 pub struct Band2Vertical {
   ///Table Cell Text Style
@@ -11213,7 +11189,7 @@ pub struct Band2Vertical {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lastCol.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:lastCol")]
 pub struct LastColumn {
   ///Table Cell Text Style
@@ -11228,7 +11204,7 @@ pub struct LastColumn {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:firstCol.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:firstCol")]
 pub struct FirstColumn {
   ///Table Cell Text Style
@@ -11243,7 +11219,7 @@ pub struct FirstColumn {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lastRow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:lastRow")]
 pub struct LastRow {
   ///Table Cell Text Style
@@ -11258,7 +11234,7 @@ pub struct LastRow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:seCell.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:seCell")]
 pub struct SoutheastCell {
   ///Table Cell Text Style
@@ -11273,7 +11249,7 @@ pub struct SoutheastCell {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:swCell.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:swCell")]
 pub struct SouthwestCell {
   ///Table Cell Text Style
@@ -11288,7 +11264,7 @@ pub struct SouthwestCell {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:firstRow.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:firstRow")]
 pub struct FirstRow {
   ///Table Cell Text Style
@@ -11303,7 +11279,7 @@ pub struct FirstRow {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:neCell.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:neCell")]
 pub struct NortheastCell {
   ///Table Cell Text Style
@@ -11318,7 +11294,7 @@ pub struct NortheastCell {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:nwCell.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:nwCell")]
 pub struct NorthwestCell {
   ///Table Cell Text Style
@@ -11333,7 +11309,7 @@ pub struct NorthwestCell {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/")]
 pub struct TablePartStyleType {
   #[sdk(choice(
@@ -11347,11 +11323,10 @@ pub struct TablePartStyleType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:pPr")]
 pub struct ParagraphProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
   ///
   /// Available in Office2007 and above.
@@ -11513,7 +11488,7 @@ pub struct ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:defPPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:defPPr")]
 pub struct DefaultParagraphProperties {
   /// Left Margin
@@ -11677,7 +11652,7 @@ pub struct DefaultParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl1pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl1pPr")]
 pub struct Level1ParagraphProperties {
   /// Left Margin
@@ -11841,7 +11816,7 @@ pub struct Level1ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl2pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl2pPr")]
 pub struct Level2ParagraphProperties {
   /// Left Margin
@@ -12005,7 +11980,7 @@ pub struct Level2ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl3pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl3pPr")]
 pub struct Level3ParagraphProperties {
   /// Left Margin
@@ -12169,7 +12144,7 @@ pub struct Level3ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl4pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl4pPr")]
 pub struct Level4ParagraphProperties {
   /// Left Margin
@@ -12333,7 +12308,7 @@ pub struct Level4ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl5pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl5pPr")]
 pub struct Level5ParagraphProperties {
   /// Left Margin
@@ -12497,7 +12472,7 @@ pub struct Level5ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl6pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl6pPr")]
 pub struct Level6ParagraphProperties {
   /// Left Margin
@@ -12661,7 +12636,7 @@ pub struct Level6ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl7pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl7pPr")]
 pub struct Level7ParagraphProperties {
   /// Left Margin
@@ -12825,7 +12800,7 @@ pub struct Level7ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl8pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl8pPr")]
 pub struct Level8ParagraphProperties {
   /// Left Margin
@@ -12989,7 +12964,7 @@ pub struct Level8ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lvl9pPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/a:lvl9pPr")]
 pub struct Level9ParagraphProperties {
   /// Left Margin
@@ -13153,11 +13128,10 @@ pub struct Level9ParagraphProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/")]
 pub struct TextParagraphPropertiesType {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
   ///
   /// Available in Office2007 and above.
@@ -13298,11 +13272,10 @@ pub struct TextParagraphPropertiesType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:endParaRPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextCharacterProperties/a:endParaRPr")]
 pub struct EndParagraphRunProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// kumimoji
   ///
   /// Available in Office2007 and above.
@@ -13520,11 +13493,10 @@ pub struct EndParagraphRunProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:rPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextCharacterProperties/a:rPr")]
 pub struct RunProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// kumimoji
   ///
   /// Available in Office2007 and above.
@@ -13742,11 +13714,10 @@ pub struct RunProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:defRPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextCharacterProperties/a:defRPr")]
 pub struct DefaultRunProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// baseline
   ///
   /// Available in Office2007 and above.
@@ -13964,11 +13935,10 @@ pub struct DefaultRunProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextCharacterProperties/")]
 pub struct TextCharacterPropertiesType {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// kumimoji
   ///
   /// Available in Office2007 and above.
@@ -14157,11 +14127,10 @@ pub struct TextCharacterPropertiesType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:p.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraph/a:p")]
 pub struct Paragraph {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   ///Text Paragraph Properties
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
@@ -14181,7 +14150,7 @@ pub struct Paragraph {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tab.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextTabStop/a:tab")]
 pub struct TabStop {
   /// Tab Position
@@ -14205,7 +14174,7 @@ pub struct TabStop {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spcPct.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacingPercent/a:spcPct")]
 pub struct SpacingPercent {
   /// Value
@@ -14228,7 +14197,7 @@ pub struct SpacingPercent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spcPts.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacingPoint/a:spcPts")]
 pub struct SpacingPoints {
   /// Value
@@ -14251,7 +14220,7 @@ pub struct SpacingPoints {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:lnSpc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/a:lnSpc")]
 pub struct LineSpacing {
   #[sdk(choice(
@@ -14265,7 +14234,7 @@ pub struct LineSpacing {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spcBef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/a:spcBef")]
 pub struct SpaceBefore {
   #[sdk(choice(
@@ -14279,7 +14248,7 @@ pub struct SpaceBefore {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:spcAft.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/a:spcAft")]
 pub struct SpaceAfter {
   #[sdk(choice(
@@ -14293,7 +14262,7 @@ pub struct SpaceAfter {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/")]
 pub struct TextSpacingType {
   #[sdk(choice(
@@ -14307,7 +14276,7 @@ pub struct TextSpacingType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tabLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextTabStopList/a:tabLst")]
 pub struct TabStopList {
   /// _
@@ -14325,7 +14294,7 @@ pub type Text = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapePropertiesExtension/a:ext")]
 pub struct ShapePropertiesExtension {
   /// URI
@@ -14355,7 +14324,7 @@ pub struct ShapePropertiesExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShapeExtension/a:ext")]
 pub struct GvmlGroupShapeExtension {
   /// URI
@@ -14378,7 +14347,7 @@ pub struct GvmlGroupShapeExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapePropertiesExtensionList/a:extLst")]
 pub struct ShapePropertiesExtensionList {
   /// _
@@ -14390,7 +14359,7 @@ pub struct ShapePropertiesExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:nvGrpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr")]
 pub struct NonVisualGroupShapeProperties {
   /// _
@@ -14406,7 +14375,7 @@ pub struct NonVisualGroupShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:grpSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupShapeProperties/a:grpSpPr")]
 pub struct VisualGroupShapeProperties {
   /// Black and White Mode
@@ -14446,7 +14415,7 @@ pub struct VisualGroupShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:sp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlShape/a:sp")]
 pub struct Shape {
   ///Non-Visual Properties for a Shape
@@ -14470,7 +14439,7 @@ pub struct Shape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:cxnSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlConnector/a:cxnSp")]
 pub struct ConnectionShape {
   ///Non-Visual Properties for a Connection Shape
@@ -14491,7 +14460,7 @@ pub struct ConnectionShape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:pic.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlPicture/a:pic")]
 pub struct Picture {
   ///Non-Visual Properties for a Picture
@@ -14515,7 +14484,7 @@ pub struct Picture {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:graphicFrame.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame")]
 pub struct GraphicFrame {
   ///Non-Visual Properties for a Graphic Frame
@@ -14536,7 +14505,7 @@ pub struct GraphicFrame {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:grpSp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShape/a:grpSp")]
 pub struct GroupShape {
   ///Non-Visual Properties for a Group Shape
@@ -14567,7 +14536,7 @@ pub struct GroupShape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst")]
 pub struct GvmlGroupShapeExtensionList {
   /// _
@@ -14579,7 +14548,7 @@ pub struct GvmlGroupShapeExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapePropsExtension/a:ext")]
 pub struct NonVisualGroupDrawingShapePropsExtension {
   /// URI
@@ -14602,7 +14571,7 @@ pub struct NonVisualGroupDrawingShapePropsExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeStyleSheetExtension/a:ext")]
 pub struct OfficeStyleSheetExtension {
   /// URI
@@ -14625,7 +14594,7 @@ pub struct OfficeStyleSheetExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ConnectorLockingExtension/a:ext")]
 pub struct ConnectorLockingExtension {
   /// URI
@@ -14644,7 +14613,7 @@ pub struct ConnectorLockingExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:grpSpLocks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GroupLocking/a:grpSpLocks")]
 pub struct GroupShapeLocks {
   /// Disallow Shape Grouping
@@ -14705,7 +14674,7 @@ pub struct GroupShapeLocks {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst")]
 pub struct NonVisualGroupDrawingShapePropsExtensionList {
   /// _
@@ -14717,7 +14686,7 @@ pub struct NonVisualGroupDrawingShapePropsExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:objectDefaults.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ObjectStyleDefaults/a:objectDefaults")]
 pub struct ObjectDefaults {
   ///Shape Default
@@ -14738,7 +14707,7 @@ pub struct ObjectDefaults {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extraClrSchemeLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorSchemeList/a:extraClrSchemeLst")]
 pub struct ExtraColorSchemeList {
   /// _
@@ -14750,7 +14719,7 @@ pub struct ExtraColorSchemeList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:custClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_CustomColorList/a:custClrLst")]
 pub struct CustomColorList {
   /// _
@@ -14762,7 +14731,7 @@ pub struct CustomColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeStyleSheetExtensionList/a:extLst")]
 pub struct OfficeStyleSheetExtensionList {
   /// _
@@ -14774,11 +14743,10 @@ pub struct OfficeStyleSheetExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hlinkClick.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Hyperlink/a:hlinkClick")]
 pub struct HyperlinkOnClick {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// relationship identifier to find target URI
   ///
   /// Available in Office2007 and above.
@@ -14847,7 +14815,7 @@ pub struct HyperlinkOnClick {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hlinkMouseOver.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Hyperlink/a:hlinkMouseOver")]
 pub struct HyperlinkOnMouseOver {
   /// relationship identifier to find target URI
@@ -14918,7 +14886,7 @@ pub struct HyperlinkOnMouseOver {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:hlinkHover.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Hyperlink/a:hlinkHover")]
 pub struct HyperlinkOnHover {
   /// relationship identifier to find target URI
@@ -14989,7 +14957,7 @@ pub struct HyperlinkOnHover {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Hyperlink/")]
 pub struct HyperlinkType {
   /// relationship identifier to find target URI
@@ -15059,7 +15027,7 @@ pub struct HyperlinkType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:rtl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bool/a:rtl")]
 pub struct RightToLeft {
   /// val
@@ -15075,7 +15043,7 @@ pub struct RightToLeft {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst")]
 pub struct NonVisualDrawingPropertiesExtensionList {
   /// _
@@ -15087,7 +15055,7 @@ pub struct NonVisualDrawingPropertiesExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ConnectorLockingExtensionList/a:extLst")]
 pub struct ConnectorLockingExtensionList {
   /// _
@@ -15099,7 +15067,7 @@ pub struct ConnectorLockingExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DataModelExtension/a:ext")]
 pub struct DataModelExtension {
   /// URI
@@ -15125,7 +15093,7 @@ pub struct DataModelExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PtExtension/a:ext")]
 pub struct PtExtension {
   /// URI
@@ -15148,7 +15116,7 @@ pub struct PtExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_HyperlinkExtension/a:ext")]
 pub struct HyperlinkExtension {
   /// URI
@@ -15171,7 +15139,7 @@ pub struct HyperlinkExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_HyperlinkExtensionList/a:extLst")]
 pub struct HyperlinkExtensionList {
   /// _
@@ -15183,7 +15151,7 @@ pub struct HyperlinkExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LinePropertiesExtension/a:ext")]
 pub struct LinePropertiesExtension {
   /// URI
@@ -15206,11 +15174,10 @@ pub struct LinePropertiesExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:headEnd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineEndProperties/a:headEnd")]
 pub struct HeadEnd {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Line Head/End Type
   ///
   /// Available in Office2007 and above.
@@ -15241,11 +15208,10 @@ pub struct HeadEnd {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:tailEnd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineEndProperties/a:tailEnd")]
 pub struct TailEnd {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Line Head/End Type
   ///
   /// Available in Office2007 and above.
@@ -15276,7 +15242,7 @@ pub struct TailEnd {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineEndProperties/")]
 pub struct LineEndPropertiesType {
   /// Line Head/End Type
@@ -15309,7 +15275,7 @@ pub struct LineEndPropertiesType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LinePropertiesExtensionList/a:extLst")]
 pub struct LinePropertiesExtensionList {
   /// _
@@ -15321,7 +15287,7 @@ pub struct LinePropertiesExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingPropsExtension/a:ext")]
 pub struct NonVisualDrawingPropertiesExtension {
   /// URI
@@ -15352,7 +15318,7 @@ pub struct NonVisualDrawingPropertiesExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:picLocks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PictureLocking/a:picLocks")]
 pub struct PictureLocks {
   /// Disallow Shape Grouping
@@ -15441,7 +15407,7 @@ pub struct PictureLocks {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPicturePropertiesExtensionList/a:extLst")]
 pub struct NonVisualPicturePropertiesExtensionList {
   /// _
@@ -15453,7 +15419,7 @@ pub struct NonVisualPicturePropertiesExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPicturePropertiesExtension/a:ext")]
 pub struct NonVisualPicturePropertiesExtension {
   /// URI
@@ -15482,7 +15448,7 @@ pub struct NonVisualPicturePropertiesExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipExtensionList/a:extLst")]
 pub struct BlipExtensionList {
   /// _
@@ -15494,7 +15460,7 @@ pub struct BlipExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipExtension/a:ext")]
 pub struct BlipExtension {
   /// URI
@@ -15520,7 +15486,7 @@ pub struct BlipExtension {
   )]
   pub xml_children: Option<BlipExtensionChoice>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RgbColorModelPercentageChoice {
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   ATint(std::boxed::Box<Tint>),
@@ -15579,7 +15545,7 @@ pub enum RgbColorModelPercentageChoice {
   #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
   AInvGamma(std::boxed::Box<InverseGamma>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RgbColorModelHexChoice {
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   ATint(std::boxed::Box<Tint>),
@@ -15638,7 +15604,7 @@ pub enum RgbColorModelHexChoice {
   #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
   AInvGamma(std::boxed::Box<InverseGamma>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HslColorChoice {
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   ATint(std::boxed::Box<Tint>),
@@ -15697,7 +15663,7 @@ pub enum HslColorChoice {
   #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
   AInvGamma(std::boxed::Box<InverseGamma>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SystemColorChoice {
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   ATint(std::boxed::Box<Tint>),
@@ -15756,7 +15722,7 @@ pub enum SystemColorChoice {
   #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
   AInvGamma(std::boxed::Box<InverseGamma>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SchemeColorChoice {
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   ATint(std::boxed::Box<Tint>),
@@ -15815,7 +15781,7 @@ pub enum SchemeColorChoice {
   #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
   AInvGamma(std::boxed::Box<InverseGamma>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresetColorChoice {
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   ATint(std::boxed::Box<Tint>),
@@ -15874,7 +15840,7 @@ pub enum PresetColorChoice {
   #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
   AInvGamma(std::boxed::Box<InverseGamma>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SolidFillChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -15889,21 +15855,21 @@ pub enum SolidFillChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientFillChoice {
   #[sdk(child(qname = "a:CT_LinearShadeProperties/a:lin"))]
   ALin(std::boxed::Box<LinearGradientFill>),
   #[sdk(child(qname = "a:CT_PathShadeProperties/a:path"))]
   APath(std::boxed::Box<PathGradientFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
   ATile(std::boxed::Box<Tile>),
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
   AStretch(std::boxed::Box<Stretch>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectContainerChoice {
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   ACont(std::boxed::Box<EffectContainer>),
@@ -15966,7 +15932,7 @@ pub enum EffectContainerChoice {
   #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
   AXfrm(std::boxed::Box<TransformEffect>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectDagChoice {
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   ACont(std::boxed::Box<EffectContainer>),
@@ -16029,7 +15995,7 @@ pub enum EffectDagChoice {
   #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
   AXfrm(std::boxed::Box<TransformEffect>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectContainerTypeChoice {
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   ACont(std::boxed::Box<EffectContainer>),
@@ -16092,7 +16058,7 @@ pub enum EffectContainerTypeChoice {
   #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
   AXfrm(std::boxed::Box<TransformEffect>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AlphaInverseChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16107,7 +16073,7 @@ pub enum AlphaInverseChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorReplacementChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16122,7 +16088,7 @@ pub enum ColorReplacementChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DuotoneChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16137,7 +16103,7 @@ pub enum DuotoneChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16152,7 +16118,7 @@ pub enum FillChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillOverlayChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16167,7 +16133,7 @@ pub enum FillOverlayChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GlowChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16182,7 +16148,7 @@ pub enum GlowChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InnerShadowChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16197,7 +16163,7 @@ pub enum InnerShadowChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OuterShadowChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16212,7 +16178,7 @@ pub enum OuterShadowChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresetShadowChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16227,7 +16193,7 @@ pub enum PresetShadowChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16242,7 +16208,7 @@ pub enum FillPropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16257,7 +16223,7 @@ pub enum FillReferenceChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16272,7 +16238,7 @@ pub enum EffectReferenceChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16287,7 +16253,7 @@ pub enum LineReferenceChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleMatrixReferenceTypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16302,14 +16268,14 @@ pub enum StyleMatrixReferenceTypeChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectPropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontCollectionTypeChoice {
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
   ALatin(std::boxed::Box<LatinFont>),
@@ -16322,7 +16288,7 @@ pub enum FontCollectionTypeChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16337,7 +16303,7 @@ pub enum FontReferenceChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BulletColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16352,7 +16318,7 @@ pub enum BulletColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ExtrusionColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16367,7 +16333,7 @@ pub enum ExtrusionColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ContourColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16382,7 +16348,7 @@ pub enum ContourColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorFromChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16397,7 +16363,7 @@ pub enum ColorFromChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorToChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16412,7 +16378,7 @@ pub enum ColorToChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForegroundColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16427,7 +16393,7 @@ pub enum ForegroundColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16442,7 +16408,7 @@ pub enum BackgroundColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HighlightChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16457,7 +16423,7 @@ pub enum HighlightChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16472,7 +16438,7 @@ pub enum ColorTypeChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16483,14 +16449,14 @@ pub enum UnderlineChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16499,7 +16465,7 @@ pub enum UnderlineChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OutlineChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16510,14 +16476,14 @@ pub enum OutlineChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OutlineChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OutlineChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16526,7 +16492,7 @@ pub enum OutlineChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16537,14 +16503,14 @@ pub enum LeftBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16553,7 +16519,7 @@ pub enum LeftBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RightBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16564,14 +16530,14 @@ pub enum RightBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RightBorderLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RightBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16580,7 +16546,7 @@ pub enum RightBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16591,14 +16557,14 @@ pub enum TopBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopBorderLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16607,7 +16573,7 @@ pub enum TopBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16618,14 +16584,14 @@ pub enum BottomBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomBorderLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16634,7 +16600,7 @@ pub enum BottomBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16645,14 +16611,14 @@ pub enum TopLeftToBottomRightBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16661,7 +16627,7 @@ pub enum TopLeftToBottomRightBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16672,14 +16638,14 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<Round>),
@@ -16688,7 +16654,7 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16715,7 +16681,7 @@ pub enum LinePropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<LinePropertiesExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineFillChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16730,7 +16696,7 @@ pub enum UnderlineFillChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
@@ -16767,7 +16733,7 @@ pub enum BlipChoice {
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
   ATint(std::boxed::Box<TintEffect>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16782,14 +16748,14 @@ pub enum CustomColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectStyleChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillStyleListChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16804,7 +16770,7 @@ pub enum FillStyleListChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFillStyleListChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -16819,7 +16785,7 @@ pub enum BackgroundFillStyleListChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Dark1ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16832,7 +16798,7 @@ pub enum Dark1ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Light1ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16845,7 +16811,7 @@ pub enum Light1ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Dark2ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16858,7 +16824,7 @@ pub enum Dark2ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Light2ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16871,7 +16837,7 @@ pub enum Light2ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent1ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16884,7 +16850,7 @@ pub enum Accent1ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent2ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16897,7 +16863,7 @@ pub enum Accent2ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent3ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16910,7 +16876,7 @@ pub enum Accent3ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent4ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16923,7 +16889,7 @@ pub enum Accent4ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent5ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16936,7 +16902,7 @@ pub enum Accent5ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent6ColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16949,7 +16915,7 @@ pub enum Accent6ColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16962,7 +16928,7 @@ pub enum HyperlinkChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FollowedHyperlinkColorChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16975,7 +16941,7 @@ pub enum FollowedHyperlinkColorChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Color2TypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -16988,14 +16954,14 @@ pub enum Color2TypeChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(std::boxed::Box<CustomGeometry>),
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   APrstGeom(std::boxed::Box<PresetGeometry>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17010,21 +16976,21 @@ pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextShapeChoice {
   #[sdk(child(qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect"))]
   AUseSpRect(std::boxed::Box<UseShapeRectangle>),
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   AXfrm(std::boxed::Box<Transform2D>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientStopChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -17039,7 +17005,7 @@ pub enum GradientStopChoice {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PathChoice {
   #[sdk(child(qname = "a:CT_Path2DClose/a:close"))]
   AClose(std::boxed::Box<CloseShapePath>),
@@ -17054,14 +17020,14 @@ pub enum PathChoice {
   #[sdk(child(qname = "a:CT_Path2DCubicBezierTo/a:cubicBezTo"))]
   ACubicBezTo(std::boxed::Box<CubicBezierCurveTo>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AdjustHandleListChoice {
   #[sdk(child(qname = "a:CT_XYAdjustHandle/a:ahXY"))]
   AAhXy(std::boxed::Box<AdjustHandleXy>),
   #[sdk(child(qname = "a:CT_PolarAdjustHandle/a:ahPolar"))]
   AAhPolar(std::boxed::Box<AdjustHandlePolar>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
   ANoAutofit(std::boxed::Box<NoAutoFit>),
@@ -17070,14 +17036,14 @@ pub enum BodyPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
   ASpAutoFit(std::boxed::Box<ShapeAutoFit>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   ASp3d(std::boxed::Box<Shape3DType>),
   #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
   AFlatTx(std::boxed::Box<FlatText>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultShapeDefinitionTypeChoice {
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   ASpPr(std::boxed::Box<ShapeProperties>),
@@ -17090,7 +17056,7 @@ pub enum DefaultShapeDefinitionTypeChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17105,7 +17071,7 @@ pub enum TableCellPropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableStyleTypeChoice {
   #[sdk(child(qname = "a:CT_TableBackgroundStyle/a:tblBg"))]
   ATblBg(std::boxed::Box<TableBackground>),
@@ -17138,7 +17104,7 @@ pub enum TableStyleTypeChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17153,91 +17119,91 @@ pub enum TablePropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TableStyle/a:tableStyle"))]
   ATableStyle(std::boxed::Box<TableStyle>),
   #[sdk(text_child(qname = "a:ST_Guid/a:tableStyleId"))]
   ATableStyleId(crate::simple_type::StringValue),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RightBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsideHorizontalBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsideVerticalBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopLeftToBottomRightBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopRightToBottomLeftBorderChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ThemeableLineStyleTypeChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellTextStyleChoice {
   #[sdk(child(qname = "a:CT_FontCollection/a:font"))]
   AFont(std::boxed::Box<Fonts>),
   #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
   AFontRef(std::boxed::Box<FontReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellTextStyleChoice2 {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -17252,42 +17218,42 @@ pub enum TableCellTextStyleChoice2 {
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellStyleChoice {
   #[sdk(child(qname = "a:CT_FillProperties/a:fill"))]
   AFill(std::boxed::Box<FillProperties>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
   AFillRef(std::boxed::Box<FillReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableBackgroundChoice {
   #[sdk(child(qname = "a:CT_FillProperties/a:fill"))]
   AFill(std::boxed::Box<FillProperties>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
   AFillRef(std::boxed::Box<FillReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableBackgroundChoice2 {
   #[sdk(child(qname = "a:CT_EffectProperties/a:effect"))]
   AEffect(std::boxed::Box<EffectPropertiesType>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
   AEffectRef(std::boxed::Box<EffectReference>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePartStyleTypeChoice {
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   ATcTxStyle(std::boxed::Box<TableCellTextStyle>),
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   ATcStyle(std::boxed::Box<TableCellStyle>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17296,14 +17262,14 @@ pub enum ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17314,14 +17280,14 @@ pub enum ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17330,14 +17296,14 @@ pub enum DefaultParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17348,14 +17314,14 @@ pub enum DefaultParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17364,14 +17330,14 @@ pub enum Level1ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17382,14 +17348,14 @@ pub enum Level1ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17398,14 +17364,14 @@ pub enum Level2ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17416,14 +17382,14 @@ pub enum Level2ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17432,14 +17398,14 @@ pub enum Level3ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17450,14 +17416,14 @@ pub enum Level3ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17466,14 +17432,14 @@ pub enum Level4ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17484,14 +17450,14 @@ pub enum Level4ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17500,14 +17466,14 @@ pub enum Level5ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17518,14 +17484,14 @@ pub enum Level5ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17534,14 +17500,14 @@ pub enum Level6ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17552,14 +17518,14 @@ pub enum Level6ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17568,14 +17534,14 @@ pub enum Level7ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17586,14 +17552,14 @@ pub enum Level7ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17602,14 +17568,14 @@ pub enum Level8ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17620,14 +17586,14 @@ pub enum Level8ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
   ABuClrTx(std::boxed::Box<BulletColorText>),
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
   ABuSzTx(std::boxed::Box<BulletSizeText>),
@@ -17636,14 +17602,14 @@ pub enum Level9ParagraphPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
   ABuFontTx(std::boxed::Box<BulletFontText>),
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
   ABuNone(std::boxed::Box<NoBullet>),
@@ -17654,7 +17620,7 @@ pub enum Level9ParagraphPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   ALnSpc(std::boxed::Box<LineSpacing>),
@@ -17691,7 +17657,7 @@ pub enum TextParagraphPropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17706,28 +17672,28 @@ pub enum EndParagraphRunPropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
   AULnTx(std::boxed::Box<UnderlineFollowsText>),
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
   AUFillTx(std::boxed::Box<UnderlineFillText>),
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17742,28 +17708,28 @@ pub enum RunPropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
   AULnTx(std::boxed::Box<UnderlineFollowsText>),
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
   AUFillTx(std::boxed::Box<UnderlineFillText>),
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17778,28 +17744,28 @@ pub enum DefaultRunPropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
   AULnTx(std::boxed::Box<UnderlineFollowsText>),
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice4 {
   #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
   AUFillTx(std::boxed::Box<UnderlineFillText>),
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
@@ -17846,7 +17812,7 @@ pub enum TextCharacterPropertiesTypeChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
   #[sdk(child(qname = "a:CT_RegularTextRun/a:r"))]
   AR(std::boxed::Box<Run>),
@@ -17858,35 +17824,35 @@ pub enum ParagraphChoice {
   #[sdk(child(qname = "a14:CT_TextMath/a14:m"))]
   A14M(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::TextMath>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSpacingChoice {
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SpaceBeforeChoice {
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SpaceAfterChoice {
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextSpacingTypeChoice {
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_FillProperties/a14:hiddenFill"))]
@@ -17927,7 +17893,7 @@ pub enum ShapePropertiesExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GvmlGroupShapeExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas"))]
@@ -17937,7 +17903,7 @@ pub enum GvmlGroupShapeExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VisualGroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -17952,14 +17918,14 @@ pub enum VisualGroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill(std::boxed::Box<GroupFill>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VisualGroupShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   ATxSp(std::boxed::Box<TextShape>),
@@ -17981,7 +17947,7 @@ pub enum GroupShapeChoice {
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
   AGrpSp(std::boxed::Box<GroupShape>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps"))]
@@ -17993,7 +17959,7 @@ pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeStyleSheetExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "thm15:CT_ThemeFamily/thm15:themeFamily"))]
@@ -18003,21 +17969,21 @@ pub enum OfficeStyleSheetExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectorLockingExtensionChoice {
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   AGraphic(std::boxed::Box<Graphic>),
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkTypeChoice {
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:snd"))]
   ASnd(std::boxed::Box<HyperlinkSound>),
   #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<HyperlinkExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataModelExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt"))]
@@ -18036,7 +18002,7 @@ pub enum DataModelExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PtExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr"))]
@@ -18048,7 +18014,7 @@ pub enum PtExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr"))]
@@ -18060,7 +18026,7 @@ pub enum HyperlinkExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesExtensionChoice {
   #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"))]
@@ -18072,7 +18038,7 @@ pub enum LinePropertiesExtensionChoice {
     #[sdk(any)]
     UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
   #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a14:CT_CompatExt/a14:compatExt"))]
@@ -18126,7 +18092,7 @@ pub enum NonVisualDrawingPropertiesExtensionChoice {
     #[sdk(any)]
     UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_CameraTool/a14:cameraTool"))]
@@ -18162,7 +18128,7 @@ pub enum NonVisualPicturePropertiesExtensionChoice {
   #[sdk(any)]
   UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipExtensionChoice {
   #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a14:CT_Photo/a14:imgProps"))]

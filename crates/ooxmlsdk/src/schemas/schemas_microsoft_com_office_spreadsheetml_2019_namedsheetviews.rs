@@ -9,11 +9,10 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:namedSheetViews.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xnsv:CT_NamedSheetViews/xnsv:namedSheetViews")]
 pub struct NamedSheetViews {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -28,7 +27,7 @@ pub struct NamedSheetViews {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:namedSheetView.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView")]
 pub struct NamedSheetView {
   /// name
@@ -62,7 +61,7 @@ pub struct NamedSheetView {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xnsv:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -74,7 +73,7 @@ pub struct ExtensionList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:nsvFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter")]
 pub struct NsvFilter {
   /// filterId
@@ -118,7 +117,7 @@ pub struct NsvFilter {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:columnFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter")]
 pub struct ColumnFilter {
   /// colId
@@ -155,7 +154,7 @@ pub struct ColumnFilter {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:sortRules.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xnsv:CT_SortRules/xnsv:sortRules")]
 pub struct SortRules {
   /// sortMethod
@@ -185,7 +184,7 @@ pub struct SortRules {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:dxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/xnsv:dxf")]
 pub struct DifferentialFormatType {
   ///Font Properties
@@ -225,7 +224,7 @@ pub struct DifferentialFormatType {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:filter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FilterColumn/xnsv:filter")]
 pub struct FilterColumn {
   /// Filter Column Data
@@ -267,7 +266,7 @@ pub struct FilterColumn {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:sortRule.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xnsv:CT_SortRule/xnsv:sortRule")]
 pub struct SortRule {
   /// colId
@@ -303,7 +302,7 @@ pub struct SortRule {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:sortCondition.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x14:CT_SortCondition/xnsv:sortCondition")]
 pub struct SortCondition {
   /// descending
@@ -364,7 +363,7 @@ pub struct SortCondition {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xnsv:richSortCondition.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition")]
 pub struct RichSortCondition {
   /// richSortKey
@@ -427,7 +426,7 @@ pub struct RichSortCondition {
   #[sdk(attr(qname = ":iconId"))]
   pub icon_id: Option<crate::simple_type::UInt32Value>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FilterColumnChoice {
   #[sdk(child(qname = "x:CT_Filters/x:filters"))]
   XFilters(
@@ -478,7 +477,7 @@ pub enum FilterColumnChoice {
     >,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortRuleChoice {
   #[sdk(child(qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
   XnsvSortCondition(std::boxed::Box<SortCondition>),

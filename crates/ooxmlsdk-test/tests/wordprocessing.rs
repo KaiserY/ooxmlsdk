@@ -356,7 +356,7 @@ fn document_round_trip_from_openxml_reader_test() {
     assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_XML);
 
   assert_eq!(
-    parsed.xmlns_map.get("w").map(String::as_str),
+    ooxmlsdk::common::find_xmlns_uri(&parsed.xmlns, "w"),
     Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
   );
   assert!(!serialized.starts_with("<?xml"));

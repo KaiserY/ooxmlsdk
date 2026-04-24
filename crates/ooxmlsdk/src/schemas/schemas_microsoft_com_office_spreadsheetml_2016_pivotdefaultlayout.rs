@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xpdl:pivotTableDefinition16.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xpdl:CT_PivotTableDefinition16/xpdl:pivotTableDefinition16")]
 pub struct PivotTableDefinition16 {
   /// EnabledSubtotalsDefault

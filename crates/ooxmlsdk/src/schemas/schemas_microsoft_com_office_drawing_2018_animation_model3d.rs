@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a3danim:embedAnim.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim")]
 pub struct EmbeddedAnimation {
   /// animId
@@ -31,7 +31,7 @@ pub struct EmbeddedAnimation {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a3danim:posterFrame.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a3danim:CT_PosterFrame/a3danim:posterFrame")]
 pub struct PosterFrame {
   /// animId
@@ -61,7 +61,7 @@ pub struct PosterFrame {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a3danim:animPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "aanim:CT_AnimationProperties/a3danim:animPr")]
 pub struct AnimationProperties {
   /// name
@@ -126,7 +126,7 @@ pub struct AnimationProperties {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a3danim:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/a3danim:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.

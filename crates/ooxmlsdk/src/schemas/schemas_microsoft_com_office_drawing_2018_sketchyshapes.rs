@@ -9,7 +9,7 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:lineSketchNone.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_Empty/ask:lineSketchNone")]
 pub struct LineSketchNoneEmpty {}
 /// Defines the LineSketchCurvedEmpty Class.
@@ -17,7 +17,7 @@ pub struct LineSketchNoneEmpty {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:lineSketchCurved.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_Empty/ask:lineSketchCurved")]
 pub struct LineSketchCurvedEmpty {}
 /// Defines the LineSketchFreehandEmpty Class.
@@ -25,7 +25,7 @@ pub struct LineSketchCurvedEmpty {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:lineSketchFreehand.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_Empty/ask:lineSketchFreehand")]
 pub struct LineSketchFreehandEmpty {}
 /// Defines the LineSketchScribbleEmpty Class.
@@ -33,7 +33,7 @@ pub struct LineSketchFreehandEmpty {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:lineSketchScribble.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_Empty/ask:lineSketchScribble")]
 pub struct LineSketchScribbleEmpty {}
 /// Defines the OpenXmlEmptyElement Class.
@@ -41,7 +41,7 @@ pub struct LineSketchScribbleEmpty {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_Empty/")]
 pub struct OpenXmlEmptyElement {}
 /// Defines the LineSketchStyleProperties Class.
@@ -49,7 +49,7 @@ pub struct OpenXmlEmptyElement {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:lineSketchStyleProps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps")]
 pub struct LineSketchStyleProperties {
   /// sd
@@ -79,7 +79,7 @@ pub struct LineSketchStyleProperties {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:type.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ask:CT_LineSketchTypeProperties/ask:type")]
 pub struct LineSketchTypeProperties {
   #[sdk(choice(
@@ -101,14 +101,14 @@ pub type LineSketchSeed = crate::simple_type::UInt32Value;
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ask:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/ask:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchStylePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -119,7 +119,7 @@ pub enum LineSketchStylePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchTypePropertiesChoice {
   #[sdk(child(qname = "ask:CT_Empty/ask:lineSketchNone"))]
   AskLineSketchNone(std::boxed::Box<LineSketchNoneEmpty>),

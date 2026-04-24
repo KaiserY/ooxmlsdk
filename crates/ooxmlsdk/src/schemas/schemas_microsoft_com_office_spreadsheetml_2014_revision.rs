@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RevisionContext {
   #[sdk(rename = "normal")]
   #[default]
@@ -16,7 +16,7 @@ pub enum RevisionContext {
   #[sdk(rename = "copy")]
   Copy,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RwColAction {
   #[sdk(rename = "insr")]
   #[default]
@@ -28,7 +28,7 @@ pub enum RwColAction {
   #[sdk(rename = "delc")]
   Delc,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FeatureType {
   #[sdk(rename = "dataValidation")]
   #[default]
@@ -58,13 +58,13 @@ pub enum FeatureType {
   #[sdk(rename = "future")]
   Future,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtFeatureType {
   #[sdk(rename = "reserved")]
   #[default]
   Reserved,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SubFeatureType {
   #[sdk(rename = "none")]
   #[default]
@@ -72,13 +72,13 @@ pub enum SubFeatureType {
   #[sdk(rename = "future")]
   Future,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ExtSubFeatureType {
   #[sdk(rename = "reserved")]
   #[default]
   Reserved,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RowColVisualOp {
   #[sdk(rename = "hide")]
   #[default]
@@ -90,7 +90,7 @@ pub enum RowColVisualOp {
   #[sdk(rename = "autosize")]
   Autosize,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SheetOp {
   #[sdk(rename = "insert")]
   #[default]
@@ -102,7 +102,7 @@ pub enum SheetOp {
   #[sdk(rename = "rename")]
   Rename,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FillType {
   #[sdk(rename = "fill")]
   #[default]
@@ -112,13 +112,13 @@ pub enum FillType {
   #[sdk(rename = "future")]
   Future,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FillTypeExt {
   #[sdk(rename = "test")]
   #[default]
   Test,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AdjustType {
   #[sdk(rename = "fmla")]
   #[default]
@@ -140,13 +140,13 @@ pub enum AdjustType {
   #[sdk(rename = "future")]
   Future,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AdjustTypeExt {
   #[sdk(rename = "test")]
   #[default]
   Test,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OartAnchorType {
   #[sdk(rename = "twoCell")]
   #[default]
@@ -161,7 +161,7 @@ pub enum OartAnchorType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:revHdrs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExHeaders/xr:revHdrs")]
 pub struct RevExHeaders {
   /// minRev
@@ -201,7 +201,7 @@ pub struct RevExHeaders {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:revStream.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExStream/xr:revStream")]
 pub struct RevExStream {
   #[sdk(choice(
@@ -227,7 +227,7 @@ pub struct RevExStream {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:dxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/xr:dxf")]
 pub struct DifferentialFormatType {
   ///Font Properties
@@ -267,7 +267,7 @@ pub struct DifferentialFormatType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:revisionPtr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevisionPtr/xr:revisionPtr")]
 pub struct RevisionPtr {
   /// revIDLastSave
@@ -311,7 +311,7 @@ pub struct RevisionPtr {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:objectState.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_StateBasedObject/xr:objectState")]
 pub struct StateBasedObject {
   #[sdk(choice(
@@ -329,7 +329,7 @@ pub struct StateBasedObject {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:hdr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExHeader/xr:hdr")]
 pub struct RevExHeader {
   /// id
@@ -366,7 +366,7 @@ pub struct RevExHeader {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrftr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExFuture/xr:xrrftr")]
 pub struct RevExFuture {
   /// rev
@@ -435,7 +435,7 @@ pub struct RevExFuture {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrUspt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExUnsupported/xr:xrrUspt")]
 pub struct RevExUnsupported {
   /// rev
@@ -494,7 +494,7 @@ pub struct RevExUnsupported {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrTrim.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExTrimmed/xr:xrrTrim")]
 pub struct RevExTrimmed {
   /// rev
@@ -553,7 +553,7 @@ pub struct RevExTrimmed {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrrc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExRowColumn/xr:xrrrc")]
 pub struct RevExRowColumn {
   /// rev
@@ -633,7 +633,7 @@ pub struct RevExRowColumn {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExMove/xr:xrrm")]
 pub struct RevExMove {
   /// rev
@@ -718,7 +718,7 @@ pub struct RevExMove {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExChangeCell/xr:xrrc")]
 pub struct RevExChangeCell {
   /// listUid
@@ -823,7 +823,7 @@ pub struct RevExChangeCell {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExFormatting/xr:xrrf")]
 pub struct RevExFormatting {
   /// rev
@@ -991,7 +991,7 @@ pub struct RevExFormatting {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrDefName.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExDefinedName/xr:xrrDefName")]
 pub struct RevExDefinedName {
   /// rev
@@ -1133,7 +1133,7 @@ pub struct RevExDefinedName {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrdo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExDelObj/xr:xrrdo")]
 pub struct RevExDelObj {
   /// rev
@@ -1195,7 +1195,7 @@ pub struct RevExDelObj {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrco.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExChgObj/xr:xrrco")]
 pub struct RevExChgObj {
   /// rev
@@ -1262,7 +1262,7 @@ pub struct RevExChgObj {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrSheet.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExSheetOp/xr:xrrSheet")]
 pub struct RevExSheetOp {
   /// rev
@@ -1349,7 +1349,7 @@ pub struct RevExSheetOp {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrList.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevisionList/xr:xrrList")]
 pub struct RevisionList {
   /// rev
@@ -1464,7 +1464,7 @@ pub struct RevisionList {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrListExpR.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR")]
 pub struct RevListAutoExpandRw {
   /// rev
@@ -1542,7 +1542,7 @@ pub struct RevListAutoExpandRw {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevGroup/xr:xrrg")]
 pub struct RevGroup {
   /// rev
@@ -1617,7 +1617,7 @@ pub struct RevGroup {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:xrrtest.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevExTest/xr:xrrtest")]
 pub struct RevExTest {}
 /// Defines the RevCell Class.
@@ -1625,7 +1625,7 @@ pub struct RevExTest {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:c.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevCell/xr:c")]
 pub struct RevCell {
   /// t
@@ -1671,7 +1671,7 @@ pub struct RevCell {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:ccse.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_ChangeCellSubEdit/xr:ccse")]
 pub struct ChangeCellSubEdit {
   /// r
@@ -1711,7 +1711,7 @@ pub struct ChangeCellSubEdit {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xr:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -1735,7 +1735,7 @@ pub type FFormula = crate::simple_type::StringValue;
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:hdr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_StateBasedHeader/xr:hdr")]
 pub struct StateBasedHeader {
   /// uid
@@ -1787,7 +1787,7 @@ pub struct StateBasedHeader {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:link.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevisionStateLink/xr:link")]
 pub struct RevisionStateLink {
   /// id
@@ -1803,7 +1803,7 @@ pub struct RevisionStateLink {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:body.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RevisionState/xr:body")]
 pub struct RevisionState {
   #[sdk(choice(
@@ -1820,7 +1820,7 @@ pub struct RevisionState {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:refmap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RefMap/xr:refmap")]
 pub struct RefMap {
   #[sdk(choice(
@@ -1837,7 +1837,7 @@ pub struct RefMap {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:rowColVisualOps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps")]
 pub struct RowColVisualOps {
   /// action
@@ -1874,7 +1874,7 @@ pub struct RowColVisualOps {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:hideUnhideSheet.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet")]
 pub struct HideUnhideSheet {
   /// hide
@@ -1890,7 +1890,7 @@ pub struct HideUnhideSheet {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:showGridlinesHeadings.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings")]
 pub struct ShowGridlinesHeadings {
   /// showGridLines
@@ -1913,7 +1913,7 @@ pub struct ShowGridlinesHeadings {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:freezePanes.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_FreezePanes/xr:freezePanes")]
 pub struct FreezePanes {
   /// sheetViewUid
@@ -1934,7 +1934,7 @@ pub struct FreezePanes {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:outlines.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_Outlines/xr:outlines")]
 pub struct Outlines {
   /// isRow
@@ -1953,7 +1953,7 @@ pub struct Outlines {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:outline.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_Outline/xr:outline")]
 pub struct Outline {
   /// isCollapsed
@@ -1982,7 +1982,7 @@ pub type Xstring = crate::simple_type::StringValue;
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:is.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Rst/xr:is")]
 pub struct RstType {
   ///Text
@@ -2004,7 +2004,7 @@ pub struct RstType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:ref.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RefCell/xr:ref")]
 pub struct RefCell {
   /// n
@@ -2072,7 +2072,7 @@ pub struct RefCell {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:sheetUid.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_SheetXluid/xr:sheetUid")]
 pub struct SheetXluid {
   /// n
@@ -2121,7 +2121,7 @@ pub struct SheetXluid {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:oartAnchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RefOartAnchor/xr:oartAnchor")]
 pub struct RefOartAnchor {
   /// n
@@ -2284,7 +2284,7 @@ pub struct RefOartAnchor {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:future.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RefFuture/xr:future")]
 pub struct RefFuture {}
 /// Defines the RefTest Class.
@@ -2292,7 +2292,7 @@ pub struct RefFuture {}
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:test.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xr:CT_RefTest/xr:test")]
 pub struct RefTest {
   /// n
@@ -2329,7 +2329,7 @@ pub struct RefTest {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:dataValidation.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataValidation/xr:dataValidation")]
 pub struct DataValidation {
     /// type
@@ -2452,7 +2452,7 @@ pub struct DataValidation {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:hyperlink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Hyperlink/xr:hyperlink")]
 pub struct Hyperlink {
   /// Reference
@@ -2496,7 +2496,7 @@ pub struct Hyperlink {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:sparklineGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x14:CT_SparklineGroup/xr:sparklineGroup")]
 pub struct SparklineGroup {
     /// manualMax
@@ -2680,7 +2680,7 @@ pub struct SparklineGroup {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:comments.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Comments/xr:comments")]
 pub struct Comments {
   ///Authors
@@ -2702,7 +2702,7 @@ pub struct Comments {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:autoFilter.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_AutoFilter/xr:autoFilter")]
 pub struct AutoFilter {
   /// Cell or Range Reference
@@ -2731,7 +2731,7 @@ pub struct AutoFilter {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xr:pivotTableDefinition.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition")]
 pub struct PivotTableDefinition {
     /// name
@@ -3296,7 +3296,7 @@ pub struct PivotTableDefinition {
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinitionExtensionList,
     >,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExStreamChoice {
   #[sdk(child(qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   XrXrrftr(std::boxed::Box<RevExFuture>),
@@ -3327,7 +3327,7 @@ pub enum RevExStreamChoice {
   #[sdk(child(qname = "xr:CT_RevGroup/xr:xrrg"))]
   XrXrrg(std::boxed::Box<RevGroup>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StateBasedObjectChoice {
   #[sdk(child(qname = "x:CT_DataValidation/xr:dataValidation"))]
   XrDataValidation(std::boxed::Box<DataValidation>),
@@ -3342,14 +3342,14 @@ pub enum StateBasedObjectChoice {
   #[sdk(child(qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"))]
   XrPivotTableDefinition(std::boxed::Box<PivotTableDefinition>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExChgObjChoice {
   #[sdk(child(qname = "xr:CT_RevisionStateLink/xr:link"))]
   XrLink(std::boxed::Box<RevisionStateLink>),
   #[sdk(child(qname = "xr:CT_RevisionState/xr:body"))]
   XrBody(std::boxed::Box<RevisionState>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevGroupChoice {
   #[sdk(child(qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   XrXrrftr(std::boxed::Box<RevExFuture>),
@@ -3378,7 +3378,7 @@ pub enum RevGroupChoice {
   #[sdk(child(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   XrXrrListExpR(std::boxed::Box<RevListAutoExpandRw>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionStateChoice {
   #[sdk(child(qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps"))]
   XrRowColVisualOps(std::boxed::Box<RowColVisualOps>),
@@ -3391,7 +3391,7 @@ pub enum RevisionStateChoice {
   #[sdk(child(qname = "xr:CT_Outlines/xr:outlines"))]
   XrOutlines(std::boxed::Box<Outlines>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RefMapChoice {
   #[sdk(child(qname = "xr:CT_RefCell/xr:ref"))]
   XrRef(std::boxed::Box<RefCell>),

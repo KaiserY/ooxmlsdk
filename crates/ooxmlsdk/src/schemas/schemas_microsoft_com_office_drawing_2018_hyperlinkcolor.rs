@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HyperlinkColorEnum {
   #[sdk(rename = "hlink")]
   #[default]
@@ -17,7 +17,7 @@ pub enum HyperlinkColorEnum {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ahyp:hlinkClr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr")]
 pub struct HyperlinkColor {
   /// val

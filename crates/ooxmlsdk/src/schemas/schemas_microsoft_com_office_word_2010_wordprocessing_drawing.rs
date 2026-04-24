@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SizeRelativeHorizontallyValues {
   #[sdk(rename = "margin")]
   #[default]
@@ -20,7 +20,7 @@ pub enum SizeRelativeHorizontallyValues {
   #[sdk(rename = "outsideMargin")]
   OutsideMargin,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SizeRelativeVerticallyValues {
   #[sdk(rename = "margin")]
   #[default]
@@ -53,7 +53,7 @@ pub type PercentagePositionVerticalOffset = crate::simple_type::StringValue;
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp14:sizeRelH.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp14:CT_SizeRelH/wp14:sizeRelH")]
 pub struct RelativeWidth {
   /// relativeFrom
@@ -73,7 +73,7 @@ pub struct RelativeWidth {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp14:sizeRelV.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp14:CT_SizeRelV/wp14:sizeRelV")]
 pub struct RelativeHeight {
   /// relativeFrom

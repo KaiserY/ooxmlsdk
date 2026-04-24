@@ -9,7 +9,7 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:taskDetails.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskDetails/p228:taskDetails")]
 pub struct TaskDetails {
   /// deleted
@@ -38,7 +38,7 @@ pub struct TaskDetails {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:comment.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_CommentAnchor/p228:comment")]
 pub struct CommentAnchor {
   /// id
@@ -59,7 +59,7 @@ pub struct CommentAnchor {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p228:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -72,7 +72,7 @@ pub struct ExtensionList {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:atrbtn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskAssignUnassignUser/p228:atrbtn")]
 pub struct AtrbtnTaskAssignUnassignUser {
   /// authorId
@@ -89,7 +89,7 @@ pub struct AtrbtnTaskAssignUnassignUser {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:asgn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskAssignUnassignUser/p228:asgn")]
 pub struct AsgnTaskAssignUnassignUser {
   /// authorId
@@ -106,7 +106,7 @@ pub struct AsgnTaskAssignUnassignUser {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskAssignUnassignUser/")]
 pub struct OpenXmlTaskAssignUnassignUserElement {
   /// authorId
@@ -123,7 +123,7 @@ pub struct OpenXmlTaskAssignUnassignUserElement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:anchr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskAnchor/p228:anchr")]
 pub struct TaskAnchor {
   /// _
@@ -138,7 +138,7 @@ pub struct TaskAnchor {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:add.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Empty/p228:add")]
 pub struct AddEmpty {}
 /// Defines the UnasgnAllEmpty Class.
@@ -146,7 +146,7 @@ pub struct AddEmpty {}
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:unasgnAll.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Empty/p228:unasgnAll")]
 pub struct UnasgnAllEmpty {}
 /// Defines the EmptyType Class.
@@ -154,7 +154,7 @@ pub struct UnasgnAllEmpty {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Empty/")]
 pub struct EmptyType {}
 /// Defines the TaskTitleEventInfo Class.
@@ -162,7 +162,7 @@ pub struct EmptyType {}
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:title.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskTitleEventInfo/p228:title")]
 pub struct TaskTitleEventInfo {
   /// val
@@ -178,7 +178,7 @@ pub struct TaskTitleEventInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:date.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskScheduleEventInfo/p228:date")]
 pub struct TaskScheduleEventInfo {
   /// stDt
@@ -201,7 +201,7 @@ pub struct TaskScheduleEventInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:pcntCmplt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskProgressEventInfo/p228:pcntCmplt")]
 pub struct TaskProgressEventInfo {
   /// val
@@ -224,7 +224,7 @@ pub struct TaskProgressEventInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:undo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskUndo/p228:undo")]
 pub struct TaskUndo {
   /// id
@@ -245,7 +245,7 @@ pub struct TaskUndo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:unknown.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskUnknownRecord/p228:unknown")]
 pub struct TaskUnknownRecord {}
 /// Defines the TaskHistoryEvent Class.
@@ -253,7 +253,7 @@ pub struct TaskUnknownRecord {}
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:event.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskHistoryEvent/p228:event")]
 pub struct TaskHistoryEvent {
   /// time
@@ -301,14 +301,14 @@ pub struct TaskHistoryEvent {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p228:history.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p228:CT_TaskHistory/p228:history")]
 pub struct TaskHistory {
   /// _
   #[sdk(child(qname = "p228:CT_TaskHistoryEvent/p228:event"))]
   pub p228_event: Vec<TaskHistoryEvent>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TaskHistoryEventChoice {
   #[sdk(child(qname = "p228:CT_TaskAssignUnassignUser/p228:asgn"))]
   P228Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),

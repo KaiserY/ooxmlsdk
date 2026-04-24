@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ColorApplicationMethodValues {
   #[sdk(rename = "span")]
   #[default]
@@ -14,7 +14,7 @@ pub enum ColorApplicationMethodValues {
   #[sdk(rename = "repeat")]
   Repeat,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HueDirectionValues {
   #[sdk(rename = "cw")]
   #[default]
@@ -22,7 +22,7 @@ pub enum HueDirectionValues {
   #[sdk(rename = "ccw")]
   Counterclockwise,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PointValues {
   #[sdk(rename = "node")]
   #[default]
@@ -38,7 +38,7 @@ pub enum PointValues {
   #[sdk(rename = "sibTrans")]
   SiblingTransition,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConnectionValues {
   #[sdk(rename = "parOf")]
   #[default]
@@ -50,7 +50,7 @@ pub enum ConnectionValues {
   #[sdk(rename = "unknownRelationship")]
   UnknownRelationship,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum DirectionValues {
   #[sdk(rename = "norm")]
   #[default]
@@ -58,7 +58,7 @@ pub enum DirectionValues {
   #[sdk(rename = "rev")]
   Reversed,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HierarchyBranchStyleValues {
   #[sdk(rename = "l")]
   #[default]
@@ -72,7 +72,7 @@ pub enum HierarchyBranchStyleValues {
   #[sdk(rename = "init")]
   Initial,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AnimateOneByOneValues {
   #[sdk(rename = "none")]
   #[default]
@@ -82,7 +82,7 @@ pub enum AnimateOneByOneValues {
   #[sdk(rename = "branch")]
   Branch,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AnimationLevelStringValues {
   #[sdk(rename = "none")]
   #[default]
@@ -92,7 +92,7 @@ pub enum AnimationLevelStringValues {
   #[sdk(rename = "ctr")]
   Center,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ResizeHandlesStringValues {
   #[sdk(rename = "exact")]
   #[default]
@@ -100,7 +100,7 @@ pub enum ResizeHandlesStringValues {
   #[sdk(rename = "rel")]
   Relative,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AlgorithmValues {
   #[sdk(rename = "composite")]
   #[default]
@@ -124,7 +124,7 @@ pub enum AlgorithmValues {
   #[sdk(rename = "snake")]
   Snake,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AxisValues {
   #[sdk(rename = "self")]
   #[default]
@@ -154,7 +154,7 @@ pub enum AxisValues {
   #[sdk(rename = "none")]
   None,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BoolOperatorValues {
   #[sdk(rename = "none")]
   #[default]
@@ -166,7 +166,7 @@ pub enum BoolOperatorValues {
   #[sdk(rename = "lte")]
   LessThanOrEqualTo,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ChildOrderValues {
   #[sdk(rename = "b")]
   #[default]
@@ -174,7 +174,7 @@ pub enum ChildOrderValues {
   #[sdk(rename = "t")]
   Top,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConstraintValues {
   #[sdk(rename = "none")]
   #[default]
@@ -306,7 +306,7 @@ pub enum ConstraintValues {
   #[sdk(rename = "wOff")]
   WidthOffset,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConstraintRelationshipValues {
   #[sdk(rename = "self")]
   #[default]
@@ -316,7 +316,7 @@ pub enum ConstraintRelationshipValues {
   #[sdk(rename = "des")]
   Descendant,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ElementValues {
   #[sdk(rename = "all")]
   #[default]
@@ -340,7 +340,7 @@ pub enum ElementValues {
   #[sdk(rename = "sibTrans")]
   SiblingTransition,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ParameterIdValues {
   #[sdk(rename = "horzAlign")]
   #[default]
@@ -454,7 +454,7 @@ pub enum ParameterIdValues {
   #[sdk(rename = "endPts")]
   EndPoints,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FunctionValues {
   #[sdk(rename = "cnt")]
   #[default]
@@ -474,7 +474,7 @@ pub enum FunctionValues {
   #[sdk(rename = "maxDepth")]
   MaxDepth,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FunctionOperatorValues {
   #[sdk(rename = "equ")]
   #[default]
@@ -490,7 +490,7 @@ pub enum FunctionOperatorValues {
   #[sdk(rename = "lte")]
   LessThanOrEqualTo,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HorizontalAlignmentValues {
   #[sdk(rename = "l")]
   #[default]
@@ -502,7 +502,7 @@ pub enum HorizontalAlignmentValues {
   #[sdk(rename = "none")]
   None,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ChildDirectionValues {
   #[sdk(rename = "horz")]
   #[default]
@@ -510,7 +510,7 @@ pub enum ChildDirectionValues {
   #[sdk(rename = "vert")]
   Vertical,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ChildAlignmentValues {
   #[sdk(rename = "t")]
   #[default]
@@ -522,7 +522,7 @@ pub enum ChildAlignmentValues {
   #[sdk(rename = "r")]
   Right,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SecondaryChildAlignmentValues {
   #[sdk(rename = "none")]
   #[default]
@@ -536,7 +536,7 @@ pub enum SecondaryChildAlignmentValues {
   #[sdk(rename = "r")]
   Right,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LinearDirectionValues {
   #[sdk(rename = "fromL")]
   #[default]
@@ -548,7 +548,7 @@ pub enum LinearDirectionValues {
   #[sdk(rename = "fromB")]
   FromBottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum SecondaryLinearDirectionValues {
   #[sdk(rename = "none")]
   #[default]
@@ -562,7 +562,7 @@ pub enum SecondaryLinearDirectionValues {
   #[sdk(rename = "fromB")]
   FromBottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StartingElementValues {
   #[sdk(rename = "node")]
   #[default]
@@ -570,7 +570,7 @@ pub enum StartingElementValues {
   #[sdk(rename = "trans")]
   Transition,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RotationPathValues {
   #[sdk(rename = "none")]
   #[default]
@@ -578,7 +578,7 @@ pub enum RotationPathValues {
   #[sdk(rename = "alongPath")]
   AlongPath,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CenterShapeMappingValues {
   #[sdk(rename = "none")]
   #[default]
@@ -586,7 +586,7 @@ pub enum CenterShapeMappingValues {
   #[sdk(rename = "fNode")]
   FirstNode,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BendPointValues {
   #[sdk(rename = "beg")]
   #[default]
@@ -596,7 +596,7 @@ pub enum BendPointValues {
   #[sdk(rename = "end")]
   End,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConnectorRoutingValues {
   #[sdk(rename = "stra")]
   #[default]
@@ -608,7 +608,7 @@ pub enum ConnectorRoutingValues {
   #[sdk(rename = "longCurve")]
   LongCurve,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ArrowheadStyleValues {
   #[sdk(rename = "auto")]
   #[default]
@@ -618,7 +618,7 @@ pub enum ArrowheadStyleValues {
   #[sdk(rename = "noArr")]
   NoArrow,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConnectorDimensionValues {
   #[sdk(rename = "1D")]
   #[default]
@@ -628,7 +628,7 @@ pub enum ConnectorDimensionValues {
   #[sdk(rename = "cust")]
   Custom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConnectorPointValues {
   #[sdk(rename = "auto")]
   #[default]
@@ -654,7 +654,7 @@ pub enum ConnectorPointValues {
   #[sdk(rename = "radial")]
   Radial,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum NodeHorizontalAlignmentValues {
   #[sdk(rename = "l")]
   #[default]
@@ -664,7 +664,7 @@ pub enum NodeHorizontalAlignmentValues {
   #[sdk(rename = "r")]
   Right,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum NodeVerticalAlignmentValues {
   #[sdk(rename = "t")]
   #[default]
@@ -674,7 +674,7 @@ pub enum NodeVerticalAlignmentValues {
   #[sdk(rename = "b")]
   Bottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FallbackDimensionValues {
   #[sdk(rename = "1D")]
   #[default]
@@ -682,7 +682,7 @@ pub enum FallbackDimensionValues {
   #[sdk(rename = "2D")]
   TwoDimension,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextDirectionValues {
   #[sdk(rename = "fromT")]
   #[default]
@@ -690,7 +690,7 @@ pub enum TextDirectionValues {
   #[sdk(rename = "fromB")]
   FromBottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PyramidAccentPositionValues {
   #[sdk(rename = "bef")]
   #[default]
@@ -698,7 +698,7 @@ pub enum PyramidAccentPositionValues {
   #[sdk(rename = "aft")]
   After,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PyramidAccentTextMarginValues {
   #[sdk(rename = "step")]
   #[default]
@@ -706,7 +706,7 @@ pub enum PyramidAccentTextMarginValues {
   #[sdk(rename = "stack")]
   Stack,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextBlockDirectionValues {
   #[sdk(rename = "horz")]
   #[default]
@@ -714,7 +714,7 @@ pub enum TextBlockDirectionValues {
   #[sdk(rename = "vert")]
   Vertical,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAnchorHorizontalValues {
   #[sdk(rename = "none")]
   #[default]
@@ -722,7 +722,7 @@ pub enum TextAnchorHorizontalValues {
   #[sdk(rename = "ctr")]
   Center,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAnchorVerticalValues {
   #[sdk(rename = "t")]
   #[default]
@@ -732,7 +732,7 @@ pub enum TextAnchorVerticalValues {
   #[sdk(rename = "b")]
   Bottom,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAlignmentValues {
   #[sdk(rename = "l")]
   #[default]
@@ -742,7 +742,7 @@ pub enum TextAlignmentValues {
   #[sdk(rename = "r")]
   Right,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AutoTextRotationValues {
   #[sdk(rename = "none")]
   #[default]
@@ -752,7 +752,7 @@ pub enum AutoTextRotationValues {
   #[sdk(rename = "grav")]
   Gravity,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum GrowDirectionValues {
   #[sdk(rename = "tL")]
   #[default]
@@ -764,7 +764,7 @@ pub enum GrowDirectionValues {
   #[sdk(rename = "bR")]
   BottomRight,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FlowDirectionValues {
   #[sdk(rename = "row")]
   #[default]
@@ -772,7 +772,7 @@ pub enum FlowDirectionValues {
   #[sdk(rename = "col")]
   Column,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ContinueDirectionValues {
   #[sdk(rename = "revDir")]
   #[default]
@@ -780,7 +780,7 @@ pub enum ContinueDirectionValues {
   #[sdk(rename = "sameDir")]
   SameDirection,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BreakpointValues {
   #[sdk(rename = "endCnv")]
   #[default]
@@ -790,7 +790,7 @@ pub enum BreakpointValues {
   #[sdk(rename = "fixed")]
   Fixed,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OffsetValues {
   #[sdk(rename = "ctr")]
   #[default]
@@ -798,7 +798,7 @@ pub enum OffsetValues {
   #[sdk(rename = "off")]
   Offset,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HierarchyAlignmentValues {
   #[sdk(rename = "tL")]
   #[default]
@@ -834,7 +834,7 @@ pub enum HierarchyAlignmentValues {
   #[sdk(rename = "rCtrDes")]
   RightCenterDescendants,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VariableValues {
   #[sdk(rename = "none")]
   #[default]
@@ -858,7 +858,7 @@ pub enum VariableValues {
   #[sdk(rename = "resizeHandles")]
   ResizeHandles,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum OutputShapeValues {
   #[sdk(rename = "none")]
   #[default]
@@ -866,7 +866,7 @@ pub enum OutputShapeValues {
   #[sdk(rename = "conn")]
   Connection,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VerticalAlignmentValues {
   #[sdk(rename = "t")]
   #[default]
@@ -892,11 +892,10 @@ pub enum VerticalAlignmentValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:colorsDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransform/dgm:colorsDef")]
 pub struct ColorsDefinition {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// Unique ID
@@ -934,7 +933,7 @@ pub struct ColorsDefinition {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:colorsDefHdr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransformHeader/dgm:colorsDefHdr")]
 pub struct ColorsDefinitionHeader {
   /// Unique ID
@@ -976,7 +975,7 @@ pub struct ColorsDefinitionHeader {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:colorsDefHdrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransformHeaderLst/dgm:colorsDefHdrLst")]
 pub struct ColorsDefinitionHeaderList {
   /// _
@@ -988,11 +987,10 @@ pub struct ColorsDefinitionHeaderList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:dataModel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModelRoot/dgm:dataModel")]
 pub struct DataModelRoot {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   ///Point List
@@ -1016,11 +1014,10 @@ pub struct DataModelRoot {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:layoutDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinition/dgm:layoutDef")]
 pub struct LayoutDefinition {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// uniqueId
@@ -1074,7 +1071,7 @@ pub struct LayoutDefinition {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:layoutDefHdr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionHeader/dgm:layoutDefHdr")]
 pub struct LayoutDefinitionHeader {
   /// Unique Identifier
@@ -1123,7 +1120,7 @@ pub struct LayoutDefinitionHeader {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:layoutDefHdrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionHeaderLst/dgm:layoutDefHdrLst")]
 pub struct LayoutDefinitionHeaderList {
   /// _
@@ -1135,7 +1132,7 @@ pub struct LayoutDefinitionHeaderList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:relIds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_RelIds/dgm:relIds")]
 pub struct RelationshipIds {
   /// Explicit Relationship to Diagram Data Part
@@ -1172,11 +1169,10 @@ pub struct RelationshipIds {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:styleDef.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinition/dgm:styleDef")]
 pub struct StyleDefinition {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// Unique Style ID
@@ -1217,7 +1213,7 @@ pub struct StyleDefinition {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:styleDefHdr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinitionHeader/dgm:styleDefHdr")]
 pub struct StyleDefinitionHeader {
   /// Unique Style ID
@@ -1259,7 +1255,7 @@ pub struct StyleDefinitionHeader {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:styleDefHdrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinitionHeaderLst/dgm:styleDefHdrLst")]
 pub struct StyleDefinitionHeaderList {
   /// _
@@ -1271,7 +1267,7 @@ pub struct StyleDefinitionHeaderList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:cat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTCategory/dgm:cat")]
 pub struct ColorTransformCategory {
   /// Category Type
@@ -1295,7 +1291,7 @@ pub struct ColorTransformCategory {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:fillClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
   /// Color Application Method Type
@@ -1329,7 +1325,7 @@ pub struct FillColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:linClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
   /// Color Application Method Type
@@ -1363,7 +1359,7 @@ pub struct LineColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:effectClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
   /// Color Application Method Type
@@ -1397,7 +1393,7 @@ pub struct EffectColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:txLinClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
   /// Color Application Method Type
@@ -1431,7 +1427,7 @@ pub struct TextLineColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:txFillClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
   /// Color Application Method Type
@@ -1465,7 +1461,7 @@ pub struct TextFillColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:txEffectClrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
   /// Color Application Method Type
@@ -1499,7 +1495,7 @@ pub struct TextEffectColorList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/")]
 pub struct ColorsType {
   /// Color Application Method Type
@@ -1533,7 +1529,7 @@ pub struct ColorsType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dgm:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -1545,7 +1541,7 @@ pub struct ExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:title.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTName/dgm:title")]
 pub struct ColorDefinitionTitle {
   /// Language
@@ -1568,7 +1564,7 @@ pub struct ColorDefinitionTitle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:desc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTDescription/dgm:desc")]
 pub struct ColorTransformDescription {
   /// Language
@@ -1591,7 +1587,7 @@ pub struct ColorTransformDescription {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:catLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTCategories/dgm:catLst")]
 pub struct ColorTransformCategories {
   /// _
@@ -1603,7 +1599,7 @@ pub struct ColorTransformCategories {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:styleLbl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTStyleLabel/dgm:styleLbl")]
 pub struct ColorTransformStyleLabel {
   /// Name
@@ -1640,7 +1636,7 @@ pub struct ColorTransformStyleLabel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:pt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Pt/dgm:pt")]
 pub struct Point {
   /// Model Identifier
@@ -1695,7 +1691,7 @@ pub struct Point {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:cxn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Cxn/dgm:cxn")]
 pub struct Connection {
   /// Model Identifier
@@ -1801,7 +1797,7 @@ pub struct Connection {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:constr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Constraint/dgm:constr")]
 pub struct Constraint {
   /// Constraint Type
@@ -1897,7 +1893,7 @@ pub struct Constraint {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:rule.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_NumericRule/dgm:rule")]
 pub struct Rule {
   /// Constraint Type
@@ -1961,7 +1957,7 @@ pub struct Rule {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:adj.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Adj/dgm:adj")]
 pub struct Adjust {
   /// Adjust Handle Index
@@ -1985,7 +1981,7 @@ pub struct Adjust {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:adjLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_AdjLst/dgm:adjLst")]
 pub struct AdjustList {
   /// _
@@ -1997,7 +1993,7 @@ pub struct AdjustList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:param.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Parameter/dgm:param")]
 pub struct Parameter {
   /// Parameter Type
@@ -2138,7 +2134,7 @@ pub struct Parameter {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:alg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Algorithm/dgm:alg")]
 pub struct Algorithm {
   /// Algorithm Type
@@ -2168,11 +2164,10 @@ pub struct Algorithm {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:shape.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Shape/dgm:shape")]
 pub struct Shape {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -2428,7 +2423,7 @@ pub struct Shape {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:presOf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_PresentationOf/dgm:presOf")]
 pub struct PresentationOf {
   /// Axis
@@ -2482,7 +2477,7 @@ pub struct PresentationOf {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:constrLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Constraints/dgm:constrLst")]
 pub struct Constraints {
   /// _
@@ -2494,7 +2489,7 @@ pub struct Constraints {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:ruleLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Rules/dgm:ruleLst")]
 pub struct RuleList {
   /// _
@@ -2506,7 +2501,7 @@ pub struct RuleList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:varLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/dgm:varLst")]
 pub struct VariableList {
   ///Show Organization Chart User Interface
@@ -2542,7 +2537,7 @@ pub struct VariableList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:presLayoutVars.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/dgm:presLayoutVars")]
 pub struct PresentationLayoutVariables {
   ///Show Organization Chart User Interface
@@ -2578,7 +2573,7 @@ pub struct PresentationLayoutVariables {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/")]
 pub struct LayoutVariablePropertySetType {
   #[sdk(choice(
@@ -2599,7 +2594,7 @@ pub struct LayoutVariablePropertySetType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:forEach.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ForEach/dgm:forEach")]
 pub struct ForEach {
   /// Name
@@ -2676,7 +2671,7 @@ pub struct ForEach {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:layoutNode.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutNode/dgm:layoutNode")]
 pub struct LayoutNode {
   /// Name
@@ -2727,7 +2722,7 @@ pub struct LayoutNode {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:choose.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Choose/dgm:choose")]
 pub struct Choose {
   /// Name
@@ -2749,7 +2744,7 @@ pub struct Choose {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:if.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_When/dgm:if")]
 pub struct DiagramChooseIf {
   /// Name
@@ -2881,7 +2876,7 @@ pub struct DiagramChooseIf {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:else.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Otherwise/dgm:else")]
 pub struct DiagramChooseElse {
   /// Name
@@ -2909,7 +2904,7 @@ pub struct DiagramChooseElse {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:dataModel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModel/dgm:dataModel")]
 pub struct DataModel {
   ///Point List
@@ -2933,7 +2928,7 @@ pub struct DataModel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:cat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Category/dgm:cat")]
 pub struct Category {
   /// Category Type
@@ -2957,7 +2952,7 @@ pub struct Category {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:title.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Name/dgm:title")]
 pub struct Title {
   /// Language
@@ -2980,7 +2975,7 @@ pub struct Title {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:desc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Description/dgm:desc")]
 pub struct Description {
   /// Language
@@ -3003,7 +2998,7 @@ pub struct Description {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:catLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Categories/dgm:catLst")]
 pub struct CategoryList {
   /// _
@@ -3015,7 +3010,7 @@ pub struct CategoryList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/dgm:style")]
 pub struct Style {
   /// _
@@ -3041,7 +3036,7 @@ pub struct Style {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:orgChart.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_OrgChart/dgm:orgChart")]
 pub struct OrganizationChart {
   /// Show Organization Chart User Interface Value
@@ -3057,7 +3052,7 @@ pub struct OrganizationChart {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:chMax.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ChildMax/dgm:chMax")]
 pub struct MaxNumberOfChildren {
   /// Maximum Children Value
@@ -3074,7 +3069,7 @@ pub struct MaxNumberOfChildren {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:chPref.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ChildPref/dgm:chPref")]
 pub struct PreferredNumberOfChildren {
   /// Preferred Number of CHildren Value
@@ -3091,7 +3086,7 @@ pub struct PreferredNumberOfChildren {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:bulletEnabled.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled")]
 pub struct BulletEnabled {
   /// Show Insert Bullet Value
@@ -3107,7 +3102,7 @@ pub struct BulletEnabled {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:dir.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Direction/dgm:dir")]
 pub struct Direction {
   /// Diagram Direction Value
@@ -3124,7 +3119,7 @@ pub struct Direction {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:hierBranch.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_HierBranchStyle/dgm:hierBranch")]
 pub struct HierarchyBranch {
   /// Organization Chart Branch Style Value
@@ -3141,7 +3136,7 @@ pub struct HierarchyBranch {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:animOne.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_AnimOne/dgm:animOne")]
 pub struct AnimateOneByOne {
   /// One By One Animation Value
@@ -3158,7 +3153,7 @@ pub struct AnimateOneByOne {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:animLvl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_AnimLvl/dgm:animLvl")]
 pub struct AnimationLevel {
   /// Level Animation Value
@@ -3175,7 +3170,7 @@ pub struct AnimationLevel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:resizeHandles.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles")]
 pub struct ResizeHandles {
   /// Shape Resize Style Type
@@ -3192,7 +3187,7 @@ pub struct ResizeHandles {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:cat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDCategory/dgm:cat")]
 pub struct StyleDisplayCategory {
   /// Category Type
@@ -3216,7 +3211,7 @@ pub struct StyleDisplayCategory {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:scene3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scene3D/dgm:scene3d")]
 pub struct Scene3D {
   ///Camera
@@ -3242,7 +3237,7 @@ pub struct Scene3D {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:sp3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Shape3D/dgm:sp3d")]
 pub struct Shape3D {
   /// Shape Depth
@@ -3324,7 +3319,7 @@ pub struct Shape3D {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:txPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_TextProps/dgm:txPr")]
 pub struct TextProperties {
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
@@ -3335,7 +3330,7 @@ pub struct TextProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:title.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDName/dgm:title")]
 pub struct StyleDefinitionTitle {
   /// Natural Language
@@ -3358,7 +3353,7 @@ pub struct StyleDefinitionTitle {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:desc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDDescription/dgm:desc")]
 pub struct StyleLabelDescription {
   /// Natural Language
@@ -3381,7 +3376,7 @@ pub struct StyleLabelDescription {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:catLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDCategories/dgm:catLst")]
 pub struct StyleDisplayCategories {
   /// _
@@ -3393,7 +3388,7 @@ pub struct StyleDisplayCategories {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:styleLbl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleLabel/dgm:styleLbl")]
 pub struct StyleLabel {
   /// Style Name
@@ -3424,7 +3419,7 @@ pub struct StyleLabel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:ptLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_PtList/dgm:ptLst")]
 pub struct PointList {
   /// _
@@ -3436,7 +3431,7 @@ pub struct PointList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:cxnLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CxnList/dgm:cxnLst")]
 pub struct ConnectionList {
   /// _
@@ -3448,7 +3443,7 @@ pub struct ConnectionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:bg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFormatting/dgm:bg")]
 pub struct Background {
   #[sdk(choice(
@@ -3471,7 +3466,7 @@ pub struct Background {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:whole.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_WholeE2oFormatting/dgm:whole")]
 pub struct Whole {
   ///Outline
@@ -3490,7 +3485,7 @@ pub struct Whole {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DataModelExtensionList/dgm:extLst")]
 pub struct DataModelExtensionList {
   /// _
@@ -3503,7 +3498,7 @@ pub struct DataModelExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:prSet.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ElemPropSet/dgm:prSet")]
 pub struct PropertySet {
   /// Presentation Element Identifier
@@ -3720,7 +3715,7 @@ pub struct PropertySet {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/dgm:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -3782,7 +3777,7 @@ pub struct ShapeProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:t.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
   ///Body Properties
@@ -3803,7 +3798,7 @@ pub struct TextBody {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PtExtensionList/dgm:extLst")]
 pub struct PtExtensionList {
   /// _
@@ -3815,7 +3810,7 @@ pub struct PtExtensionList {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext")]
 pub struct DiagramDefinitionExtension {
   /// URI
@@ -3841,7 +3836,7 @@ pub struct DiagramDefinitionExtension {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:sampData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/dgm:sampData")]
 pub struct SampleData {
   /// Use Default
@@ -3860,7 +3855,7 @@ pub struct SampleData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:styleData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/dgm:styleData")]
 pub struct StyleData {
   /// Use Default
@@ -3879,7 +3874,7 @@ pub struct StyleData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:clrData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/dgm:clrData")]
 pub struct ColorData {
   /// Use Default
@@ -3898,7 +3893,7 @@ pub struct ColorData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/")]
 pub struct SampleDataType {
   /// Use Default
@@ -3917,14 +3912,14 @@ pub struct SampleDataType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dgm:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtensionList/dgm:extLst")]
 pub struct DiagramDefinitionExtensionList {
   /// _
   #[sdk(child(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext"))]
   pub dgm_ext: Vec<DiagramDefinitionExtension>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillColorListChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3955,7 +3950,7 @@ pub enum FillColorListChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineColorListChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -3986,7 +3981,7 @@ pub enum LineColorListChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectColorListChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -4017,7 +4012,7 @@ pub enum EffectColorListChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextLineColorListChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -4048,7 +4043,7 @@ pub enum TextLineColorListChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextFillColorListChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -4079,7 +4074,7 @@ pub enum TextFillColorListChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextEffectColorListChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -4110,7 +4105,7 @@ pub enum TextEffectColorListChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorsTypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -4141,7 +4136,7 @@ pub enum ColorsTypeChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutVariablePropertySetTypeChoice {
   #[sdk(child(qname = "dgm:CT_OrgChart/dgm:orgChart"))]
   DgmOrgChart(std::boxed::Box<OrganizationChart>),
@@ -4162,7 +4157,7 @@ pub enum LayoutVariablePropertySetTypeChoice {
   #[sdk(child(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"))]
   DgmResizeHandles(std::boxed::Box<ResizeHandles>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForEachChoice {
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
@@ -4183,7 +4178,7 @@ pub enum ForEachChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutNodeChoice {
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
@@ -4206,7 +4201,7 @@ pub enum LayoutNodeChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramChooseIfChoice {
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
@@ -4227,7 +4222,7 @@ pub enum DiagramChooseIfChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramChooseElseChoice {
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
@@ -4248,7 +4243,7 @@ pub enum DiagramChooseElseChoice {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextPropertiesChoice {
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   ASp3d(
@@ -4259,7 +4254,7 @@ pub enum TextPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FlatText>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -4284,7 +4279,7 @@ pub enum BackgroundChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice2 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -4295,7 +4290,7 @@ pub enum BackgroundChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WholeChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -4306,7 +4301,7 @@ pub enum WholeChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -4317,7 +4312,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -4342,7 +4337,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -4353,7 +4348,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramDefinitionExtensionChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"))]

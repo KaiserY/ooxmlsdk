@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:cameraTool.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_CameraTool/a14:cameraTool")]
 pub struct CameraTool {
   /// cellRange
@@ -32,7 +32,7 @@ pub struct CameraTool {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:compatExt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_CompatExt/a14:compatExt")]
 pub struct CompatExtension {
   /// spid
@@ -48,7 +48,7 @@ pub struct CompatExtension {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:isCanvas.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas")]
 pub struct IsCanvas {
   /// val
@@ -64,7 +64,7 @@ pub struct IsCanvas {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:contentPart.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_GvmlContentPart/a14:contentPart")]
 pub struct GvmlContentPart {
   /// bwMode
@@ -98,7 +98,7 @@ pub struct GvmlContentPart {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:shadowObscured.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_ShadowObscured/a14:shadowObscured")]
 pub struct ShadowObscured {
   /// val
@@ -114,7 +114,7 @@ pub struct ShadowObscured {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:hiddenFill.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillProperties/a14:hiddenFill")]
 pub struct HiddenFillProperties {
   #[sdk(choice(
@@ -132,7 +132,7 @@ pub struct HiddenFillProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:hiddenLine.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a14:hiddenLine")]
 pub struct HiddenLineProperties {
   /// line width
@@ -211,7 +211,7 @@ pub struct HiddenLineProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:hiddenEffects.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectProperties/a14:hiddenEffects")]
 pub struct HiddenEffectsProperties {
   #[sdk(choice(
@@ -225,7 +225,7 @@ pub struct HiddenEffectsProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:hiddenScene3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scene3D/a14:hiddenScene3d")]
 pub struct HiddenScene3D {
   ///Camera
@@ -251,7 +251,7 @@ pub struct HiddenScene3D {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:hiddenSp3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Shape3D/a14:hiddenSp3d")]
 pub struct HiddenShape3D {
   /// Shape Depth
@@ -333,11 +333,10 @@ pub struct HiddenShape3D {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:imgProps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_Photo/a14:imgProps")]
 pub struct ImageProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "a14:CT_PictureLayer/a14:imgLayer"))]
   pub image_layer: std::boxed::Box<ImageLayer>,
@@ -347,11 +346,10 @@ pub struct ImageProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:useLocalDpi.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_UseLocalDpi/a14:useLocalDpi")]
 pub struct UseLocalDpi {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// val
   ///
   /// Available in Office2010 and above.
@@ -365,7 +363,7 @@ pub struct UseLocalDpi {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:m.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_TextMath/a14:m")]
 pub struct TextMath {}
 /// Defines the OfficeArtExtensionList Class.
@@ -373,7 +371,7 @@ pub struct TextMath {}
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/a14:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -385,7 +383,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:cpLocks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_ContentPartLocking/a14:cpLocks")]
 pub struct ContentPartLocks {
   /// Disallow Shape Grouping
@@ -467,7 +465,7 @@ pub struct ContentPartLocks {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:foregroundMark.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectBackgroundRemovalForegroundMark/a14:foregroundMark")]
 pub struct ForegroundMark {
   /// x1
@@ -532,7 +530,7 @@ pub struct ForegroundMark {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:backgroundMark.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectBackgroundRemovalBackgroundMark/a14:backgroundMark")]
 pub struct BackgroundMark {
   /// x1
@@ -597,7 +595,7 @@ pub struct BackgroundMark {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticBlur.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectBlur/a14:artisticBlur")]
 pub struct ArtisticBlur {
   /// radius
@@ -620,7 +618,7 @@ pub struct ArtisticBlur {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticCement.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectCement/a14:artisticCement")]
 pub struct ArtisticCement {
   /// trans
@@ -657,7 +655,7 @@ pub struct ArtisticCement {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticChalkSketch.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectChalkSketch/a14:artisticChalkSketch")]
 pub struct ArtisticChalkSketch {
   /// trans
@@ -694,7 +692,7 @@ pub struct ArtisticChalkSketch {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticCrisscrossEtching.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectCrisscrossEtching/a14:artisticCrisscrossEtching")]
 pub struct ArtisticCrisscrossEtching {
   /// trans
@@ -731,7 +729,7 @@ pub struct ArtisticCrisscrossEtching {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticCutout.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectCutout/a14:artisticCutout")]
 pub struct ArtisticCutout {
   /// trans
@@ -768,7 +766,7 @@ pub struct ArtisticCutout {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticFilmGrain.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectFilmGrain/a14:artisticFilmGrain")]
 pub struct ArtisticFilmGrain {
   /// trans
@@ -805,7 +803,7 @@ pub struct ArtisticFilmGrain {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticGlass.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectGlass/a14:artisticGlass")]
 pub struct ArtisticGlass {
   /// trans
@@ -842,7 +840,7 @@ pub struct ArtisticGlass {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticGlowDiffused.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectGlowDiffused/a14:artisticGlowDiffused")]
 pub struct ArtisticGlowDiffused {
   /// trans
@@ -879,7 +877,7 @@ pub struct ArtisticGlowDiffused {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticGlowEdges.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectGlowEdges/a14:artisticGlowEdges")]
 pub struct ArtisticGlowEdges {
   /// trans
@@ -916,7 +914,7 @@ pub struct ArtisticGlowEdges {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticLightScreen.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectLightScreen/a14:artisticLightScreen")]
 pub struct ArtisticLightScreen {
   /// trans
@@ -953,7 +951,7 @@ pub struct ArtisticLightScreen {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticLineDrawing.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectLineDrawing/a14:artisticLineDrawing")]
 pub struct ArtisticLineDrawing {
   /// trans
@@ -990,7 +988,7 @@ pub struct ArtisticLineDrawing {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticMarker.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectMarker/a14:artisticMarker")]
 pub struct ArtisticMarker {
   /// trans
@@ -1027,7 +1025,7 @@ pub struct ArtisticMarker {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticMosiaicBubbles.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectMosiaicBubbles/a14:artisticMosiaicBubbles")]
 pub struct ArtisticMosaicBubbles {
   /// trans
@@ -1064,7 +1062,7 @@ pub struct ArtisticMosaicBubbles {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPaintStrokes.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPaintStrokes/a14:artisticPaintStrokes")]
 pub struct ArtisticPaintStrokes {
   /// trans
@@ -1101,7 +1099,7 @@ pub struct ArtisticPaintStrokes {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPaintBrush.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPaintBrush/a14:artisticPaintBrush")]
 pub struct ArtisticPaintBrush {
   /// trans
@@ -1138,7 +1136,7 @@ pub struct ArtisticPaintBrush {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPastelsSmooth.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPastelsSmooth/a14:artisticPastelsSmooth")]
 pub struct ArtisticPastelsSmooth {
   /// trans
@@ -1175,7 +1173,7 @@ pub struct ArtisticPastelsSmooth {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPencilGrayscale.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPencilGrayscale/a14:artisticPencilGrayscale")]
 pub struct ArtisticPencilGrayscale {
   /// trans
@@ -1212,7 +1210,7 @@ pub struct ArtisticPencilGrayscale {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPencilSketch.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPencilSketch/a14:artisticPencilSketch")]
 pub struct ArtisticPencilSketch {
   /// trans
@@ -1249,7 +1247,7 @@ pub struct ArtisticPencilSketch {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPhotocopy.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPhotocopy/a14:artisticPhotocopy")]
 pub struct ArtisticPhotocopy {
   /// trans
@@ -1286,7 +1284,7 @@ pub struct ArtisticPhotocopy {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticPlasticWrap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectPlasticWrap/a14:artisticPlasticWrap")]
 pub struct ArtisticPlasticWrap {
   /// trans
@@ -1323,7 +1321,7 @@ pub struct ArtisticPlasticWrap {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticTexturizer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectTexturizer/a14:artisticTexturizer")]
 pub struct ArtisticTexturizer {
   /// trans
@@ -1360,7 +1358,7 @@ pub struct ArtisticTexturizer {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:artisticWatercolorSponge.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectWatercolorSponge/a14:artisticWatercolorSponge")]
 pub struct ArtisticWatercolorSponge {
   /// trans
@@ -1397,7 +1395,7 @@ pub struct ArtisticWatercolorSponge {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:backgroundRemoval.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectBackgroundRemoval/a14:backgroundRemoval")]
 pub struct BackgroundRemoval {
   /// t
@@ -1468,7 +1466,7 @@ pub struct BackgroundRemoval {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:brightnessContrast.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectBrightnessContrast/a14:brightnessContrast")]
 pub struct BrightnessContrast {
   /// bright
@@ -1505,7 +1503,7 @@ pub struct BrightnessContrast {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:colorTemperature.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectColorTemperature/a14:colorTemperature")]
 pub struct ColorTemperature {
   /// colorTemp
@@ -1528,7 +1526,7 @@ pub struct ColorTemperature {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:saturation.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectSaturation/a14:saturation")]
 pub struct Saturation {
   /// sat
@@ -1551,7 +1549,7 @@ pub struct Saturation {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:sharpenSoften.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffectSharpenSoften/a14:sharpenSoften")]
 pub struct SharpenSoften {
   /// amount
@@ -1574,7 +1572,7 @@ pub struct SharpenSoften {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:imgEffect.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureEffect/a14:imgEffect")]
 pub struct ImageEffect {
   /// visible
@@ -1620,7 +1618,7 @@ pub struct ImageEffect {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:imgLayer.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_PictureLayer/a14:imgLayer")]
 pub struct ImageLayer {
   /// embed
@@ -1639,7 +1637,7 @@ pub struct ImageLayer {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/a14:cNvPr")]
 pub struct NonVisualDrawingProperties {
     /// Application defined unique identifier.
@@ -1702,7 +1700,7 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:cNvContentPartPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_NonVisualInkContentPartProperties/a14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
@@ -1724,7 +1722,7 @@ pub struct NonVisualInkContentPartProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:nvContentPartPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_GvmlContentPartNonVisual/a14:nvContentPartPr")]
 pub struct NonVisualContentPartProperties {
   /// _
@@ -1740,7 +1738,7 @@ pub struct NonVisualContentPartProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a14:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/a14:xfrm")]
 pub struct Transform2D {
   /// Rotation
@@ -1771,7 +1769,7 @@ pub struct Transform2D {
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenFillPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -1796,7 +1794,7 @@ pub enum HiddenFillPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -1813,7 +1811,7 @@ pub enum HiddenLinePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(
@@ -1824,7 +1822,7 @@ pub enum HiddenLinePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomDash>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
   ARound(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Round>),
@@ -1835,7 +1833,7 @@ pub enum HiddenLinePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Miter>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenEffectsPropertiesChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -1846,7 +1844,7 @@ pub enum HiddenEffectsPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ImageEffectChoice {
   #[sdk(child(qname = "a14:CT_PictureEffectBlur/a14:artisticBlur"))]
   A14ArtisticBlur(std::boxed::Box<ArtisticBlur>),

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum XsiTypeValue {
   #[sdk(rename = "dcterms:W3CDTF")]
   #[default]
@@ -15,11 +15,10 @@ pub enum XsiTypeValue {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cp:coreProperties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cp:CT_CoreProperties/cp:coreProperties")]
 pub struct CoreProperties {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   ///cp:category
   #[sdk(text_child(qname = "cp:CT_Category/cp:category"))]
@@ -84,7 +83,7 @@ pub type ContentStatus = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dcterms:created.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dcterms:CT_Created/dcterms:created")]
 pub struct Created {
   /// type
@@ -138,7 +137,7 @@ pub type LastPrinted = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is dcterms:modified.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dcterms:CT_Modified/dcterms:modified")]
 pub struct Modified {
   /// type
@@ -180,7 +179,7 @@ pub type Version = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cp:keywords.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cp:CT_Keywords/cp:keywords")]
 pub struct Keywords {
   /// lang
@@ -201,7 +200,7 @@ pub struct Keywords {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cp:value.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cp:CT_Keyword/cp:value")]
 pub struct Keyword {
   /// lang

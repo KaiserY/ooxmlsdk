@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is Types.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "CT_Types/Types")]
 pub struct Types {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   #[sdk(choice(qname = "CT_Default/Default", qname = "CT_Override/Override"))]
   pub xml_children: Vec<TypesChoice>,
@@ -23,7 +22,7 @@ pub struct Types {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is Default.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "CT_Default/Default")]
 pub struct Default {
   /// extension
@@ -46,7 +45,7 @@ pub struct Default {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is Override.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "CT_Override/Override")]
 pub struct Override {
   /// content_type
@@ -64,7 +63,7 @@ pub struct Override {
   #[sdk(attr(qname = "PartName"))]
   pub part_name: crate::simple_type::StringValue,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TypesChoice {
   #[sdk(child(qname = "CT_Default/Default"))]
   Default(std::boxed::Box<Default>),

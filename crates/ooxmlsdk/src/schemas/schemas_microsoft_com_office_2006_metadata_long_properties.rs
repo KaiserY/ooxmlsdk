@@ -9,7 +9,7 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is lp:LongProperties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "lp:CT_LongProperties/lp:LongProperties")]
 pub struct LongProperties {
   /// _
@@ -21,7 +21,7 @@ pub struct LongProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is lp:LongProp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "lp:CT_LongProp/lp:LongProp")]
 pub struct LongProperty {
   /// name

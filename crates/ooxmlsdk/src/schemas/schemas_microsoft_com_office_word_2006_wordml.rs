@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:tcg.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Tcg/wne:tcg")]
 pub struct TemplateCommandGroup {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -34,7 +33,7 @@ pub struct TemplateCommandGroup {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:mcds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Mcds/wne:mcds")]
 pub struct Mcds {
   /// _
@@ -46,11 +45,10 @@ pub struct Mcds {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:vbaSuppData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_VbaSuppData/wne:vbaSuppData")]
 pub struct VbaSuppData {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -65,11 +63,10 @@ pub struct VbaSuppData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:recipients.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_HashedRecipients/wne:recipients")]
 pub struct MailMergeRecipients {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -81,7 +78,7 @@ pub struct MailMergeRecipients {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:fci.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Fci/wne:fci")]
 pub struct FixedCommandKeyboardCustomization {
   /// fciName
@@ -113,7 +110,7 @@ pub struct FixedCommandKeyboardCustomization {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:macro.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_MacroWll/wne:macro")]
 pub struct MacroKeyboardCustomization {
   /// macroName
@@ -129,7 +126,7 @@ pub struct MacroKeyboardCustomization {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:wll.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_MacroWll/wne:wll")]
 pub struct WllMacroKeyboardCustomization {
   /// macroName
@@ -145,7 +142,7 @@ pub struct WllMacroKeyboardCustomization {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_MacroWll/")]
 pub struct MacroWllType {
   /// macroName
@@ -161,7 +158,7 @@ pub struct MacroWllType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:acd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_AcdKeymap/wne:acd")]
 pub struct AllocatedCommandKeyboardCustomization {
   /// acdName
@@ -177,7 +174,7 @@ pub struct AllocatedCommandKeyboardCustomization {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:acdEntry.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_AcdKeymap/wne:acdEntry")]
 pub struct AllocatedCommandManifestEntry {
   /// acdName
@@ -193,7 +190,7 @@ pub struct AllocatedCommandManifestEntry {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_AcdKeymap/")]
 pub struct AcceleratorKeymapType {
   /// acdName
@@ -209,7 +206,7 @@ pub struct AcceleratorKeymapType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:wch.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_LongHexNumber/wne:wch")]
 pub struct CharacterInsertion {
   /// val
@@ -226,7 +223,7 @@ pub struct CharacterInsertion {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:keymap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Keymap/wne:keymap")]
 pub struct KeyMapEntry {
   /// chmPrimary
@@ -282,7 +279,7 @@ pub struct KeyMapEntry {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:acd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Acd/wne:acd")]
 pub struct AllocatedCommand {
   /// argValue
@@ -320,7 +317,7 @@ pub struct AllocatedCommand {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:mcd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Mcd/wne:mcd")]
 pub struct Mcd {
   /// macroName
@@ -444,7 +441,7 @@ pub type EventDocBuildingBlockAfterInsertXsdString = crate::simple_type::StringV
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:docEvents.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_DocEvents/wne:docEvents")]
 pub struct DocEvents {
   /// _
@@ -492,7 +489,7 @@ pub struct DocEvents {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:acdManifest.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_AcdManifest/wne:acdManifest")]
 pub struct AllocatedCommandManifest {
   /// _
@@ -504,7 +501,7 @@ pub struct AllocatedCommandManifest {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:toolbarData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Rel/wne:toolbarData")]
 pub struct ToolbarData {
   /// id
@@ -520,7 +517,7 @@ pub struct ToolbarData {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:keymaps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Keymaps/wne:keymaps")]
 pub struct KeyMapCustomizations {
   /// _
@@ -532,7 +529,7 @@ pub struct KeyMapCustomizations {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:keymapsBad.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Keymaps/wne:keymapsBad")]
 pub struct MismatchedKeyMapCustomization {
   /// _
@@ -544,7 +541,7 @@ pub struct MismatchedKeyMapCustomization {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Keymaps/")]
 pub struct KeymapsType {
   ///Defines the KeyMapEntry Class.
@@ -556,7 +553,7 @@ pub struct KeymapsType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:toolbars.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Toolbars/wne:toolbars")]
 pub struct Toolbars {
   /// _
@@ -571,7 +568,7 @@ pub struct Toolbars {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:acds.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Acds/wne:acds")]
 pub struct AllocatedCommands {
   /// _
@@ -583,7 +580,7 @@ pub struct AllocatedCommands {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:active.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_OnOff/wne:active")]
 pub struct RecordIncluded {
   /// val
@@ -599,7 +596,7 @@ pub struct RecordIncluded {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:hash.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_DecimalNumber/wne:hash")]
 pub struct RecordHashCode {
   /// val
@@ -615,7 +612,7 @@ pub struct RecordHashCode {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wne:recipientData.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_HashedRecipientData/wne:recipientData")]
 pub struct SingleDataSourceRecord {
   /// _
@@ -625,7 +622,7 @@ pub struct SingleDataSourceRecord {
   #[sdk(child(qname = "wne:CT_DecimalNumber/wne:hash"))]
   pub record_hash_code: std::boxed::Box<RecordHashCode>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum KeyMapEntryChoice {
   #[sdk(child(qname = "wne:CT_Fci/wne:fci"))]
   WneFci(std::boxed::Box<FixedCommandKeyboardCustomization>),

@@ -9,11 +9,10 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrdwi:webImagesSrd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrdwi:CT_WebImagesSupportingRichData/xlrdwi:webImagesSrd")]
 pub struct WebImagesSupportingRichData {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -28,7 +27,7 @@ pub struct WebImagesSupportingRichData {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrdwi:webImageSrd.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrdwi:CT_WebImageSupportingRichData/xlrdwi:webImageSrd")]
 pub struct WebImageSupportingRichData {
   /// _
@@ -51,7 +50,7 @@ pub struct WebImageSupportingRichData {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrdwi:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xlrdwi:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -63,7 +62,7 @@ pub struct ExtensionList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrdwi:address.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:address")]
 pub struct AddressWebImageSupportingRichDataRelationship {
   /// id
@@ -79,7 +78,7 @@ pub struct AddressWebImageSupportingRichDataRelationship {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrdwi:moreImagesAddress.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:moreImagesAddress")]
 pub struct MoreImagesAddressWebImageSupportingRichDataRelationship {
   /// id
@@ -95,7 +94,7 @@ pub struct MoreImagesAddressWebImageSupportingRichDataRelationship {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrdwi:blip.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:blip")]
 pub struct BlipWebImageSupportingRichDataRelationship {
   /// id
@@ -111,7 +110,7 @@ pub struct BlipWebImageSupportingRichDataRelationship {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/")]
 pub struct OpenXmlWebImageSupportingRichDataRelationshipElement {
   /// id

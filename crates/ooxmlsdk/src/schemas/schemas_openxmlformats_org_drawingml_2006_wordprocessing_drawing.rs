@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum WrapTextValues {
   #[sdk(rename = "bothSides")]
   #[default]
@@ -16,7 +16,7 @@ pub enum WrapTextValues {
   #[sdk(rename = "largest")]
   Largest,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HorizontalAlignmentValues {
   #[sdk(rename = "left")]
   #[default]
@@ -30,7 +30,7 @@ pub enum HorizontalAlignmentValues {
   #[sdk(rename = "outside")]
   Outside,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HorizontalRelativePositionValues {
   #[sdk(rename = "margin")]
   #[default]
@@ -50,7 +50,7 @@ pub enum HorizontalRelativePositionValues {
   #[sdk(rename = "outsideMargin")]
   OutsideMargin,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VerticalAlignmentValues {
   #[sdk(rename = "top")]
   #[default]
@@ -64,7 +64,7 @@ pub enum VerticalAlignmentValues {
   #[sdk(rename = "outside")]
   Outside,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VerticalRelativePositionValues {
   #[sdk(rename = "margin")]
   #[default]
@@ -89,7 +89,7 @@ pub enum VerticalRelativePositionValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:wrapNone.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_WrapNone/wp:wrapNone")]
 pub struct WrapNone {}
 /// Square Wrapping.
@@ -97,7 +97,7 @@ pub struct WrapNone {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:wrapSquare.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_WrapSquare/wp:wrapSquare")]
 pub struct WrapSquare {
   /// Text Wrapping Location
@@ -145,7 +145,7 @@ pub struct WrapSquare {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:wrapTight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_WrapTight/wp:wrapTight")]
 pub struct WrapTight {
   /// Text Wrapping Location
@@ -179,7 +179,7 @@ pub struct WrapTight {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:wrapThrough.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_WrapThrough/wp:wrapThrough")]
 pub struct WrapThrough {
   /// Text Wrapping Location
@@ -213,7 +213,7 @@ pub struct WrapThrough {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:wrapTopAndBottom.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom")]
 pub struct WrapTopBottom {
   /// Distance From Text on Top Edge
@@ -239,7 +239,7 @@ pub struct WrapTopBottom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:inline.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_Inline/wp:inline")]
 pub struct Inline {
   /// Distance From Text on Top Edge
@@ -311,7 +311,7 @@ pub struct Inline {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:anchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_Anchor/wp:anchor")]
 pub struct Anchor {
   /// Distance From Text on Top Edge
@@ -464,7 +464,7 @@ pub struct Anchor {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:start.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/wp:start")]
 pub struct StartPoint {
   /// X-Axis Coordinate
@@ -501,7 +501,7 @@ pub struct StartPoint {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:lineTo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/wp:lineTo")]
 pub struct LineTo {
   /// X-Axis Coordinate
@@ -538,7 +538,7 @@ pub struct LineTo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:simplePos.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/wp:simplePos")]
 pub struct SimplePosition {
   /// X-Axis Coordinate
@@ -575,7 +575,7 @@ pub struct SimplePosition {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/")]
 pub struct Point2DType {
   /// X-Axis Coordinate
@@ -612,7 +612,7 @@ pub struct Point2DType {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:effectExtent.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_EffectExtent/wp:effectExtent")]
 pub struct EffectExtent {
   /// Additional Extent on Left Edge
@@ -677,7 +677,7 @@ pub struct EffectExtent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:wrapPolygon.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_WrapPath/wp:wrapPolygon")]
 pub struct WrapPolygon {
   /// Wrapping Points Modified
@@ -699,7 +699,7 @@ pub struct WrapPolygon {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:positionH.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_PosH/wp:positionH")]
 pub struct HorizontalPosition {
   /// Horizontal Position Relative Base
@@ -725,7 +725,7 @@ pub struct HorizontalPosition {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:positionV.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_PosV/wp:positionV")]
 pub struct VerticalPosition {
   /// Vertical Position Relative Base
@@ -751,7 +751,7 @@ pub struct VerticalPosition {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:extent.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/wp:extent")]
 pub struct Extent {
   /// Extent Length
@@ -788,7 +788,7 @@ pub struct Extent {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:docPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/wp:docPr")]
 pub struct DocProperties {
     /// Application defined unique identifier.
@@ -851,7 +851,7 @@ pub struct DocProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:cNvGraphicFramePr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
   ///Graphic Frame Locks
@@ -884,7 +884,7 @@ pub type PositionOffset = crate::simple_type::Int32Value;
 ///
 /// When the object is serialized out as xml, it's qualified name is wp:align.
 pub type HorizontalAlignment = HorizontalAlignmentValues;
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AnchorChoice {
   #[sdk(child(qname = "wp:CT_WrapNone/wp:wrapNone"))]
   WpWrapNone(std::boxed::Box<WrapNone>),
@@ -897,7 +897,7 @@ pub enum AnchorChoice {
   #[sdk(child(qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"))]
   WpWrapTopAndBottom(std::boxed::Box<WrapTopBottom>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HorizontalPositionChoice {
   #[sdk(text_child(qname = "wp:ST_AlignH/wp:align"))]
   WpAlign(HorizontalAlignmentValues),
@@ -907,7 +907,7 @@ pub enum HorizontalPositionChoice {
   #[sdk(text_child(qname = "a:ST_Percentage/wp14:pctPosHOffset"))]
   Wp14PctPosHOffset(crate::simple_type::StringValue),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VerticalPositionChoice {
   #[sdk(text_child(qname = "wp:ST_AlignV/wp:align"))]
   WpAlign(VerticalAlignmentValues),

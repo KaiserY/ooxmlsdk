@@ -9,11 +9,10 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is clbl:labelList.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "clbl:CT_ClassificationLabelList/clbl:labelList")]
 pub struct ClassificationLabelList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -28,7 +27,7 @@ pub struct ClassificationLabelList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is clbl:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "clbl:CT_ClassificationExtension/clbl:ext")]
 pub struct ClassificationExtension {
   /// uri
@@ -47,7 +46,7 @@ pub struct ClassificationExtension {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is clbl:label.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "clbl:CT_ClassificationLabel/clbl:label")]
 pub struct ClassificationLabel {
   /// id
@@ -124,7 +123,7 @@ pub struct ClassificationLabel {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is clbl:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "clbl:CT_ClassificationExtensionList/clbl:extLst")]
 pub struct ClassificationExtensionList {
   /// _

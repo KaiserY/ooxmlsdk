@@ -9,7 +9,7 @@
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp15:webVideoPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp15:CT_WebVideoPr/wp15:webVideoPr")]
 pub struct WebVideoProperty {
   /// embeddedHtml

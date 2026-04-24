@@ -9,11 +9,10 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Tasks.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_Tasks/t:Tasks")]
 pub struct Tasks {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -28,7 +27,7 @@ pub struct Tasks {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Task.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_Task/t:Task")]
 pub struct Task {
   /// id
@@ -58,7 +57,7 @@ pub struct Task {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oel:CT_ExtensionList/t:extLst")]
 pub struct ExtensionList {
   /// _
@@ -70,7 +69,7 @@ pub struct ExtensionList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Anchor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskAnchor/t:Anchor")]
 pub struct TaskAnchor {
   /// _
@@ -85,7 +84,7 @@ pub struct TaskAnchor {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:History.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskHistory/t:History")]
 pub struct TaskHistory {
   /// _
@@ -97,7 +96,7 @@ pub struct TaskHistory {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Event.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskHistoryEvent/t:Event")]
 pub struct TaskHistoryEvent {
   /// time
@@ -148,7 +147,7 @@ pub struct TaskHistoryEvent {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Attribution.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUser/t:Attribution")]
 pub struct AttributionTaskUser {
   /// userId
@@ -178,7 +177,7 @@ pub struct AttributionTaskUser {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Assign.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUser/t:Assign")]
 pub struct AssignTaskUser {
   /// userId
@@ -208,7 +207,7 @@ pub struct AssignTaskUser {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Unassign.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUser/t:Unassign")]
 pub struct UnassignTaskUser {
   /// userId
@@ -238,7 +237,7 @@ pub struct UnassignTaskUser {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUser/")]
 pub struct OpenXmlTaskUserElement {
   /// userId
@@ -268,7 +267,7 @@ pub struct OpenXmlTaskUserElement {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Create.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskCreateEventInfo/t:Create")]
 pub struct TaskCreateEventInfo {}
 /// Defines the TaskTitleEventInfo Class.
@@ -276,7 +275,7 @@ pub struct TaskCreateEventInfo {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:SetTitle.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskTitleEventInfo/t:SetTitle")]
 pub struct TaskTitleEventInfo {
   /// title
@@ -292,7 +291,7 @@ pub struct TaskTitleEventInfo {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Schedule.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskScheduleEventInfo/t:Schedule")]
 pub struct TaskScheduleEventInfo {
   /// startDate
@@ -315,7 +314,7 @@ pub struct TaskScheduleEventInfo {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Progress.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskProgressEventInfo/t:Progress")]
 pub struct TaskProgressEventInfo {
   /// percentComplete
@@ -338,7 +337,7 @@ pub struct TaskProgressEventInfo {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Priority.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskPriorityEventInfo/t:Priority")]
 pub struct TaskPriorityEventInfo {
   /// value
@@ -361,7 +360,7 @@ pub struct TaskPriorityEventInfo {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Delete.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskDeleteEventInfo/t:Delete")]
 pub struct TaskDeleteEventInfo {}
 /// Defines the TaskUndeleteEventInfo Class.
@@ -369,7 +368,7 @@ pub struct TaskDeleteEventInfo {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Undelete.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUndeleteEventInfo/t:Undelete")]
 pub struct TaskUndeleteEventInfo {}
 /// Defines the TaskUnassignAll Class.
@@ -377,7 +376,7 @@ pub struct TaskUndeleteEventInfo {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:UnassignAll.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUnassignAll/t:UnassignAll")]
 pub struct TaskUnassignAll {}
 /// Defines the TaskUndo Class.
@@ -385,7 +384,7 @@ pub struct TaskUnassignAll {}
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Undo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_TaskUndo/t:Undo")]
 pub struct TaskUndo {
   /// id
@@ -406,7 +405,7 @@ pub struct TaskUndo {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is t:Comment.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "t:CT_CommentAnchor/t:Comment")]
 pub struct CommentAnchor {
   /// id
@@ -417,7 +416,7 @@ pub struct CommentAnchor {
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TaskHistoryEventChoice {
   #[sdk(child(qname = "t:CT_TaskUser/t:Assign"))]
   TAssign(std::boxed::Box<AssignTaskUser>),

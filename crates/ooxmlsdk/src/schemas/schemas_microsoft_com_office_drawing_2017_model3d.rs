@@ -9,7 +9,7 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:model3d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3D/am3d:model3d")]
 pub struct Model3D {
   /// Embedded Picture Reference
@@ -65,7 +65,7 @@ pub struct Model3D {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:sx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/am3d:sx")]
 pub struct SxRatio {
   /// Numerator
@@ -88,7 +88,7 @@ pub struct SxRatio {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:sy.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/am3d:sy")]
 pub struct SyRatio {
   /// Numerator
@@ -111,7 +111,7 @@ pub struct SyRatio {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:sz.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/am3d:sz")]
 pub struct SzRatio {
   /// Numerator
@@ -134,7 +134,7 @@ pub struct SzRatio {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/")]
 pub struct RatioType {
   /// Numerator
@@ -157,7 +157,7 @@ pub struct RatioType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:meterPerModelUnit.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PositiveRatio/am3d:meterPerModelUnit")]
 pub struct MeterPerModelUnitPositiveRatio {
   /// n
@@ -180,7 +180,7 @@ pub struct MeterPerModelUnitPositiveRatio {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:sz.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PositiveRatio/am3d:sz")]
 pub struct SzPositiveRatio {
   /// n
@@ -203,7 +203,7 @@ pub struct SzPositiveRatio {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:illuminance.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PositiveRatio/am3d:illuminance")]
 pub struct IlluminancePositiveRatio {
   /// n
@@ -226,7 +226,7 @@ pub struct IlluminancePositiveRatio {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:intensity.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PositiveRatio/am3d:intensity")]
 pub struct IntensityPositiveRatio {
   /// n
@@ -249,7 +249,7 @@ pub struct IntensityPositiveRatio {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PositiveRatio/")]
 pub struct OpenXmlPositiveRatioElement {
   /// n
@@ -272,7 +272,7 @@ pub struct OpenXmlPositiveRatioElement {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:preTrans.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/am3d:preTrans")]
 pub struct PreTransVector3D {
   /// Distance along X-axis in 3D
@@ -323,7 +323,7 @@ pub struct PreTransVector3D {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:postTrans.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/am3d:postTrans")]
 pub struct PostTransVector3D {
   /// Distance along X-axis in 3D
@@ -374,7 +374,7 @@ pub struct PostTransVector3D {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:up.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/am3d:up")]
 pub struct UpVector3D {
   /// Distance along X-axis in 3D
@@ -425,7 +425,7 @@ pub struct UpVector3D {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Vector3D/")]
 pub struct Vector3DType {
   /// Distance along X-axis in 3D
@@ -476,7 +476,7 @@ pub struct Vector3DType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:scale.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Scale3D/am3d:scale")]
 pub struct Scale3D {
   /// _
@@ -494,7 +494,7 @@ pub struct Scale3D {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:rot.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Rotate3D/am3d:rot")]
 pub struct Rotate3D {
   /// ax
@@ -524,7 +524,7 @@ pub struct Rotate3D {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/am3d:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -536,7 +536,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:pos.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point3D/am3d:pos")]
 pub struct PosPoint3D {
   /// X-Coordinate in 3D
@@ -587,7 +587,7 @@ pub struct PosPoint3D {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:lookAt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point3D/am3d:lookAt")]
 pub struct LookAtPoint3D {
   /// X-Coordinate in 3D
@@ -638,7 +638,7 @@ pub struct LookAtPoint3D {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point3D/")]
 pub struct OpenXmlPoint3DElement {
   /// X-Coordinate in 3D
@@ -689,7 +689,7 @@ pub struct OpenXmlPoint3DElement {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:orthographic.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_OrthographicProjection/am3d:orthographic")]
 pub struct OrthographicProjection {
   /// _
@@ -704,7 +704,7 @@ pub struct OrthographicProjection {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:perspective.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PerspectiveProjection/am3d:perspective")]
 pub struct PerspectiveProjection {
   /// fov
@@ -730,7 +730,7 @@ pub struct PerspectiveProjection {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:blip.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Blip/am3d:blip")]
 pub struct Blip {
   /// Embedded Picture Reference
@@ -786,7 +786,7 @@ pub struct Blip {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:clr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/am3d:clr")]
 pub struct ColorType {
   #[sdk(choice(
@@ -804,7 +804,7 @@ pub struct ColorType {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:ext.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DExtension/am3d:ext")]
 pub struct Model3DExtension {
   /// URI
@@ -827,7 +827,7 @@ pub struct Model3DExtension {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/am3d:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -889,7 +889,7 @@ pub struct ShapeProperties {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:camera.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DCamera/am3d:camera")]
 pub struct Model3DCamera {
   /// _
@@ -915,7 +915,7 @@ pub struct Model3DCamera {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:trans.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DTransform/am3d:trans")]
 pub struct Model3DTransform {
   /// _
@@ -942,7 +942,7 @@ pub struct Model3DTransform {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:attrSrcUrl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a1611:CT_PictureAttributionSourceURL/am3d:attrSrcUrl")]
 pub struct PictureAttributionSourceUrl {
   /// id
@@ -958,7 +958,7 @@ pub struct PictureAttributionSourceUrl {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:raster.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DRaster/am3d:raster")]
 pub struct Model3DRaster {
   /// rName
@@ -984,7 +984,7 @@ pub struct Model3DRaster {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DExtensionList/am3d:extLst")]
 pub struct Model3DExtensionList {
   /// _
@@ -996,7 +996,7 @@ pub struct Model3DExtensionList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:objViewport.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_ObjectViewport/am3d:objViewport")]
 pub struct ObjectViewport {
   /// viewportSz
@@ -1022,7 +1022,7 @@ pub struct ObjectViewport {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:winViewport.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_WindowViewport/am3d:winViewport")]
 pub struct WindowViewport {
   /// _
@@ -1034,7 +1034,7 @@ pub struct WindowViewport {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:ambientLight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_AmbientLight/am3d:ambientLight")]
 pub struct AmbientLight {
   /// enabled
@@ -1059,7 +1059,7 @@ pub struct AmbientLight {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:ptLight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_PointLight/am3d:ptLight")]
 pub struct PointLight {
   /// enabled
@@ -1101,7 +1101,7 @@ pub struct PointLight {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:spotLight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_SpotLight/am3d:spotLight")]
 pub struct SpotLight {
   /// enabled
@@ -1160,7 +1160,7 @@ pub struct SpotLight {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:dirLight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_DirectionalLight/am3d:dirLight")]
 pub struct DirectionalLight {
   /// enabled
@@ -1205,17 +1205,17 @@ pub struct DirectionalLight {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is am3d:unkLight.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_UnknownLight/am3d:unkLight")]
 pub struct UnknownLight {}
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DChoice {
   #[sdk(child(qname = "am3d:CT_ObjectViewport/am3d:objViewport"))]
   Am3dObjViewport(std::boxed::Box<ObjectViewport>),
   #[sdk(child(qname = "am3d:CT_WindowViewport/am3d:winViewport"))]
   Am3dWinViewport(std::boxed::Box<WindowViewport>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DChoice2 {
   #[sdk(child(qname = "am3d:CT_PointLight/am3d:ptLight"))]
   Am3dPtLight(std::boxed::Box<PointLight>),
@@ -1226,7 +1226,7 @@ pub enum Model3DChoice2 {
   #[sdk(child(qname = "am3d:CT_UnknownLight/am3d:unkLight"))]
   Am3dUnkLight(std::boxed::Box<UnknownLight>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(
@@ -1301,7 +1301,7 @@ pub enum BlipChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TintEffect>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -1332,7 +1332,7 @@ pub enum ColorTypeChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DExtensionChoice {
   #[sdk(child(qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim"))]
     A3danimEmbedAnim(
@@ -1349,7 +1349,7 @@ pub enum Model3DExtensionChoice {
     #[sdk(any)]
     UnknownXml(String),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -1360,7 +1360,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -1385,7 +1385,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -1396,7 +1396,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DCameraChoice {
   #[sdk(child(qname = "am3d:CT_OrthographicProjection/am3d:orthographic"))]
   Am3dOrthographic(std::boxed::Box<OrthographicProjection>),

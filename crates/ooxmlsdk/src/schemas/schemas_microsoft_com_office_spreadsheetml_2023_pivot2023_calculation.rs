@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AggregationType {
   #[sdk(rename = "distinctCount")]
   #[default]
@@ -23,7 +23,7 @@ pub enum AggregationType {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:aggregationInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_AggregationInfo/xlpcalc:aggregationInfo")]
 pub struct AggregationInfo {
   /// aggregationType
@@ -46,7 +46,7 @@ pub struct AggregationInfo {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:featureSupportInfo.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_FeatureSupport/xlpcalc:featureSupportInfo")]
 pub struct FeatureSupport {
   /// featureName
@@ -62,7 +62,7 @@ pub struct FeatureSupport {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:pivotFieldSubtotals.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotFieldSubtotals/xlpcalc:pivotFieldSubtotals")]
 pub struct PivotFieldSubtotals {
   /// _
@@ -74,7 +74,7 @@ pub struct PivotFieldSubtotals {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:pivotAreaReferenceSubtotals.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotAreaReferenceSubtotals/xlpcalc:pivotAreaReferenceSubtotals")]
 pub struct PivotAreaReferenceSubtotals {
   /// _
@@ -86,7 +86,7 @@ pub struct PivotAreaReferenceSubtotals {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:pivotFieldSubtotalLineItems.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotTableSubtotalLineItems/xlpcalc:pivotFieldSubtotalLineItems")]
 pub struct PivotTableSubtotalLineItems {
   /// _
@@ -98,7 +98,7 @@ pub struct PivotTableSubtotalLineItems {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:subtotal.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotal")]
 pub struct SubtotalPivotItemSubtotal {
   /// subtotalType
@@ -121,7 +121,7 @@ pub struct SubtotalPivotItemSubtotal {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:subtotalLineItem.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotalLineItem")]
 pub struct SubtotalLineItemPivotItemSubtotal {
   /// subtotalType
@@ -144,7 +144,7 @@ pub struct SubtotalLineItemPivotItemSubtotal {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotItemSubtotal/")]
 pub struct OpenXmlPivotItemSubtotalElement {
   /// subtotalType
@@ -167,7 +167,7 @@ pub struct OpenXmlPivotItemSubtotalElement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlpcalc:subtotal.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlpcalc:CT_PivotSubtotalType/xlpcalc:subtotal")]
 pub struct PivotSubtotalType {
   /// subtotalType

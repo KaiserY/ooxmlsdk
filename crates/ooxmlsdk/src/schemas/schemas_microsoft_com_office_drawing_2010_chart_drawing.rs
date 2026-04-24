@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:contentPart.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr14:CT_ContentPart/cdr14:contentPart")]
 pub struct ContentPart {
   /// id
@@ -46,7 +46,7 @@ pub struct ContentPart {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/cdr14:cNvPr")]
 pub struct NonVisualDrawingProperties {
     /// Application defined unique identifier.
@@ -109,7 +109,7 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:cNvContentPartPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_NonVisualInkContentPartProperties/cdr14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
@@ -136,7 +136,7 @@ pub struct NonVisualInkContentPartProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:nvContentPartPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr14:CT_ContentPartNonVisual/cdr14:nvContentPartPr")]
 pub struct NonVisualContentPartProperties {
   /// _
@@ -152,7 +152,7 @@ pub struct NonVisualContentPartProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:nvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr14:CT_ApplicationNonVisualDrawingProps/cdr14:nvPr")]
 pub struct ApplicationNonVisualDrawingProperties {
   /// macro
@@ -175,7 +175,7 @@ pub struct ApplicationNonVisualDrawingProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:xfrm.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/cdr14:xfrm")]
 pub struct Transform2D {
   /// Rotation
@@ -211,7 +211,7 @@ pub struct Transform2D {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdr14:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/cdr14:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.

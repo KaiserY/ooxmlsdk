@@ -1617,6 +1617,7 @@ fn sdk_type_derive_tokens() -> TokenStream {
       Clone,
       Debug,
       Default,
+      PartialEq,
       ooxmlsdk_derive::SdkType
     )]
   }
@@ -1661,7 +1662,7 @@ fn gen_schema_enum_from_decl(
 
   Ok(quote! {
     #( #enum_attrs )*
-    #[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
     #sdk_enum_attrs
     pub enum #enum_name_ident {
       #( #variants, )*
@@ -1763,7 +1764,7 @@ fn gen_choice_type_decl(
 
       return Ok(quote! {
         #( #enum_attrs )*
-        #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+        #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
         pub enum #enum_ident {
           #( #variants )*
         }
@@ -1788,7 +1789,7 @@ fn gen_choice_type_decl(
 
   Ok(quote! {
     #( #enum_attrs )*
-    #[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+    #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
     pub enum #enum_ident {
       #( #variants )*
     }
@@ -3025,10 +3026,7 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
   if support.xmlns_mode == crate::sdk_code::codegen_ir::XmlnsMode::MapOnly {
     fields.push(quote! {
-      pub xmlns: Option<String>,
-    });
-    fields.push(quote! {
-      pub xmlns_map: std::collections::HashMap<String, String>,
+      pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     });
   }
 

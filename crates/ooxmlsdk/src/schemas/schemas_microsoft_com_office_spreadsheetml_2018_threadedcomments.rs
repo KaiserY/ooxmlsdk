@@ -9,11 +9,10 @@
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:personList.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:CT_PersonList/xltc:personList")]
 pub struct PersonList {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -28,11 +27,10 @@ pub struct PersonList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:ThreadedComments.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:CT_ThreadedComments/xltc:ThreadedComments")]
 pub struct ThreadedComments {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -47,7 +45,7 @@ pub struct ThreadedComments {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:person.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:CT_Person/xltc:person")]
 pub struct Person {
   /// displayName
@@ -92,7 +90,7 @@ pub struct Person {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xltc:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -104,7 +102,7 @@ pub struct ExtensionList {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:threadedComment.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:CT_ThreadedComment/xltc:threadedComment")]
 pub struct ThreadedComment {
   /// ref
@@ -185,7 +183,7 @@ pub type ThreadedCommentText = crate::simple_type::StringValue;
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:mentions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:CT_ThreadedCommentMentions/xltc:mentions")]
 pub struct ThreadedCommentMentions {
   /// _
@@ -197,7 +195,7 @@ pub struct ThreadedCommentMentions {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xltc:mention.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:CT_Mention/xltc:mention")]
 pub struct Mention {
   /// mentionpersonId

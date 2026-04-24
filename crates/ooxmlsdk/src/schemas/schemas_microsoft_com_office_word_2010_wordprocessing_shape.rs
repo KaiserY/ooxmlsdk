@@ -9,7 +9,7 @@
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:wsp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wps:CT_WordprocessingShape/wps:wsp")]
 pub struct WordprocessingShape {
   /// normalEastAsianFlow
@@ -50,7 +50,7 @@ pub struct WordprocessingShape {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/wps:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -62,7 +62,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:cNvPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/wps:cNvPr")]
 pub struct NonVisualDrawingProperties {
     /// Application defined unique identifier.
@@ -125,7 +125,7 @@ pub struct NonVisualDrawingProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:cNvSpPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
   /// Text Box
@@ -150,7 +150,7 @@ pub struct NonVisualDrawingShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:cNvCnPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr")]
 pub struct NonVisualConnectorProperties {
   ///Connection Shape Locks
@@ -178,7 +178,7 @@ pub struct NonVisualConnectorProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/wps:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -240,7 +240,7 @@ pub struct ShapeProperties {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:style.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/wps:style")]
 pub struct ShapeStyle {
   /// _
@@ -266,7 +266,7 @@ pub struct ShapeStyle {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:txbx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wps:CT_TextboxInfo/wps:txbx")]
 pub struct TextBoxInfo2 {
   /// id
@@ -289,7 +289,7 @@ pub struct TextBoxInfo2 {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:linkedTxbx.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx")]
 pub struct LinkedTextBox {
   /// id
@@ -315,7 +315,7 @@ pub struct LinkedTextBox {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wps:bodyPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBodyProperties/wps:bodyPr")]
 pub struct TextBodyProperties {
   /// Rotation
@@ -494,21 +494,21 @@ pub struct TextBodyProperties {
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingShapeChoice {
   #[sdk(child(qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr"))]
   WpsCNvSpPr(std::boxed::Box<NonVisualDrawingShapeProperties>),
   #[sdk(child(qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr"))]
   WpsCNvCnPr(std::boxed::Box<NonVisualConnectorProperties>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingShapeChoice2 {
   #[sdk(child(qname = "wps:CT_TextboxInfo/wps:txbx"))]
   WpsTxbx(std::boxed::Box<TextBoxInfo2>),
   #[sdk(child(qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"))]
   WpsLinkedTxbx(std::boxed::Box<LinkedTextBox>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -519,7 +519,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -544,7 +544,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -555,7 +555,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
   #[sdk(child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
   ANoAutofit(
@@ -570,7 +570,7 @@ pub enum TextBodyPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapeAutoFit>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   ASp3d(

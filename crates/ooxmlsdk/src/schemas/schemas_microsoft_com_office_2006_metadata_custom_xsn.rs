@@ -9,7 +9,7 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ntns:customXsn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ntns:CT_CustomXsn/ntns:customXsn")]
 pub struct CustomXsn {
   /// _

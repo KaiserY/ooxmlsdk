@@ -9,7 +9,7 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrvr:refreshIntervals.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrvr:CT_RichValueRefreshIntervals/xlrvr:refreshIntervals")]
 pub struct RichValueRefreshIntervals {
   /// _
@@ -21,7 +21,7 @@ pub struct RichValueRefreshIntervals {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xlrvr:refreshInterval.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xlrvr:CT_RichValueRefreshInterval/xlrvr:refreshInterval")]
 pub struct RichValueRefreshInterval {
   /// resourceIdInt

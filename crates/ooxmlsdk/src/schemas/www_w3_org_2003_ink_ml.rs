@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ChannelDataTypeValues {
   #[sdk(rename = "integer")]
   #[default]
@@ -14,7 +14,7 @@ pub enum ChannelDataTypeValues {
   #[sdk(rename = "boolean")]
   Boolean,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ChannelValueOrientationValues {
   #[sdk(rename = "+ve")]
   #[default]
@@ -22,7 +22,7 @@ pub enum ChannelValueOrientationValues {
   #[sdk(rename = "-ve")]
   MinusVe,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardChannelPropertyNameValues {
   #[sdk(rename = "threshold")]
   #[default]
@@ -46,7 +46,7 @@ pub enum StandardChannelPropertyNameValues {
   #[sdk(rename = "distortion")]
   Distortion,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardBrushPropertyNameValues {
   #[sdk(rename = "width")]
   #[default]
@@ -68,7 +68,7 @@ pub enum StandardBrushPropertyNameValues {
   #[sdk(rename = "ignorePressure")]
   IgnorePressure,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardChannelNameValues {
   #[sdk(rename = "X")]
   #[default]
@@ -140,7 +140,7 @@ pub enum StandardChannelNameValues {
   #[sdk(rename = "TC")]
   FingerTouch,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardLengthUnitsValues {
   #[sdk(rename = "m")]
   #[default]
@@ -160,7 +160,7 @@ pub enum StandardLengthUnitsValues {
   #[sdk(rename = "ex")]
   Ex,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardPerLengthUnitsValues {
   #[sdk(rename = "1/m")]
   #[default]
@@ -180,7 +180,7 @@ pub enum StandardPerLengthUnitsValues {
   #[sdk(rename = "1/ex")]
   PerEx,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardTimeUnitsValues {
   #[sdk(rename = "s")]
   #[default]
@@ -188,7 +188,7 @@ pub enum StandardTimeUnitsValues {
   #[sdk(rename = "ms")]
   Millisecond,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardPerTimeUnitsValues {
   #[sdk(rename = "1/s")]
   #[default]
@@ -196,7 +196,7 @@ pub enum StandardPerTimeUnitsValues {
   #[sdk(rename = "1/ms")]
   PerMillisecond,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardMassForceUnitsValues {
   #[sdk(rename = "Kg")]
   #[default]
@@ -210,7 +210,7 @@ pub enum StandardMassForceUnitsValues {
   #[sdk(rename = "lb")]
   Pond,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardPerMassForceUnitsValues {
   #[sdk(rename = "1/Kg")]
   #[default]
@@ -224,7 +224,7 @@ pub enum StandardPerMassForceUnitsValues {
   #[sdk(rename = "1/lb")]
   PerPond,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardAngleUnitsValues {
   #[sdk(rename = "deg")]
   #[default]
@@ -232,7 +232,7 @@ pub enum StandardAngleUnitsValues {
   #[sdk(rename = "rad")]
   Radian,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardPerAngleUnitsValues {
   #[sdk(rename = "1/deg")]
   #[default]
@@ -240,7 +240,7 @@ pub enum StandardPerAngleUnitsValues {
   #[sdk(rename = "1/rad")]
   PerRadian,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardOtherUnitsValues {
   #[sdk(rename = "%")]
   #[default]
@@ -250,7 +250,7 @@ pub enum StandardOtherUnitsValues {
   #[sdk(rename = "none")]
   None,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StandardPerOtherUnitsValues {
   #[sdk(rename = "1/%")]
   #[default]
@@ -258,7 +258,7 @@ pub enum StandardPerOtherUnitsValues {
   #[sdk(rename = "1/dev")]
   PerDeviceResolution,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TraceTypeValues {
   #[sdk(rename = "penDown")]
   #[default]
@@ -268,7 +268,7 @@ pub enum TraceTypeValues {
   #[sdk(rename = "indeterminate")]
   Indeterminate,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TraceContinuationValues {
   #[sdk(rename = "begin")]
   #[default]
@@ -278,7 +278,7 @@ pub enum TraceContinuationValues {
   #[sdk(rename = "middle")]
   Middle,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RasterOperationValues {
   #[sdk(rename = "black")]
   #[default]
@@ -314,7 +314,7 @@ pub enum RasterOperationValues {
   #[sdk(rename = "white")]
   White,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum PenTipShapeValues {
   #[sdk(rename = "ellipse")]
   #[default]
@@ -324,7 +324,7 @@ pub enum PenTipShapeValues {
   #[sdk(rename = "drop")]
   Drop,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum MappingTypeValues {
   #[sdk(rename = "identity")]
   #[default]
@@ -340,7 +340,7 @@ pub enum MappingTypeValues {
   #[sdk(rename = "unknown")]
   Unknown,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TableApplyValues {
   #[sdk(rename = "absolute")]
   #[default]
@@ -348,7 +348,7 @@ pub enum TableApplyValues {
   #[sdk(rename = "relative")]
   Relative,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TableInterpolationValues {
   #[sdk(rename = "floor")]
   #[default]
@@ -367,11 +367,10 @@ pub enum TableInterpolationValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:ink.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Ink/inkml:ink")]
 pub struct Ink {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// documentID
@@ -398,7 +397,7 @@ pub struct Ink {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:bind.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Bind/inkml:bind")]
 pub struct Bind {
   /// source
@@ -435,7 +434,7 @@ pub struct Bind {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:table.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Table/inkml:table")]
 pub struct Table {
   /// id
@@ -467,7 +466,7 @@ pub struct Table {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:matrix.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Matrix/inkml:matrix")]
 pub struct Matrix {
   /// id
@@ -485,7 +484,7 @@ pub struct Matrix {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:mapping.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Mapping/inkml:mapping")]
 pub struct Mapping {
   /// id
@@ -527,7 +526,7 @@ pub struct Mapping {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:channel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Channel/inkml:channel")]
 pub struct Channel {
   /// id
@@ -695,7 +694,7 @@ pub struct Channel {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:intermittentChannels.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_IntermittentChannels/inkml:intermittentChannels")]
 pub struct IntermittentChannels {
   /// _
@@ -707,7 +706,7 @@ pub struct IntermittentChannels {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:channelProperty.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_ChannelProperty/inkml:channelProperty")]
 pub struct ChannelProperty {
   /// channel
@@ -851,7 +850,7 @@ pub struct ChannelProperty {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:traceFormat.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_TraceFormat/inkml:traceFormat")]
 pub struct TraceFormat {
   /// id
@@ -873,7 +872,7 @@ pub struct TraceFormat {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:sampleRate.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_SampleRate/inkml:sampleRate")]
 pub struct SampleRate {
   /// uniform
@@ -896,7 +895,7 @@ pub struct SampleRate {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:latency.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Latency/inkml:latency")]
 pub struct Latency {
   /// value
@@ -912,7 +911,7 @@ pub struct Latency {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:activeArea.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_ActiveArea/inkml:activeArea")]
 pub struct ActiveArea {
   /// size
@@ -998,7 +997,7 @@ pub struct ActiveArea {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:srcProperty.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_SrcProperty/inkml:srcProperty")]
 pub struct SourceProperty {
   /// name
@@ -1077,7 +1076,7 @@ pub struct SourceProperty {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:channelProperties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_ChannelProperties/inkml:channelProperties")]
 pub struct ChannelProperties {
   /// _
@@ -1089,7 +1088,7 @@ pub struct ChannelProperties {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:annotation.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Annotation/inkml:annotation")]
 pub struct Annotation {
   /// type
@@ -1114,7 +1113,7 @@ pub struct Annotation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:annotationXML.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_AnnotationXML/inkml:annotationXML")]
 pub struct AnnotationXml {
   /// type
@@ -1148,7 +1147,7 @@ pub struct AnnotationXml {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:brushProperty.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_BrushProperty/inkml:brushProperty")]
 pub struct BrushProperty {
   /// name
@@ -1283,7 +1282,7 @@ pub struct BrushProperty {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:canvas.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Canvas/inkml:canvas")]
 pub struct Canvas {
   /// id
@@ -1310,7 +1309,7 @@ pub struct Canvas {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:canvasTransform.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_CanvasTransform/inkml:canvasTransform")]
 pub struct CanvasTransform {
   /// id
@@ -1336,7 +1335,7 @@ pub struct CanvasTransform {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:inkSource.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_InkSource/inkml:inkSource")]
 pub struct InkSource {
   /// id
@@ -1406,7 +1405,7 @@ pub struct InkSource {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:brush.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Brush/inkml:brush")]
 pub struct Brush {
   /// id
@@ -1439,7 +1438,7 @@ pub struct Brush {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:timestamp.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Timestamp/inkml:timestamp")]
 pub struct Timestamp {
   /// id
@@ -1484,7 +1483,7 @@ pub struct Timestamp {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:trace.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Trace/inkml:trace")]
 pub struct Trace {
   /// id
@@ -1554,7 +1553,7 @@ pub struct Trace {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:traceGroup.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_TraceGroup/inkml:traceGroup")]
 pub struct TraceGroup {
   /// id
@@ -1593,7 +1592,7 @@ pub struct TraceGroup {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:traceView.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_TraceView/inkml:traceView")]
 pub struct TraceView {
   /// id
@@ -1645,7 +1644,7 @@ pub struct TraceView {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:context.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Context/inkml:context")]
 pub struct Context {
   /// id
@@ -1735,7 +1734,7 @@ pub struct Context {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is inkml:definitions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Definitions/inkml:definitions")]
 pub struct Definitions {
   #[sdk(choice(
@@ -1753,7 +1752,7 @@ pub struct Definitions {
   ))]
   pub xml_children: Vec<DefinitionsChoice>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InkChoice {
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
   InkmlAnnotation(std::boxed::Box<Annotation>),
@@ -1770,14 +1769,14 @@ pub enum InkChoice {
   #[sdk(child(qname = "inkml:CT_TraceView/inkml:traceView"))]
   InkmlTraceView(std::boxed::Box<TraceView>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MappingChoice {
   #[sdk(child(qname = "inkml:CT_Table/inkml:table"))]
   InkmlTable(std::boxed::Box<Table>),
   #[sdk(child(qname = "inkml:CT_Matrix/inkml:matrix"))]
   InkmlMatrix(std::boxed::Box<Matrix>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TraceGroupChoice {
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
   InkmlAnnotation(std::boxed::Box<Annotation>),
@@ -1788,7 +1787,7 @@ pub enum TraceGroupChoice {
   #[sdk(child(qname = "inkml:CT_TraceGroup/inkml:traceGroup"))]
   InkmlTraceGroup(std::boxed::Box<TraceGroup>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TraceViewChoice {
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
   InkmlAnnotation(std::boxed::Box<Annotation>),
@@ -1797,7 +1796,7 @@ pub enum TraceViewChoice {
   #[sdk(child(qname = "inkml:CT_TraceView/inkml:traceView"))]
   InkmlTraceView(std::boxed::Box<TraceView>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefinitionsChoice {
   #[sdk(child(qname = "inkml:CT_Brush/inkml:brush"))]
   InkmlBrush(std::boxed::Box<Brush>),

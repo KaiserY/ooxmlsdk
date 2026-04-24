@@ -9,11 +9,10 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:macrosheet.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Macrosheet/xne:macrosheet")]
 pub struct Macrosheet {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   ///Sheet Properties
@@ -144,11 +143,10 @@ pub struct Macrosheet {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:worksheetSortMap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xne:CT_WorksheetSortMap/xne:worksheetSortMap")]
 pub struct WorksheetSortMap {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   ///Row Sort Map
@@ -177,7 +175,7 @@ pub type Formula = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:rowSortMap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xne:CT_RowSortMap/xne:rowSortMap")]
 pub struct RowSortMap {
   /// Reference
@@ -209,7 +207,7 @@ pub struct RowSortMap {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:colSortMap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xne:CT_ColSortMap/xne:colSortMap")]
 pub struct ColumnSortMap {
   /// Reference
@@ -241,7 +239,7 @@ pub struct ColumnSortMap {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:row.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xne:CT_SortMapItem/xne:row")]
 pub struct RowSortMapItem {
   /// New Value
@@ -264,7 +262,7 @@ pub struct RowSortMapItem {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:col.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xne:CT_SortMapItem/xne:col")]
 pub struct ColumnSortMapItem {
   /// New Value
@@ -287,7 +285,7 @@ pub struct ColumnSortMapItem {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xne:CT_SortMapItem/")]
 pub struct SortMapItemType {
   /// New Value

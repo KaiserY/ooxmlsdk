@@ -9,11 +9,10 @@
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:webextension.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtension/we:webextension")]
 pub struct WebExtension {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// id
@@ -54,7 +53,7 @@ pub struct WebExtension {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:webextensionref.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_WebExtensionPartRef/we:webextensionref")]
 pub struct WebExtensionReference {
   /// id
@@ -70,7 +69,7 @@ pub struct WebExtensionReference {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:property.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionProperty/we:property")]
 pub struct WebExtensionProperty {
   /// name
@@ -93,7 +92,7 @@ pub struct WebExtensionProperty {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/we:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -105,7 +104,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:binding.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionBinding/we:binding")]
 pub struct WebExtensionBinding {
   /// id
@@ -138,7 +137,7 @@ pub struct WebExtensionBinding {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:reference.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionReference/we:reference")]
 pub struct WebExtensionStoreReference {
   /// id
@@ -178,7 +177,7 @@ pub struct WebExtensionStoreReference {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:alternateReferences.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences")]
 pub struct WebExtensionReferenceList {
   /// _
@@ -190,7 +189,7 @@ pub struct WebExtensionReferenceList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:properties.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionPropertyBag/we:properties")]
 pub struct WebExtensionPropertyBag {
   /// _
@@ -202,7 +201,7 @@ pub struct WebExtensionPropertyBag {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:bindings.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionBindingList/we:bindings")]
 pub struct WebExtensionBindingList {
   /// _
@@ -214,7 +213,7 @@ pub struct WebExtensionBindingList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is we:snapshot.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Blip/we:snapshot")]
 pub struct Snapshot {
   /// Embedded Picture Reference
@@ -265,7 +264,7 @@ pub struct Snapshot {
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipExtensionList>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SnapshotChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TargetMode {
   #[sdk(rename = "External")]
   #[default]
@@ -17,11 +17,10 @@ pub enum TargetMode {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is Relationships.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "CT_Relationships/Relationships")]
 pub struct Relationships {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   ///Relationship
   #[sdk(child(qname = "CT_Relationship/Relationship"))]
@@ -32,7 +31,7 @@ pub struct Relationships {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is Relationship.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "CT_Relationship/Relationship")]
 pub struct Relationship {
   /// TARGET MODE

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum EndPointRoleValues {
   #[sdk(rename = "source")]
   #[default]
@@ -16,7 +16,7 @@ pub enum EndPointRoleValues {
   #[sdk(rename = "router")]
   Router,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum MediumValues {
   #[sdk(rename = "acoustic")]
   #[default]
@@ -26,7 +26,7 @@ pub enum MediumValues {
   #[sdk(rename = "visual")]
   Visual,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum AnchorPointValues {
   #[sdk(rename = "start")]
   #[default]
@@ -34,7 +34,7 @@ pub enum AnchorPointValues {
   #[sdk(rename = "end")]
   End,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum DisjunctionTypeValues {
   #[sdk(rename = "recognition")]
   #[default]
@@ -51,7 +51,7 @@ pub enum DisjunctionTypeValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:derived-from.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_DerivedFrom/emma:derived-from")]
 pub struct DerivedFrom {
   /// resource
@@ -75,7 +75,7 @@ pub struct DerivedFrom {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:info.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Info/emma:info")]
 pub struct Info {
   /// id
@@ -96,7 +96,7 @@ pub struct Info {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:lattice.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Lattice/emma:lattice")]
 pub struct Lattice {
   /// initial
@@ -142,7 +142,7 @@ pub type Literal = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:interpretation.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Interpretation/emma:interpretation")]
 pub struct Interpretation {
   /// id
@@ -358,7 +358,7 @@ pub struct Interpretation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:one-of.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_OneOf/emma:one-of")]
 pub struct OneOf {
   /// disjunction-type
@@ -568,7 +568,7 @@ pub struct OneOf {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:group.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Group/emma:group")]
 pub struct Group {
   /// id
@@ -772,7 +772,7 @@ pub struct Group {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:sequence.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Sequence/emma:sequence")]
 pub struct Sequence {
   /// id
@@ -975,7 +975,7 @@ pub struct Sequence {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:group-info.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_GroupInfo/emma:group-info")]
 pub struct GroupInfo {
   /// ref
@@ -994,7 +994,7 @@ pub struct GroupInfo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:derivation.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Derivation/emma:derivation")]
 pub struct Derivation {
   #[sdk(choice(
@@ -1010,7 +1010,7 @@ pub struct Derivation {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:grammar.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Grammar/emma:grammar")]
 pub struct Grammar {
   /// id
@@ -1037,7 +1037,7 @@ pub struct Grammar {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:model.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Model/emma:model")]
 pub struct Model {
   /// id
@@ -1066,7 +1066,7 @@ pub struct Model {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:endpoint-info.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_EndPointInfo/emma:endpoint-info")]
 pub struct EndPointInfo {
   /// id
@@ -1088,7 +1088,7 @@ pub struct EndPointInfo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:endpoint.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_EndPoint/emma:endpoint")]
 pub struct EndPoint {
   /// id
@@ -1179,7 +1179,7 @@ pub struct EndPoint {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:node.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Node/emma:node")]
 pub struct Node {
   /// node-number
@@ -1227,7 +1227,7 @@ pub struct Node {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:arc.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Arc/emma:arc")]
 pub struct Arc {
   /// from
@@ -1339,7 +1339,7 @@ pub struct Arc {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is emma:emma.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Emma/emma:emma")]
 pub struct Emma {
   /// version
@@ -1362,14 +1362,14 @@ pub struct Emma {
   ))]
   pub xml_children: Vec<EmmaChoice>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LatticeChoice {
   #[sdk(child(qname = "emma:CT_Arc/emma:arc"))]
   EmmaArc(std::boxed::Box<Arc>),
   #[sdk(child(qname = "emma:CT_Node/emma:node"))]
   EmmaNode(std::boxed::Box<Node>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InterpretationChoice {
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
   EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -1382,7 +1382,7 @@ pub enum InterpretationChoice {
   #[sdk(child(qname = "msink:CT_CtxNode/msink:context"))]
   MsinkContext(std::boxed::Box<crate::schemas::schemas_microsoft_com_ink_2010_main::ContextNode>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OneOfChoice {
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
   EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -1397,7 +1397,7 @@ pub enum OneOfChoice {
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
   EmmaSequence(std::boxed::Box<Sequence>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
   EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -1414,7 +1414,7 @@ pub enum GroupChoice {
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
   EmmaSequence(std::boxed::Box<Sequence>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SequenceChoice {
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
   EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -1429,7 +1429,7 @@ pub enum SequenceChoice {
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
   EmmaSequence(std::boxed::Box<Sequence>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DerivationChoice {
   #[sdk(child(qname = "emma:CT_Interpretation/emma:interpretation"))]
   EmmaInterpretation(std::boxed::Box<Interpretation>),
@@ -1440,7 +1440,7 @@ pub enum DerivationChoice {
   #[sdk(child(qname = "emma:CT_Group/emma:group"))]
   EmmaGroup(std::boxed::Box<Group>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EmmaChoice {
   #[sdk(child(qname = "emma:CT_Derivation/emma:derivation"))]
   EmmaDerivation(std::boxed::Box<Derivation>),

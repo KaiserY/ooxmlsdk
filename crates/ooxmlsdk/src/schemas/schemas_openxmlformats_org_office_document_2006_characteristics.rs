@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum RelationValues {
   #[sdk(rename = "ge")]
   #[default]
@@ -23,11 +23,10 @@ pub enum RelationValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ac:additionalCharacteristics.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ac:CT_AdditionalCharacteristics/ac:additionalCharacteristics")]
 pub struct AdditionalCharacteristicsInfo {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -39,7 +38,7 @@ pub struct AdditionalCharacteristicsInfo {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is ac:characteristic.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ac:CT_Characteristic/ac:characteristic")]
 pub struct Characteristic {
   /// Name of Characteristic

@@ -9,11 +9,10 @@
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wetp:taskpanes.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wetp:CT_OsfTaskpanes/wetp:taskpanes")]
 pub struct Taskpanes {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
@@ -25,7 +24,7 @@ pub struct Taskpanes {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wetp:webextensionref.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_WebExtensionPartRef/wetp:webextensionref")]
 pub struct WebExtensionPartReference {
   /// id
@@ -41,7 +40,7 @@ pub struct WebExtensionPartReference {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wetp:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/wetp:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -53,7 +52,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wetp:taskpane.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wetp:CT_OsfTaskpane/wetp:taskpane")]
 pub struct WebExtensionTaskpane {
   /// dockstate

@@ -6,7 +6,7 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use syn::{Arm, Attribute, Ident, ItemMod, parse_str, parse2};
+use syn::{Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
@@ -238,31 +238,9 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
   Ok(())
 }
 
-fn write_namespaces(sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Path) -> Result<()> {
-  let mut uri_to_prefix_arms: Vec<Arm> = vec![];
-
-  for namespace in sdk_data_namespaces {
-    let uri = namespace.uri.as_str();
-    let prefix = namespace.prefix.as_str();
-    let attrs = version_cfg_attrs(&namespace.version);
-
-    uri_to_prefix_arms.push(parse2(quote! {
-      #( #attrs )*
-      #uri => Some(#prefix),
-    })?);
-  }
-
-  let token_stream: TokenStream = quote! {
-    pub(crate) fn prefix_by_uri(uri: &str) -> Option<&'static str> {
-      match uri {
-        #( #uri_to_prefix_arms )*
-        _ => None,
-      }
-    }
-  };
-
+fn write_namespaces(_sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Path) -> Result<()> {
   let namespaces_path = out_dir_path.join("namespaces.rs");
-  write_generated_module(&namespaces_path, token_stream)?;
+  write_generated_module(&namespaces_path, quote! {})?;
 
   Ok(())
 }

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ModelTimeGroupingContentType {
   #[sdk(rename = "years")]
   #[default]
@@ -31,7 +31,7 @@ pub enum ModelTimeGroupingContentType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x16:modelTimeGroupings.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x16:CT_ModelTimeGroupings/x16:modelTimeGroupings")]
 pub struct ModelTimeGroupings {
   /// _
@@ -43,7 +43,7 @@ pub struct ModelTimeGroupings {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x16:modelTimeGrouping.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x16:CT_ModelTimeGrouping/x16:modelTimeGrouping")]
 pub struct ModelTimeGrouping {
   /// tableName
@@ -76,7 +76,7 @@ pub struct ModelTimeGrouping {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is x16:calculatedTimeColumn.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x16:CT_CalculatedTimeColumn/x16:calculatedTimeColumn")]
 pub struct CalculatedTimeColumn {
   /// columnName

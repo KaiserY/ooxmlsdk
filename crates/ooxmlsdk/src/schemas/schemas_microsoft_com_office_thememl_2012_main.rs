@@ -9,11 +9,10 @@
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is thm15:themeFamily.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "thm15:CT_ThemeFamily/thm15:themeFamily")]
 pub struct ThemeFamily {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// name
   ///
   /// Available in Office2013 and above.
@@ -54,7 +53,7 @@ pub struct ThemeFamily {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is thm15:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/thm15:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.
@@ -66,7 +65,7 @@ pub struct OfficeArtExtensionList {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is thm15:themeVariant.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "thm15:CT_ThemeVariant/thm15:themeVariant")]
 pub struct ThemeVariant {
   /// name
@@ -132,7 +131,7 @@ pub struct ThemeVariant {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is thm15:themeVariantLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "thm15:CT_ThemeVariantList/thm15:themeVariantLst")]
 pub struct ThemeVariantList {
   /// _

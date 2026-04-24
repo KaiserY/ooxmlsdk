@@ -9,11 +9,10 @@
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:FeaturePropertyBags.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_FeaturePropertyBags/xfpb:FeaturePropertyBags")]
 pub struct FeaturePropertyBags {
-  pub xmlns: Option<String>,
-  pub xmlns_map: std::collections::HashMap<String, String>,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// count
@@ -38,7 +37,7 @@ pub struct FeaturePropertyBags {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:fpbs.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs")]
 pub struct FpbsFeaturePropertyBags {
   /// count
@@ -63,7 +62,7 @@ pub struct FpbsFeaturePropertyBags {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_FeaturePropertyBags/")]
 pub struct OpenXmlFeaturePropertyBagsElement {
   /// count
@@ -85,7 +84,7 @@ pub struct OpenXmlFeaturePropertyBagsElement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:xfComplement.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_XfComplement/xfpb:xfComplement")]
 pub struct XfComplement {
   /// i
@@ -101,7 +100,7 @@ pub struct XfComplement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:DXFComplement.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_DXFComplement/xfpb:DXFComplement")]
 pub struct DxfComplement {
   /// i
@@ -117,7 +116,7 @@ pub struct DxfComplement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:revdxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_RevDxf/xfpb:revdxf")]
 pub struct RevDxf {
   /// _
@@ -132,7 +131,7 @@ pub struct RevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:headerRowRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:headerRowRevDxf")]
 pub struct HeaderRowRevDxfTableRevDxf {
   /// _
@@ -147,7 +146,7 @@ pub struct HeaderRowRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:dataRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:dataRevDxf")]
 pub struct DataRevDxfTableRevDxf {
   /// _
@@ -162,7 +161,7 @@ pub struct DataRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:totalsRowRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:totalsRowRevDxf")]
 pub struct TotalsRowRevDxfTableRevDxf {
   /// _
@@ -177,7 +176,7 @@ pub struct TotalsRowRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:headerRowBorderRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:headerRowBorderRevDxf")]
 pub struct HeaderRowBorderRevDxfTableRevDxf {
   /// _
@@ -192,7 +191,7 @@ pub struct HeaderRowBorderRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:tableBorderRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:tableBorderRevDxf")]
 pub struct TableBorderRevDxfTableRevDxf {
   /// _
@@ -207,7 +206,7 @@ pub struct TableBorderRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:totalsRowBorderRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:totalsRowBorderRevDxf")]
 pub struct TotalsRowBorderRevDxfTableRevDxf {
   /// _
@@ -222,7 +221,7 @@ pub struct TotalsRowBorderRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:columnHeaderRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:columnHeaderRevDxf")]
 pub struct ColumnHeaderRevDxfTableRevDxf {
   /// _
@@ -237,7 +236,7 @@ pub struct ColumnHeaderRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:columnBodyRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:columnBodyRevDxf")]
 pub struct ColumnBodyRevDxfTableRevDxf {
   /// _
@@ -252,7 +251,7 @@ pub struct ColumnBodyRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:columnTotalsRevDxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/xfpb:columnTotalsRevDxf")]
 pub struct ColumnTotalsRevDxfTableRevDxf {
   /// _
@@ -267,7 +266,7 @@ pub struct ColumnTotalsRevDxfTableRevDxf {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_TableRevDxf/")]
 pub struct OpenXmlTableRevDxfElement {
   #[sdk(choice(
@@ -281,7 +280,7 @@ pub struct OpenXmlTableRevDxfElement {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:bagExt.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_BagExtensions/xfpb:bagExt")]
 pub struct BagExtensions {
   /// _
@@ -293,7 +292,7 @@ pub struct BagExtensions {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:bag.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag")]
 pub struct FeaturePropertyBag {
   /// type
@@ -340,7 +339,7 @@ pub struct FeaturePropertyBag {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xfpb:extLst")]
 pub struct ExtensionList {
   ///Extension.
@@ -352,7 +351,7 @@ pub struct ExtensionList {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:a.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a")]
 pub struct ArrayFeatureProperty {
   /// Name of the key for the key value pair.
@@ -377,7 +376,7 @@ pub struct ArrayFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:bagId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId")]
 pub struct BagFeatureProperty {
   /// k
@@ -395,7 +394,7 @@ pub struct BagFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:i.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_IntFeatureProperty/xfpb:i")]
 pub struct IntFeatureProperty {
   /// k
@@ -413,7 +412,7 @@ pub struct IntFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:s.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_StringFeatureProperty/xfpb:s")]
 pub struct StringFeatureProperty {
   /// k
@@ -431,7 +430,7 @@ pub struct StringFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:b.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_BoolFeatureProperty/xfpb:b")]
 pub struct BoolFeatureProperty {
   /// k
@@ -449,7 +448,7 @@ pub struct BoolFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:d.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d")]
 pub struct DecimalFeatureProperty {
   /// k
@@ -467,7 +466,7 @@ pub struct DecimalFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:rel.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xfpb:CT_RelFeatureProperty/xfpb:rel")]
 pub struct RelFeatureProperty {
   /// Name of the key for the key value pair.
@@ -485,7 +484,7 @@ pub struct RelFeatureProperty {
 /// Available in Microsoft365 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:dxf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/xfpb:dxf")]
 pub struct DifferentialFormatType {
   ///Font Properties
@@ -556,7 +555,7 @@ pub type Xsdboolean = crate::simple_type::BooleanValue;
 ///
 /// When the object is serialized out as xml, it's qualified name is xfpb:d.
 pub type Xsddouble = crate::simple_type::DoubleValue;
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OpenXmlFeaturePropertyBagsElementChoice {
   #[sdk(child(qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
   XfpbBagExt(std::boxed::Box<BagExtensions>),
@@ -565,14 +564,14 @@ pub enum OpenXmlFeaturePropertyBagsElementChoice {
   #[sdk(child(qname = "x:CT_ExtensionList/xfpb:extLst"))]
   XfpbExtLst(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OpenXmlTableRevDxfElementChoice {
   #[sdk(child(qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
   XfpbFpbs(std::boxed::Box<FpbsFeaturePropertyBags>),
   #[sdk(child(qname = "x:CT_Dxf/xfpb:dxf"))]
   XfpbDxf(std::boxed::Box<DifferentialFormatType>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FeaturePropertyBagChoice {
   #[sdk(child(qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a"))]
   XfpbA(std::boxed::Box<ArrayFeatureProperty>),
@@ -589,7 +588,7 @@ pub enum FeaturePropertyBagChoice {
   #[sdk(child(qname = "xfpb:CT_RelFeatureProperty/xfpb:rel"))]
   XfpbRel(std::boxed::Box<RelFeatureProperty>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArrayFeaturePropertyChoice {
   #[sdk(text_child(qname = "xsd:unsignedInt/xfpb:bagId"))]
   XfpbBagId(crate::simple_type::UInt32Value),

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TargetScreenSize {
   #[sdk(rename = "544x376")]
   #[default]
@@ -35,7 +35,7 @@ pub enum TargetScreenSize {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a15:backgroundPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a15:CT_BackgroundPr/a15:backgroundPr")]
 pub struct BackgroundProperties {
   /// bwMode
@@ -79,7 +79,7 @@ pub struct BackgroundProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a15:nonVisualGroupProps.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps")]
 pub struct NonVisualGroupProperties {
   /// isLegacyGroup
@@ -95,7 +95,7 @@ pub struct NonVisualGroupProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a15:objectPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a15:CT_ObjectPr/a15:objectPr")]
 pub struct ObjectProperties {
   /// objectId
@@ -125,7 +125,7 @@ pub struct ObjectProperties {
 /// Available in Office2013 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is a15:signatureLine.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a15:CT_SignatureLine/a15:signatureLine")]
 pub struct SignatureLine {
   /// isSignatureLine

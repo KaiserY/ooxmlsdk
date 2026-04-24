@@ -9,7 +9,7 @@
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p202:designTagLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p202:CT_DesignerTagList/p202:designTagLst")]
 pub struct DesignerTagList {
   /// _
@@ -21,7 +21,7 @@ pub struct DesignerTagList {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p202:designPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p202:CT_DesignerDrawingProps/p202:designPr")]
 pub struct DesignerDrawingProps {
   /// edtDesignElem
@@ -43,7 +43,7 @@ pub struct DesignerDrawingProps {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p202:designTag.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p202:CT_DesignerTag/p202:designTag")]
 pub struct DesignerTag {
   /// name
@@ -66,7 +66,7 @@ pub struct DesignerTag {
 /// Available in Office2021 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is p202:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p202:extLst")]
 pub struct ExtensionList {
   ///Extension.

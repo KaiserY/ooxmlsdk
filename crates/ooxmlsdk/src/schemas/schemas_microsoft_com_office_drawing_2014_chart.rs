@@ -9,7 +9,7 @@
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:spPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c16:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
@@ -71,7 +71,7 @@ pub struct ShapeProperties {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:explosion.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c16:explosion")]
 pub struct UnsignedIntegerType {
   /// Integer Value
@@ -87,7 +87,7 @@ pub struct UnsignedIntegerType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:invertIfNegative.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c16:invertIfNegative")]
 pub struct InvertIfNegativeBoolean {
   /// Boolean Value
@@ -103,7 +103,7 @@ pub struct InvertIfNegativeBoolean {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:bubble3D.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c16:bubble3D")]
 pub struct Bubble3DBoolean {
   /// Boolean Value
@@ -119,7 +119,7 @@ pub struct Bubble3DBoolean {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/")]
 pub struct BooleanType {
   /// Boolean Value
@@ -135,7 +135,7 @@ pub struct BooleanType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:marker.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Marker/c16:marker")]
 pub struct Marker {
   ///Symbol
@@ -161,7 +161,7 @@ pub struct Marker {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:dLbl.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLbl/c16:dLbl")]
 pub struct DLbl {
   /// _
@@ -195,7 +195,7 @@ pub struct DLbl {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:categoryFilterExceptions.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions")]
 pub struct CategoryFilterExceptions {
   /// _
@@ -207,7 +207,7 @@ pub struct CategoryFilterExceptions {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:pivotOptions16.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_PivotOptions16/c16:pivotOptions16")]
 pub struct PivotOptions16 {
   /// _
@@ -219,7 +219,7 @@ pub struct PivotOptions16 {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:datapointuniqueidmap.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap")]
 pub struct ChartDataPointUniqueIdMap {
   /// _
@@ -231,7 +231,7 @@ pub struct ChartDataPointUniqueIdMap {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:uniqueId.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_ChartUniqueID/c16:uniqueId")]
 pub struct UniqueIdChartUniqueId {
   /// val
@@ -247,7 +247,7 @@ pub struct UniqueIdChartUniqueId {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:uniqueID.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_ChartUniqueID/c16:uniqueID")]
 pub struct UniqueId {
   /// val
@@ -263,7 +263,7 @@ pub struct UniqueId {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_ChartUniqueID/")]
 pub struct UniqueIdChart {
   /// val
@@ -279,7 +279,7 @@ pub struct UniqueIdChart {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:categoryFilterException.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_CategoryFilterException/c16:categoryFilterException")]
 pub struct CategoryFilterException {
   /// _
@@ -309,7 +309,7 @@ pub struct CategoryFilterException {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:numCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumData/c16:numCache")]
 pub struct NumberDataType {
   ///Format Code
@@ -332,7 +332,7 @@ pub struct NumberDataType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:filteredLitCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_NumFilteredLiteralCache/c16:filteredLitCache")]
 pub struct NumFilteredLiteralCache {
   /// _
@@ -344,7 +344,7 @@ pub struct NumFilteredLiteralCache {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:strCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/c16:strCache")]
 pub struct StringDataType {
   /// _
@@ -364,7 +364,7 @@ pub struct StringDataType {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:filteredLitCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_StrFilteredLiteralCache/c16:filteredLitCache")]
 pub struct StrFilteredLiteralCache {
   /// _
@@ -376,7 +376,7 @@ pub struct StrFilteredLiteralCache {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:multiLvlStrCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache")]
 pub struct MultiLvlStrData {
   /// _
@@ -396,7 +396,7 @@ pub struct MultiLvlStrData {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:filteredLitCache.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_MultiLvlStrFilteredLiteralCache/c16:filteredLitCache")]
 pub struct MultiLvlStrFilteredLiteralCache {
   /// _
@@ -408,7 +408,7 @@ pub struct MultiLvlStrFilteredLiteralCache {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:literalDataChart.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_LiteralDataChart/c16:literalDataChart")]
 pub struct LiteralDataChart {
   /// val
@@ -424,7 +424,7 @@ pub struct LiteralDataChart {
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:showExpandCollapseFieldButtons.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_BooleanFalse/c16:showExpandCollapseFieldButtons")]
 pub struct BooleanFalse {
   /// val
@@ -446,7 +446,7 @@ pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 /// Available in Office2016 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is c16:ptentry.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry")]
 pub struct ChartDataPointUniqueIdMapEntry {
   /// _
@@ -456,7 +456,7 @@ pub struct ChartDataPointUniqueIdMapEntry {
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueID"))]
   pub unique_id: std::boxed::Box<UniqueId>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
@@ -467,7 +467,7 @@ pub enum ShapePropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -492,7 +492,7 @@ pub enum ShapePropertiesChoice2 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
   ),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
@@ -503,7 +503,7 @@ pub enum ShapePropertiesChoice3 {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
   ),
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct DLblChoiceSequence {
   ///Layout.
   #[sdk(child(qname = "c:CT_Layout/c:layout"))]
@@ -565,7 +565,7 @@ pub struct DLblChoiceSequence {
   #[sdk(text_child(qname = "xsd:string/c:separator"))]
   pub separator: Option<crate::simple_type::StringValue>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblChoice {
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Delete>),

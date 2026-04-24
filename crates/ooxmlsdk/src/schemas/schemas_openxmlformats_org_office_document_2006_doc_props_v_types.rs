@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum VectorBaseValues {
   #[sdk(rename = "variant")]
   #[default]
@@ -50,7 +50,7 @@ pub enum VectorBaseValues {
   #[sdk(rename = "cf")]
   ClipboardData,
 }
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ArrayBaseValues {
   #[sdk(rename = "variant")]
   #[default]
@@ -93,7 +93,7 @@ pub enum ArrayBaseValues {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:variant.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Variant/vt:variant")]
 pub struct Variant {
   #[sdk(choice(
@@ -140,7 +140,7 @@ pub struct Variant {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:vector.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Vector/vt:vector")]
 pub struct VtVector {
   /// Vector Base Type
@@ -187,7 +187,7 @@ pub struct VtVector {
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:array.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Array/vt:array")]
 pub struct VtArray {
   /// Array Lower Bounds Attribute
@@ -273,7 +273,7 @@ pub type VtoStorage = crate::simple_type::Base64BinaryValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:empty.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Empty/vt:empty")]
 pub struct VtEmpty {}
 /// Null.
@@ -281,7 +281,7 @@ pub struct VtEmpty {}
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:null.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Null/vt:null")]
 pub struct VtNull {}
 /// 1-Byte Signed Integer.
@@ -415,7 +415,7 @@ pub type VtError = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:vstream.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Vstream/vt:vstream")]
 pub struct VtvStreamData {
   /// VSTREAM Version Attribute
@@ -443,7 +443,7 @@ pub type VtClassId = crate::simple_type::StringValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:cf.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "vt:CT_Cf/vt:cf")]
 pub struct VtClipboardData {
   /// Format Attribute
@@ -464,7 +464,7 @@ pub struct VtClipboardData {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::Base64BinaryValue>,
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VariantChoice {
   #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   VtVariant(std::boxed::Box<Variant>),
@@ -537,7 +537,7 @@ pub enum VariantChoice {
   #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtCf(std::boxed::Box<VtClipboardData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VtVectorChoice {
   #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   VtVariant(std::boxed::Box<Variant>),
@@ -582,7 +582,7 @@ pub enum VtVectorChoice {
   #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtCf(std::boxed::Box<VtClipboardData>),
 }
-#[derive(Clone, Debug, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VtArrayChoice {
   #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   VtVariant(std::boxed::Box<Variant>),

@@ -9,7 +9,7 @@
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdip:customPropertyEditors.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdip:CT_CustomPropertyEditors/cdip:customPropertyEditors")]
 pub struct CustomPropertyEditors {
   /// _
@@ -51,7 +51,7 @@ pub type ShowOnOpen = crate::simple_type::BooleanValue;
 /// Available in Office2007 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is cdip:customPropertyEditor.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdip:CT_CustomPropertyEditor/cdip:customPropertyEditor")]
 pub struct CustomPropertyEditor {
   /// _

@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 //
 
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum Indefinite {
   #[sdk(rename = "indefinite")]
   #[default]
@@ -15,7 +15,7 @@ pub enum Indefinite {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is aanim:animPr.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "aanim:CT_AnimationProperties/aanim:animPr")]
 pub struct AnimationProperties {
   /// name
@@ -78,7 +78,7 @@ pub struct AnimationProperties {
 /// Available in Office2019 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is aanim:extLst.
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkType)]
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/aanim:extLst")]
 pub struct OfficeArtExtensionList {
   ///Extension.

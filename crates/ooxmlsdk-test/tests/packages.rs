@@ -3,8 +3,9 @@
 use std::io::Cursor;
 
 use ooxmlsdk::parts::{
-  PartRef, main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  spreadsheet_document::SpreadsheetDocument, wordprocessing_document::WordprocessingDocument,
+  PartRef, PartRootCache, main_document_part::MainDocumentPart,
+  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
+  style_definitions_part::StyleDefinitionsPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::sdk::SdkPartHandle;
 use ooxmlsdk_test::fixtures;
@@ -44,35 +45,61 @@ fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
 fn package_relationships_resolve_with_container_local_part_factory() {
   let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
+  let main_part_id = package.get_id_of_part(main_part).unwrap();
 
   let resolved = package
-    .get_part_by_id(
-      package
-        .relationships()
-        .iter()
-        .find(|relationship| {
-          ooxmlsdk::common::relationship_type_matches(
-            relationship.relationship_type(),
-            MainDocumentPart::RELATIONSHIP_TYPE,
-          )
-        })
-        .unwrap()
-        .id(),
-    )
+    .try_get_part_by_id(main_part_id)
     .and_then(PartRef::downcast::<MainDocumentPart>)
     .unwrap();
 
   assert_eq!(resolved.part_id(), main_part.part_id());
   assert_eq!(package.parts().count(), package.relationships().len());
+  assert_eq!(
+    package
+      .get_sub_part_of_type::<MainDocumentPart>()
+      .unwrap()
+      .part_id(),
+    main_part.part_id()
+  );
+  assert_eq!(package.get_parts_of_type::<MainDocumentPart>().count(), 1);
 }
 
 #[test]
 fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
+  let styles_part = main_part.style_definitions_part(&package).unwrap();
 
   assert!(main_part.relationships(&package).is_some());
-  assert!(main_part.style_definitions_part(&package).is_some());
+  assert_eq!(
+    main_part.get_id_of_part(&package, styles_part),
+    main_part
+      .relationships(&package)
+      .unwrap()
+      .iter()
+      .find(|relationship| {
+        ooxmlsdk::common::relationship_type_matches(
+          relationship.relationship_type(),
+          StyleDefinitionsPart::RELATIONSHIP_TYPE,
+        )
+      })
+      .map(|relationship| relationship.id())
+  );
+  assert_eq!(
+    main_part
+      .get_sub_part_of_type::<_, StyleDefinitionsPart>(&package)
+      .unwrap()
+      .part_id(),
+    styles_part.part_id()
+  );
+  assert!(styles_part.path(&package).unwrap().ends_with("styles.xml"));
+  assert!(
+    styles_part
+      .content_type(&package)
+      .unwrap()
+      .ends_with("+xml")
+  );
+  assert!(!styles_part.data(&package).unwrap().is_empty());
   assert!(main_part.document_settings_part(&package).is_some());
   assert_eq!(
     main_part
@@ -81,6 +108,19 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
       .count(),
     0
   );
+}
+
+#[test]
+fn root_cache_reports_and_unloads_lazy_roots() {
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let part_id = main_part.part_id();
+
+  assert!(!package.is_root_element_loaded(part_id));
+  assert!(main_part.root_element(&mut package).is_ok());
+  assert!(package.is_root_element_loaded(part_id));
+  assert!(package.unload_root_element(part_id).is_some());
+  assert!(!package.is_root_element_loaded(part_id));
 }
 
 #[test]

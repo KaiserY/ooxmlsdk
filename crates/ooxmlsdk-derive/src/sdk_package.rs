@@ -296,6 +296,28 @@ fn package_relationship_method_tokens(
       Self::part_ref_from_relationship(relationship)
     }
 
+    #[inline]
+    pub fn try_get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
+      self.get_part_by_id(relationship_id)
+    }
+
+    pub fn get_parts_of_type<T: crate::sdk::SdkPartHandle + 'static>(
+      &self,
+    ) -> impl Iterator<Item = T> + '_ {
+      self.parts().filter_map(|entry| entry.part.downcast::<T>())
+    }
+
+    pub fn get_sub_part_of_type<T: crate::sdk::SdkPartHandle + 'static>(&self) -> Option<T> {
+      self.get_parts_of_type::<T>().next()
+    }
+
+    pub fn get_id_of_part<T: crate::sdk::SdkPartHandle>(&self, part: T) -> Option<&str> {
+      let target_part_id = part.part_id();
+      self.relationships().iter().find_map(|relationship| {
+        (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
+      })
+    }
+
     fn part_ref_from_relationship(
       relationship: &crate::common::RelationshipInfo,
     ) -> Option<crate::parts::PartRef> {

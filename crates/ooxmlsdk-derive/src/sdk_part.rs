@@ -1018,6 +1018,29 @@ fn expand_part_handle(
       ) -> Option<&crate::common::RelationshipSet> {
         <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
       }
+
+      #[inline]
+      pub fn path<P: crate::sdk::SdkPackage>(self, package: &P) -> Option<&str> {
+        <Self as crate::sdk::SdkPartHandle>::path(self, package)
+      }
+
+      #[inline]
+      pub fn content_type<P: crate::sdk::SdkPackage>(self, package: &P) -> Option<&str> {
+        <Self as crate::sdk::SdkPartHandle>::content_type(self, package)
+      }
+
+      #[inline]
+      pub fn data_kind<P: crate::sdk::SdkPackage>(
+        self,
+        package: &P,
+      ) -> Option<crate::common::StoredPartDataKind> {
+        <Self as crate::sdk::SdkPartHandle>::data_kind(self, package)
+      }
+
+      #[inline]
+      pub fn data<P: crate::sdk::SdkPackage>(self, package: &P) -> Option<&[u8]> {
+        <Self as crate::sdk::SdkPartHandle>::data(self, package)
+      }
     }
 
     #root_method
@@ -1187,6 +1210,43 @@ fn part_handle_child_methods_tokens(
       ) -> Option<crate::parts::PartRef> {
         let relationship = self.relationships(package)?.get(relationship_id)?;
         Self::part_ref_from_relationship(relationship)
+      }
+
+      #[inline]
+      pub fn try_get_part_by_id<P: crate::sdk::SdkPackage>(
+        self,
+        package: &P,
+        relationship_id: &str,
+      ) -> Option<crate::parts::PartRef> {
+        self.get_part_by_id(package, relationship_id)
+      }
+
+      pub fn get_parts_of_type<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle + 'static>(
+        self,
+        package: &P,
+      ) -> impl Iterator<Item = T> + '_ {
+        self.parts(package).filter_map(|entry| entry.part.downcast::<T>())
+      }
+
+      pub fn get_sub_part_of_type<
+        P: crate::sdk::SdkPackage,
+        T: crate::sdk::SdkPartHandle + 'static,
+      >(
+        self,
+        package: &P,
+      ) -> Option<T> {
+        self.get_parts_of_type::<P, T>(package).next()
+      }
+
+      pub fn get_id_of_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        self,
+        package: &P,
+        part: T,
+      ) -> Option<&str> {
+        let target_part_id = part.part_id();
+        self.relationships(package)?.iter().find_map(|relationship| {
+          (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
+        })
       }
 
       #part_ref_from_relationship

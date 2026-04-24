@@ -375,6 +375,19 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         &mut self,
         part_id: crate::common::PartId,
       ) -> Option<&mut Option<crate::parts::PartRootElement>>;
+
+      #[inline]
+      fn is_root_element_loaded(&self, part_id: crate::common::PartId) -> bool {
+        self.root_element(part_id).is_some()
+      }
+
+      #[inline]
+      fn unload_root_element(
+        &mut self,
+        part_id: crate::common::PartId,
+      ) -> Option<crate::parts::PartRootElement> {
+        self.root_element_slot_mut(part_id)?.take()
+      }
     }
 
     #( #package_root_cache_impls )*

@@ -11,6 +11,7 @@ use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
+use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
 use ooxmlsdk_test::fixtures::doc_sample_path;
 use quick_xml::{Reader, escape::unescape, events::Event};
 use zip::ZipArchive;
@@ -63,9 +64,30 @@ fn assert_doc_sample_invalid(file_name: &str) {
   let path = test_file_path(file_name);
 
   let result = match kind {
-    DocSampleKind::Wordprocessing => WordprocessingDocument::new_from_file(&path).map(|_| ()),
-    DocSampleKind::Spreadsheet => SpreadsheetDocument::new_from_file(&path).map(|_| ()),
-    DocSampleKind::Presentation => PresentationDocument::new_from_file(&path).map(|_| ()),
+    DocSampleKind::Wordprocessing => {
+      WordprocessingDocument::new_from_file(&path).and_then(|mut package| {
+        package
+          .main_document_part()?
+          .root_element(&mut package)
+          .map(|_| ())
+      })
+    }
+    DocSampleKind::Spreadsheet => {
+      SpreadsheetDocument::new_from_file(&path).and_then(|mut package| {
+        package
+          .workbook_part()?
+          .root_element(&mut package)
+          .map(|_| ())
+      })
+    }
+    DocSampleKind::Presentation => {
+      PresentationDocument::new_from_file(&path).and_then(|mut package| {
+        package
+          .presentation_part()?
+          .root_element(&mut package)
+          .map(|_| ())
+      })
+    }
   };
 
   assert!(
@@ -81,15 +103,21 @@ fn assert_doc_sample_opens(file_name: &str) {
   match kind {
     DocSampleKind::Wordprocessing => {
       let package = WordprocessingDocument::new_from_file(&path).unwrap();
-      assert_eq!(package.main_document_part.inner_path, "word/document.xml");
+      let main_part = package.main_document_part().unwrap();
+      assert_eq!(part_path(&package, main_part), "word/document.xml");
     }
     DocSampleKind::Spreadsheet => {
       let package = SpreadsheetDocument::new_from_file(&path).unwrap();
-      assert_eq!(package.workbook_part.inner_path, "xl/workbook.xml");
+      let workbook_part = package.workbook_part().unwrap();
+      assert_eq!(part_path(&package, workbook_part), "xl/workbook.xml");
     }
     DocSampleKind::Presentation => {
       let package = PresentationDocument::new_from_file(&path).unwrap();
-      assert_eq!(package.presentation_part.inner_path, "ppt/presentation.xml");
+      let presentation_part = package.presentation_part().unwrap();
+      assert_eq!(
+        part_path(&package, presentation_part),
+        "ppt/presentation.xml"
+      );
     }
   }
 }
@@ -98,32 +126,23 @@ fn assert_wordprocessing_document_round_trip(
   original: &WordprocessingDocument,
   roundtripped: &WordprocessingDocument,
 ) {
-  assert_eq!(original.inner_path, roundtripped.inner_path);
+  let original_main = original.main_document_part().unwrap();
+  let roundtripped_main = roundtripped.main_document_part().unwrap();
   assert_eq!(
-    original.main_document_part.inner_path,
-    roundtripped.main_document_part.inner_path
+    part_path(original, original_main),
+    part_path(roundtripped, roundtripped_main)
   );
   assert_eq!(
-    original
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len()),
-    roundtripped
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len())
+    original.relationships().len(),
+    roundtripped.relationships().len()
   );
   assert_eq!(
-    original
-      .main_document_part
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len()),
-    roundtripped
-      .main_document_part
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len())
+    original_main
+      .relationships(original)
+      .map(ooxmlsdk::common::RelationshipSet::len),
+    roundtripped_main
+      .relationships(roundtripped)
+      .map(ooxmlsdk::common::RelationshipSet::len)
   );
 }
 
@@ -131,36 +150,27 @@ fn assert_spreadsheet_document_round_trip(
   original: &SpreadsheetDocument,
   roundtripped: &SpreadsheetDocument,
 ) {
-  assert_eq!(original.inner_path, roundtripped.inner_path);
+  let original_workbook = original.workbook_part().unwrap();
+  let roundtripped_workbook = roundtripped.workbook_part().unwrap();
   assert_eq!(
-    original.workbook_part.inner_path,
-    roundtripped.workbook_part.inner_path
+    part_path(original, original_workbook),
+    part_path(roundtripped, roundtripped_workbook)
   );
   assert_eq!(
-    original
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len()),
-    roundtripped
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len())
+    original.relationships().len(),
+    roundtripped.relationships().len()
   );
   assert_eq!(
-    original
-      .workbook_part
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len()),
-    roundtripped
-      .workbook_part
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len())
+    original_workbook
+      .relationships(original)
+      .map(ooxmlsdk::common::RelationshipSet::len),
+    roundtripped_workbook
+      .relationships(roundtripped)
+      .map(ooxmlsdk::common::RelationshipSet::len)
   );
   assert_eq!(
-    original.workbook_part.worksheet_parts.len(),
-    roundtripped.workbook_part.worksheet_parts.len()
+    original_workbook.worksheet_parts(original).count(),
+    roundtripped_workbook.worksheet_parts(roundtripped).count()
   );
 }
 
@@ -168,41 +178,42 @@ fn assert_presentation_document_round_trip(
   original: &PresentationDocument,
   roundtripped: &PresentationDocument,
 ) {
-  assert_eq!(original.inner_path, roundtripped.inner_path);
+  let original_presentation = original.presentation_part().unwrap();
+  let roundtripped_presentation = roundtripped.presentation_part().unwrap();
   assert_eq!(
-    original.presentation_part.inner_path,
-    roundtripped.presentation_part.inner_path
+    part_path(original, original_presentation),
+    part_path(roundtripped, roundtripped_presentation)
   );
   assert_eq!(
-    original
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len()),
-    roundtripped
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len())
+    original.relationships().len(),
+    roundtripped.relationships().len()
   );
   assert_eq!(
-    original
-      .presentation_part
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len()),
-    roundtripped
-      .presentation_part
-      .relationships
-      .as_ref()
-      .map(|relationships| relationships.relationship.len())
+    original_presentation
+      .relationships(original)
+      .map(ooxmlsdk::common::RelationshipSet::len),
+    roundtripped_presentation
+      .relationships(roundtripped)
+      .map(ooxmlsdk::common::RelationshipSet::len)
   );
   assert_eq!(
-    original.presentation_part.slide_parts.len(),
-    roundtripped.presentation_part.slide_parts.len()
+    original_presentation.slide_parts(original).count(),
+    roundtripped_presentation.slide_parts(roundtripped).count()
   );
   assert_eq!(
-    original.presentation_part.slide_master_parts.len(),
-    roundtripped.presentation_part.slide_master_parts.len()
+    original_presentation.slide_master_parts(original).count(),
+    roundtripped_presentation
+      .slide_master_parts(roundtripped)
+      .count()
   );
+}
+
+fn part_path<P, T>(package: &P, part: T) -> &str
+where
+  P: SdkPackage,
+  T: SdkPartHandle,
+{
+  package.storage().part(part.part_id()).unwrap().path()
 }
 
 fn doc_sample_kind(file_name: &str) -> DocSampleKind {

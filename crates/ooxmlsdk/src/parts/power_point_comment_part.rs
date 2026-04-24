@@ -7,13 +7,11 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2018/10/relationships/comments";
 pub const PATH_PREFIX: &str = "../comments";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PowerPointCommentPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element:
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_power_point_comment_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::CommentList,
+  >,
 }

@@ -91,6 +91,7 @@ impl ExtendedPart {
     })
   }
 
+  #[allow(dead_code)]
   pub(crate) fn save_zip<W: Write + Seek>(
     &self,
     parent_path: &str,

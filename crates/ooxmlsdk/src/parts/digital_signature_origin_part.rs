@@ -7,13 +7,13 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin";
 pub const PATH_PREFIX: &str = "_xmlsignatures";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DigitalSignatureOriginPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub part_content: Vec<u8>,
-  pub xml_signature_parts: Vec<crate::parts::xml_signature_part::XmlSignaturePart>,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+    kind = "repeated"
+  ))]
+  pub(crate) xml_signature_parts:
+    crate::sdk::PartChild<crate::parts::xml_signature_part::XmlSignaturePart>,
 }

@@ -7,12 +7,10 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties";
 pub const PATH_PREFIX: &str = "docProps";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CoreFilePropertiesPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element: crate::schemas::opc_core_properties::CoreProperties,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_core_file_properties_part"))]
+  pub(crate) root_element:
+    crate::sdk::PartRoot<crate::schemas::opc_core_properties::CoreProperties>,
 }

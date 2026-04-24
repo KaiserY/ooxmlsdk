@@ -11,6 +11,7 @@ use syn::{
 
 mod sdk_choice;
 mod sdk_enum;
+mod sdk_package;
 mod sdk_part;
 mod sdk_type;
 
@@ -45,6 +46,15 @@ pub fn sdk_choice(input: TokenStream) -> TokenStream {
 pub fn sdk_part(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match sdk_part::expand_sdk_part(&input) {
+    Ok(tokens) => tokens.into(),
+    Err(err) => err.to_compile_error().into(),
+  }
+}
+
+#[proc_macro_derive(SdkPackage, attributes(sdk))]
+pub fn sdk_package(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  match sdk_package::expand_sdk_package(&input) {
     Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }

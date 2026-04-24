@@ -28,4 +28,27 @@ mod tests {
       .expect("failed to generate sdk data");
     sdk_code::gen_sdk_code(&sdk_data_dir, &runtime_src_dir).expect("failed to generate sdk code");
   }
+
+  #[test]
+  fn test_gen_sdk_code_to_temp_dir() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+      .parent()
+      .and_then(|path| path.parent())
+      .expect("workspace root");
+    let sdk_data_dir = workspace_root.join("sdk_data");
+    let out_dir = std::env::temp_dir().join(format!("ooxmlsdk-gen-{}", std::process::id()));
+
+    if out_dir.exists() {
+      std::fs::remove_dir_all(&out_dir).expect("failed to clear temp generated dir");
+    }
+    std::fs::create_dir_all(&out_dir).expect("failed to create temp generated dir");
+
+    sdk_code::gen_sdk_code(&sdk_data_dir, &out_dir).expect("failed to generate sdk code");
+
+    assert!(out_dir.join("parts.rs").is_file());
+    assert!(out_dir.join("parts/wordprocessing_document.rs").is_file());
+
+    std::fs::remove_dir_all(&out_dir).expect("failed to remove temp generated dir");
+  }
 }

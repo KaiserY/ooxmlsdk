@@ -7,13 +7,16 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing";
 pub const PATH_PREFIX: &str = "../diagrams";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DiagramPersistLayoutPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element: crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing,
-  pub image_parts: Vec<crate::parts::image_part::ImagePart>,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_diagram_persist_layout_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
+    crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing,
+  >,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
+  ))]
+  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
 }

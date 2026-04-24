@@ -6,6 +6,96 @@ pub struct PartDescriptor {
 }
 
 #[cfg(feature = "parts")]
+pub struct PartChild<T>(std::marker::PhantomData<T>);
+
+#[cfg(feature = "parts")]
+impl<T> PartChild<T> {
+  #[inline]
+  pub const fn new() -> Self {
+    Self(std::marker::PhantomData)
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Clone for PartChild<T> {
+  fn clone(&self) -> Self {
+    *self
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Copy for PartChild<T> {}
+
+#[cfg(feature = "parts")]
+impl<T> std::fmt::Debug for PartChild<T> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_tuple("PartChild").finish()
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Default for PartChild<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Eq for PartChild<T> {}
+
+#[cfg(feature = "parts")]
+impl<T> PartialEq for PartChild<T> {
+  fn eq(&self, _other: &Self) -> bool {
+    true
+  }
+}
+
+#[cfg(feature = "parts")]
+pub struct PartRoot<T>(std::marker::PhantomData<T>);
+
+#[cfg(feature = "parts")]
+impl<T> PartRoot<T> {
+  #[inline]
+  pub const fn new() -> Self {
+    Self(std::marker::PhantomData)
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Clone for PartRoot<T> {
+  fn clone(&self) -> Self {
+    *self
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Copy for PartRoot<T> {}
+
+#[cfg(feature = "parts")]
+impl<T> std::fmt::Debug for PartRoot<T> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_tuple("PartRoot").finish()
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Default for PartRoot<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<T> Eq for PartRoot<T> {}
+
+#[cfg(feature = "parts")]
+impl<T> PartialEq for PartRoot<T> {
+  fn eq(&self, _other: &Self) -> bool {
+    true
+  }
+}
+
+#[cfg(feature = "parts")]
 impl PartDescriptor {
   pub const fn new(relationship_type: &'static str, path_prefix: &'static str) -> Self {
     Self {
@@ -48,6 +138,52 @@ pub trait SdkChoice: Sized {
   #[inline]
   fn from_text_value(_value: &str) -> Option<Self> {
     None
+  }
+}
+
+#[cfg(feature = "parts")]
+pub trait SdkPackage {
+  fn storage(&self) -> &crate::common::SdkPackageStorage;
+
+  fn storage_mut(&mut self) -> &mut crate::common::SdkPackageStorage;
+
+  fn main_part_id(&self) -> Option<crate::common::PartId>;
+}
+
+#[cfg(feature = "parts")]
+pub trait SdkPartHandle: Copy + Sized + 'static {
+  const DESCRIPTOR: PartDescriptor;
+  const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
+  const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
+
+  fn from_part_id(part_id: crate::common::PartId) -> Self;
+
+  fn part_id(self) -> crate::common::PartId;
+
+  #[inline(always)]
+  fn relationship_type() -> &'static str {
+    Self::RELATIONSHIP_TYPE
+  }
+
+  #[inline(always)]
+  fn path_prefix() -> &'static str {
+    Self::PATH_PREFIX
+  }
+
+  #[inline]
+  fn relationships<P: SdkPackage>(self, package: &P) -> Option<&crate::common::RelationshipSet> {
+    package.storage().relationships(self.part_id())
+  }
+
+  #[inline]
+  fn target_part_id<P: SdkPackage>(
+    self,
+    package: &P,
+    relationship_id: &str,
+  ) -> Option<crate::common::PartId> {
+    package
+      .storage()
+      .target_part_id(self.part_id(), relationship_id)
   }
 }
 

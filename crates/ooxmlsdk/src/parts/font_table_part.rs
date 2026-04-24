@@ -7,13 +7,16 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable";
 pub const PATH_PREFIX: &str = ".";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct FontTablePart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element: crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
-  pub font_parts: Vec<crate::parts::font_part::FontPart>,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_font_table_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
+    crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
+  >,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    kind = "repeated"
+  ))]
+  pub(crate) font_parts: crate::sdk::PartChild<crate::parts::font_part::FontPart>,
 }

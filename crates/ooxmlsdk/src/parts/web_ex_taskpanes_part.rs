@@ -7,15 +7,18 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes";
 pub const PATH_PREFIX: &str = "../webextensions";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebExTaskpanesPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element:
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_web_ex_taskpanes_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
+  >,
   #[cfg(feature = "microsoft365")]
-  pub web_extension_parts: Vec<crate::parts::web_extension_part::WebExtensionPart>,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension",
+    kind = "repeated"
+  ))]
+  pub(crate) web_extension_parts:
+    crate::sdk::PartChild<crate::parts::web_extension_part::WebExtensionPart>,
 }

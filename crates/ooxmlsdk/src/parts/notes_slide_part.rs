@@ -7,57 +7,170 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
 pub const PATH_PREFIX: &str = "../notesSlides";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct NotesSlidePart {
-    pub r_id: String,
-    pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-    pub rels_path: String,
-    pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-    pub inner_path: String,
-    pub root_element: crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesSlide,
-    pub custom_xml_parts: Vec<crate::parts::custom_xml_part::CustomXmlPart>,
-    pub audio_reference_relationships: Vec<
-        crate::common::data_part::AudioReferenceRelationship,
+    pub(crate) id: crate::common::PartId,
+    #[sdk(part_root(accessor = "as_notes_slide_part"))]
+    pub(crate) root_element: crate::sdk::PartRoot<
+        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesSlide,
     >,
-    pub chart_parts: Vec<crate::parts::chart_part::ChartPart>,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) custom_xml_parts: crate::sdk::PartChild<
+        crate::parts::custom_xml_part::CustomXmlPart,
+    >,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) chart_parts: crate::sdk::PartChild<crate::parts::chart_part::ChartPart>,
     #[cfg(feature = "microsoft365")]
-    pub extended_chart_parts: Vec<crate::parts::extended_chart_part::ExtendedChartPart>,
-    pub diagram_colors_parts: Vec<crate::parts::diagram_colors_part::DiagramColorsPart>,
-    pub diagram_data_parts: Vec<crate::parts::diagram_data_part::DiagramDataPart>,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) extended_chart_parts: crate::sdk::PartChild<
+        crate::parts::extended_chart_part::ExtendedChartPart,
+    >,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) diagram_colors_parts: crate::sdk::PartChild<
+        crate::parts::diagram_colors_part::DiagramColorsPart,
+    >,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) diagram_data_parts: crate::sdk::PartChild<
+        crate::parts::diagram_data_part::DiagramDataPart,
+    >,
     #[cfg(feature = "microsoft365")]
-    pub diagram_persist_layout_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) diagram_persist_layout_parts: crate::sdk::PartChild<
         crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart,
     >,
-    pub diagram_layout_definition_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) diagram_layout_definition_parts: crate::sdk::PartChild<
         crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
     >,
-    pub diagram_style_parts: Vec<crate::parts::diagram_style_part::DiagramStylePart>,
-    pub embedded_object_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) diagram_style_parts: crate::sdk::PartChild<
+        crate::parts::diagram_style_part::DiagramStylePart,
+    >,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) embedded_object_parts: crate::sdk::PartChild<
         crate::parts::embedded_object_part::EmbeddedObjectPart,
     >,
-    pub embedded_package_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) embedded_package_parts: crate::sdk::PartChild<
         crate::parts::embedded_package_part::EmbeddedPackagePart,
     >,
-    pub image_parts: Vec<crate::parts::image_part::ImagePart>,
-    pub video_reference_relationships: Vec<
-        crate::common::data_part::VideoReferenceRelationship,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) vml_drawing_parts: crate::sdk::PartChild<
+        crate::parts::vml_drawing_part::VmlDrawingPart,
     >,
-    pub vml_drawing_parts: Vec<crate::parts::vml_drawing_part::VmlDrawingPart>,
-    pub embedded_control_persistence_binary_data_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) embedded_control_persistence_binary_data_parts: crate::sdk::PartChild<
         crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
     >,
     #[cfg(feature = "microsoft365")]
-    pub model3_d_reference_relationship_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) model3_d_reference_relationship_parts: crate::sdk::PartChild<
         crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
     >,
-    pub notes_master_part: Option<
-        std::boxed::Box<crate::parts::notes_master_part::NotesMasterPart>,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+            kind = "optional"
+        )
+    )]
+    pub(crate) notes_master_part: crate::sdk::PartChild<
+        crate::parts::notes_master_part::NotesMasterPart,
     >,
-    pub theme_override_part: Option<
-        std::boxed::Box<crate::parts::theme_override_part::ThemeOverridePart>,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
+            kind = "optional"
+        )
+    )]
+    pub(crate) theme_override_part: crate::sdk::PartChild<
+        crate::parts::theme_override_part::ThemeOverridePart,
     >,
-    pub slide_part: Option<std::boxed::Box<crate::parts::slide_part::SlidePart>>,
-    pub user_defined_tags_parts: Vec<
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+            kind = "optional"
+        )
+    )]
+    pub(crate) slide_part: crate::sdk::PartChild<crate::parts::slide_part::SlidePart>,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) user_defined_tags_parts: crate::sdk::PartChild<
         crate::parts::user_defined_tags_part::UserDefinedTagsPart,
     >,
 }

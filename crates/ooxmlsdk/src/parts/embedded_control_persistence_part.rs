@@ -7,15 +7,16 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control";
 pub const PATH_PREFIX: &str = "embeddings";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct EmbeddedControlPersistencePart {
-    pub r_id: String,
-    pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-    pub rels_path: String,
-    pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-    pub inner_path: String,
-    pub part_content: Vec<u8>,
-    pub embedded_control_persistence_binary_data_parts: Vec<
+    pub(crate) id: crate::common::PartId,
+    #[sdk(
+        part_child(
+            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+            kind = "repeated"
+        )
+    )]
+    pub(crate) embedded_control_persistence_binary_data_parts: crate::sdk::PartChild<
         crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
     >,
 }

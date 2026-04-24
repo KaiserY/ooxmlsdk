@@ -8,8 +8,15 @@ use heck::ToUpperCamelCase;
 pub struct PartModuleDecl {
   pub module_name: String,
   pub struct_name: String,
+  pub content_type: String,
   pub relationship_type: String,
   pub path_prefix: String,
+  pub is_package: bool,
+  pub main_part_module_name: Option<String>,
+  pub main_part_struct_name: Option<String>,
+  pub main_part_accessor_name: Option<String>,
+  pub root_element_type: Option<String>,
+  pub root_element_accessor_name: Option<String>,
   pub version: String,
   pub features: Vec<String>,
   pub fields: Vec<PartFieldDecl>,
@@ -149,12 +156,32 @@ pub fn build_part_codegen_ir(part: &Part, all_parts: &[Part]) -> PartModuleDecl 
   PartModuleDecl {
     module_name: part.module_name.clone(),
     struct_name: part.name.clone(),
+    content_type: part.content_type.clone(),
     relationship_type: part.relationship_type.clone(),
     path_prefix: part.paths.general.clone(),
+    is_package: part.base == "OpenXmlPackage",
+    main_part_module_name: package_main_child(part).map(|child| child.name.to_snake_case()),
+    main_part_struct_name: package_main_child(part).map(|child| child.name.clone()),
+    main_part_accessor_name: package_main_child(part).map(|child| child.api_name.to_snake_case()),
+    root_element_type: part_root_element_type(part),
+    root_element_accessor_name: part_root_element_type(part)
+      .map(|_| format!("as_{}", part.name.to_snake_case())),
     version: part.version.clone(),
     features: part.features.clone(),
     fields,
   }
+}
+
+fn package_main_child(part: &Part) -> Option<&PartChild> {
+  if part.base != "OpenXmlPackage" {
+    return None;
+  }
+
+  part
+    .children
+    .iter()
+    .find(|child| child.min_occurs_is_non_zero)
+    .or_else(|| part.children.first())
 }
 
 fn build_part_child_field_decl(child: &PartChild, all_parts: &[Part]) -> PartFieldDecl {
@@ -256,6 +283,10 @@ fn part_root_rust_type(part: &Part) -> String {
       part.root_class_name.to_upper_camel_case()
     )
   }
+}
+
+fn part_root_element_type(part: &Part) -> Option<String> {
+  matches!(part.content_kind, PartContentKind::Xml).then(|| part_root_rust_type(part))
 }
 
 trait ToSnakeCaseLocal {

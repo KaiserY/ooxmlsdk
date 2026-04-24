@@ -7,12 +7,11 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage";
 pub const PATH_PREFIX: &str = "richData";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdRichValueWebImagePart {
-    pub r_id: String,
-    pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-    pub rels_path: String,
-    pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-    pub inner_path: String,
-    pub root_element: crate::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
+    pub(crate) id: crate::common::PartId,
+    #[sdk(part_root(accessor = "as_rd_rich_value_web_image_part"))]
+    pub(crate) root_element: crate::sdk::PartRoot<
+        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
+    >,
 }

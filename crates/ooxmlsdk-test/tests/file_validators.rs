@@ -4,6 +4,7 @@ use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
+use ooxmlsdk::validator::SdkValidator;
 use ooxmlsdk_test::fixtures;
 
 fn test_file_path(file_name: &str) -> std::path::PathBuf {
@@ -13,18 +14,33 @@ fn test_file_path(file_name: &str) -> std::path::PathBuf {
 }
 
 fn assert_presentation_document_validates(file_name: &str) {
-  let package = PresentationDocument::new_from_file(test_file_path(file_name)).unwrap();
-  package.presentation_part.validate().unwrap();
+  let mut package = PresentationDocument::new_from_file(test_file_path(file_name)).unwrap();
+  let presentation_part = package.presentation_part().unwrap();
+  presentation_part
+    .root_element(&mut package)
+    .unwrap()
+    .validate()
+    .unwrap();
 }
 
 fn assert_spreadsheet_document_validates(file_name: &str) {
-  let package = SpreadsheetDocument::new_from_file(test_file_path(file_name)).unwrap();
-  package.workbook_part.validate().unwrap();
+  let mut package = SpreadsheetDocument::new_from_file(test_file_path(file_name)).unwrap();
+  let workbook_part = package.workbook_part().unwrap();
+  workbook_part
+    .root_element(&mut package)
+    .unwrap()
+    .validate()
+    .unwrap();
 }
 
 fn assert_wordprocessing_document_validates(file_name: &str) {
-  let package = WordprocessingDocument::new_from_file(test_file_path(file_name)).unwrap();
-  package.main_document_part.validate().unwrap();
+  let mut package = WordprocessingDocument::new_from_file(test_file_path(file_name)).unwrap();
+  let main_document_part = package.main_document_part().unwrap();
+  main_document_part
+    .root_element(&mut package)
+    .unwrap()
+    .validate()
+    .unwrap();
 }
 
 #[cfg(feature = "microsoft365")]

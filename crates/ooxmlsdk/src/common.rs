@@ -7,6 +7,8 @@ mod error;
 #[cfg(feature = "parts")]
 pub mod extended_part;
 #[cfg(feature = "parts")]
+pub mod package;
+#[cfg(feature = "parts")]
 mod part;
 mod xml;
 
@@ -20,6 +22,11 @@ pub use error::{
 };
 #[cfg(feature = "parts")]
 pub use extended_part::ExtendedPart;
+#[cfg(feature = "parts")]
+pub use package::{
+  PackageOpenMode, PartId, RelationshipInfo, RelationshipSet, RelationshipTargetKind,
+  SdkPackageStorage, StoredPart, StoredPartData, StoredPartDataKind,
+};
 #[cfg(feature = "parts")]
 pub use part::{
   load_data_part_reference, load_extended_part, load_part_relationships, load_typed_child_part,

@@ -7,12 +7,11 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections";
 pub const PATH_PREFIX: &str = ".";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ConnectionsPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element: crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_connections_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
+    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections,
+  >,
 }

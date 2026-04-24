@@ -7,14 +7,13 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
 pub const PATH_PREFIX: &str = "../customXml";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomXmlPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub part_content: String,
-  pub custom_xml_properties_part:
-    Option<std::boxed::Box<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>>,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
+    kind = "optional"
+  ))]
+  pub(crate) custom_xml_properties_part:
+    crate::sdk::PartChild<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>,
 }

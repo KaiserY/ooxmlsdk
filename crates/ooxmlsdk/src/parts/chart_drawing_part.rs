@@ -7,17 +7,28 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes";
 pub const PATH_PREFIX: &str = "../drawings";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartDrawingPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element: crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
-  pub chart_part: Option<std::boxed::Box<crate::parts::chart_part::ChartPart>>,
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_chart_drawing_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
+    crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
+  >,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+    kind = "optional"
+  ))]
+  pub(crate) chart_part: crate::sdk::PartChild<crate::parts::chart_part::ChartPart>,
   #[cfg(feature = "microsoft365")]
-  pub extended_chart_part:
-    Option<std::boxed::Box<crate::parts::extended_chart_part::ExtendedChartPart>>,
-  pub image_parts: Vec<crate::parts::image_part::ImagePart>,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+    kind = "optional"
+  ))]
+  pub(crate) extended_chart_part:
+    crate::sdk::PartChild<crate::parts::extended_chart_part::ExtendedChartPart>,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
+  ))]
+  pub(crate) image_parts: crate::sdk::PartChild<crate::parts::image_part::ImagePart>,
 }

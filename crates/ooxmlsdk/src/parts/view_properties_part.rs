@@ -7,14 +7,16 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps";
 pub const PATH_PREFIX: &str = ".";
-#[derive(Clone, Debug, Default, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ViewPropertiesPart {
-  pub r_id: String,
-  pub relationships: Option<crate::schemas::opc_relationships::Relationships>,
-  pub rels_path: String,
-  pub extended_parts: Vec<crate::common::extended_part::ExtendedPart>,
-  pub inner_path: String,
-  pub root_element:
+  pub(crate) id: crate::common::PartId,
+  #[sdk(part_root(accessor = "as_view_properties_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
-  pub slide_parts: Vec<crate::parts::slide_part::SlidePart>,
+  >,
+  #[sdk(part_child(
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+    kind = "repeated"
+  ))]
+  pub(crate) slide_parts: crate::sdk::PartChild<crate::parts::slide_part::SlidePart>,
 }

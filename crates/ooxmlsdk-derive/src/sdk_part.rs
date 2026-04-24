@@ -1094,6 +1094,8 @@ fn part_handle_root_method_tokens(
   };
   let root_ty = &root_info.root_ty;
   let root_accessor_ident = &root_info.accessor_ident;
+  let root_accessor_mut_ident: Ident =
+    parse_str(&format!("{root_accessor_ident}_mut")).expect("root accessor mut identifier");
 
   quote! {
     impl #part_ident {
@@ -1133,6 +1135,60 @@ fn part_handle_root_method_tokens(
                 .to_string(),
             )
           })
+      }
+
+      pub fn root_element_mut<P: crate::parts::PartRootCache>(
+        self,
+        package: &mut P,
+      ) -> Result<&mut #root_ty, crate::common::SdkError> {
+        if package
+          .root_element(self.id)
+          .and_then(crate::parts::PartRootElement::#root_accessor_ident)
+          .is_none()
+        {
+          let root_element = {
+            let part = package.storage().part(self.id).ok_or_else(|| {
+              crate::common::SdkError::CommonError(format!(
+                "part id {:?} is not present in package storage",
+                self.id,
+              ))
+            })?;
+            #root_ty::from_bytes(part.data().bytes())?
+          };
+
+          *package.root_element_slot_mut(self.id).ok_or_else(|| {
+            crate::common::SdkError::CommonError(format!(
+              "part id {:?} is not present in package root cache",
+              self.id,
+            ))
+          })? = Some(crate::parts::PartRootElement::#part_ident(Box::new(root_element)));
+        }
+
+        package
+          .root_element_slot_mut(self.id)
+          .and_then(Option::as_mut)
+          .and_then(crate::parts::PartRootElement::#root_accessor_mut_ident)
+          .ok_or_else(|| {
+            crate::common::SdkError::CommonError(
+              concat!("cached root element has unexpected type for ", stringify!(#part_ident))
+                .to_string(),
+            )
+          })
+      }
+
+      pub fn set_root_element<P: crate::parts::PartRootCache>(
+        self,
+        package: &mut P,
+        root_element: #root_ty,
+      ) -> Result<(), crate::common::SdkError> {
+        *package.root_element_slot_mut(self.id).ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part id {:?} is not present in package root cache",
+            self.id,
+          ))
+        })? = Some(crate::parts::PartRootElement::#part_ident(Box::new(root_element)));
+
+        Ok(())
       }
     }
   }

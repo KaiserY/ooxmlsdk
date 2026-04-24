@@ -3303,11 +3303,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_calculation_chain_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculationChain,
+  > {
+    match self {
+      PartRootElement::CalculationChainPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_cell_metadata_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata> {
     match self {
       PartRootElement::CellMetadataPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_cell_metadata_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata> {
+    match self {
+      PartRootElement::CellMetadataPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3321,6 +3339,16 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_chart_color_style_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ColorStyle>
+  {
+    match self {
+      PartRootElement::ChartColorStylePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_chart_drawing_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes> {
@@ -3329,11 +3357,27 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_chart_drawing_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes> {
+    match self {
+      PartRootElement::ChartDrawingPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_chart_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartSpace> {
     match self {
       PartRootElement::ChartPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_chart_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartSpace> {
+    match self {
+      PartRootElement::ChartPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3347,11 +3391,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_chart_style_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ChartStyle>
+  {
+    match self {
+      PartRootElement::ChartStylePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_chartsheet_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Chartsheet> {
     match self {
       PartRootElement::ChartsheetPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_chartsheet_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Chartsheet>
+  {
+    match self {
+      PartRootElement::ChartsheetPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3364,11 +3427,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_comment_authors_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentAuthorList,
+  > {
+    match self {
+      PartRootElement::CommentAuthorsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_connections_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections> {
     match self {
       PartRootElement::ConnectionsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_connections_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections>
+  {
+    match self {
+      PartRootElement::ConnectionsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3383,11 +3465,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_control_properties_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FormControlProperties,
+  >{
+    match self {
+      PartRootElement::ControlPropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_core_file_properties_part(
     &self,
   ) -> Option<&crate::schemas::opc_core_properties::CoreProperties> {
     match self {
       PartRootElement::CoreFilePropertiesPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_core_file_properties_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::opc_core_properties::CoreProperties> {
+    match self {
+      PartRootElement::CoreFilePropertiesPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3401,6 +3502,17 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_custom_data_properties_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DatastoreItem,
+  > {
+    match self {
+      PartRootElement::CustomDataPropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_custom_file_properties_part(
     &self,
   ) -> Option<
@@ -3411,11 +3523,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+    pub fn as_custom_file_properties_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_openxmlformats_org_office_document_2006_custom_properties::Properties,
+  >{
+    match self {
+      PartRootElement::CustomFilePropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_custom_xml_mappings_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::MapInfo> {
     match self {
       PartRootElement::CustomXmlMappingsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_custom_xml_mappings_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::MapInfo> {
+    match self {
+      PartRootElement::CustomXmlMappingsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3429,12 +3559,32 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_custom_xml_properties_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_office_document_2006_custom_xml::DataStoreItem,
+  > {
+    match self {
+      PartRootElement::CustomXmlPropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_customization_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup>
   {
     match self {
       PartRootElement::CustomizationPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_customization_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup,
+  > {
+    match self {
+      PartRootElement::CustomizationPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3447,11 +3597,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_diagram_colors_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::ColorsDefinition,
+  > {
+    match self {
+      PartRootElement::DiagramColorsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_diagram_data_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::DataModelRoot> {
     match self {
       PartRootElement::DiagramDataPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_diagram_data_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::DataModelRoot>
+  {
+    match self {
+      PartRootElement::DiagramDataPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3464,12 +3633,31 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_diagram_layout_definition_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::LayoutDefinition,
+  > {
+    match self {
+      PartRootElement::DiagramLayoutDefinitionPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   #[cfg(feature = "microsoft365")]
   pub fn as_diagram_persist_layout_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing> {
     match self {
       PartRootElement::DiagramPersistLayoutPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_diagram_persist_layout_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing> {
+    match self {
+      PartRootElement::DiagramPersistLayoutPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3482,11 +3670,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_diagram_style_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::StyleDefinition>
+  {
+    match self {
+      PartRootElement::DiagramStylePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_dialogsheet_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet> {
     match self {
       PartRootElement::DialogsheetPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_dialogsheet_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet>
+  {
+    match self {
+      PartRootElement::DialogsheetPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3498,12 +3704,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_document_settings_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Settings>
+  {
+    match self {
+      PartRootElement::DocumentSettingsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   #[cfg(feature = "microsoft365")]
   pub fn as_document_tasks_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_tasks_2019_documenttasks::Tasks> {
     match self {
       PartRootElement::DocumentTasksPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_document_tasks_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_tasks_2019_documenttasks::Tasks> {
+    match self {
+      PartRootElement::DocumentTasksPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3517,11 +3741,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+    pub fn as_drawings_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing::WorksheetDrawing,
+  >{
+    match self {
+      PartRootElement::DrawingsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_endnotes_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Endnotes> {
     match self {
       PartRootElement::EndnotesPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_endnotes_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Endnotes>
+  {
+    match self {
+      PartRootElement::EndnotesPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3531,6 +3774,16 @@ impl PartRootElement {
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace> {
     match self {
       PartRootElement::ExtendedChartPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_extended_chart_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace>
+  {
+    match self {
+      PartRootElement::ExtendedChartPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3544,11 +3797,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+    pub fn as_extended_file_properties_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties,
+  >{
+    match self {
+      PartRootElement::ExtendedFilePropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_external_workbook_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExternalLink> {
     match self {
       PartRootElement::ExternalWorkbookPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_external_workbook_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExternalLink>
+  {
+    match self {
+      PartRootElement::ExternalWorkbookPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3563,11 +3835,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_feature_property_bags_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::FeaturePropertyBags,
+  >{
+    match self {
+      PartRootElement::FeaturePropertyBagsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_font_table_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts> {
     match self {
       PartRootElement::FontTablePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_font_table_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts> {
+    match self {
+      PartRootElement::FontTablePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3579,11 +3870,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_footer_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footer>
+  {
+    match self {
+      PartRootElement::FooterPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_footnotes_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footnotes> {
     match self {
       PartRootElement::FootnotesPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_footnotes_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footnotes>
+  {
+    match self {
+      PartRootElement::FootnotesPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3597,6 +3906,16 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_glossary_document_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::GlossaryDocument,
+  > {
+    match self {
+      PartRootElement::GlossaryDocumentPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_handout_master_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::HandoutMaster>
@@ -3606,11 +3925,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_handout_master_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::HandoutMaster>
+  {
+    match self {
+      PartRootElement::HandoutMasterPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_header_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header> {
     match self {
       PartRootElement::HeaderPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_header_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header>
+  {
+    match self {
+      PartRootElement::HeaderPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3625,6 +3962,17 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_label_info_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_2020_mip_label_metadata::ClassificationLabelList,
+  >{
+    match self {
+      PartRootElement::LabelInfoPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_macro_sheet_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_excel_2006_main::Macrosheet> {
@@ -3633,11 +3981,28 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_macro_sheet_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_excel_2006_main::Macrosheet> {
+    match self {
+      PartRootElement::MacroSheetPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_main_document_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document> {
     match self {
       PartRootElement::MainDocumentPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_main_document_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document>
+  {
+    match self {
+      PartRootElement::MainDocumentPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3652,11 +4017,31 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_named_sheet_views_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews::NamedSheetViews,
+  >{
+    match self {
+      PartRootElement::NamedSheetViewsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_notes_master_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesMaster> {
     match self {
       PartRootElement::NotesMasterPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_notes_master_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesMaster>
+  {
+    match self {
+      PartRootElement::NotesMasterPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3668,11 +4053,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_notes_slide_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesSlide>
+  {
+    match self {
+      PartRootElement::NotesSlidePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_numbering_definitions_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Numbering> {
     match self {
       PartRootElement::NumberingDefinitionsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_numbering_definitions_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Numbering>
+  {
+    match self {
+      PartRootElement::NumberingDefinitionsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3686,12 +4089,32 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_pivot_table_cache_definition_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheDefinition,
+  > {
+    match self {
+      PartRootElement::PivotTableCacheDefinitionPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_pivot_table_cache_records_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheRecords>
   {
     match self {
       PartRootElement::PivotTableCacheRecordsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_pivot_table_cache_records_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheRecords,
+  > {
+    match self {
+      PartRootElement::PivotTableCacheRecordsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3705,12 +4128,32 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_pivot_table_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
+  > {
+    match self {
+      PartRootElement::PivotTablePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   #[cfg(feature = "microsoft365")]
   pub fn as_power_point_authors_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList> {
     match self {
       PartRootElement::PowerPointAuthorsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_power_point_authors_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList>
+  {
+    match self {
+      PartRootElement::PowerPointAuthorsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3723,12 +4166,31 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_power_point_comment_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::CommentList>
+  {
+    match self {
+      PartRootElement::PowerPointCommentPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_presentation_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation>
   {
     match self {
       PartRootElement::PresentationPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_presentation_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation>
+  {
+    match self {
+      PartRootElement::PresentationPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3742,11 +4204,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+    pub fn as_presentation_properties_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::PresentationProperties,
+  >{
+    match self {
+      PartRootElement::PresentationPropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_query_table_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable> {
     match self {
       PartRootElement::QueryTablePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_query_table_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable>
+  {
+    match self {
+      PartRootElement::QueryTablePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3757,6 +4238,17 @@ impl PartRootElement {
   {
     match self {
       PartRootElement::RdArrayPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_rd_array_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::ArrayData,
+  > {
+    match self {
+      PartRootElement::RdArrayPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3772,6 +4264,17 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+  pub fn as_rd_rich_value_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueData,
+  > {
+    match self {
+      PartRootElement::RdRichValuePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
   pub fn as_rd_rich_value_structure_part(
     &self,
   ) -> Option<
@@ -3779,6 +4282,17 @@ impl PartRootElement {
   > {
     match self {
       PartRootElement::RdRichValueStructurePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_rd_rich_value_structure_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueStructures,
+  >{
+    match self {
+      PartRootElement::RdRichValueStructurePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3794,6 +4308,17 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+    pub fn as_rd_rich_value_types_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichValueTypesInfo,
+  >{
+    match self {
+      PartRootElement::RdRichValueTypesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
     pub fn as_rd_rich_value_web_image_part(
         &self,
     ) -> Option<
@@ -3801,6 +4326,17 @@ impl PartRootElement {
   >{
     match self {
       PartRootElement::RdRichValueWebImagePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_rd_rich_value_web_image_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
+  >{
+    match self {
+      PartRootElement::RdRichValueWebImagePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3816,6 +4352,17 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+    pub fn as_rd_supporting_property_bag_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBags,
+  >{
+    match self {
+      PartRootElement::RdSupportingPropertyBagPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
     pub fn as_rd_supporting_property_bag_structure_part(
         &self,
     ) -> Option<
@@ -3827,11 +4374,31 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+    pub fn as_rd_supporting_property_bag_structure_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBagStructures,
+  >{
+    match self {
+      PartRootElement::RdSupportingPropertyBagStructurePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
   pub fn as_ribbon_and_backstage_customizations_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi> {
     match self {
       PartRootElement::RibbonAndBackstageCustomizationsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_ribbon_and_backstage_customizations_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi> {
+    match self {
+      PartRootElement::RibbonAndBackstageCustomizationsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3846,6 +4413,17 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_rich_styles_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichStylesheet,
+  > {
+    match self {
+      PartRootElement::RichStylesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_shared_string_table_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringTable>
@@ -3855,12 +4433,31 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_shared_string_table_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringTable,
+  > {
+    match self {
+      PartRootElement::SharedStringTablePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_single_cell_table_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SingleXmlCells>
   {
     match self {
       PartRootElement::SingleCellTablePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_single_cell_table_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SingleXmlCells>
+  {
+    match self {
+      PartRootElement::SingleCellTablePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3876,11 +4473,32 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+    pub fn as_slicer_cache_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCacheDefinition,
+  >{
+    match self {
+      PartRootElement::SlicerCachePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
   pub fn as_slicers_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers> {
     match self {
       PartRootElement::SlicersPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_slicers_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers>
+  {
+    match self {
+      PartRootElement::SlicersPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3892,11 +4510,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_slide_comments_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentList>
+  {
+    match self {
+      PartRootElement::SlideCommentsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_slide_layout_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideLayout> {
     match self {
       PartRootElement::SlideLayoutPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_slide_layout_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideLayout>
+  {
+    match self {
+      PartRootElement::SlideLayoutPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3908,11 +4544,28 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_slide_master_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideMaster>
+  {
+    match self {
+      PartRootElement::SlideMasterPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_slide_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Slide> {
     match self {
       PartRootElement::SlidePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_slide_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Slide> {
+    match self {
+      PartRootElement::SlidePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3926,11 +4579,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_slide_sync_data_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideSyncProperties,
+  > {
+    match self {
+      PartRootElement::SlideSyncDataPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_style_definitions_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles> {
     match self {
       PartRootElement::StyleDefinitionsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_style_definitions_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles>
+  {
+    match self {
+      PartRootElement::StyleDefinitionsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3943,11 +4615,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_styles_with_effects_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles>
+  {
+    match self {
+      PartRootElement::StylesWithEffectsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_table_definition_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table> {
     match self {
       PartRootElement::TableDefinitionPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_table_definition_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table> {
+    match self {
+      PartRootElement::TableDefinitionPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3959,6 +4649,15 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_table_styles_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TableStyleList>
+  {
+    match self {
+      PartRootElement::TableStylesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_theme_override_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ThemeOverride> {
@@ -3967,11 +4666,28 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_theme_override_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ThemeOverride>
+  {
+    match self {
+      PartRootElement::ThemeOverridePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_theme_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Theme> {
     match self {
       PartRootElement::ThemePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_theme_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Theme> {
+    match self {
+      PartRootElement::ThemePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -3987,12 +4703,33 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+    pub fn as_time_line_cache_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
+  >{
+    match self {
+      PartRootElement::TimeLineCachePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
   pub fn as_time_line_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::Timelines>
   {
     match self {
       PartRootElement::TimeLinePart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_time_line_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::Timelines>
+  {
+    match self {
+      PartRootElement::TimeLinePart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4004,11 +4741,27 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_user_defined_tags_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TagList> {
+    match self {
+      PartRootElement::UserDefinedTagsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_vba_data_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_word_2006_wordml::VbaSuppData> {
     match self {
       PartRootElement::VbaDataPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_vba_data_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_word_2006_wordml::VbaSuppData> {
+    match self {
+      PartRootElement::VbaDataPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4021,12 +4774,31 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_view_properties_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
+  > {
+    match self {
+      PartRootElement::ViewPropertiesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_volatile_dependencies_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes>
   {
     match self {
       PartRootElement::VolatileDependenciesPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_volatile_dependencies_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes>
+  {
+    match self {
+      PartRootElement::VolatileDependenciesPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4042,6 +4814,17 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+  pub fn as_web_ex_taskpanes_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
+  > {
+    match self {
+      PartRootElement::WebExTaskpanesPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
   pub fn as_web_extension_part(
     &self,
   ) -> Option<
@@ -4052,12 +4835,32 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_web_extension_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_webextensions_webextension_2010_11::WebExtension,
+  >{
+    match self {
+      PartRootElement::WebExtensionPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_web_settings_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings>
   {
     match self {
       PartRootElement::WebSettingsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_web_settings_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings>
+  {
+    match self {
+      PartRootElement::WebSettingsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4072,11 +4875,31 @@ impl PartRootElement {
     }
   }
   #[cfg(feature = "microsoft365")]
+  pub fn as_word_comments_extensible_part_mut(
+    &mut self,
+  ) -> Option<
+    &mut crate::schemas::schemas_microsoft_com_office_word_2018_wordml_cex::CommentsExtensible,
+  > {
+    match self {
+      PartRootElement::WordCommentsExtensiblePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
   pub fn as_wordprocessing_comments_ex_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_word_2012_wordml::CommentsEx> {
     match self {
       PartRootElement::WordprocessingCommentsExPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_wordprocessing_comments_ex_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_word_2012_wordml::CommentsEx> {
+    match self {
+      PartRootElement::WordprocessingCommentsExPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4089,11 +4912,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_wordprocessing_comments_ids_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_word_2016_wordml_cid::CommentsIds>
+  {
+    match self {
+      PartRootElement::WordprocessingCommentsIdsPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_wordprocessing_comments_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Comments> {
     match self {
       PartRootElement::WordprocessingCommentsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_wordprocessing_comments_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Comments>
+  {
+    match self {
+      PartRootElement::WordprocessingCommentsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4106,11 +4948,28 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+  pub fn as_wordprocessing_people_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_word_2012_wordml::People> {
+    match self {
+      PartRootElement::WordprocessingPeoplePart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_workbook_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook> {
     match self {
       PartRootElement::WorkbookPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_workbook_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook> {
+    match self {
+      PartRootElement::WorkbookPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4125,11 +4984,30 @@ impl PartRootElement {
       _ => None,
     }
   }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_workbook_person_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::PersonList,
+  >{
+    match self {
+      PartRootElement::WorkbookPersonPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_workbook_revision_header_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers> {
     match self {
       PartRootElement::WorkbookRevisionHeaderPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_workbook_revision_header_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers> {
+    match self {
+      PartRootElement::WorkbookRevisionHeaderPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4141,11 +5019,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_workbook_revision_log_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Revisions>
+  {
+    match self {
+      PartRootElement::WorkbookRevisionLogPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_workbook_styles_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Stylesheet> {
     match self {
       PartRootElement::WorkbookStylesPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_workbook_styles_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Stylesheet>
+  {
+    match self {
+      PartRootElement::WorkbookStylesPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4157,11 +5053,27 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_workbook_user_data_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users> {
+    match self {
+      PartRootElement::WorkbookUserDataPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_worksheet_comments_part(
     &self,
   ) -> Option<&crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Comments> {
     match self {
       PartRootElement::WorksheetCommentsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_worksheet_comments_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Comments> {
+    match self {
+      PartRootElement::WorksheetCommentsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4173,11 +5085,29 @@ impl PartRootElement {
       _ => None,
     }
   }
+  pub fn as_worksheet_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Worksheet>
+  {
+    match self {
+      PartRootElement::WorksheetPart(root) => Some(root.as_mut()),
+      _ => None,
+    }
+  }
   pub fn as_worksheet_sort_map_part(
     &self,
   ) -> Option<&crate::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap> {
     match self {
       PartRootElement::WorksheetSortMapPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  pub fn as_worksheet_sort_map_part_mut(
+    &mut self,
+  ) -> Option<&mut crate::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap>
+  {
+    match self {
+      PartRootElement::WorksheetSortMapPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }
@@ -4189,6 +5119,17 @@ impl PartRootElement {
   >{
     match self {
       PartRootElement::WorksheetThreadedCommentsPart(root) => Some(root.as_ref()),
+      _ => None,
+    }
+  }
+  #[cfg(feature = "microsoft365")]
+    pub fn as_worksheet_threaded_comments_part_mut(
+        &mut self,
+    ) -> Option<
+        &mut crate::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
+  >{
+    match self {
+      PartRootElement::WorksheetThreadedCommentsPart(root) => Some(root.as_mut()),
       _ => None,
     }
   }

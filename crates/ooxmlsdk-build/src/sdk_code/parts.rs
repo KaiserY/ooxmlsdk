@@ -186,6 +186,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     if let Some((root_type, accessor_name)) = part_root_element_info(part) {
       let root_ty: Type = parse_str(&root_type)?;
       let root_accessor_ident: Ident = parse_str(&accessor_name)?;
+      let root_accessor_ident_mut: Ident = parse_str(&format!("{accessor_name}_mut"))?;
       root_variants.push(quote! {
         #( #part_attrs )*
         #struct_ident(Box<#root_ty>),
@@ -199,6 +200,14 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         pub fn #root_accessor_ident(&self) -> Option<&#root_ty> {
           match self {
             PartRootElement::#struct_ident(root) => Some(root.as_ref()),
+            _ => None,
+          }
+        }
+
+        #( #part_attrs )*
+        pub fn #root_accessor_ident_mut(&mut self) -> Option<&mut #root_ty> {
+          match self {
+            PartRootElement::#struct_ident(root) => Some(root.as_mut()),
             _ => None,
           }
         }
@@ -547,6 +556,7 @@ mod tests {
       "MainDocumentPart (Box < crate :: schemas :: schemas_openxmlformats_org_wordprocessingml_2006_main :: Document >)"
     ));
     assert!(rendered.contains("pub fn as_main_document_part"));
+    assert!(rendered.contains("pub fn as_main_document_part_mut"));
   }
 
   #[test]

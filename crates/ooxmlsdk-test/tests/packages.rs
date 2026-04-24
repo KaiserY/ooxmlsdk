@@ -11,6 +11,7 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{Body, Document};
 use ooxmlsdk::sdk::SdkPackage;
 use ooxmlsdk_test::fixtures;
 
@@ -28,6 +29,13 @@ fn main_document_body_child_count(
     .as_ref()
     .map(|body| body.body_choice.len() + usize::from(body.w_sect_pr.is_some()))
     .unwrap_or_default()
+}
+
+fn empty_body_document() -> Document {
+  Document {
+    body: Some(Box::new(Body::default())),
+    ..Default::default()
+  }
 }
 
 #[test]
@@ -275,6 +283,106 @@ fn root_cache_reports_and_unloads_lazy_roots() {
   assert!(package.is_root_element_loaded(part_id));
   assert!(package.unload_root_element(part_id).is_some());
   assert!(!package.is_root_element_loaded(part_id));
+}
+
+#[test]
+fn part_root_element_mutation_is_saved() {
+  // Source: adapted from OpenXmlPart root element save/mutation coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  let root = main_part.root_element_mut(&mut package).unwrap();
+  assert!(root.body.is_some());
+  root.body = None;
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
+
+  assert!(reopened_root.body.is_none());
+}
+
+#[test]
+fn set_root_element_replaces_lazy_root_and_is_saved() {
+  // Source: adapted from OpenXmlPart root element save/mutation coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let part_id = main_part.part_id();
+
+  assert!(!package.is_root_element_loaded(part_id));
+
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  assert!(package.is_root_element_loaded(part_id));
+  assert_eq!(
+    main_document_body_child_count(main_part.root_element(&mut package).unwrap()),
+    0
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
+
+  assert_eq!(main_document_body_child_count(reopened_root), 0);
+  assert!(reopened_root.body.is_some());
+}
+
+#[test]
+fn root_element_mut_updates_eager_root_and_is_saved() {
+  // Source: adapted from OpenXmlPart root element save/mutation coverage.
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let part_id = main_part.part_id();
+
+  assert!(main_part.root_element(&mut package).is_ok());
+  assert!(package.is_root_element_loaded(part_id));
+  main_part.root_element_mut(&mut package).unwrap().body = Some(Box::new(Body::default()));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
+
+  assert_eq!(main_document_body_child_count(reopened_root), 0);
+  assert!(reopened_root.body.is_some());
+}
+
+#[test]
+fn set_root_element_replaces_unloaded_root_cache() {
+  // Source: adapted from OpenXmlPart root element load/unload/save coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let part_id = main_part.part_id();
+
+  assert!(main_part.root_element(&mut package).is_ok());
+  assert!(package.unload_root_element(part_id).is_some());
+  assert!(!package.is_root_element_loaded(part_id));
+
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  assert!(package.is_root_element_loaded(part_id));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
+
+  assert_eq!(main_document_body_child_count(reopened_root), 0);
+  assert!(reopened_root.body.is_some());
 }
 
 #[test]

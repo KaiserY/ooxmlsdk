@@ -10,11 +10,20 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-word.stylesWithEffects+xml";
 pub const TARGET_NAME: &str = "stylesWithEffects";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct StylesWithEffectsPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_styles_with_effects_part"))]
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
   >,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl StylesWithEffectsPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
 }

@@ -169,7 +169,7 @@ pub mod worksheet_sort_map_part;
 #[cfg(feature = "microsoft365")]
 pub mod worksheet_threaded_comments_part;
 pub mod xml_signature_part;
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PartRef {
   AlternativeFormatImportPart(
         crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
@@ -241,7 +241,6 @@ pub enum PartRef {
     ExtendedFilePropertiesPart(
         crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
     ),
-    ExtendedPart(crate::parts::extended_part::ExtendedPart),
     ExternalWorkbookPart(crate::parts::external_workbook_part::ExternalWorkbookPart),
     #[cfg(feature = "microsoft365")]
     FeaturePropertyBagsPart(
@@ -413,9 +412,10 @@ pub enum PartRef {
         crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart,
     ),
     XmlSignaturePart(crate::parts::xml_signature_part::XmlSignaturePart),
+    ExtendedPart(crate::parts::extended_part::ExtendedPart),
 }
 impl PartRef {
-  pub fn part_id(self) -> crate::common::PartId {
+  pub fn part_id(&self) -> crate::common::PartId {
     match self {
       PartRef::AlternativeFormatImportPart(part) => part.part_id(),
       PartRef::CalculationChainPart(part) => part.part_id(),
@@ -463,9 +463,6 @@ impl PartRef {
       #[cfg(feature = "microsoft365")]
       PartRef::ExtendedChartPart(part) => part.part_id(),
       PartRef::ExtendedFilePropertiesPart(part) => part.part_id(),
-      PartRef::ExtendedPart(part) => {
-        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::part_id(part)
-      }
       PartRef::ExternalWorkbookPart(part) => part.part_id(),
       #[cfg(feature = "microsoft365")]
       PartRef::FeaturePropertyBagsPart(part) => part.part_id(),
@@ -581,549 +578,2237 @@ impl PartRef {
       #[cfg(feature = "microsoft365")]
       PartRef::WorksheetThreadedCommentsPart(part) => part.part_id(),
       PartRef::XmlSignaturePart(part) => part.part_id(),
+      PartRef::ExtendedPart(part) => {
+        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::part_id(part)
+      }
     }
   }
-  pub fn downcast<T: crate::sdk::SdkPartHandle + 'static>(self) -> Option<T> {
+  pub fn relationship_id(&self) -> Option<&str> {
     match self {
-      PartRef::AlternativeFormatImportPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CalculationChainPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CellMetadataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+            PartRef::AlternativeFormatImportPart(part) => {
+                <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CalculationChainPart(part) => {
+                <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CellMetadataPart(part) => {
+                <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ChartColorStylePart(part) => {
+                <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ChartDrawingPart(part) => {
+                <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ChartPart(part) => {
+                <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ChartStylePart(part) => {
+                <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ChartsheetPart(part) => {
+                <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CommentAuthorsPart(part) => {
+                <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ConnectionsPart(part) => {
+                <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ControlPropertiesPart(part) => {
+                <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CoreFilePropertiesPart(part) => {
+                <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::CustomDataPart(part) => {
+                <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::CustomDataPropertiesPart(part) => {
+                <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CustomFilePropertiesPart(part) => {
+                <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CustomPropertyPart(part) => {
+                <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CustomXmlMappingsPart(part) => {
+                <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CustomXmlPart(part) => {
+                <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CustomXmlPropertiesPart(part) => {
+                <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::CustomizationPart(part) => {
+                <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DiagramColorsPart(part) => {
+                <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DiagramDataPart(part) => {
+                <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DiagramLayoutDefinitionPart(part) => {
+                <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::DiagramPersistLayoutPart(part) => {
+                <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DiagramStylePart(part) => {
+                <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DialogsheetPart(part) => {
+                <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DigitalSignatureOriginPart(part) => {
+                <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DocumentSettingsPart(part) => {
+                <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::DocumentTasksPart(part) => {
+                <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::DrawingsPart(part) => {
+                <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => {
+                <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::EmbeddedControlPersistencePart(part) => {
+                <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::EmbeddedObjectPart(part) => {
+                <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::EmbeddedPackagePart(part) => {
+                <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::EndnotesPart(part) => {
+                <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ExcelAttachedToolbarsPart(part) => {
+                <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ExtendedChartPart(part) => {
+                <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ExtendedFilePropertiesPart(part) => {
+                <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ExternalWorkbookPart(part) => {
+                <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::FeaturePropertyBagsPart(part) => {
+                <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::FontPart(part) => {
+                <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::FontTablePart(part) => {
+                <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::FooterPart(part) => {
+                <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::FootnotesPart(part) => {
+                <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::GlossaryDocumentPart(part) => {
+                <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::HandoutMasterPart(part) => {
+                <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::HeaderPart(part) => {
+                <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ImagePart(part) => {
+                <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::InternationalMacroSheetPart(part) => {
+                <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::LabelInfoPart(part) => {
+                <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::LegacyDiagramTextInfoPart(part) => {
+                <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::LegacyDiagramTextPart(part) => {
+                <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::MacroSheetPart(part) => {
+                <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::MailMergeRecipientDataPart(part) => {
+                <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::MainDocumentPart(part) => {
+                <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::Model3DReferenceRelationshipPart(part) => {
+                <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::NamedSheetViewsPart(part) => {
+                <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::NotesMasterPart(part) => {
+                <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::NotesSlidePart(part) => {
+                <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::NumberingDefinitionsPart(part) => {
+                <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::PivotTableCacheDefinitionPart(part) => {
+                <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::PivotTableCacheRecordsPart(part) => {
+                <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::PivotTablePart(part) => {
+                <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::PowerPointAuthorsPart(part) => {
+                <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::PowerPointCommentPart(part) => {
+                <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::PresentationPart(part) => {
+                <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::PresentationPropertiesPart(part) => {
+                <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::QueryTablePart(part) => {
+                <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::QuickAccessToolbarCustomizationsPart(part) => {
+                <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdArrayPart(part) => {
+                <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValuePart(part) => {
+                <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValueStructurePart(part) => {
+                <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValueTypesPart(part) => {
+                <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValueWebImagePart(part) => {
+                <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdSupportingPropertyBagPart(part) => {
+                <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdSupportingPropertyBagStructurePart(part) => {
+                <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RibbonAndBackstageCustomizationsPart(part) => {
+                <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::RibbonExtensibilityPart(part) => {
+                <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RichStylesPart(part) => {
+                <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SharedStringTablePart(part) => {
+                <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SingleCellTablePart(part) => {
+                <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::SlicerCachePart(part) => {
+                <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::SlicersPart(part) => {
+                <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SlideCommentsPart(part) => {
+                <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SlideLayoutPart(part) => {
+                <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SlideMasterPart(part) => {
+                <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SlidePart(part) => {
+                <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SlideSyncDataPart(part) => {
+                <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::SpreadsheetPrinterSettingsPart(part) => {
+                <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::StyleDefinitionsPart(part) => {
+                <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::StylesWithEffectsPart(part) => {
+                <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::TableDefinitionPart(part) => {
+                <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::TableStylesPart(part) => {
+                <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ThemeOverridePart(part) => {
+                <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ThemePart(part) => {
+                <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ThumbnailPart(part) => {
+                <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::TimeLineCachePart(part) => {
+                <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::TimeLinePart(part) => {
+                <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::UserDefinedTagsPart(part) => {
+                <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::VbaDataPart(part) => {
+                <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::VbaProjectPart(part) => {
+                <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ViewPropertiesPart(part) => {
+                <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::VmlDrawingPart(part) => {
+                <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::VolatileDependenciesPart(part) => {
+                <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WebExTaskpanesPart(part) => {
+                <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WebExtensionPart(part) => {
+                <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WebSettingsPart(part) => {
+                <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WordAttachedToolbarsPart(part) => {
+                <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordCommentsExtensiblePart(part) => {
+                <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordprocessingCommentsExPart(part) => {
+                <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordprocessingCommentsIdsPart(part) => {
+                <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WordprocessingCommentsPart(part) => {
+                <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordprocessingPeoplePart(part) => {
+                <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WordprocessingPrinterSettingsPart(part) => {
+                <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorkbookPart(part) => {
+                <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WorkbookPersonPart(part) => {
+                <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorkbookRevisionHeaderPart(part) => {
+                <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorkbookRevisionLogPart(part) => {
+                <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorkbookStylesPart(part) => {
+                <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorkbookUserDataPart(part) => {
+                <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorksheetCommentsPart(part) => {
+                <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorksheetPart(part) => {
+                <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::WorksheetSortMapPart(part) => {
+                <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WorksheetThreadedCommentsPart(part) => {
+                <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::XmlSignaturePart(part) => {
+                <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+            PartRef::ExtendedPart(part) => {
+                <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::relationship_id(
+                    part,
+                )
+            }
+        }
+  }
+  pub fn child_descriptors(&self) -> &'static [crate::sdk::PartChildDescriptor] {
+    match self {
+            PartRef::AlternativeFormatImportPart(_) => {
+                <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CalculationChainPart(_) => {
+                <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CellMetadataPart(_) => {
+                <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ChartColorStylePart(_) => {
+                <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ChartDrawingPart(_) => {
+                <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ChartPart(_) => {
+                <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ChartStylePart(_) => {
+                <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ChartsheetPart(_) => {
+                <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CommentAuthorsPart(_) => {
+                <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ConnectionsPart(_) => {
+                <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ControlPropertiesPart(_) => {
+                <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CoreFilePropertiesPart(_) => {
+                <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::CustomDataPart(_) => {
+                <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::CustomDataPropertiesPart(_) => {
+                <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CustomFilePropertiesPart(_) => {
+                <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CustomPropertyPart(_) => {
+                <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CustomXmlMappingsPart(_) => {
+                <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CustomXmlPart(_) => {
+                <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CustomXmlPropertiesPart(_) => {
+                <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::CustomizationPart(_) => {
+                <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DiagramColorsPart(_) => {
+                <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DiagramDataPart(_) => {
+                <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DiagramLayoutDefinitionPart(_) => {
+                <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::DiagramPersistLayoutPart(_) => {
+                <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DiagramStylePart(_) => {
+                <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DialogsheetPart(_) => {
+                <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DigitalSignatureOriginPart(_) => {
+                <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DocumentSettingsPart(_) => {
+                <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::DocumentTasksPart(_) => {
+                <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::DrawingsPart(_) => {
+                <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::EmbeddedControlPersistenceBinaryDataPart(_) => {
+                <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::EmbeddedControlPersistencePart(_) => {
+                <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::EmbeddedObjectPart(_) => {
+                <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::EmbeddedPackagePart(_) => {
+                <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::EndnotesPart(_) => {
+                <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ExcelAttachedToolbarsPart(_) => {
+                <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::ExtendedChartPart(_) => {
+                <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ExtendedFilePropertiesPart(_) => {
+                <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ExternalWorkbookPart(_) => {
+                <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::FeaturePropertyBagsPart(_) => {
+                <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::FontPart(_) => {
+                <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::FontTablePart(_) => {
+                <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::FooterPart(_) => {
+                <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::FootnotesPart(_) => {
+                <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::GlossaryDocumentPart(_) => {
+                <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::HandoutMasterPart(_) => {
+                <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::HeaderPart(_) => {
+                <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ImagePart(_) => {
+                <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::InternationalMacroSheetPart(_) => {
+                <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::LabelInfoPart(_) => {
+                <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::LegacyDiagramTextInfoPart(_) => {
+                <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::LegacyDiagramTextPart(_) => {
+                <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::MacroSheetPart(_) => {
+                <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::MailMergeRecipientDataPart(_) => {
+                <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::MainDocumentPart(_) => {
+                <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::Model3DReferenceRelationshipPart(_) => {
+                <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::NamedSheetViewsPart(_) => {
+                <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::NotesMasterPart(_) => {
+                <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::NotesSlidePart(_) => {
+                <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::NumberingDefinitionsPart(_) => {
+                <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::PivotTableCacheDefinitionPart(_) => {
+                <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::PivotTableCacheRecordsPart(_) => {
+                <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::PivotTablePart(_) => {
+                <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::PowerPointAuthorsPart(_) => {
+                <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::PowerPointCommentPart(_) => {
+                <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::PresentationPart(_) => {
+                <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::PresentationPropertiesPart(_) => {
+                <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::QueryTablePart(_) => {
+                <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::QuickAccessToolbarCustomizationsPart(_) => {
+                <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdArrayPart(_) => {
+                <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValuePart(_) => {
+                <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValueStructurePart(_) => {
+                <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValueTypesPart(_) => {
+                <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdRichValueWebImagePart(_) => {
+                <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdSupportingPropertyBagPart(_) => {
+                <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RdSupportingPropertyBagStructurePart(_) => {
+                <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RibbonAndBackstageCustomizationsPart(_) => {
+                <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::RibbonExtensibilityPart(_) => {
+                <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::RichStylesPart(_) => {
+                <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SharedStringTablePart(_) => {
+                <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SingleCellTablePart(_) => {
+                <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::SlicerCachePart(_) => {
+                <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::SlicersPart(_) => {
+                <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SlideCommentsPart(_) => {
+                <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SlideLayoutPart(_) => {
+                <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SlideMasterPart(_) => {
+                <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SlidePart(_) => {
+                <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SlideSyncDataPart(_) => {
+                <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::SpreadsheetPrinterSettingsPart(_) => {
+                <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::StyleDefinitionsPart(_) => {
+                <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::StylesWithEffectsPart(_) => {
+                <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::TableDefinitionPart(_) => {
+                <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::TableStylesPart(_) => {
+                <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ThemeOverridePart(_) => {
+                <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ThemePart(_) => {
+                <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ThumbnailPart(_) => {
+                <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::TimeLineCachePart(_) => {
+                <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::TimeLinePart(_) => {
+                <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::UserDefinedTagsPart(_) => {
+                <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::VbaDataPart(_) => {
+                <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::VbaProjectPart(_) => {
+                <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ViewPropertiesPart(_) => {
+                <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::VmlDrawingPart(_) => {
+                <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::VolatileDependenciesPart(_) => {
+                <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WebExTaskpanesPart(_) => {
+                <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WebExtensionPart(_) => {
+                <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WebSettingsPart(_) => {
+                <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WordAttachedToolbarsPart(_) => {
+                <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordCommentsExtensiblePart(_) => {
+                <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordprocessingCommentsExPart(_) => {
+                <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordprocessingCommentsIdsPart(_) => {
+                <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WordprocessingCommentsPart(_) => {
+                <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WordprocessingPeoplePart(_) => {
+                <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WordprocessingPrinterSettingsPart(_) => {
+                <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorkbookPart(_) => {
+                <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WorkbookPersonPart(_) => {
+                <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorkbookRevisionHeaderPart(_) => {
+                <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorkbookRevisionLogPart(_) => {
+                <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorkbookStylesPart(_) => {
+                <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorkbookUserDataPart(_) => {
+                <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorksheetCommentsPart(_) => {
+                <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorksheetPart(_) => {
+                <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::WorksheetSortMapPart(_) => {
+                <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            #[cfg(feature = "microsoft365")]
+            PartRef::WorksheetThreadedCommentsPart(_) => {
+                <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::XmlSignaturePart(_) => {
+                <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::child_descriptors()
+            }
+            PartRef::ExtendedPart(_) => &[],
+        }
+  }
+  pub fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
+    match self {
+      PartRef::AlternativeFormatImportPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CalculationChainPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CellMetadataPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::ChartColorStylePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ChartDrawingPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ChartPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::ChartColorStylePart(part) => part.modeled_relationship_graph(package),
+      PartRef::ChartDrawingPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ChartPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::ChartStylePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ChartsheetPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CommentAuthorsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ConnectionsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::ChartStylePart(part) => part.modeled_relationship_graph(package),
+      PartRef::ChartsheetPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CommentAuthorsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ConnectionsPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::ControlPropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CoreFilePropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::ControlPropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CoreFilePropertiesPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::CustomDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::CustomDataPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::CustomDataPropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CustomFilePropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CustomPropertyPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CustomXmlMappingsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CustomXmlPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CustomXmlPropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::CustomizationPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DiagramColorsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DiagramDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DiagramLayoutDefinitionPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::CustomDataPropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CustomFilePropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CustomPropertyPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CustomXmlMappingsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CustomXmlPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CustomXmlPropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::CustomizationPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DiagramColorsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DiagramDataPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DiagramLayoutDefinitionPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::DiagramPersistLayoutPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DiagramStylePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DialogsheetPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DigitalSignatureOriginPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DocumentSettingsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::DiagramPersistLayoutPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DiagramStylePart(part) => part.modeled_relationship_graph(package),
+      PartRef::DialogsheetPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DigitalSignatureOriginPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DocumentSettingsPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::DocumentTasksPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::DrawingsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::DocumentTasksPart(part) => part.modeled_relationship_graph(package),
+      PartRef::DrawingsPart(part) => part.modeled_relationship_graph(package),
       PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        part.modeled_relationship_graph(package)
       }
-      PartRef::EmbeddedControlPersistencePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::EmbeddedObjectPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::EmbeddedPackagePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::EndnotesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ExcelAttachedToolbarsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::EmbeddedControlPersistencePart(part) => part.modeled_relationship_graph(package),
+      PartRef::EmbeddedObjectPart(part) => part.modeled_relationship_graph(package),
+      PartRef::EmbeddedPackagePart(part) => part.modeled_relationship_graph(package),
+      PartRef::EndnotesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ExcelAttachedToolbarsPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::ExtendedChartPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ExtendedFilePropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ExtendedPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ExternalWorkbookPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::ExtendedChartPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ExtendedFilePropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ExternalWorkbookPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::FeaturePropertyBagsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::FontPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::FontTablePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::FooterPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::FootnotesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::GlossaryDocumentPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::HandoutMasterPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::HeaderPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::ImagePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::InternationalMacroSheetPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::FeaturePropertyBagsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::FontPart(part) => part.modeled_relationship_graph(package),
+      PartRef::FontTablePart(part) => part.modeled_relationship_graph(package),
+      PartRef::FooterPart(part) => part.modeled_relationship_graph(package),
+      PartRef::FootnotesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::GlossaryDocumentPart(part) => part.modeled_relationship_graph(package),
+      PartRef::HandoutMasterPart(part) => part.modeled_relationship_graph(package),
+      PartRef::HeaderPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ImagePart(part) => part.modeled_relationship_graph(package),
+      PartRef::InternationalMacroSheetPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::LabelInfoPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::LegacyDiagramTextInfoPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::LegacyDiagramTextPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::MacroSheetPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::MailMergeRecipientDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::MainDocumentPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::LabelInfoPart(part) => part.modeled_relationship_graph(package),
+      PartRef::LegacyDiagramTextInfoPart(part) => part.modeled_relationship_graph(package),
+      PartRef::LegacyDiagramTextPart(part) => part.modeled_relationship_graph(package),
+      PartRef::MacroSheetPart(part) => part.modeled_relationship_graph(package),
+      PartRef::MailMergeRecipientDataPart(part) => part.modeled_relationship_graph(package),
+      PartRef::MainDocumentPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::Model3DReferenceRelationshipPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::Model3DReferenceRelationshipPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::NamedSheetViewsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::NotesMasterPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::NotesSlidePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::NumberingDefinitionsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::PivotTableCacheDefinitionPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::PivotTableCacheRecordsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::PivotTablePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::NamedSheetViewsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::NotesMasterPart(part) => part.modeled_relationship_graph(package),
+      PartRef::NotesSlidePart(part) => part.modeled_relationship_graph(package),
+      PartRef::NumberingDefinitionsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::PivotTableCacheDefinitionPart(part) => part.modeled_relationship_graph(package),
+      PartRef::PivotTableCacheRecordsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::PivotTablePart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::PowerPointAuthorsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::PowerPointAuthorsPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::PowerPointCommentPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::PresentationPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::PresentationPropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
-      PartRef::QueryTablePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::PowerPointCommentPart(part) => part.modeled_relationship_graph(package),
+      PartRef::PresentationPart(part) => part.modeled_relationship_graph(package),
+      PartRef::PresentationPropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::QueryTablePart(part) => part.modeled_relationship_graph(package),
       PartRef::QuickAccessToolbarCustomizationsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        part.modeled_relationship_graph(package)
       }
       #[cfg(feature = "microsoft365")]
-      PartRef::RdArrayPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::RdArrayPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValuePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::RdRichValuePart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValueStructurePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::RdRichValueStructurePart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValueTypesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::RdRichValueTypesPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValueWebImagePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::RdRichValueWebImagePart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
-      PartRef::RdSupportingPropertyBagPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
-      }
+      PartRef::RdSupportingPropertyBagPart(part) => part.modeled_relationship_graph(package),
       #[cfg(feature = "microsoft365")]
       PartRef::RdSupportingPropertyBagStructurePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        part.modeled_relationship_graph(package)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RibbonAndBackstageCustomizationsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        part.modeled_relationship_graph(package)
+      }
+      PartRef::RibbonExtensibilityPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::RichStylesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::SharedStringTablePart(part) => part.modeled_relationship_graph(package),
+      PartRef::SingleCellTablePart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::SlicerCachePart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::SlicersPart(part) => part.modeled_relationship_graph(package),
+      PartRef::SlideCommentsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::SlideLayoutPart(part) => part.modeled_relationship_graph(package),
+      PartRef::SlideMasterPart(part) => part.modeled_relationship_graph(package),
+      PartRef::SlidePart(part) => part.modeled_relationship_graph(package),
+      PartRef::SlideSyncDataPart(part) => part.modeled_relationship_graph(package),
+      PartRef::SpreadsheetPrinterSettingsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::StyleDefinitionsPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::StylesWithEffectsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::TableDefinitionPart(part) => part.modeled_relationship_graph(package),
+      PartRef::TableStylesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ThemeOverridePart(part) => part.modeled_relationship_graph(package),
+      PartRef::ThemePart(part) => part.modeled_relationship_graph(package),
+      PartRef::ThumbnailPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::TimeLineCachePart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::TimeLinePart(part) => part.modeled_relationship_graph(package),
+      PartRef::UserDefinedTagsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::VbaDataPart(part) => part.modeled_relationship_graph(package),
+      PartRef::VbaProjectPart(part) => part.modeled_relationship_graph(package),
+      PartRef::ViewPropertiesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::VmlDrawingPart(part) => part.modeled_relationship_graph(package),
+      PartRef::VolatileDependenciesPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WebExTaskpanesPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WebExtensionPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WebSettingsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WordAttachedToolbarsPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordCommentsExtensiblePart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordprocessingCommentsExPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordprocessingCommentsIdsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WordprocessingCommentsPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordprocessingPeoplePart(part) => part.modeled_relationship_graph(package),
+      PartRef::WordprocessingPrinterSettingsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorkbookPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WorkbookPersonPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorkbookRevisionHeaderPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorkbookRevisionLogPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorkbookStylesPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorkbookUserDataPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorksheetCommentsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorksheetPart(part) => part.modeled_relationship_graph(package),
+      PartRef::WorksheetSortMapPart(part) => part.modeled_relationship_graph(package),
+      #[cfg(feature = "microsoft365")]
+      PartRef::WorksheetThreadedCommentsPart(part) => part.modeled_relationship_graph(package),
+      PartRef::XmlSignaturePart(part) => part.modeled_relationship_graph(package),
+      PartRef::ExtendedPart(part) => part.modeled_relationship_graph(package),
+    }
+  }
+  pub fn collect_modeled_part_relationship_graphs<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+    graphs: &mut std::collections::HashMap<crate::common::PartId, crate::common::RelationshipGraph>,
+  ) -> Result<(), crate::common::SdkError> {
+    match self {
+      PartRef::AlternativeFormatImportPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CalculationChainPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CellMetadataPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ChartColorStylePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ChartDrawingPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ChartPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ChartStylePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ChartsheetPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CommentAuthorsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ConnectionsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ControlPropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CoreFilePropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::CustomDataPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::CustomDataPropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CustomFilePropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CustomPropertyPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CustomXmlMappingsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CustomXmlPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CustomXmlPropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::CustomizationPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DiagramColorsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DiagramDataPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DiagramLayoutDefinitionPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::DiagramPersistLayoutPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DiagramStylePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DialogsheetPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DigitalSignatureOriginPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DocumentSettingsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::DocumentTasksPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::DrawingsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::EmbeddedControlPersistencePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::EmbeddedObjectPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::EmbeddedPackagePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::EndnotesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ExcelAttachedToolbarsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ExtendedChartPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ExtendedFilePropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ExternalWorkbookPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::FeaturePropertyBagsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::FontPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::FontTablePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::FooterPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::FootnotesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::GlossaryDocumentPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::HandoutMasterPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::HeaderPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ImagePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::InternationalMacroSheetPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::LabelInfoPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::LegacyDiagramTextInfoPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::LegacyDiagramTextPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::MacroSheetPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::MailMergeRecipientDataPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::MainDocumentPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::Model3DReferenceRelationshipPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::NamedSheetViewsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::NotesMasterPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::NotesSlidePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::NumberingDefinitionsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::PivotTableCacheDefinitionPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::PivotTableCacheRecordsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::PivotTablePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::PowerPointAuthorsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::PowerPointCommentPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::PresentationPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::PresentationPropertiesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::QueryTablePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::QuickAccessToolbarCustomizationsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdArrayPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValuePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValueStructurePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValueTypesPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValueWebImagePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdSupportingPropertyBagPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdSupportingPropertyBagStructurePart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RibbonAndBackstageCustomizationsPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::RibbonExtensibilityPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RichStylesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SharedStringTablePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SingleCellTablePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::SlicerCachePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::SlicersPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SlideCommentsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SlideLayoutPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SlideMasterPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SlidePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SlideSyncDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::SpreadsheetPrinterSettingsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::StyleDefinitionsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::StylesWithEffectsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::TableDefinitionPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::TableStylesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::ThemeOverridePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::ThemePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::ThumbnailPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::TimeLineCachePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::TimeLinePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::UserDefinedTagsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::VbaDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::VbaProjectPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::ViewPropertiesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::VmlDrawingPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::VolatileDependenciesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WebExTaskpanesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WebExtensionPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WebSettingsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WordAttachedToolbarsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordCommentsExtensiblePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordprocessingCommentsExPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordprocessingCommentsIdsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WordprocessingCommentsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordprocessingPeoplePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WordprocessingPrinterSettingsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorkbookPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WorkbookPersonPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorkbookRevisionHeaderPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorkbookRevisionLogPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorkbookStylesPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorkbookUserDataPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorksheetCommentsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorksheetPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::WorksheetSortMapPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WorksheetThreadedCommentsPart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
       PartRef::XmlSignaturePart(part) => {
-        let any: &dyn std::any::Any = &part;
-        any.downcast_ref::<T>().copied()
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+      PartRef::ExtendedPart(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
+      }
+    }
+  }
+  pub fn downcast<T: crate::sdk::SdkPartHandle + 'static>(self) -> Option<T> {
+    match &self {
+      PartRef::AlternativeFormatImportPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CalculationChainPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CellMetadataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ChartColorStylePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ChartDrawingPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ChartPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ChartStylePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ChartsheetPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CommentAuthorsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ConnectionsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ControlPropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CoreFilePropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::CustomDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::CustomDataPropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CustomFilePropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CustomPropertyPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CustomXmlMappingsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CustomXmlPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CustomXmlPropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::CustomizationPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DiagramColorsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DiagramDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DiagramLayoutDefinitionPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::DiagramPersistLayoutPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DiagramStylePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DialogsheetPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DigitalSignatureOriginPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DocumentSettingsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::DocumentTasksPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::DrawingsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::EmbeddedControlPersistencePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::EmbeddedObjectPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::EmbeddedPackagePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::EndnotesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ExcelAttachedToolbarsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::ExtendedChartPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ExtendedFilePropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ExternalWorkbookPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::FeaturePropertyBagsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::FontPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::FontTablePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::FooterPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::FootnotesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::GlossaryDocumentPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::HandoutMasterPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::HeaderPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ImagePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::InternationalMacroSheetPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::LabelInfoPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::LegacyDiagramTextInfoPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::LegacyDiagramTextPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::MacroSheetPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::MailMergeRecipientDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::MainDocumentPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::Model3DReferenceRelationshipPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::NamedSheetViewsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::NotesMasterPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::NotesSlidePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::NumberingDefinitionsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::PivotTableCacheDefinitionPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::PivotTableCacheRecordsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::PivotTablePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::PowerPointAuthorsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::PowerPointCommentPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::PresentationPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::PresentationPropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::QueryTablePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::QuickAccessToolbarCustomizationsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdArrayPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValuePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValueStructurePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValueTypesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdRichValueWebImagePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdSupportingPropertyBagPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RdSupportingPropertyBagStructurePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RibbonAndBackstageCustomizationsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::RibbonExtensibilityPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::RichStylesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SharedStringTablePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SingleCellTablePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::SlicerCachePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::SlicersPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SlideCommentsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SlideLayoutPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SlideMasterPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SlidePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SlideSyncDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::SpreadsheetPrinterSettingsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::StyleDefinitionsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::StylesWithEffectsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::TableDefinitionPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::TableStylesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ThemeOverridePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ThemePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ThumbnailPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::TimeLineCachePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::TimeLinePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::UserDefinedTagsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::VbaDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::VbaProjectPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ViewPropertiesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::VmlDrawingPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::VolatileDependenciesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WebExTaskpanesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WebExtensionPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WebSettingsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WordAttachedToolbarsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordCommentsExtensiblePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordprocessingCommentsExPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordprocessingCommentsIdsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WordprocessingCommentsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WordprocessingPeoplePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WordprocessingPrinterSettingsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorkbookPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WorkbookPersonPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorkbookRevisionHeaderPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorkbookRevisionLogPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorkbookStylesPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorkbookUserDataPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorksheetCommentsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorksheetPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::WorksheetSortMapPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      #[cfg(feature = "microsoft365")]
+      PartRef::WorksheetThreadedCommentsPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::XmlSignaturePart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
+      }
+      PartRef::ExtendedPart(part) => {
+        let any: &dyn std::any::Any = part;
+        any.downcast_ref::<T>().cloned()
       }
     }
   }
@@ -1133,1482 +2818,4756 @@ impl PartRef {
   ) -> Option<Self> {
     let part = package.storage().part(part_id)?;
     let Some(relationship_type) = part.relationship_type() else {
-      return Some(PartRef::ExtendedPart(
-        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::ExtendedPart(
+                    <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     };
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
+      "",
+      ".",
+      "afchunk",
     ) {
       return Some(
                 PartRef::AlternativeFormatImportPart(
-                    <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml",
+      ".",
+      "calcChain",
     ) {
       return Some(
                 PartRef::CalculationChainPart(
-                    <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml",
+      ".",
+      "metadata",
     ) {
       return Some(
                 PartRef::CellMetadataPart(
-                    <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
+      "application/vnd.ms-office.chartcolorstyle+xml",
+      ".",
+      "colors",
     ) {
       return Some(
                 PartRef::ChartColorStylePart(
-                    <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
+      "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml",
+      "../drawings",
+      "drawing",
     ) {
       return Some(
                 PartRef::ChartDrawingPart(
-                    <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+      "application/vnd.openxmlformats-officedocument.drawingml.chart+xml",
+      "charts",
+      "chart",
     ) {
-      return Some(PartRef::ChartPart(
-        <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::ChartPart(
+                    <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
+      "application/vnd.ms-office.chartstyle+xml",
+      ".",
+      "style",
     ) {
-      return Some(PartRef::ChartStylePart(
-        <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::ChartStylePart(
+                    <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
+      "chartsheets",
+      "sheet",
     ) {
-      return Some(PartRef::ChartsheetPart(
-        <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::ChartsheetPart(
+                    <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
+      "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml",
+      ".",
+      "commentAuthors",
     ) {
       return Some(
                 PartRef::CommentAuthorsPart(
-                    <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml",
+      ".",
+      "connections",
     ) {
       return Some(
                 PartRef::ConnectionsPart(
-                    <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+      "application/vnd.ms-excel.controlproperties+xml",
+      "../ctrlProps",
+      "ctrlProp",
     ) {
       return Some(
                 PartRef::ControlPropertiesPart(
-                    <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+      "application/vnd.openxmlformats-package.core-properties+xml",
+      "docProps",
+      "core",
     ) {
       return Some(
                 PartRef::CoreFilePropertiesPart(
-                    <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/customData",
+      "application/binary",
+      "customData",
+      "customData",
     ) {
-      return Some(PartRef::CustomDataPart(
-        <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::CustomDataPart(
+                    <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/customDataProps",
+      "application/vnd.ms-excel.customDataProperties+xml",
+      "customData",
+      "customDataProps",
     ) {
       return Some(
                 PartRef::CustomDataPropertiesPart(
-                    <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
+      "application/vnd.openxmlformats-officedocument.custom-properties+xml",
+      "docProps",
+      "custom",
     ) {
       return Some(
                 PartRef::CustomFilePropertiesPart(
-                    <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty",
+      "",
+      ".",
+      "CustomProperty",
     ) {
       return Some(
                 PartRef::CustomPropertyPart(
-                    <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps",
+      "application/xml",
+      ".",
+      "xmlMaps",
     ) {
       return Some(
                 PartRef::CustomXmlMappingsPart(
-                    <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+      "",
+      "../customXml",
+      "item",
     ) {
-      return Some(PartRef::CustomXmlPart(
-        <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::CustomXmlPart(
+                    <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
+      "application/vnd.openxmlformats-officedocument.customXmlProperties+xml",
+      ".",
+      "itemProps",
     ) {
       return Some(
                 PartRef::CustomXmlPropertiesPart(
-                    <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations",
+      "application/vnd.ms-word.keyMapCustomizations+xml",
+      ".",
+      "customizations",
     ) {
       return Some(
                 PartRef::CustomizationPart(
-                    <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml",
+      "../graphics",
+      "colors",
     ) {
       return Some(
                 PartRef::DiagramColorsPart(
-                    <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml",
+      "../graphics",
+      "data",
     ) {
       return Some(
                 PartRef::DiagramDataPart(
-                    <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml",
+      "../graphics",
+      "layout",
     ) {
       return Some(
                 PartRef::DiagramLayoutDefinitionPart(
-                    <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+      "application/vnd.ms-office.drawingml.diagramDrawing+xml",
+      "../diagrams",
+      "drawing",
     ) {
       return Some(
                 PartRef::DiagramPersistLayoutPart(
-                    <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml",
+      "../graphics",
+      "quickStyle",
     ) {
       return Some(
                 PartRef::DiagramStylePart(
-                    <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml",
+      "dialogsheets",
+      "sheet",
     ) {
       return Some(
                 PartRef::DialogsheetPart(
-                    <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin",
+      "application/vnd.openxmlformats-package.digital-signature-origin",
+      "_xmlsignatures",
+      "origin",
     ) {
       return Some(
                 PartRef::DigitalSignatureOriginPart(
-                    <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+      ".",
+      "settings",
     ) {
       return Some(
                 PartRef::DocumentSettingsPart(
-                    <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
+      "application/vnd.ms-office.documenttasks+xml",
+      ".",
+      "tasks",
     ) {
       return Some(
                 PartRef::DocumentTasksPart(
-                    <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+      "application/vnd.openxmlformats-officedocument.drawing+xml",
+      "../drawings",
+      "drawing",
     ) {
-      return Some(PartRef::DrawingsPart(
-        <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::DrawingsPart(
+                    <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+      "",
+      ".",
+      "ActiveXControl",
     ) {
       return Some(
                 PartRef::EmbeddedControlPersistenceBinaryDataPart(
-                    <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
+      "",
+      "embeddings",
+      "control",
     ) {
       return Some(
                 PartRef::EmbeddedControlPersistencePart(
-                    <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+      "",
+      "embeddings",
+      "embeddedObject",
     ) {
       return Some(
                 PartRef::EmbeddedObjectPart(
-                    <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
+      "",
+      "embeddings",
+      "package",
     ) {
       return Some(
                 PartRef::EmbeddedPackagePart(
-                    <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml",
+      ".",
+      "endnotes",
     ) {
-      return Some(PartRef::EndnotesPart(
-        <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::EndnotesPart(
+                    <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
+      "application/vnd.ms-excel.attachedToolbars",
+      ".",
+      "attachedToolbars",
     ) {
       return Some(
                 PartRef::ExcelAttachedToolbarsPart(
-                    <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+      "application/vnd.ms-office.chartex+xml",
+      "extendedCharts",
+      "chart",
     ) {
       return Some(
                 PartRef::ExtendedChartPart(
-                    <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+      "application/vnd.openxmlformats-officedocument.extended-properties+xml",
+      "docProps",
+      "app",
     ) {
       return Some(
                 PartRef::ExtendedFilePropertiesPart(
-                    <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml",
+      "externalReferences",
+      "externalReference",
     ) {
       return Some(
                 PartRef::ExternalWorkbookPart(
-                    <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag",
+      "application/vnd.ms-excel.featurepropertybag+xml",
+      "featurePropertyBag",
+      "featurePropertyBag",
     ) {
       return Some(
                 PartRef::FeaturePropertyBagsPart(
-                    <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+      "",
+      "fonts",
+      "font",
     ) {
-      return Some(PartRef::FontPart(
-        <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::FontPart(
+                    <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
+      ".",
+      "fontTable",
     ) {
-      return Some(PartRef::FontTablePart(
-        <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::FontTablePart(
+                    <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml",
+      ".",
+      "footer",
     ) {
-      return Some(PartRef::FooterPart(
-        <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::FooterPart(
+                    <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
+      ".",
+      "footnotes",
     ) {
-      return Some(PartRef::FootnotesPart(
-        <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::FootnotesPart(
+                    <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml",
+      "glossary",
+      "document",
     ) {
       return Some(
                 PartRef::GlossaryDocumentPart(
-                    <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
+      "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml",
+      "handoutMasters",
+      "handoutMaster",
     ) {
       return Some(
                 PartRef::HandoutMasterPart(
-                    <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+      ".",
+      "header",
     ) {
-      return Some(PartRef::HeaderPart(
-        <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::HeaderPart(
+                    <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "",
+      "../media",
+      "image",
     ) {
-      return Some(PartRef::ImagePart(
-        <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::ImagePart(
+                    <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+      "application/vnd.ms-excel.intlmacrosheet+xml",
+      "macrosheets",
+      "intlsheet",
     ) {
       return Some(
                 PartRef::InternationalMacroSheetPart(
-                    <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels",
+      "application/vnd.ms-office.classificationlabels+xml",
+      "docMetadata",
+      "LabelInfo",
     ) {
-      return Some(PartRef::LabelInfoPart(
-        <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::LabelInfoPart(
+                    <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
+      "application/vnd.ms-office.legacyDocTextInfo",
+      ".",
+      "legacyDocTextInfo",
     ) {
       return Some(
                 PartRef::LegacyDiagramTextInfoPart(
-                    <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
+      "application/vnd.ms-office.legacyDiagramText",
+      ".",
+      "legacyDiagramText",
     ) {
       return Some(
                 PartRef::LegacyDiagramTextPart(
-                    <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+      "application/vnd.ms-excel.macrosheet+xml",
+      "macrosheets",
+      "sheet",
     ) {
-      return Some(PartRef::MacroSheetPart(
-        <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::MacroSheetPart(
+                    <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
+      "",
+      ".",
+      "recipients",
     ) {
       return Some(
                 PartRef::MailMergeRecipientDataPart(
-                    <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+      "word",
+      "document",
     ) {
       return Some(
                 PartRef::MainDocumentPart(
-                    <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
+      "model/gltf-binary",
+      "../media",
+      "model3d",
     ) {
       return Some(
                 PartRef::Model3DReferenceRelationshipPart(
-                    <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView",
+      "application/vnd.ms-excel.namedsheetviews+xml",
+      "../namedSheetViews",
+      "namedSheetView",
     ) {
       return Some(
                 PartRef::NamedSheetViewsPart(
-                    <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+      "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
+      "notesMasters",
+      "notesMaster",
     ) {
       return Some(
                 PartRef::NotesMasterPart(
-                    <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide",
+      "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
+      "../notesSlides",
+      "notesSlide",
     ) {
-      return Some(PartRef::NotesSlidePart(
-        <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::NotesSlidePart(
+                    <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
+      ".",
+      "numbering",
     ) {
       return Some(
                 PartRef::NumberingDefinitionsPart(
-                    <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml",
+      "../pivotCache",
+      "pivotCacheDefinition",
     ) {
       return Some(
                 PartRef::PivotTableCacheDefinitionPart(
-                    <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml",
+      ".",
+      "pivotCacheRecords",
     ) {
       return Some(
                 PartRef::PivotTableCacheRecordsPart(
-                    <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml",
+      "../pivotTables",
+      "pivotTable",
     ) {
-      return Some(PartRef::PivotTablePart(
-        <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::PivotTablePart(
+                    <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2018/10/relationships/authors",
+      "application/vnd.ms-powerpoint.authors+xml",
+      ".",
+      "authors",
     ) {
       return Some(
                 PartRef::PowerPointAuthorsPart(
-                    <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2018/10/relationships/comments",
+      "application/vnd.ms-powerpoint.comments+xml",
+      "../comments",
+      "modernComment",
     ) {
       return Some(
                 PartRef::PowerPointCommentPart(
-                    <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+      "ppt",
+      "presentation",
     ) {
       return Some(
                 PartRef::PresentationPart(
-                    <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
+      "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml",
+      ".",
+      "presProps",
     ) {
       return Some(
                 PartRef::PresentationPropertiesPart(
-                    <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml",
+      "../queryTables",
+      "queryTable",
     ) {
-      return Some(PartRef::QueryTablePart(
-        <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::QueryTablePart(
+                    <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization",
+      "application/xml",
+      "userCustomization",
+      "customUI",
     ) {
       return Some(
                 PartRef::QuickAccessToolbarCustomizationsPart(
-                    <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
+      "application/vnd.ms-excel.rdarray+xml",
+      "richData",
+      "rdarray",
     ) {
-      return Some(PartRef::RdArrayPart(
-        <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::RdArrayPart(
+                    <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
+      "application/vnd.ms-excel.rdrichvalue+xml",
+      "richData",
+      "rdrichvalue",
     ) {
       return Some(
                 PartRef::RdRichValuePart(
-                    <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure",
+      "application/vnd.ms-excel.rdrichvaluestructure+xml",
+      "richData",
+      "rdrichvaluestructure",
     ) {
       return Some(
                 PartRef::RdRichValueStructurePart(
-                    <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes",
+      "application/vnd.ms-excel.rdrichvaluetypes+xml",
+      "richData",
+      "rdRichValueTypes",
     ) {
       return Some(
                 PartRef::RdRichValueTypesPart(
-                    <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
+      "application/vnd.ms-excel.rdrichvaluewebimage+xml",
+      "richData",
+      "rdRichValueWebImage",
     ) {
       return Some(
                 PartRef::RdRichValueWebImagePart(
-                    <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
+      "application/vnd.ms-excel.rdsupportingpropertybag+xml",
+      "richData",
+      "rdsupportingpropertybag",
     ) {
       return Some(
                 PartRef::RdSupportingPropertyBagPart(
-                    <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure",
+      "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml",
+      "richData",
+      "rdsupportingpropertybagstructure",
     ) {
       return Some(
                 PartRef::RdSupportingPropertyBagStructurePart(
-                    <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility",
+      "application/xml",
+      "customUI",
+      "customUI",
     ) {
       return Some(
                 PartRef::RibbonAndBackstageCustomizationsPart(
-                    <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility",
+      "application/xml",
+      "customUI",
+      "customUI",
     ) {
       return Some(
                 PartRef::RibbonExtensibilityPart(
-                    <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/06/relationships/richStyles",
+      "application/vnd.ms-excel.richstyles+xml",
+      "richData",
+      "richStyles",
     ) {
-      return Some(PartRef::RichStylesPart(
-        <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::RichStylesPart(
+                    <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml",
+      ".",
+      "sharedStrings",
     ) {
       return Some(
                 PartRef::SharedStringTablePart(
-                    <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml",
+      "../tables",
+      "tableSingleCells",
     ) {
       return Some(
                 PartRef::SingleCellTablePart(
-                    <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
+      "application/vnd.ms-excel.slicerCache+xml",
+      "slicerCaches",
+      "slicerCache",
     ) {
       return Some(
                 PartRef::SlicerCachePart(
-                    <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/slicer",
+      "application/vnd.ms-excel.slicer+xml",
+      "../slicers",
+      "slicer",
     ) {
-      return Some(PartRef::SlicersPart(
-        <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::SlicersPart(
+                    <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      "application/vnd.openxmlformats-officedocument.presentationml.comments+xml",
+      "../comments",
+      "comment",
     ) {
       return Some(
                 PartRef::SlideCommentsPart(
-                    <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+      "../slideLayouts",
+      "slideLayout",
     ) {
       return Some(
                 PartRef::SlideLayoutPart(
-                    <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+      "slideMasters",
+      "slideMaster",
     ) {
       return Some(
                 PartRef::SlideMasterPart(
-                    <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+      "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+      "slides",
+      "slide",
     ) {
-      return Some(PartRef::SlidePart(
-        <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::SlidePart(
+                    <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideUpdateInfo",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml",
+      "slideUpdateInfo",
+      "slideUpdateInfo",
     ) {
       return Some(
                 PartRef::SlideSyncDataPart(
-                    <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings",
+      "../printerSettings",
+      "printerSettings",
     ) {
       return Some(
                 PartRef::SpreadsheetPrinterSettingsPart(
-                    <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+      ".",
+      "styles",
     ) {
       return Some(
                 PartRef::StyleDefinitionsPart(
-                    <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
+      "application/vnd.ms-word.stylesWithEffects+xml",
+      ".",
+      "stylesWithEffects",
     ) {
       return Some(
                 PartRef::StylesWithEffectsPart(
-                    <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml",
+      "../tables",
+      "table",
     ) {
       return Some(
                 PartRef::TableDefinitionPart(
-                    <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
+      "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml",
+      ".",
+      "tableStyles",
     ) {
       return Some(
                 PartRef::TableStylesPart(
-                    <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
+      "application/vnd.openxmlformats-officedocument.themeOverride+xml",
+      "theme",
+      "themeoverride",
     ) {
       return Some(
                 PartRef::ThemeOverridePart(
-                    <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+      "application/vnd.openxmlformats-officedocument.theme+xml",
+      "theme",
+      "theme",
     ) {
-      return Some(PartRef::ThemePart(
-        <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
-      ));
+      return Some(
+                PartRef::ThemePart(
+                    <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
+      "",
+      "docProps",
+      "thumbnail",
     ) {
-      return Some(PartRef::ThumbnailPart(
-        <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::ThumbnailPart(
+                    <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/timelineCache",
+      "application/vnd.ms-excel.timelineCache+xml",
+      "timelineCaches",
+      "timelineCache",
     ) {
       return Some(
                 PartRef::TimeLineCachePart(
-                    <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/timeline",
+      "application/vnd.ms-excel.timeline+xml",
+      "../timelines",
+      "timeline",
     ) {
-      return Some(PartRef::TimeLinePart(
-        <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::TimeLinePart(
+                    <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+      "application/vnd.openxmlformats-officedocument.presentationml.tags+xml",
+      "tags",
+      "tag",
     ) {
       return Some(
                 PartRef::UserDefinedTagsPart(
-                    <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+      "application/vnd.ms-word.vbaData+xml",
+      ".",
+      "vbaData",
     ) {
-      return Some(PartRef::VbaDataPart(
-        <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::VbaDataPart(
+                    <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+      "application/vnd.ms-office.vbaProject",
+      ".",
+      "vbaProject",
     ) {
-      return Some(PartRef::VbaProjectPart(
-        <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::VbaProjectPart(
+                    <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
+      "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml",
+      ".",
+      "viewProps",
     ) {
       return Some(
                 PartRef::ViewPropertiesPart(
-                    <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+      "application/vnd.openxmlformats-officedocument.vmlDrawing",
+      "../drawings",
+      "vmldrawing",
     ) {
-      return Some(PartRef::VmlDrawingPart(
-        <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::VmlDrawingPart(
+                    <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml",
+      ".",
+      "volatileDependencies",
     ) {
       return Some(
                 PartRef::VolatileDependenciesPart(
-                    <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes",
+      "application/vnd.ms-office.webextensiontaskpanes+xml",
+      "../webextensions",
+      "taskpanes",
     ) {
       return Some(
                 PartRef::WebExTaskpanesPart(
-                    <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/webextension",
+      "application/vnd.ms-office.webextension+xml",
+      "../webextensions",
+      "webextension",
     ) {
       return Some(
                 PartRef::WebExtensionPart(
-                    <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml",
+      ".",
+      "webSettings",
     ) {
       return Some(
                 PartRef::WebSettingsPart(
-                    <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
+      "application/vnd.ms-word.attachedToolbars",
+      ".",
+      "attachedToolbars",
     ) {
       return Some(
                 PartRef::WordAttachedToolbarsPart(
-                    <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml",
+      ".",
+      "commentsExtensible",
     ) {
       return Some(
                 PartRef::WordCommentsExtensiblePart(
-                    <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
+      ".",
+      "commentsExtended",
     ) {
       return Some(
                 PartRef::WordprocessingCommentsExPart(
-                    <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml",
+      ".",
+      "commentsIds",
     ) {
       return Some(
                 PartRef::WordprocessingCommentsIdsPart(
-                    <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
+      ".",
+      "comments",
     ) {
       return Some(
                 PartRef::WordprocessingCommentsPart(
-                    <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2011/relationships/people",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml",
+      ".",
+      "people",
     ) {
       return Some(
                 PartRef::WordprocessingPeoplePart(
-                    <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings",
+      "../printerSettings",
+      "printerSettings",
     ) {
       return Some(
                 PartRef::WordprocessingPrinterSettingsPart(
-                    <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "xl",
+      "workbook",
     ) {
-      return Some(PartRef::WorkbookPart(
-        <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::WorkbookPart(
+                    <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/10/relationships/person",
+      "application/vnd.ms-excel.person+xml",
+      "persons",
+      "person",
     ) {
       return Some(
                 PartRef::WorkbookPersonPart(
-                    <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml",
+      "revisions",
+      "revisionHeaders",
     ) {
       return Some(
                 PartRef::WorkbookRevisionHeaderPart(
-                    <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml",
+      ".",
+      "revisionLog",
     ) {
       return Some(
                 PartRef::WorkbookRevisionLogPart(
-                    <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml",
+      ".",
+      "styles",
     ) {
       return Some(
                 PartRef::WorkbookStylesPart(
-                    <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml",
+      "revisions",
+      "userNames",
     ) {
       return Some(
                 PartRef::WorkbookUserDataPart(
-                    <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml",
+      "..",
+      "comments",
     ) {
       return Some(
                 PartRef::WorksheetCommentsPart(
-                    <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml",
+      "worksheets",
+      "sheet",
     ) {
-      return Some(PartRef::WorksheetPart(
-        <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::from_part_id(
-          part_id,
-        ),
-      ));
+      return Some(
+                PartRef::WorksheetPart(
+                    <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
+                        part_id,
+                    ),
+                ),
+            );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2006/relationships/wsSortMap",
+      "application/vnd.ms-excel.wsSortMap+xml",
+      ".",
+      "wsSortMap",
     ) {
       return Some(
                 PartRef::WorksheetSortMapPart(
-                    <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
     #[cfg(feature = "microsoft365")]
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment",
+      "application/vnd.ms-excel.threadedcomments+xml",
+      "../threadedcomments",
+      "threadedcomment",
     ) {
       return Some(
                 PartRef::WorksheetThreadedCommentsPart(
-                    <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    if crate::common::relationship_type_matches(
+    if crate::common::part_descriptor_matches(
       relationship_type,
+      part.content_type(),
+      part.path(),
       "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+      "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+      "_xmlsignatures",
+      "sig",
     ) {
       return Some(
                 PartRef::XmlSignaturePart(
-                    <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::from_part_id(
+                    <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                        package.storage(),
                         part_id,
                     ),
                 ),
             );
     }
-    Some(PartRef::ExtendedPart(
-      <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(
-        part_id,
-      ),
-    ))
+    Some(
+            PartRef::ExtendedPart(
+                <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+                    package.storage(),
+                    part_id,
+                ),
+            ),
+        )
+  }
+  pub fn from_relationship<P: crate::sdk::SdkPackage>(
+    package: &P,
+    relationship: &crate::common::RelationshipInfo,
+  ) -> Option<Self> {
+    Self::from_relationship_storage(package.storage(), relationship)
+  }
+  pub fn from_relationship_storage(
+    storage: &crate::common::SdkPackageStorage,
+    relationship: &crate::common::RelationshipInfo,
+  ) -> Option<Self> {
+    let part_id = relationship.target_part_id()?;
+    let part = storage.part(part_id)?;
+    let Some(relationship_type) = part.relationship_type() else {
+      return Some(
+                PartRef::ExtendedPart(
+                    <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    };
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
+      "",
+      ".",
+      "afchunk",
+    ) {
+      return Some(
+                PartRef::AlternativeFormatImportPart(
+                    <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml",
+      ".",
+      "calcChain",
+    ) {
+      return Some(
+                PartRef::CalculationChainPart(
+                    <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml",
+      ".",
+      "metadata",
+    ) {
+      return Some(
+                PartRef::CellMetadataPart(
+                    <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
+      "application/vnd.ms-office.chartcolorstyle+xml",
+      ".",
+      "colors",
+    ) {
+      return Some(
+                PartRef::ChartColorStylePart(
+                    <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
+      "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml",
+      "../drawings",
+      "drawing",
+    ) {
+      return Some(
+                PartRef::ChartDrawingPart(
+                    <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+      "application/vnd.openxmlformats-officedocument.drawingml.chart+xml",
+      "charts",
+      "chart",
+    ) {
+      return Some(
+                PartRef::ChartPart(
+                    <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
+      "application/vnd.ms-office.chartstyle+xml",
+      ".",
+      "style",
+    ) {
+      return Some(
+                PartRef::ChartStylePart(
+                    <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
+      "chartsheets",
+      "sheet",
+    ) {
+      return Some(
+                PartRef::ChartsheetPart(
+                    <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
+      "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml",
+      ".",
+      "commentAuthors",
+    ) {
+      return Some(
+                PartRef::CommentAuthorsPart(
+                    <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml",
+      ".",
+      "connections",
+    ) {
+      return Some(
+                PartRef::ConnectionsPart(
+                    <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+      "application/vnd.ms-excel.controlproperties+xml",
+      "../ctrlProps",
+      "ctrlProp",
+    ) {
+      return Some(
+                PartRef::ControlPropertiesPart(
+                    <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+      "application/vnd.openxmlformats-package.core-properties+xml",
+      "docProps",
+      "core",
+    ) {
+      return Some(
+                PartRef::CoreFilePropertiesPart(
+                    <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/customData",
+      "application/binary",
+      "customData",
+      "customData",
+    ) {
+      return Some(
+                PartRef::CustomDataPart(
+                    <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/customDataProps",
+      "application/vnd.ms-excel.customDataProperties+xml",
+      "customData",
+      "customDataProps",
+    ) {
+      return Some(
+                PartRef::CustomDataPropertiesPart(
+                    <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
+      "application/vnd.openxmlformats-officedocument.custom-properties+xml",
+      "docProps",
+      "custom",
+    ) {
+      return Some(
+                PartRef::CustomFilePropertiesPart(
+                    <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty",
+      "",
+      ".",
+      "CustomProperty",
+    ) {
+      return Some(
+                PartRef::CustomPropertyPart(
+                    <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps",
+      "application/xml",
+      ".",
+      "xmlMaps",
+    ) {
+      return Some(
+                PartRef::CustomXmlMappingsPart(
+                    <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+      "",
+      "../customXml",
+      "item",
+    ) {
+      return Some(
+                PartRef::CustomXmlPart(
+                    <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
+      "application/vnd.openxmlformats-officedocument.customXmlProperties+xml",
+      ".",
+      "itemProps",
+    ) {
+      return Some(
+                PartRef::CustomXmlPropertiesPart(
+                    <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations",
+      "application/vnd.ms-word.keyMapCustomizations+xml",
+      ".",
+      "customizations",
+    ) {
+      return Some(
+                PartRef::CustomizationPart(
+                    <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml",
+      "../graphics",
+      "colors",
+    ) {
+      return Some(
+                PartRef::DiagramColorsPart(
+                    <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml",
+      "../graphics",
+      "data",
+    ) {
+      return Some(
+                PartRef::DiagramDataPart(
+                    <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml",
+      "../graphics",
+      "layout",
+    ) {
+      return Some(
+                PartRef::DiagramLayoutDefinitionPart(
+                    <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+      "application/vnd.ms-office.drawingml.diagramDrawing+xml",
+      "../diagrams",
+      "drawing",
+    ) {
+      return Some(
+                PartRef::DiagramPersistLayoutPart(
+                    <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml",
+      "../graphics",
+      "quickStyle",
+    ) {
+      return Some(
+                PartRef::DiagramStylePart(
+                    <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml",
+      "dialogsheets",
+      "sheet",
+    ) {
+      return Some(
+                PartRef::DialogsheetPart(
+                    <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin",
+      "application/vnd.openxmlformats-package.digital-signature-origin",
+      "_xmlsignatures",
+      "origin",
+    ) {
+      return Some(
+                PartRef::DigitalSignatureOriginPart(
+                    <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+      ".",
+      "settings",
+    ) {
+      return Some(
+                PartRef::DocumentSettingsPart(
+                    <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
+      "application/vnd.ms-office.documenttasks+xml",
+      ".",
+      "tasks",
+    ) {
+      return Some(
+                PartRef::DocumentTasksPart(
+                    <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+      "application/vnd.openxmlformats-officedocument.drawing+xml",
+      "../drawings",
+      "drawing",
+    ) {
+      return Some(
+                PartRef::DrawingsPart(
+                    <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+      "",
+      ".",
+      "ActiveXControl",
+    ) {
+      return Some(
+                PartRef::EmbeddedControlPersistenceBinaryDataPart(
+                    <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
+      "",
+      "embeddings",
+      "control",
+    ) {
+      return Some(
+                PartRef::EmbeddedControlPersistencePart(
+                    <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+      "",
+      "embeddings",
+      "embeddedObject",
+    ) {
+      return Some(
+                PartRef::EmbeddedObjectPart(
+                    <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
+      "",
+      "embeddings",
+      "package",
+    ) {
+      return Some(
+                PartRef::EmbeddedPackagePart(
+                    <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml",
+      ".",
+      "endnotes",
+    ) {
+      return Some(
+                PartRef::EndnotesPart(
+                    <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
+      "application/vnd.ms-excel.attachedToolbars",
+      ".",
+      "attachedToolbars",
+    ) {
+      return Some(
+                PartRef::ExcelAttachedToolbarsPart(
+                    <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+      "application/vnd.ms-office.chartex+xml",
+      "extendedCharts",
+      "chart",
+    ) {
+      return Some(
+                PartRef::ExtendedChartPart(
+                    <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+      "application/vnd.openxmlformats-officedocument.extended-properties+xml",
+      "docProps",
+      "app",
+    ) {
+      return Some(
+                PartRef::ExtendedFilePropertiesPart(
+                    <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml",
+      "externalReferences",
+      "externalReference",
+    ) {
+      return Some(
+                PartRef::ExternalWorkbookPart(
+                    <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag",
+      "application/vnd.ms-excel.featurepropertybag+xml",
+      "featurePropertyBag",
+      "featurePropertyBag",
+    ) {
+      return Some(
+                PartRef::FeaturePropertyBagsPart(
+                    <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+      "",
+      "fonts",
+      "font",
+    ) {
+      return Some(
+                PartRef::FontPart(
+                    <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
+      ".",
+      "fontTable",
+    ) {
+      return Some(
+                PartRef::FontTablePart(
+                    <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml",
+      ".",
+      "footer",
+    ) {
+      return Some(
+                PartRef::FooterPart(
+                    <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
+      ".",
+      "footnotes",
+    ) {
+      return Some(
+                PartRef::FootnotesPart(
+                    <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml",
+      "glossary",
+      "document",
+    ) {
+      return Some(
+                PartRef::GlossaryDocumentPart(
+                    <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
+      "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml",
+      "handoutMasters",
+      "handoutMaster",
+    ) {
+      return Some(
+                PartRef::HandoutMasterPart(
+                    <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+      ".",
+      "header",
+    ) {
+      return Some(
+                PartRef::HeaderPart(
+                    <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "",
+      "../media",
+      "image",
+    ) {
+      return Some(
+                PartRef::ImagePart(
+                    <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+      "application/vnd.ms-excel.intlmacrosheet+xml",
+      "macrosheets",
+      "intlsheet",
+    ) {
+      return Some(
+                PartRef::InternationalMacroSheetPart(
+                    <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels",
+      "application/vnd.ms-office.classificationlabels+xml",
+      "docMetadata",
+      "LabelInfo",
+    ) {
+      return Some(
+                PartRef::LabelInfoPart(
+                    <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
+      "application/vnd.ms-office.legacyDocTextInfo",
+      ".",
+      "legacyDocTextInfo",
+    ) {
+      return Some(
+                PartRef::LegacyDiagramTextInfoPart(
+                    <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
+      "application/vnd.ms-office.legacyDiagramText",
+      ".",
+      "legacyDiagramText",
+    ) {
+      return Some(
+                PartRef::LegacyDiagramTextPart(
+                    <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+      "application/vnd.ms-excel.macrosheet+xml",
+      "macrosheets",
+      "sheet",
+    ) {
+      return Some(
+                PartRef::MacroSheetPart(
+                    <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
+      "",
+      ".",
+      "recipients",
+    ) {
+      return Some(
+                PartRef::MailMergeRecipientDataPart(
+                    <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+      "word",
+      "document",
+    ) {
+      return Some(
+                PartRef::MainDocumentPart(
+                    <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
+      "model/gltf-binary",
+      "../media",
+      "model3d",
+    ) {
+      return Some(
+                PartRef::Model3DReferenceRelationshipPart(
+                    <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView",
+      "application/vnd.ms-excel.namedsheetviews+xml",
+      "../namedSheetViews",
+      "namedSheetView",
+    ) {
+      return Some(
+                PartRef::NamedSheetViewsPart(
+                    <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+      "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
+      "notesMasters",
+      "notesMaster",
+    ) {
+      return Some(
+                PartRef::NotesMasterPart(
+                    <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide",
+      "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
+      "../notesSlides",
+      "notesSlide",
+    ) {
+      return Some(
+                PartRef::NotesSlidePart(
+                    <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
+      ".",
+      "numbering",
+    ) {
+      return Some(
+                PartRef::NumberingDefinitionsPart(
+                    <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml",
+      "../pivotCache",
+      "pivotCacheDefinition",
+    ) {
+      return Some(
+                PartRef::PivotTableCacheDefinitionPart(
+                    <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml",
+      ".",
+      "pivotCacheRecords",
+    ) {
+      return Some(
+                PartRef::PivotTableCacheRecordsPart(
+                    <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml",
+      "../pivotTables",
+      "pivotTable",
+    ) {
+      return Some(
+                PartRef::PivotTablePart(
+                    <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2018/10/relationships/authors",
+      "application/vnd.ms-powerpoint.authors+xml",
+      ".",
+      "authors",
+    ) {
+      return Some(
+                PartRef::PowerPointAuthorsPart(
+                    <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2018/10/relationships/comments",
+      "application/vnd.ms-powerpoint.comments+xml",
+      "../comments",
+      "modernComment",
+    ) {
+      return Some(
+                PartRef::PowerPointCommentPart(
+                    <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+      "ppt",
+      "presentation",
+    ) {
+      return Some(
+                PartRef::PresentationPart(
+                    <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
+      "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml",
+      ".",
+      "presProps",
+    ) {
+      return Some(
+                PartRef::PresentationPropertiesPart(
+                    <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml",
+      "../queryTables",
+      "queryTable",
+    ) {
+      return Some(
+                PartRef::QueryTablePart(
+                    <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization",
+      "application/xml",
+      "userCustomization",
+      "customUI",
+    ) {
+      return Some(
+                PartRef::QuickAccessToolbarCustomizationsPart(
+                    <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
+      "application/vnd.ms-excel.rdarray+xml",
+      "richData",
+      "rdarray",
+    ) {
+      return Some(
+                PartRef::RdArrayPart(
+                    <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
+      "application/vnd.ms-excel.rdrichvalue+xml",
+      "richData",
+      "rdrichvalue",
+    ) {
+      return Some(
+                PartRef::RdRichValuePart(
+                    <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure",
+      "application/vnd.ms-excel.rdrichvaluestructure+xml",
+      "richData",
+      "rdrichvaluestructure",
+    ) {
+      return Some(
+                PartRef::RdRichValueStructurePart(
+                    <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes",
+      "application/vnd.ms-excel.rdrichvaluetypes+xml",
+      "richData",
+      "rdRichValueTypes",
+    ) {
+      return Some(
+                PartRef::RdRichValueTypesPart(
+                    <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
+      "application/vnd.ms-excel.rdrichvaluewebimage+xml",
+      "richData",
+      "rdRichValueWebImage",
+    ) {
+      return Some(
+                PartRef::RdRichValueWebImagePart(
+                    <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
+      "application/vnd.ms-excel.rdsupportingpropertybag+xml",
+      "richData",
+      "rdsupportingpropertybag",
+    ) {
+      return Some(
+                PartRef::RdSupportingPropertyBagPart(
+                    <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure",
+      "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml",
+      "richData",
+      "rdsupportingpropertybagstructure",
+    ) {
+      return Some(
+                PartRef::RdSupportingPropertyBagStructurePart(
+                    <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility",
+      "application/xml",
+      "customUI",
+      "customUI",
+    ) {
+      return Some(
+                PartRef::RibbonAndBackstageCustomizationsPart(
+                    <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility",
+      "application/xml",
+      "customUI",
+      "customUI",
+    ) {
+      return Some(
+                PartRef::RibbonExtensibilityPart(
+                    <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/06/relationships/richStyles",
+      "application/vnd.ms-excel.richstyles+xml",
+      "richData",
+      "richStyles",
+    ) {
+      return Some(
+                PartRef::RichStylesPart(
+                    <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml",
+      ".",
+      "sharedStrings",
+    ) {
+      return Some(
+                PartRef::SharedStringTablePart(
+                    <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml",
+      "../tables",
+      "tableSingleCells",
+    ) {
+      return Some(
+                PartRef::SingleCellTablePart(
+                    <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
+      "application/vnd.ms-excel.slicerCache+xml",
+      "slicerCaches",
+      "slicerCache",
+    ) {
+      return Some(
+                PartRef::SlicerCachePart(
+                    <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/slicer",
+      "application/vnd.ms-excel.slicer+xml",
+      "../slicers",
+      "slicer",
+    ) {
+      return Some(
+                PartRef::SlicersPart(
+                    <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      "application/vnd.openxmlformats-officedocument.presentationml.comments+xml",
+      "../comments",
+      "comment",
+    ) {
+      return Some(
+                PartRef::SlideCommentsPart(
+                    <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+      "../slideLayouts",
+      "slideLayout",
+    ) {
+      return Some(
+                PartRef::SlideLayoutPart(
+                    <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+      "slideMasters",
+      "slideMaster",
+    ) {
+      return Some(
+                PartRef::SlideMasterPart(
+                    <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+      "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+      "slides",
+      "slide",
+    ) {
+      return Some(
+                PartRef::SlidePart(
+                    <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideUpdateInfo",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml",
+      "slideUpdateInfo",
+      "slideUpdateInfo",
+    ) {
+      return Some(
+                PartRef::SlideSyncDataPart(
+                    <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings",
+      "../printerSettings",
+      "printerSettings",
+    ) {
+      return Some(
+                PartRef::SpreadsheetPrinterSettingsPart(
+                    <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+      ".",
+      "styles",
+    ) {
+      return Some(
+                PartRef::StyleDefinitionsPart(
+                    <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
+      "application/vnd.ms-word.stylesWithEffects+xml",
+      ".",
+      "stylesWithEffects",
+    ) {
+      return Some(
+                PartRef::StylesWithEffectsPart(
+                    <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml",
+      "../tables",
+      "table",
+    ) {
+      return Some(
+                PartRef::TableDefinitionPart(
+                    <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
+      "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml",
+      ".",
+      "tableStyles",
+    ) {
+      return Some(
+                PartRef::TableStylesPart(
+                    <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
+      "application/vnd.openxmlformats-officedocument.themeOverride+xml",
+      "theme",
+      "themeoverride",
+    ) {
+      return Some(
+                PartRef::ThemeOverridePart(
+                    <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+      "application/vnd.openxmlformats-officedocument.theme+xml",
+      "theme",
+      "theme",
+    ) {
+      return Some(
+                PartRef::ThemePart(
+                    <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
+      "",
+      "docProps",
+      "thumbnail",
+    ) {
+      return Some(
+                PartRef::ThumbnailPart(
+                    <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/timelineCache",
+      "application/vnd.ms-excel.timelineCache+xml",
+      "timelineCaches",
+      "timelineCache",
+    ) {
+      return Some(
+                PartRef::TimeLineCachePart(
+                    <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/timeline",
+      "application/vnd.ms-excel.timeline+xml",
+      "../timelines",
+      "timeline",
+    ) {
+      return Some(
+                PartRef::TimeLinePart(
+                    <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+      "application/vnd.openxmlformats-officedocument.presentationml.tags+xml",
+      "tags",
+      "tag",
+    ) {
+      return Some(
+                PartRef::UserDefinedTagsPart(
+                    <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+      "application/vnd.ms-word.vbaData+xml",
+      ".",
+      "vbaData",
+    ) {
+      return Some(
+                PartRef::VbaDataPart(
+                    <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+      "application/vnd.ms-office.vbaProject",
+      ".",
+      "vbaProject",
+    ) {
+      return Some(
+                PartRef::VbaProjectPart(
+                    <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
+      "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml",
+      ".",
+      "viewProps",
+    ) {
+      return Some(
+                PartRef::ViewPropertiesPart(
+                    <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+      "application/vnd.openxmlformats-officedocument.vmlDrawing",
+      "../drawings",
+      "vmldrawing",
+    ) {
+      return Some(
+                PartRef::VmlDrawingPart(
+                    <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml",
+      ".",
+      "volatileDependencies",
+    ) {
+      return Some(
+                PartRef::VolatileDependenciesPart(
+                    <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes",
+      "application/vnd.ms-office.webextensiontaskpanes+xml",
+      "../webextensions",
+      "taskpanes",
+    ) {
+      return Some(
+                PartRef::WebExTaskpanesPart(
+                    <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/webextension",
+      "application/vnd.ms-office.webextension+xml",
+      "../webextensions",
+      "webextension",
+    ) {
+      return Some(
+                PartRef::WebExtensionPart(
+                    <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml",
+      ".",
+      "webSettings",
+    ) {
+      return Some(
+                PartRef::WebSettingsPart(
+                    <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
+      "application/vnd.ms-word.attachedToolbars",
+      ".",
+      "attachedToolbars",
+    ) {
+      return Some(
+                PartRef::WordAttachedToolbarsPart(
+                    <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml",
+      ".",
+      "commentsExtensible",
+    ) {
+      return Some(
+                PartRef::WordCommentsExtensiblePart(
+                    <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
+      ".",
+      "commentsExtended",
+    ) {
+      return Some(
+                PartRef::WordprocessingCommentsExPart(
+                    <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml",
+      ".",
+      "commentsIds",
+    ) {
+      return Some(
+                PartRef::WordprocessingCommentsIdsPart(
+                    <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
+      ".",
+      "comments",
+    ) {
+      return Some(
+                PartRef::WordprocessingCommentsPart(
+                    <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2011/relationships/people",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml",
+      ".",
+      "people",
+    ) {
+      return Some(
+                PartRef::WordprocessingPeoplePart(
+                    <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings",
+      "../printerSettings",
+      "printerSettings",
+    ) {
+      return Some(
+                PartRef::WordprocessingPrinterSettingsPart(
+                    <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "xl",
+      "workbook",
+    ) {
+      return Some(
+                PartRef::WorkbookPart(
+                    <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/10/relationships/person",
+      "application/vnd.ms-excel.person+xml",
+      "persons",
+      "person",
+    ) {
+      return Some(
+                PartRef::WorkbookPersonPart(
+                    <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml",
+      "revisions",
+      "revisionHeaders",
+    ) {
+      return Some(
+                PartRef::WorkbookRevisionHeaderPart(
+                    <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml",
+      ".",
+      "revisionLog",
+    ) {
+      return Some(
+                PartRef::WorkbookRevisionLogPart(
+                    <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml",
+      ".",
+      "styles",
+    ) {
+      return Some(
+                PartRef::WorkbookStylesPart(
+                    <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml",
+      "revisions",
+      "userNames",
+    ) {
+      return Some(
+                PartRef::WorkbookUserDataPart(
+                    <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml",
+      "..",
+      "comments",
+    ) {
+      return Some(
+                PartRef::WorksheetCommentsPart(
+                    <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml",
+      "worksheets",
+      "sheet",
+    ) {
+      return Some(
+                PartRef::WorksheetPart(
+                    <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2006/relationships/wsSortMap",
+      "application/vnd.ms-excel.wsSortMap+xml",
+      ".",
+      "wsSortMap",
+    ) {
+      return Some(
+                PartRef::WorksheetSortMapPart(
+                    <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    #[cfg(feature = "microsoft365")]
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment",
+      "application/vnd.ms-excel.threadedcomments+xml",
+      "../threadedcomments",
+      "threadedcomment",
+    ) {
+      return Some(
+                PartRef::WorksheetThreadedCommentsPart(
+                    <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    if crate::common::part_descriptor_matches(
+      relationship_type,
+      part.content_type(),
+      part.path(),
+      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+      "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+      "_xmlsignatures",
+      "sig",
+    ) {
+      return Some(
+                PartRef::XmlSignaturePart(
+                    <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                        storage,
+                        relationship.id(),
+                        part_id,
+                    ),
+                ),
+            );
+    }
+    Some(
+            PartRef::ExtendedPart(
+                <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+                    storage,
+                    relationship.id(),
+                    part_id,
+                ),
+            ),
+        )
   }
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct IdPartPair<'a> {
   pub relationship_id: &'a str,
   pub part: PartRef,
@@ -6621,19 +11580,21 @@ where
     .unix_permissions(0o755);
   let mut entry_set = std::collections::HashSet::<String>::new();
   let storage = crate::sdk::SdkPackage::storage(package);
+  let mut modeled_part_relationships = std::collections::HashMap::new();
+  crate::sdk::SdkPackage::collect_modeled_part_relationship_graphs(
+    package,
+    &mut modeled_part_relationships,
+  )?;
   zip.start_file("[Content_Types].xml", options)?;
   zip.write_all(&storage.content_types().to_xml_bytes()?)?;
-  if !storage.package_relationships().is_empty() {
+  let package_relationships =
+    crate::sdk::SdkPackage::modeled_relationship_graph(package)?.to_relationship_set();
+  if !package_relationships.is_empty() {
     if entry_set.insert("_rels".to_string()) {
       zip.add_directory("_rels", options)?;
     }
     zip.start_file("_rels/.rels", options)?;
-    zip.write_all(
-      &storage
-        .package_relationships()
-        .to_relationships()
-        .to_xml_bytes()?,
-    )?;
+    zip.write_all(&package_relationships.to_relationships().to_xml_bytes()?)?;
   }
   for (index, part) in storage.parts().iter().enumerate() {
     if part.is_deleted() {
@@ -6645,7 +11606,10 @@ where
     if !directory_path.is_empty() && entry_set.insert(directory_path.to_string()) {
       zip.add_directory(directory_path, options)?;
     }
-    let relationships = part.relationships();
+    let relationships = modeled_part_relationships
+      .remove(&part_id)
+      .unwrap_or_default()
+      .to_relationship_set();
     if !relationships.is_empty() {
       let rels_dir_path = crate::common::part_relationships_directory_path(part.path());
       if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {

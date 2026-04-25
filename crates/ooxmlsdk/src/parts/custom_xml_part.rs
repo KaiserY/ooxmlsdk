@@ -10,12 +10,27 @@ pub const PATH_PREFIX: &str = "../customXml";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "item";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomXmlPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps"
   ))]
   pub(crate) custom_xml_properties_part:
-    crate::sdk::OptionalPart<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>,
+    Option<Box<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl CustomXmlPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
+    &[crate::sdk::PartChildDescriptor::new(
+      "custom_xml_properties_part",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
+      "crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart",
+      crate::sdk::PartChildCardinality::Optional,
+    )];
 }

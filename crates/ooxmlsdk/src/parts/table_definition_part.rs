@@ -11,8 +11,9 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
 pub const TARGET_NAME: &str = "table";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct TableDefinitionPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_table_definition_part"))]
   pub(crate) root_element:
@@ -20,6 +21,19 @@ pub struct TableDefinitionPart {
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable"
   ))]
-  pub(crate) query_table_parts:
-    crate::sdk::RepeatedPart<crate::parts::query_table_part::QueryTablePart>,
+  pub(crate) query_table_parts: Vec<crate::parts::query_table_part::QueryTablePart>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl TableDefinitionPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
+    &[crate::sdk::PartChildDescriptor::new(
+      "query_table_parts",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
+      "crate::parts::query_table_part::QueryTablePart",
+      crate::sdk::PartChildCardinality::Repeated,
+    )];
 }

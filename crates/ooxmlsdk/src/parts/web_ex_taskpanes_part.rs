@@ -10,8 +10,9 @@ pub const PATH_PREFIX: &str = "../webextensions";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.webextensiontaskpanes+xml";
 pub const TARGET_NAME: &str = "taskpanes";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebExTaskpanesPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_web_ex_taskpanes_part"))]
   pub(crate) root_element: crate::sdk::PartRoot<
@@ -21,6 +22,21 @@ pub struct WebExTaskpanesPart {
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension"
   ))]
-  pub(crate) web_extension_parts:
-    crate::sdk::RepeatedPart<crate::parts::web_extension_part::WebExtensionPart>,
+  pub(crate) web_extension_parts: Vec<crate::parts::web_extension_part::WebExtensionPart>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl WebExTaskpanesPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
+    #[cfg(feature = "microsoft365")]
+    crate::sdk::PartChildDescriptor::new(
+      "web_extension_parts",
+      "http://schemas.microsoft.com/office/2011/relationships/webextension",
+      "crate::parts::web_extension_part::WebExtensionPart",
+      crate::sdk::PartChildCardinality::Repeated,
+    ),
+  ];
 }

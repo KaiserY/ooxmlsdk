@@ -10,8 +10,9 @@ pub const PATH_PREFIX: &str = "customData";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.customDataProperties+xml";
 pub const TARGET_NAME: &str = "customDataProps";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomDataPropertiesPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_custom_data_properties_part"))]
   pub(crate) root_element: crate::sdk::PartRoot<
@@ -21,6 +22,21 @@ pub struct CustomDataPropertiesPart {
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData"
   ))]
-  pub(crate) custom_data_part:
-    crate::sdk::OptionalPart<crate::parts::custom_data_part::CustomDataPart>,
+  pub(crate) custom_data_part: Option<Box<crate::parts::custom_data_part::CustomDataPart>>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl CustomDataPropertiesPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
+    #[cfg(feature = "microsoft365")]
+    crate::sdk::PartChildDescriptor::new(
+      "custom_data_part",
+      "http://schemas.microsoft.com/office/2007/relationships/customData",
+      "crate::parts::custom_data_part::CustomDataPart",
+      crate::sdk::PartChildCardinality::Optional,
+    ),
+  ];
 }

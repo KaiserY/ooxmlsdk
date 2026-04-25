@@ -11,8 +11,9 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml";
 pub const TARGET_NAME: &str = "fontTable";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct FontTablePart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_font_table_part"))]
   pub(crate) root_element: crate::sdk::PartRoot<
@@ -21,5 +22,19 @@ pub struct FontTablePart {
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font"
   ))]
-  pub(crate) font_parts: crate::sdk::RepeatedPart<crate::parts::font_part::FontPart>,
+  pub(crate) font_parts: Vec<crate::parts::font_part::FontPart>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl FontTablePart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
+    &[crate::sdk::PartChildDescriptor::new(
+      "font_parts",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+      "crate::parts::font_part::FontPart",
+      crate::sdk::PartChildCardinality::Repeated,
+    )];
 }

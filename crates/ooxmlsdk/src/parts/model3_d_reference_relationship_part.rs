@@ -10,7 +10,16 @@ pub const PATH_PREFIX: &str = "../media";
 pub const CONTENT_TYPE: &str = "model/gltf-binary";
 pub const TARGET_NAME: &str = "model3d";
 pub const EXTENSION: &str = ".glb";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct Model3DReferenceRelationshipPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl Model3DReferenceRelationshipPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
 }

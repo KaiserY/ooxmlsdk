@@ -10,8 +10,9 @@ pub const PATH_PREFIX: &str = "customUI";
 pub const CONTENT_TYPE: &str = "application/xml";
 pub const TARGET_NAME: &str = "customUI";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RibbonAndBackstageCustomizationsPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_ribbon_and_backstage_customizations_part"))]
   pub(crate) root_element:
@@ -19,5 +20,19 @@ pub struct RibbonAndBackstageCustomizationsPart {
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl RibbonAndBackstageCustomizationsPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
+    &[crate::sdk::PartChildDescriptor::new(
+      "image_parts",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "crate::parts::image_part::ImagePart",
+      crate::sdk::PartChildCardinality::Repeated,
+    )];
 }

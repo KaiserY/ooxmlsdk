@@ -27,8 +27,9 @@ pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub use package::{
   NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, ReferenceRelationshipKind,
-  RelationshipInfo, RelationshipSet, RelationshipTargetKind, SdkPackageStorage, StoredPart,
-  StoredPartData, StoredPartDataKind,
+  RelationshipGraph, RelationshipGraphEdge, RelationshipGraphEdgeKind, RelationshipInfo,
+  RelationshipSet, RelationshipTargetKind, SdkPackageStorage, StoredPart, StoredPartData,
+  StoredPartDataKind,
 };
 #[cfg(feature = "parts")]
 pub use part::{
@@ -244,6 +245,54 @@ pub fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
   }
 
   false
+}
+
+#[inline]
+pub fn part_descriptor_matches(
+  actual_relationship_type: &str,
+  actual_content_type: &str,
+  actual_path: &str,
+  descriptor_relationship_type: &str,
+  descriptor_content_type: &str,
+  descriptor_path_prefix: &str,
+  descriptor_target_name: &str,
+) -> bool {
+  if !relationship_type_matches(actual_relationship_type, descriptor_relationship_type) {
+    return false;
+  }
+  if descriptor_content_type.is_empty() || actual_content_type == descriptor_content_type {
+    return true;
+  }
+
+  relationship_type_matches(
+    actual_relationship_type,
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+  ) && package_main_part_path_matches(actual_path, descriptor_path_prefix, descriptor_target_name)
+}
+
+#[inline]
+fn package_main_part_path_matches(
+  actual_path: &str,
+  descriptor_path_prefix: &str,
+  descriptor_target_name: &str,
+) -> bool {
+  if descriptor_target_name.is_empty() {
+    return false;
+  }
+
+  let expected_stem = if descriptor_path_prefix.is_empty() || descriptor_path_prefix == "." {
+    descriptor_target_name.to_string()
+  } else {
+    format!(
+      "{}/{}",
+      descriptor_path_prefix.trim_matches('/'),
+      descriptor_target_name
+    )
+  };
+
+  actual_path
+    .strip_suffix(".xml")
+    .is_some_and(|actual_stem| actual_stem == expected_stem)
 }
 
 #[inline(always)]

@@ -3,7 +3,8 @@
 use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{
-  ReferenceRelationshipKind, RelationshipSet, RelationshipTargetKind, StoredPartDataKind,
+  ReferenceRelationshipKind, RelationshipGraphEdgeKind, RelationshipSet, RelationshipTargetKind,
+  StoredPartDataKind,
 };
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
@@ -100,7 +101,7 @@ fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
 fn package_relationships_resolve_with_container_local_part_factory() {
   let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let main_part_id = package.get_id_of_part(main_part).unwrap();
+  let main_part_id = package.get_id_of_part(&main_part).unwrap();
 
   let resolved = package
     .try_get_part_by_id(main_part_id)
@@ -121,6 +122,138 @@ fn package_relationships_resolve_with_container_local_part_factory() {
 }
 
 #[test]
+fn package_relationship_graph_round_trips_relationship_set() {
+  let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let graph = package.relationship_graph();
+
+  assert_eq!(graph.len(), package.relationships().len());
+  assert_eq!(graph.part_relationships().count(), package.parts().count());
+  assert!(graph.reference_relationships().next().is_none());
+  assert!(graph.raw_relationships().next().is_none());
+
+  let rebuilt = graph.to_relationship_set();
+  assert_eq!(
+    rebuilt.to_relationship_graph(),
+    package.relationship_graph()
+  );
+  assert!(matches!(
+    graph
+      .get(
+        package
+          .get_id_of_part(&package.main_document_part().unwrap())
+          .unwrap()
+      )
+      .unwrap()
+      .kind(),
+    RelationshipGraphEdgeKind::Part
+  ));
+}
+
+#[test]
+fn package_relationship_graph_can_be_edited_and_written_back() {
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let mut graph = package.relationship_graph();
+  graph
+    .add_external_relationship(
+      "rIdGraphExternal",
+      "http://example.com/relationships/custom",
+      "https://example.com/graph",
+    )
+    .unwrap();
+
+  package.replace_relationships_from_graph(graph);
+  let mut saved = Cursor::new(Vec::new());
+  package.save(&mut saved).unwrap();
+  saved.set_position(0);
+
+  let reopened = WordprocessingDocument::new(saved).unwrap();
+  let relationship = reopened.relationships().get("rIdGraphExternal").unwrap();
+  assert_eq!(
+    relationship.relationship_type(),
+    "http://example.com/relationships/custom"
+  );
+  assert_eq!(relationship.target(), "https://example.com/graph");
+  assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
+  assert!(matches!(relationship.target_mode(), TargetMode::External));
+  assert!(matches!(
+    reopened
+      .relationship_graph()
+      .get("rIdGraphExternal")
+      .unwrap()
+      .kind(),
+    RelationshipGraphEdgeKind::Reference(ReferenceRelationshipKind::External)
+  ));
+}
+
+#[test]
+fn package_save_writes_package_relationships_from_modeled_parts() {
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let main_part_id = package.main_document_part().unwrap().part_id();
+  let relationship_ids: Vec<_> = package
+    .relationships()
+    .iter()
+    .map(|relationship| relationship.id().to_string())
+    .collect();
+  for relationship_id in relationship_ids {
+    package.relationships_mut().remove(&relationship_id);
+  }
+  assert!(package.relationships().is_empty());
+
+  let mut saved = Cursor::new(Vec::new());
+  package.save(&mut saved).unwrap();
+  saved.set_position(0);
+
+  let reopened = WordprocessingDocument::new(saved).unwrap();
+  assert_eq!(
+    reopened.main_document_part().unwrap().part_id(),
+    main_part_id
+  );
+}
+
+#[test]
+fn package_save_writes_part_relationships_from_modeled_parts() {
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let header = main_part
+    .add_new_part::<_, HeaderPart>(&mut package, "rIdModeledHeader")
+    .unwrap();
+  header
+    .set_data(
+      &mut package,
+      br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+        .to_vec(),
+    )
+    .unwrap();
+  let header_relationship_id = main_part
+    .get_id_of_part(&package, &header)
+    .unwrap()
+    .to_string();
+  package
+    .storage_mut()
+    .relationships_mut(main_part.part_id())
+    .unwrap()
+    .remove(&header_relationship_id);
+  assert!(
+    main_part
+      .get_part_by_id(&package, &header_relationship_id)
+      .is_none()
+  );
+
+  let mut saved = Cursor::new(Vec::new());
+  package.save(&mut saved).unwrap();
+  saved.set_position(0);
+
+  let reopened = WordprocessingDocument::new(saved).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  assert!(
+    reopened_main
+      .get_part_by_id(&reopened, &header_relationship_id)
+      .and_then(PartRef::downcast::<HeaderPart>)
+      .is_some()
+  );
+}
+
+#[test]
 fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
@@ -128,7 +261,7 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
 
   assert!(main_part.relationships(&package).is_some());
   assert_eq!(
-    main_part.get_id_of_part(&package, styles_part),
+    main_part.get_id_of_part(&package, &styles_part),
     main_part
       .style_definitions_part_relationships(&package)
       .next()
@@ -159,10 +292,31 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   assert_eq!(
     main_part
       .parts(&package)
-      .filter(|pair| pair.part.downcast::<MainDocumentPart>().is_some())
+      .filter(|pair| pair.part.clone().downcast::<MainDocumentPart>().is_some())
       .count(),
     0
   );
+}
+
+#[test]
+fn part_relationship_graph_classifies_children_and_references() {
+  let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let graph = main_part.relationship_graph(&package).unwrap();
+  let relationships = main_part.relationships(&package).unwrap();
+
+  assert_eq!(graph.len(), relationships.len());
+  assert_eq!(
+    graph.part_relationships().count(),
+    relationships.part_relationships().count()
+  );
+  assert_eq!(graph.reference_relationships().count(), 71);
+  assert_eq!(graph.raw_relationships().count(), 0);
+  assert!(matches!(
+    graph.get("rId18").unwrap().kind(),
+    RelationshipGraphEdgeKind::Reference(ReferenceRelationshipKind::Hyperlink)
+  ));
+  assert_eq!(graph.to_relationship_set().to_relationship_graph(), graph);
 }
 
 #[test]
@@ -181,7 +335,7 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
     Some(StoredPartDataKind::Binary)
   );
   assert_eq!(
-    main_part.get_id_of_part(&package, comments_part),
+    main_part.get_id_of_part(&package, &comments_part),
     Some("rId7")
   );
   assert_eq!(
@@ -301,8 +455,8 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
 
   let presentation_part = package.presentation_part().unwrap();
   let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
-  let slide1 = slides[0];
-  let slide2 = slides[1];
+  let slide1 = slides[0].clone();
+  let slide2 = slides[1].clone();
 
   let slide1_relationships: Vec<_> = slide1.data_part_reference_relationships(&package).collect();
   let slide1_media_relationships: Vec<_> = slide1_relationships
@@ -395,8 +549,8 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
 
   let reopened_presentation_part = reopened.presentation_part().unwrap();
   let reopened_slides: Vec<_> = reopened_presentation_part.slide_parts(&reopened).collect();
-  let reopened_slide1 = reopened_slides[0];
-  let reopened_slide2 = reopened_slides[1];
+  let reopened_slide1 = reopened_slides[0].clone();
+  let reopened_slide2 = reopened_slides[1].clone();
   let reopened_slide1_relationships: Vec<_> = reopened_slide1
     .data_part_reference_relationships(&reopened)
     .filter(|relationship| relationship.target_part_id() == reopened_media_data_part.part_id())
@@ -717,7 +871,7 @@ fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target(
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_header = reopened_main
     .header_parts(&reopened)
-    .find(|part| reopened_main.get_id_of_part(&reopened, *part) == Some("rIdSdkHeaderForDataRef"))
+    .find(|part| reopened_main.get_id_of_part(&reopened, part) == Some("rIdSdkHeaderForDataRef"))
     .unwrap();
   let reopened_relationship = reopened_header
     .get_reference_relationship(&reopened, "rIdSdkDataRef")
@@ -1048,7 +1202,7 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
     .add_new_part::<_, HeaderPart>(&mut package, relationship_id.as_str())
     .unwrap();
   assert_eq!(
-    main_part.get_id_of_part(&package, header_part),
+    main_part.get_id_of_part(&package, &header_part),
     Some(relationship_id.as_str())
   );
   assert_eq!(
@@ -1073,7 +1227,7 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_header = reopened_main
     .header_parts(&reopened)
-    .find(|part| reopened_main.get_id_of_part(&reopened, *part) == Some(relationship_id.as_str()))
+    .find(|part| reopened_main.get_id_of_part(&reopened, part) == Some(relationship_id.as_str()))
     .unwrap();
 
   assert_eq!(reopened_header.path(&reopened), Some("word/header1.xml"));
@@ -1091,7 +1245,7 @@ fn add_new_part_auto_id_skips_existing_relationship_ids() {
     .add_new_part_auto_id::<_, HeaderPart>(&mut package)
     .unwrap();
   let relationship_id = main_part
-    .get_id_of_part(&package, header_part)
+    .get_id_of_part(&package, &header_part)
     .unwrap()
     .to_string();
   assert!(relationship_id.starts_with("rId"));
@@ -1120,7 +1274,7 @@ fn package_add_new_part_creates_package_relationship() {
   let ribbon_part = package
     .add_new_part::<RibbonExtensibilityPart>(relationship_id)
     .unwrap();
-  assert_eq!(package.get_id_of_part(ribbon_part), Some(relationship_id));
+  assert_eq!(package.get_id_of_part(&ribbon_part), Some(relationship_id));
   assert_eq!(ribbon_part.path(&package), Some("customUI/customUI1.xml"));
   assert_eq!(ribbon_part.content_type(&package), Some("application/xml"));
 
@@ -1193,7 +1347,7 @@ fn set_data_replaces_existing_part_bytes() {
 
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
-  let relationship_id = main_part.get_id_of_part(&package, image_part).unwrap();
+  let relationship_id = main_part.get_id_of_part(&package, &image_part).unwrap();
   let reopened_image = reopened_main
     .get_part_by_id(&reopened, relationship_id)
     .and_then(PartRef::downcast::<ImagePart>)
@@ -1222,7 +1376,7 @@ fn add_image_part_with_id_feeds_data_and_saves() {
     .unwrap();
 
   assert_eq!(
-    main_part.get_id_of_part(&package, image_part),
+    main_part.get_id_of_part(&package, &image_part),
     Some(relationship_id)
   );
   assert_eq!(image_part.content_type(&package), Some("image/png"));
@@ -1256,7 +1410,7 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
     .set_data(&mut package, b"jpeg bytes".to_vec())
     .unwrap();
   let relationship_id = main_part
-    .get_id_of_part(&package, image_part)
+    .get_id_of_part(&package, &image_part)
     .unwrap()
     .to_string();
 
@@ -1302,7 +1456,7 @@ fn add_alternative_format_import_part_with_id_feeds_data_and_saves() {
     .unwrap();
 
   assert_eq!(
-    main_part.get_id_of_part(&package, alt_chunk),
+    main_part.get_id_of_part(&package, &alt_chunk),
     Some(relationship_id)
   );
   assert_eq!(alt_chunk.content_type(&package), Some("text/html"));
@@ -1342,7 +1496,7 @@ fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
     )
     .unwrap();
   let relationship_id = main_part
-    .get_id_of_part(&package, alt_chunk)
+    .get_id_of_part(&package, &alt_chunk)
     .unwrap()
     .to_string();
 
@@ -1392,7 +1546,7 @@ fn add_custom_xml_part_by_type_feeds_data_and_saves() {
     .feed_data(&mut package, &mut Cursor::new(xml.clone()))
     .unwrap();
   let relationship_id = main_part
-    .get_id_of_part(&package, custom_xml)
+    .get_id_of_part(&package, &custom_xml)
     .unwrap()
     .to_string();
 
@@ -1435,7 +1589,7 @@ fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
   custom_xml.set_data(&mut package, inkml.clone()).unwrap();
 
   assert_eq!(
-    main_part.get_id_of_part(&package, custom_xml),
+    main_part.get_id_of_part(&package, &custom_xml),
     Some(relationship_id)
   );
   assert_eq!(
@@ -1474,7 +1628,7 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"ole object bytes".to_vec())
     .unwrap();
   let embedded_object_id = main_part
-    .get_id_of_part(&package, embedded_object)
+    .get_id_of_part(&package, &embedded_object)
     .unwrap()
     .to_string();
 
@@ -1485,7 +1639,7 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"xlsx package bytes".to_vec())
     .unwrap();
   let embedded_package_id = main_part
-    .get_id_of_part(&package, embedded_package)
+    .get_id_of_part(&package, &embedded_package)
     .unwrap()
     .to_string();
 
@@ -1497,11 +1651,11 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
     .unwrap();
   font.set_data(&mut package, b"ttf bytes".to_vec()).unwrap();
   let font_table_id = main_part
-    .get_id_of_part(&package, font_table)
+    .get_id_of_part(&package, &font_table)
     .unwrap()
     .to_string();
   let font_id = font_table
-    .get_id_of_part(&package, font)
+    .get_id_of_part(&package, &font)
     .unwrap()
     .to_string();
 
@@ -1518,11 +1672,11 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"<recipients/>".to_vec())
     .unwrap();
   let settings_id = main_part
-    .get_id_of_part(&package, settings)
+    .get_id_of_part(&package, &settings)
     .unwrap()
     .to_string();
   let recipients_id = settings
-    .get_id_of_part(&package, recipients)
+    .get_id_of_part(&package, &recipients)
     .unwrap()
     .to_string();
 
@@ -1619,7 +1773,7 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"<customProperty/>".to_vec())
     .unwrap();
   let custom_property_id = worksheet
-    .get_id_of_part(&package, custom_property)
+    .get_id_of_part(&package, &custom_property)
     .unwrap()
     .to_string();
 
@@ -1633,7 +1787,7 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"<control/>".to_vec())
     .unwrap();
   let control_id = worksheet
-    .get_id_of_part(&package, control)
+    .get_id_of_part(&package, &control)
     .unwrap()
     .to_string();
 
@@ -1647,7 +1801,7 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"worksheet activeX bin".to_vec())
     .unwrap();
   let direct_binary_id = worksheet
-    .get_id_of_part(&package, direct_binary)
+    .get_id_of_part(&package, &direct_binary)
     .unwrap()
     .to_string();
 
@@ -1661,7 +1815,7 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
     .set_data(&mut package, b"control activeX bin".to_vec())
     .unwrap();
   let child_binary_id = control
-    .get_id_of_part(&package, child_binary)
+    .get_id_of_part(&package, &child_binary)
     .unwrap()
     .to_string();
 
@@ -1754,7 +1908,7 @@ fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
   thumbnail
     .feed_data(&mut package, &mut Cursor::new(jpeg.clone()))
     .unwrap();
-  let relationship_id = package.get_id_of_part(thumbnail).unwrap().to_string();
+  let relationship_id = package.get_id_of_part(&thumbnail).unwrap().to_string();
   let thumbnail_path = package
     .storage()
     .part(thumbnail.part_id())
@@ -1797,7 +1951,7 @@ fn add_thumbnail_part_with_id_uses_content_type_and_relationship_id() {
     .unwrap();
   thumbnail.set_data(&mut package, jpeg.clone()).unwrap();
 
-  assert_eq!(package.get_id_of_part(thumbnail), Some(relationship_id));
+  assert_eq!(package.get_id_of_part(&thumbnail), Some(relationship_id));
   assert_eq!(thumbnail.content_type(&package), Some("image/jpg"));
 
   let mut buffer = Cursor::new(Vec::new());
@@ -1864,15 +2018,15 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
     .unwrap();
 
   assert_eq!(
-    package.get_id_of_part(package_extended),
+    package.get_id_of_part(&package_extended),
     Some("rIdSdkPackageExtended")
   );
   assert_eq!(
-    main_part.get_id_of_part(&package, part_extended),
+    main_part.get_id_of_part(&package, &part_extended),
     Some("rIdSdkMainExtended")
   );
   assert_eq!(
-    part_extended.get_id_of_part(&package, nested_extended),
+    part_extended.get_id_of_part(&package, &nested_extended),
     Some("rIdSdkNestedExtended")
   );
   assert_eq!(package_extended.content_type(&package), Some("text/xml"));
@@ -1965,7 +2119,7 @@ fn delete_package_part_removes_relationship_part_and_content_type() {
     .unwrap();
   let thumbnail_path = thumbnail.path(&package).unwrap().to_string();
 
-  assert!(package.delete_part(thumbnail).unwrap());
+  assert!(package.delete_part(thumbnail.clone()).unwrap());
   assert!(!package.delete_part_by_id("rIdSdkThumbnail").unwrap());
   assert!(package.get_part_by_id("rIdSdkThumbnail").is_none());
   assert!(package.storage().part(thumbnail.part_id()).is_none());
@@ -2020,12 +2174,16 @@ fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
   let extended_path = extended.path(&package).unwrap().to_string();
   let nested_path = nested.path(&package).unwrap().to_string();
 
-  assert!(extended.delete_part(&mut package, nested).unwrap());
+  assert!(extended.delete_part(&mut package, nested.clone()).unwrap());
   assert!(!extended.delete_part_by_id(&mut package, "tempId2").unwrap());
   assert!(extended.get_part_by_id(&package, "tempId2").is_none());
   assert!(package.storage().part(nested.part_id()).is_none());
 
-  assert!(main_part.delete_part(&mut package, extended).unwrap());
+  assert!(
+    main_part
+      .delete_part(&mut package, extended.clone())
+      .unwrap()
+  );
   assert!(main_part.get_part_by_id(&package, "tempId").is_none());
   assert!(package.storage().part(extended.part_id()).is_none());
 
@@ -2199,26 +2357,26 @@ fn add_part_and_create_relationship_to_part_share_existing_parts() {
     .unwrap();
 
   let shared_id = extended
-    .create_relationship_to_part_with_id(&mut package, image, "rIdSharedImage")
+    .create_relationship_to_part_with_id(&mut package, image.clone(), "rIdSharedImage")
     .unwrap();
   assert_eq!(shared_id, "rIdSharedImage");
   assert_eq!(
     extended
-      .create_relationship_to_part(&mut package, image)
+      .create_relationship_to_part(&mut package, image.clone())
       .unwrap(),
     "rIdSharedImage"
   );
   assert!(
     extended
-      .add_part_with_id(&mut package, image, "rIdDifferentSharedImage")
+      .add_part_with_id(&mut package, image.clone(), "rIdDifferentSharedImage")
       .is_err()
   );
   assert_eq!(
-    extended.get_id_of_part(&package, image),
+    extended.get_id_of_part(&package, &image),
     Some("rIdSharedImage")
   );
 
-  assert!(main_part.delete_part(&mut package, image).unwrap());
+  assert!(main_part.delete_part(&mut package, image.clone()).unwrap());
   assert!(main_part.get_part_by_id(&package, "rIdMainImage").is_none());
   assert_eq!(image.data(&package), Some(&b"shared image"[..]));
 
@@ -2229,7 +2387,7 @@ fn add_part_and_create_relationship_to_part_share_existing_parts() {
     image_path.as_str()
   ));
 
-  assert!(extended.delete_part(&mut package, image).unwrap());
+  assert!(extended.delete_part(&mut package, image.clone()).unwrap());
   assert!(package.storage().part(image.part_id()).is_none());
 
   let mut deleted_buffer = Cursor::new(Vec::new());
@@ -2336,11 +2494,11 @@ fn add_file_properties_and_signature_origin_parts_create_fixed_package_relations
   assert!(package.add_custom_file_properties_part().is_err());
   assert!(package.add_digital_signature_origin_part().is_err());
 
-  let core_id = package.get_id_of_part(core).unwrap().to_string();
-  let extended_id = package.get_id_of_part(extended).unwrap().to_string();
-  let custom_id = package.get_id_of_part(custom).unwrap().to_string();
+  let core_id = package.get_id_of_part(&core).unwrap().to_string();
+  let extended_id = package.get_id_of_part(&extended).unwrap().to_string();
+  let custom_id = package.get_id_of_part(&custom).unwrap().to_string();
   let signature_origin_id = package
-    .get_id_of_part(signature_origin)
+    .get_id_of_part(&signature_origin)
     .unwrap()
     .to_string();
   let mut buffer = Cursor::new(Vec::new());
@@ -2422,7 +2580,7 @@ fn spreadsheet_sheet_relationship_ids_match_workbook_part_relationships() {
     .collect();
   let worksheet_relationship_ids: Vec<&str> = workbook_part
     .worksheet_parts(&package)
-    .map(|worksheet| workbook_part.get_id_of_part(&package, worksheet).unwrap())
+    .map(|worksheet| workbook_part.get_id_of_part(&package, &worksheet).unwrap())
     .collect();
 
   assert!(!sheet_relationship_ids.is_empty());

@@ -7,8 +7,9 @@ use std::{
   path::Path,
 };
 
+use ooxmlsdk::common::{PartId, RelationshipInfo};
 use ooxmlsdk::parts::{
-  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
+  PartRef, presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
@@ -30,30 +31,42 @@ fn assert_doc_sample_round_trip(file_name: &str) {
 
   match kind {
     DocSampleKind::Wordprocessing => {
-      let original = WordprocessingDocument::new_from_file(&path).unwrap();
+      let mut original = WordprocessingDocument::new_from_file(&path).unwrap();
+      assert_relationship_graph_lossless(&mut original, file_name);
+      assert_modeled_relationship_graphs_match_relationship_sets(&original, file_name);
+      assert_relationship_graph_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
       let reopened = WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
       assert_wordprocessing_document_round_trip(&original, &reopened);
+      assert_relationship_graphs_round_trip(&original, &reopened, file_name);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Spreadsheet => {
-      let original = SpreadsheetDocument::new_from_file(&path).unwrap();
+      let mut original = SpreadsheetDocument::new_from_file(&path).unwrap();
+      assert_relationship_graph_lossless(&mut original, file_name);
+      assert_modeled_relationship_graphs_match_relationship_sets(&original, file_name);
+      assert_relationship_graph_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
       let reopened = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
       assert_spreadsheet_document_round_trip(&original, &reopened);
+      assert_relationship_graphs_round_trip(&original, &reopened, file_name);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Presentation => {
-      let original = PresentationDocument::new_from_file(&path).unwrap();
+      let mut original = PresentationDocument::new_from_file(&path).unwrap();
+      assert_relationship_graph_lossless(&mut original, file_name);
+      assert_modeled_relationship_graphs_match_relationship_sets(&original, file_name);
+      assert_relationship_graph_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
       let reopened = PresentationDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
       assert_presentation_document_round_trip(&original, &reopened);
+      assert_relationship_graphs_round_trip(&original, &reopened, file_name);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
   }
@@ -104,18 +117,18 @@ fn assert_doc_sample_opens(file_name: &str) {
     DocSampleKind::Wordprocessing => {
       let package = WordprocessingDocument::new_from_file(&path).unwrap();
       let main_part = package.main_document_part().unwrap();
-      assert_eq!(part_path(&package, main_part), "word/document.xml");
+      assert_eq!(part_path(&package, &main_part), "word/document.xml");
     }
     DocSampleKind::Spreadsheet => {
       let package = SpreadsheetDocument::new_from_file(&path).unwrap();
       let workbook_part = package.workbook_part().unwrap();
-      assert_eq!(part_path(&package, workbook_part), "xl/workbook.xml");
+      assert_eq!(part_path(&package, &workbook_part), "xl/workbook.xml");
     }
     DocSampleKind::Presentation => {
       let package = PresentationDocument::new_from_file(&path).unwrap();
       let presentation_part = package.presentation_part().unwrap();
       assert_eq!(
-        part_path(&package, presentation_part),
+        part_path(&package, &presentation_part),
         "ppt/presentation.xml"
       );
     }
@@ -129,8 +142,8 @@ fn assert_wordprocessing_document_round_trip(
   let original_main = original.main_document_part().unwrap();
   let roundtripped_main = roundtripped.main_document_part().unwrap();
   assert_eq!(
-    part_path(original, original_main),
-    part_path(roundtripped, roundtripped_main)
+    part_path(original, &original_main),
+    part_path(roundtripped, &roundtripped_main)
   );
   assert_eq!(
     original.relationships().len(),
@@ -153,8 +166,8 @@ fn assert_spreadsheet_document_round_trip(
   let original_workbook = original.workbook_part().unwrap();
   let roundtripped_workbook = roundtripped.workbook_part().unwrap();
   assert_eq!(
-    part_path(original, original_workbook),
-    part_path(roundtripped, roundtripped_workbook)
+    part_path(original, &original_workbook),
+    part_path(roundtripped, &roundtripped_workbook)
   );
   assert_eq!(
     original.relationships().len(),
@@ -181,8 +194,8 @@ fn assert_presentation_document_round_trip(
   let original_presentation = original.presentation_part().unwrap();
   let roundtripped_presentation = roundtripped.presentation_part().unwrap();
   assert_eq!(
-    part_path(original, original_presentation),
-    part_path(roundtripped, roundtripped_presentation)
+    part_path(original, &original_presentation),
+    part_path(roundtripped, &roundtripped_presentation)
   );
   assert_eq!(
     original.relationships().len(),
@@ -208,7 +221,203 @@ fn assert_presentation_document_round_trip(
   );
 }
 
-fn part_path<P, T>(package: &P, part: T) -> &str
+fn assert_relationship_graph_lossless<P: SdkPackage>(package: &mut P, file_name: &str) {
+  let package_graph = package.storage().package_relationship_graph();
+  assert_eq!(
+    package_graph.to_relationship_set().to_relationship_graph(),
+    package_graph,
+    "package relationship graph is not RelationshipSet-lossless for {file_name}"
+  );
+  package
+    .storage_mut()
+    .replace_package_relationships_from_graph(package_graph);
+
+  let part_graphs: Vec<_> = package
+    .storage()
+    .parts()
+    .iter()
+    .enumerate()
+    .filter(|(_, part)| !part.is_deleted())
+    .map(|(index, part)| {
+      let part_id = PartId::from_index(index);
+      (
+        part_id,
+        part.path().to_string(),
+        package
+          .storage()
+          .relationship_graph(part_id)
+          .expect("active part has relationships"),
+      )
+    })
+    .collect();
+
+  for (part_id, path, graph) in part_graphs {
+    assert_eq!(
+      graph.to_relationship_set().to_relationship_graph(),
+      graph,
+      "part relationship graph is not RelationshipSet-lossless for {file_name}:{path}"
+    );
+    package
+      .storage_mut()
+      .replace_relationships_from_graph(part_id, graph)
+      .unwrap();
+  }
+}
+
+fn assert_modeled_relationship_graphs_match_relationship_sets<P: SdkPackage>(
+  package: &P,
+  file_name: &str,
+) {
+  assert_eq!(
+    package.modeled_relationship_graph().unwrap(),
+    package.storage().package_relationship_graph(),
+    "package relationship fields do not model RelationshipSet for {file_name}"
+  );
+
+  for (index, part) in package.storage().parts().iter().enumerate() {
+    if part.is_deleted() {
+      continue;
+    }
+
+    let part_id = PartId::from_index(index);
+    let Some(part_ref) = PartRef::from_part_id(package, part_id) else {
+      continue;
+    };
+    let modeled_graph = part_ref.modeled_relationship_graph(package).unwrap();
+    let relationship_graph = package
+      .storage()
+      .relationship_graph(part_id)
+      .expect("active part has relationships");
+    assert_eq!(
+      modeled_graph,
+      relationship_graph,
+      "part relationship fields do not model RelationshipSet for {file_name}:{}",
+      part.path()
+    );
+  }
+}
+
+fn assert_relationship_graphs_round_trip<P: SdkPackage>(
+  original: &P,
+  roundtripped: &P,
+  file_name: &str,
+) {
+  assert_eq!(
+    original.storage().package_relationship_graph(),
+    roundtripped.storage().package_relationship_graph(),
+    "package relationship graph changed after save/reopen for {file_name}"
+  );
+
+  for (index, original_part) in original.storage().parts().iter().enumerate() {
+    if original_part.is_deleted() {
+      continue;
+    }
+
+    let original_part_id = PartId::from_index(index);
+    let original_graph = original
+      .storage()
+      .relationship_graph(original_part_id)
+      .expect("active part has relationships");
+    let (roundtripped_part_id, _) = roundtripped
+      .storage()
+      .part_by_path(original_part.path())
+      .unwrap_or_else(|| {
+        panic!(
+          "missing round-tripped part for {file_name}:{}",
+          original_part.path()
+        )
+      });
+    let roundtripped_graph = roundtripped
+      .storage()
+      .relationship_graph(roundtripped_part_id)
+      .expect("active part has relationships");
+
+    assert_eq!(
+      original_graph,
+      roundtripped_graph,
+      "part relationship graph changed after save/reopen for {file_name}:{}",
+      original_part.path()
+    );
+  }
+}
+
+fn assert_relationship_graph_child_descriptor_coverage<P: SdkPackage>(
+  package: &P,
+  file_name: &str,
+) {
+  let package_descriptors = P::child_descriptors();
+  for relationship in package
+    .storage()
+    .package_relationship_graph()
+    .part_relationships()
+  {
+    assert_relationship_covered_by_descriptors(
+      package,
+      package_descriptors,
+      relationship,
+      file_name,
+      "package",
+    );
+  }
+
+  for (index, part) in package.storage().parts().iter().enumerate() {
+    if part.is_deleted() {
+      continue;
+    }
+
+    let part_id = PartId::from_index(index);
+    let Some(part_ref) = ooxmlsdk::parts::PartRef::from_part_id(package, part_id) else {
+      continue;
+    };
+    let descriptors = part_ref.child_descriptors();
+    let Some(graph) = package.storage().relationship_graph(part_id) else {
+      continue;
+    };
+
+    for relationship in graph.part_relationships() {
+      assert_relationship_covered_by_descriptors(
+        package,
+        descriptors,
+        relationship,
+        file_name,
+        part.path(),
+      );
+    }
+  }
+}
+
+fn assert_relationship_covered_by_descriptors(
+  package: &impl SdkPackage,
+  descriptors: &[ooxmlsdk::sdk::PartChildDescriptor],
+  relationship: &RelationshipInfo,
+  file_name: &str,
+  source: &str,
+) {
+  assert!(
+    descriptors.iter().any(|descriptor| {
+      ooxmlsdk::common::relationship_type_matches(
+        relationship.relationship_type(),
+        descriptor.relationship_type,
+      )
+    }) || relationship_targets_extended_part(package, relationship),
+    "relationship is not covered by generated part child descriptors for {file_name}:{source}: id={} type={} target={}",
+    relationship.id(),
+    relationship.relationship_type(),
+    relationship.target()
+  );
+}
+
+fn relationship_targets_extended_part(
+  package: &impl SdkPackage,
+  relationship: &RelationshipInfo,
+) -> bool {
+  relationship
+    .target_part_id()
+    .and_then(|part_id| PartRef::from_part_id(package, part_id))
+    .is_some_and(|part| matches!(part, PartRef::ExtendedPart(_)))
+}
+
+fn part_path<'a, P, T>(package: &'a P, part: &T) -> &'a str
 where
   P: SdkPackage,
   T: SdkPartHandle,

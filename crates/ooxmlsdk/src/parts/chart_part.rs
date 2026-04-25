@@ -10,8 +10,9 @@ pub const PATH_PREFIX: &str = "charts";
 pub const CONTENT_TYPE: &str = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
 pub const TARGET_NAME: &str = "chart";
 pub const EXTENSION: &str = "";
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartPart {
+  pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_root(accessor = "as_chart_part"))]
   pub(crate) root_element: crate::sdk::PartRoot<
@@ -20,32 +21,76 @@ pub struct ChartPart {
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes"
   ))]
-  pub(crate) chart_drawing_part:
-    crate::sdk::OptionalPart<crate::parts::chart_drawing_part::ChartDrawingPart>,
+  pub(crate) chart_drawing_part: Option<Box<crate::parts::chart_drawing_part::ChartDrawingPart>>,
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
   ))]
   pub(crate) embedded_package_part:
-    crate::sdk::OptionalPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
+    Option<Box<crate::parts::embedded_package_part::EmbeddedPackagePart>>,
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
   ))]
-  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
+  pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
   #[sdk(part_child(
     relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride"
   ))]
-  pub(crate) theme_override_part:
-    crate::sdk::OptionalPart<crate::parts::theme_override_part::ThemeOverridePart>,
+  pub(crate) theme_override_part: Option<Box<crate::parts::theme_override_part::ThemeOverridePart>>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartStyle"
   ))]
-  pub(crate) chart_style_parts:
-    crate::sdk::RepeatedPart<crate::parts::chart_style_part::ChartStylePart>,
+  pub(crate) chart_style_parts: Vec<crate::parts::chart_style_part::ChartStylePart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle"
   ))]
   pub(crate) chart_color_style_parts:
-    crate::sdk::RepeatedPart<crate::parts::chart_color_style_part::ChartColorStylePart>,
+    Vec<crate::parts::chart_color_style_part::ChartColorStylePart>,
+  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
+  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl ChartPart {
+  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
+    crate::sdk::PartChildDescriptor::new(
+      "chart_drawing_part",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
+      "crate::parts::chart_drawing_part::ChartDrawingPart",
+      crate::sdk::PartChildCardinality::Optional,
+    ),
+    crate::sdk::PartChildDescriptor::new(
+      "embedded_package_part",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
+      "crate::parts::embedded_package_part::EmbeddedPackagePart",
+      crate::sdk::PartChildCardinality::Optional,
+    ),
+    crate::sdk::PartChildDescriptor::new(
+      "image_parts",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "crate::parts::image_part::ImagePart",
+      crate::sdk::PartChildCardinality::Repeated,
+    ),
+    crate::sdk::PartChildDescriptor::new(
+      "theme_override_part",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
+      "crate::parts::theme_override_part::ThemeOverridePart",
+      crate::sdk::PartChildCardinality::Optional,
+    ),
+    #[cfg(feature = "microsoft365")]
+    crate::sdk::PartChildDescriptor::new(
+      "chart_style_parts",
+      "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
+      "crate::parts::chart_style_part::ChartStylePart",
+      crate::sdk::PartChildCardinality::Repeated,
+    ),
+    #[cfg(feature = "microsoft365")]
+    crate::sdk::PartChildDescriptor::new(
+      "chart_color_style_parts",
+      "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
+      "crate::parts::chart_color_style_part::ChartColorStylePart",
+      crate::sdk::PartChildCardinality::Repeated,
+    ),
+  ];
 }

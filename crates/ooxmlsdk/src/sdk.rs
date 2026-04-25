@@ -745,6 +745,22 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn add_digital_signature_origin_part(
+    &mut self,
+  ) -> Result<
+    crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart,
+    crate::common::SdkError,
+  >
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_new_part_with_target_mode::<
+      crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart,
+    >(relationship_id, crate::common::NewPartTargetMode::Fixed)
+  }
+
+  #[inline]
   fn add_new_part_with_content_type_and_extension<T>(
     &mut self,
     relationship_id: impl Into<String>,

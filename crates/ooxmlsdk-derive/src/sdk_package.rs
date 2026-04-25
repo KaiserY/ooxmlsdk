@@ -397,6 +397,19 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn add_digital_signature_origin_part(
+        &mut self,
+      ) -> Result<
+        crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart,
+        crate::common::SdkError,
+      >
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_digital_signature_origin_part(self)
+      }
+
+      #[inline]
       pub fn add_thumbnail_part(
         &mut self,
         content_type: impl Into<std::borrow::Cow<'static, str>>,

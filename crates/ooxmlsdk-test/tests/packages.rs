@@ -7,7 +7,8 @@ use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
   core_file_properties_part::CoreFilePropertiesPart,
   custom_file_properties_part::CustomFilePropertiesPart, custom_property_part::CustomPropertyPart,
-  custom_xml_part::CustomXmlPart, document_settings_part::DocumentSettingsPart,
+  custom_xml_part::CustomXmlPart, digital_signature_origin_part::DigitalSignatureOriginPart,
+  document_settings_part::DocumentSettingsPart,
   embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
   embedded_control_persistence_part::EmbeddedControlPersistencePart,
   embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
@@ -1365,8 +1366,8 @@ fn add_main_document_part_creates_fixed_main_part_path() {
 }
 
 #[test]
-fn add_file_properties_parts_create_fixed_package_relationships() {
-  // Source: upstream W050/X006 AddCoreFilePropertiesPart/AddExtendedFilePropertiesPart/AddCustomFilePropertiesPart coverage.
+fn add_file_properties_and_signature_origin_parts_create_fixed_package_relationships() {
+  // Source: upstream W050/X006 AddCoreFilePropertiesPart/AddExtendedFilePropertiesPart/AddCustomFilePropertiesPart/AddDigitalSignatureOriginPart coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
   let main_part = package.add_main_document_part().unwrap();
   main_part
@@ -1402,10 +1403,15 @@ fn add_file_properties_parts_create_fixed_package_relationships() {
         .to_vec(),
     )
     .unwrap();
+  let signature_origin = package.add_digital_signature_origin_part().unwrap();
 
   assert_eq!(core.path(&package), Some("docProps/core.xml"));
   assert_eq!(extended.path(&package), Some("docProps/app.xml"));
   assert_eq!(custom.path(&package), Some("docProps/custom.xml"));
+  assert_eq!(
+    signature_origin.path(&package),
+    Some("_xmlsignatures/origin.sigs")
+  );
   assert_eq!(
     core.content_type(&package),
     Some("application/vnd.openxmlformats-package.core-properties+xml")
@@ -1418,13 +1424,22 @@ fn add_file_properties_parts_create_fixed_package_relationships() {
     custom.content_type(&package),
     Some("application/vnd.openxmlformats-officedocument.custom-properties+xml")
   );
+  assert_eq!(
+    signature_origin.content_type(&package),
+    Some("application/vnd.openxmlformats-package.digital-signature-origin")
+  );
   assert!(package.add_core_file_properties_part().is_err());
   assert!(package.add_extended_file_properties_part().is_err());
   assert!(package.add_custom_file_properties_part().is_err());
+  assert!(package.add_digital_signature_origin_part().is_err());
 
   let core_id = package.get_id_of_part(core).unwrap().to_string();
   let extended_id = package.get_id_of_part(extended).unwrap().to_string();
   let custom_id = package.get_id_of_part(custom).unwrap().to_string();
+  let signature_origin_id = package
+    .get_id_of_part(signature_origin)
+    .unwrap()
+    .to_string();
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
 
@@ -1441,10 +1456,18 @@ fn add_file_properties_parts_create_fixed_package_relationships() {
     .get_part_by_id(custom_id.as_str())
     .and_then(PartRef::downcast::<CustomFilePropertiesPart>)
     .unwrap();
+  let reopened_signature_origin = reopened
+    .get_part_by_id(signature_origin_id.as_str())
+    .and_then(PartRef::downcast::<DigitalSignatureOriginPart>)
+    .unwrap();
 
   assert_eq!(reopened_core.path(&reopened), Some("docProps/core.xml"));
   assert_eq!(reopened_extended.path(&reopened), Some("docProps/app.xml"));
   assert_eq!(reopened_custom.path(&reopened), Some("docProps/custom.xml"));
+  assert_eq!(
+    reopened_signature_origin.path(&reopened),
+    Some("_xmlsignatures/origin.sigs")
+  );
   assert!(reopened_core.data(&reopened).is_some_and(|data| {
     data
       .windows(b"hello".len())

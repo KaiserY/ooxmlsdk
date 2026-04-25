@@ -5,7 +5,10 @@ use std::io::{Cursor, Write};
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
-  custom_xml_part::CustomXmlPart, header_part::HeaderPart, image_part::ImagePart,
+  custom_xml_part::CustomXmlPart, document_settings_part::DocumentSettingsPart,
+  embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
+  font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
+  image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
   main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
   ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
   style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
@@ -17,7 +20,9 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, Document, Header,
 };
 use ooxmlsdk::sdk::{
-  AlternativeFormatImportPartType, CustomXmlPartType, SdkPackage, ThumbnailPartType,
+  AlternativeFormatImportPartType, CustomXmlPartType, EmbeddedObjectPartType,
+  EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType, SdkPackage,
+  ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -968,6 +973,150 @@ fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
     Some("application/inkml+xml")
   );
   assert_eq!(reopened_custom_xml.data(&reopened), Some(inkml.as_slice()));
+}
+
+#[test]
+fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
+  // Source: upstream OpenXmlSupportedRelationshipExtensions typed PartTypeInfo overloads.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  let embedded_object = main_part
+    .add_embedded_object_part_by_type(&mut package, EmbeddedObjectPartType::Binary)
+    .unwrap();
+  embedded_object
+    .set_data(&mut package, b"ole object bytes".to_vec())
+    .unwrap();
+  let embedded_object_id = main_part
+    .get_id_of_part(&package, embedded_object)
+    .unwrap()
+    .to_string();
+
+  let embedded_package = main_part
+    .add_embedded_package_part_by_type(&mut package, EmbeddedPackagePartType::Xlsx)
+    .unwrap();
+  embedded_package
+    .set_data(&mut package, b"xlsx package bytes".to_vec())
+    .unwrap();
+  let embedded_package_id = main_part
+    .get_id_of_part(&package, embedded_package)
+    .unwrap()
+    .to_string();
+
+  let font_table = main_part
+    .add_new_part_auto_id::<_, FontTablePart>(&mut package)
+    .unwrap();
+  let font = font_table
+    .add_font_part_by_type(&mut package, FontPartType::FontTtf)
+    .unwrap();
+  font.set_data(&mut package, b"ttf bytes".to_vec()).unwrap();
+  let font_table_id = main_part
+    .get_id_of_part(&package, font_table)
+    .unwrap()
+    .to_string();
+  let font_id = font_table
+    .get_id_of_part(&package, font)
+    .unwrap()
+    .to_string();
+
+  let settings = main_part
+    .add_new_part_auto_id::<_, DocumentSettingsPart>(&mut package)
+    .unwrap();
+  let recipients = settings
+    .add_mail_merge_recipient_data_part_by_type(
+      &mut package,
+      MailMergeRecipientDataPartType::OpenXmlMailMergeRecipientData,
+    )
+    .unwrap();
+  recipients
+    .set_data(&mut package, b"<recipients/>".to_vec())
+    .unwrap();
+  let settings_id = main_part
+    .get_id_of_part(&package, settings)
+    .unwrap()
+    .to_string();
+  let recipients_id = settings
+    .get_id_of_part(&package, recipients)
+    .unwrap()
+    .to_string();
+
+  assert_eq!(
+    embedded_object.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.oleObject")
+  );
+  assert_eq!(
+    embedded_package.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  );
+  assert_eq!(font.content_type(&package), Some("application/x-font-ttf"));
+  assert_eq!(
+    recipients.content_type(&package),
+    Some(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.mailMergeRecipientData+xml"
+    )
+  );
+  assert!(
+    package
+      .storage()
+      .part(embedded_package.part_id())
+      .unwrap()
+      .path()
+      .ends_with(".xlsx")
+  );
+  assert!(
+    package
+      .storage()
+      .part(font.part_id())
+      .unwrap()
+      .path()
+      .ends_with(".ttf")
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+
+  let reopened_embedded_object = reopened_main
+    .get_part_by_id(&reopened, embedded_object_id.as_str())
+    .and_then(PartRef::downcast::<EmbeddedObjectPart>)
+    .unwrap();
+  let reopened_embedded_package = reopened_main
+    .get_part_by_id(&reopened, embedded_package_id.as_str())
+    .and_then(PartRef::downcast::<EmbeddedPackagePart>)
+    .unwrap();
+  let reopened_font_table = reopened_main
+    .get_part_by_id(&reopened, font_table_id.as_str())
+    .and_then(PartRef::downcast::<FontTablePart>)
+    .unwrap();
+  let reopened_font = reopened_font_table
+    .get_part_by_id(&reopened, font_id.as_str())
+    .and_then(PartRef::downcast::<FontPart>)
+    .unwrap();
+  let reopened_settings = reopened_main
+    .get_part_by_id(&reopened, settings_id.as_str())
+    .and_then(PartRef::downcast::<DocumentSettingsPart>)
+    .unwrap();
+  let reopened_recipients = reopened_settings
+    .get_part_by_id(&reopened, recipients_id.as_str())
+    .and_then(PartRef::downcast::<MailMergeRecipientDataPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_embedded_object.data(&reopened),
+    Some(&b"ole object bytes"[..])
+  );
+  assert_eq!(
+    reopened_embedded_package.data(&reopened),
+    Some(&b"xlsx package bytes"[..])
+  );
+  assert_eq!(reopened_font.data(&reopened), Some(&b"ttf bytes"[..]));
+  assert_eq!(
+    reopened_recipients.data(&reopened),
+    Some(&b"<recipients/>"[..])
+  );
 }
 
 #[test]

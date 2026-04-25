@@ -1383,6 +1383,204 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_custom_property_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::CustomPropertyPartType,
+      ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_custom_property_part_by_type(
+          self, package, part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_custom_property_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::CustomPropertyPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_custom_property_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_object_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedObjectPartType,
+      ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_object_part_by_type(
+          self, package, part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_object_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedObjectPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_object_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_package_part<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_package_part(
+          self,
+          package,
+          content_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_package_part_with_id<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_package_part_with_id(
+          self,
+          package,
+          content_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_package_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedPackagePartType,
+      ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_package_part_by_type(
+          self, package, part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_package_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedPackagePartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_package_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_font_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::FontPartType,
+      ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_font_part_by_type(self, package, part_type)
+      }
+
+      #[inline]
+      pub fn add_font_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::FontPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_font_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_mail_merge_recipient_data_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::MailMergeRecipientDataPartType,
+      ) -> Result<
+        crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_mail_merge_recipient_data_part_by_type(
+          self, package, part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_mail_merge_recipient_data_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::MailMergeRecipientDataPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<
+        crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_mail_merge_recipient_data_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn remove_relationship<P: crate::sdk::SdkPackage>(
         self,
         package: &mut P,

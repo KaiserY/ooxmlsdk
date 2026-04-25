@@ -219,6 +219,186 @@ impl CustomXmlPartType {
 
 #[cfg(feature = "parts")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CustomPropertyPartType {
+  Spreadsheet,
+  Xml,
+}
+
+#[cfg(feature = "parts")]
+impl CustomPropertyPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Spreadsheet => {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.customProperty"
+      }
+      Self::Xml => "application/xml",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    ".xml"
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EmbeddedObjectPartType {
+  Binary,
+}
+
+#[cfg(feature = "parts")]
+impl EmbeddedObjectPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Binary => "application/vnd.openxmlformats-officedocument.oleObject",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    ".bin"
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EmbeddedPackagePartType {
+  Docm,
+  Docx,
+  Dotm,
+  Dotx,
+  Potm,
+  Potx,
+  Ppam,
+  Ppsm,
+  Ppsx,
+  Pptm,
+  Pptx,
+  Sldm,
+  Sldx,
+  Thmx,
+  Xlam,
+  Xlsb,
+  Xlsm,
+  Xlsx,
+  Xltm,
+  Xltx,
+}
+
+#[cfg(feature = "parts")]
+impl EmbeddedPackagePartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Docm => "application/vnd.ms-word.document.macroEnabled.12",
+      Self::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      Self::Dotm => "application/vnd.ms-word.template.macroEnabled.12",
+      Self::Dotx => "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+      Self::Potm => "application/vnd.ms-powerpoint.template.macroEnabled.12",
+      Self::Potx => "application/vnd.openxmlformats-officedocument.presentationml.template",
+      Self::Ppam => "application/vnd.ms-powerpoint.addin.macroEnabled.12",
+      Self::Ppsm => "application/vnd.ms-powerpoint.slideshow.macroEnabled.12",
+      Self::Ppsx => "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+      Self::Pptm => "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+      Self::Pptx => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      Self::Sldm => "application/vnd.ms-powerpoint.slide.macroEnabled.12",
+      Self::Sldx => "application/vnd.openxmlformats-officedocument.presentationml.slide",
+      Self::Thmx => "application/vnd.ms-officetheme",
+      Self::Xlam => "application/vnd.ms-excel.addin.macroEnabled.12",
+      Self::Xlsb => "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+      Self::Xlsm => "application/vnd.ms-excel.sheet.macroEnabled.12",
+      Self::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      Self::Xltm => "application/vnd.ms-excel.template.macroEnabled.12",
+      Self::Xltx => "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    match self {
+      Self::Docm => ".docm",
+      Self::Docx => ".docx",
+      Self::Dotm => ".dotm",
+      Self::Dotx => ".dotx",
+      Self::Potm => ".potm",
+      Self::Potx => ".potx",
+      Self::Ppam => ".ppam",
+      Self::Ppsm => ".ppsm",
+      Self::Ppsx => ".ppsx",
+      Self::Pptm => ".pptm",
+      Self::Pptx => ".pptx",
+      Self::Sldm => ".sldm",
+      Self::Sldx => ".sldx",
+      Self::Thmx => ".thmx",
+      Self::Xlam => ".xlam",
+      Self::Xlsb => ".xlsb",
+      Self::Xlsm => ".xlsm",
+      Self::Xlsx => ".xlsx",
+      Self::Xltm => ".xltm",
+      Self::Xltx => ".xltx",
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FontPartType {
+  FontData,
+  FontTtf,
+  FontOdttf,
+}
+
+#[cfg(feature = "parts")]
+impl FontPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::FontData => "application/x-fontdata",
+      Self::FontTtf => "application/x-font-ttf",
+      Self::FontOdttf => "application/vnd.openxmlformats-officedocument.obfuscatedFont",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    match self {
+      Self::FontData => ".fntdata",
+      Self::FontTtf => ".ttf",
+      Self::FontOdttf => ".odttf",
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MailMergeRecipientDataPartType {
+  OpenXmlMailMergeRecipientData,
+  MsWordMailMergeRecipientData,
+}
+
+#[cfg(feature = "parts")]
+impl MailMergeRecipientDataPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::OpenXmlMailMergeRecipientData => {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.mailMergeRecipientData+xml"
+      }
+      Self::MsWordMailMergeRecipientData => "application/vnd.ms-word.mailMergeRecipientData+xml",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    ".xml"
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ThumbnailPartType {
   Jpeg,
   Emf,
@@ -734,6 +914,61 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   }
 
   #[inline]
+  fn add_new_part_with_content_type_and_extension<P, T>(
+    self,
+    package: &mut P,
+    relationship_id: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    extension: &'static str,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let part_id = package.storage_mut().add_child_part(
+      self.part_id(),
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: T::RELATIONSHIP_TYPE,
+        content_type: content_type.into(),
+        path_prefix: T::PATH_PREFIX,
+        target_name: T::TARGET_NAME,
+        extension,
+      },
+    )?;
+    package.push_root_element_slot();
+    Ok(T::from_part_id(part_id))
+  }
+
+  #[inline]
+  fn add_new_part_with_content_type_and_extension_auto_id<P, T>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    extension: &'static str,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_new_part_with_content_type_and_extension::<P, T>(
+      package,
+      relationship_id,
+      content_type,
+      extension,
+    )
+  }
+
+  #[inline]
   fn add_image_part<P>(
     self,
     package: &mut P,
@@ -892,6 +1127,357 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
     P: SdkPackage + crate::parts::PartRootCache,
   {
     self.add_custom_xml_part_with_id(package, part_type.content_type(), relationship_id)
+  }
+
+  #[inline]
+  fn add_custom_property_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::custom_property_part::CustomPropertyPart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_custom_property_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self
+      .add_new_part_with_content_type::<P, crate::parts::custom_property_part::CustomPropertyPart>(
+        package,
+        relationship_id,
+        content_type,
+      )
+  }
+
+  #[inline]
+  fn add_custom_property_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: CustomPropertyPartType,
+  ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension_auto_id::<
+      P,
+      crate::parts::custom_property_part::CustomPropertyPart,
+    >(package, part_type.content_type(), part_type.extension())
+  }
+
+  #[inline]
+  fn add_custom_property_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: CustomPropertyPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<
+      P,
+      crate::parts::custom_property_part::CustomPropertyPart,
+    >(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
+  }
+
+  #[inline]
+  fn add_embedded_object_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::embedded_object_part::EmbeddedObjectPart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_object_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self
+      .add_new_part_with_content_type::<P, crate::parts::embedded_object_part::EmbeddedObjectPart>(
+        package,
+        relationship_id,
+        content_type,
+      )
+  }
+
+  #[inline]
+  fn add_embedded_object_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedObjectPartType,
+  ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension_auto_id::<
+      P,
+      crate::parts::embedded_object_part::EmbeddedObjectPart,
+    >(package, part_type.content_type(), part_type.extension())
+  }
+
+  #[inline]
+  fn add_embedded_object_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedObjectPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<
+      P,
+      crate::parts::embedded_object_part::EmbeddedObjectPart,
+    >(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
+  }
+
+  #[inline]
+  fn add_embedded_package_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::embedded_package_part::EmbeddedPackagePart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_package_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<
+      P,
+      crate::parts::embedded_package_part::EmbeddedPackagePart,
+    >(package, relationship_id, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_package_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedPackagePartType,
+  ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension_auto_id::<
+      P,
+      crate::parts::embedded_package_part::EmbeddedPackagePart,
+    >(package, part_type.content_type(), part_type.extension())
+  }
+
+  #[inline]
+  fn add_embedded_package_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedPackagePartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<
+      P,
+      crate::parts::embedded_package_part::EmbeddedPackagePart,
+    >(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
+  }
+
+  #[inline]
+  fn add_font_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<P, crate::parts::font_part::FontPart>(
+      package,
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_font_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<P, crate::parts::font_part::FontPart>(
+      package,
+      relationship_id,
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_font_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: FontPartType,
+  ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self
+      .add_new_part_with_content_type_and_extension_auto_id::<P, crate::parts::font_part::FontPart>(
+        package,
+        part_type.content_type(),
+        part_type.extension(),
+      )
+  }
+
+  #[inline]
+  fn add_font_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: FontPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<P, crate::parts::font_part::FontPart>(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
+  }
+
+  #[inline]
+  fn add_mail_merge_recipient_data_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<
+    crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_mail_merge_recipient_data_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<
+      P,
+      crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    >(package, relationship_id, content_type)
+  }
+
+  #[inline]
+  fn add_mail_merge_recipient_data_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: MailMergeRecipientDataPartType,
+  ) -> Result<
+    crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension_auto_id::<
+      P,
+      crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    >(package, part_type.content_type(), part_type.extension())
+  }
+
+  #[inline]
+  fn add_mail_merge_recipient_data_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: MailMergeRecipientDataPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<
+      P,
+      crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    >(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
   }
 
   #[inline]

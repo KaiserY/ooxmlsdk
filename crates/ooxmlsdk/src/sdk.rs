@@ -351,7 +351,7 @@ pub trait SdkPackage {
       relationship_id,
       crate::common::NewPartDescriptor {
         relationship_type: T::RELATIONSHIP_TYPE,
-        content_type: T::CONTENT_TYPE,
+        content_type: std::borrow::Cow::Borrowed(T::CONTENT_TYPE),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
         extension: T::EXTENSION,
@@ -466,7 +466,33 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       relationship_id,
       crate::common::NewPartDescriptor {
         relationship_type: T::RELATIONSHIP_TYPE,
-        content_type: T::CONTENT_TYPE,
+        content_type: std::borrow::Cow::Borrowed(T::CONTENT_TYPE),
+        path_prefix: T::PATH_PREFIX,
+        target_name: T::TARGET_NAME,
+        extension: T::EXTENSION,
+      },
+    )?;
+    package.push_root_element_slot();
+    Ok(T::from_part_id(part_id))
+  }
+
+  #[inline]
+  fn add_new_part_with_content_type<P, T>(
+    self,
+    package: &mut P,
+    relationship_id: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let part_id = package.storage_mut().add_child_part(
+      self.part_id(),
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: T::RELATIONSHIP_TYPE,
+        content_type: content_type.into(),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
         extension: T::EXTENSION,
@@ -492,6 +518,28 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       })?
       .next_relationship_id();
     self.add_new_part::<P, T>(package, relationship_id)
+  }
+
+  #[inline]
+  fn add_new_part_with_content_type_auto_id<P, T>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_new_part_with_content_type::<P, T>(package, relationship_id, content_type)
   }
 
   #[inline]
@@ -593,6 +641,24 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   #[inline]
   fn data<P: SdkPackage>(self, package: &P) -> Option<&[u8]> {
     self.stored_part(package).map(|part| part.data().bytes())
+  }
+
+  #[inline]
+  fn set_data<P: SdkPackage>(
+    self,
+    package: &mut P,
+    data: impl Into<Vec<u8>>,
+  ) -> Result<(), crate::common::SdkError> {
+    package.storage_mut().set_part_data(self.part_id(), data)
+  }
+
+  #[inline]
+  fn feed_data<P: SdkPackage, R: std::io::Read>(
+    self,
+    package: &mut P,
+    reader: &mut R,
+  ) -> Result<(), crate::common::SdkError> {
+    package.storage_mut().feed_part_data(self.part_id(), reader)
   }
 
   #[inline]

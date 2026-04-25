@@ -1049,6 +1049,24 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn set_data<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        data: impl Into<Vec<u8>>,
+      ) -> Result<(), crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::set_data(self, package, data)
+      }
+
+      #[inline]
+      pub fn feed_data<P: crate::sdk::SdkPackage, R: std::io::Read>(
+        self,
+        package: &mut P,
+        reader: &mut R,
+      ) -> Result<(), crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::feed_data(self, package, reader)
+      }
+
+      #[inline]
       pub fn external_relationships<P: crate::sdk::SdkPackage>(
         self,
         package: &P,
@@ -1135,6 +1153,25 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_new_part_with_content_type<P, T>(
+        self,
+        package: &mut P,
+        relationship_id: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_new_part_with_content_type(
+          self,
+          package,
+          relationship_id,
+          content_type,
+        )
+      }
+
+      #[inline]
       pub fn add_new_part_auto_id<P, T>(
         self,
         package: &mut P,
@@ -1144,6 +1181,23 @@ fn expand_part_handle(
         T: crate::sdk::SdkPartHandle,
       {
         <Self as crate::sdk::SdkPartHandle>::add_new_part_auto_id(self, package)
+      }
+
+      #[inline]
+      pub fn add_new_part_with_content_type_auto_id<P, T>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_new_part_with_content_type_auto_id(
+          self,
+          package,
+          content_type,
+        )
       }
 
       #[inline]

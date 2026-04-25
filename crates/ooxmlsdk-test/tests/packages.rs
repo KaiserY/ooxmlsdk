@@ -646,6 +646,73 @@ fn package_add_new_part_creates_package_relationship() {
 }
 
 #[test]
+fn image_part_feed_data_is_saved() {
+  // Source: upstream AddNewPart<ImagePart>(mime).FeedData(...) coverage.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkImage";
+  let image_bytes = b"\x89PNG\r\n\x1a\nsdk-image-bytes".to_vec();
+
+  let image_part = main_part
+    .add_new_part_with_content_type::<_, ImagePart>(&mut package, relationship_id, "image/png")
+    .unwrap();
+  image_part
+    .feed_data(&mut package, &mut Cursor::new(image_bytes.clone()))
+    .unwrap();
+
+  assert_eq!(image_part.content_type(&package), Some("image/png"));
+  assert_eq!(image_part.data(&package), Some(image_bytes.as_slice()));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_image = reopened_main
+    .get_part_by_id(&reopened, relationship_id)
+    .and_then(PartRef::downcast::<ImagePart>)
+    .unwrap();
+
+  assert_eq!(reopened_image.content_type(&reopened), Some("image/png"));
+  assert_eq!(reopened_image.data(&reopened), Some(image_bytes.as_slice()));
+}
+
+#[test]
+fn set_data_replaces_existing_part_bytes() {
+  // Source: upstream GetStream(FileMode.Create) replacement semantics adapted to raw bytes.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let image_part = main_part
+    .add_new_part_with_content_type_auto_id::<_, ImagePart>(&mut package, "image/png")
+    .unwrap();
+
+  image_part
+    .set_data(&mut package, b"first image bytes".to_vec())
+    .unwrap();
+  image_part
+    .set_data(&mut package, b"replacement image bytes".to_vec())
+    .unwrap();
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let relationship_id = main_part.get_id_of_part(&package, image_part).unwrap();
+  let reopened_image = reopened_main
+    .get_part_by_id(&reopened, relationship_id)
+    .and_then(PartRef::downcast::<ImagePart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_image.data(&reopened),
+    Some(&b"replacement image bytes"[..])
+  );
+}
+
+#[test]
 fn add_main_document_part_creates_fixed_main_part_path() {
   // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();

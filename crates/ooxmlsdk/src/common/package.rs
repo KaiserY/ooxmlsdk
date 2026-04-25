@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
@@ -38,10 +39,10 @@ pub enum StoredPartDataKind {
   Binary,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NewPartDescriptor {
   pub relationship_type: &'static str,
-  pub content_type: &'static str,
+  pub content_type: Cow<'static, str>,
   pub path_prefix: &'static str,
   pub target_name: &'static str,
   pub extension: &'static str,
@@ -72,6 +73,13 @@ impl StoredPartData {
 
   #[inline]
   pub fn bytes(&self) -> &[u8] {
+    match self {
+      Self::Raw { bytes, .. } => bytes,
+    }
+  }
+
+  #[inline]
+  pub fn bytes_mut(&mut self) -> &mut Vec<u8> {
     match self {
       Self::Raw { bytes, .. } => bytes,
     }
@@ -636,7 +644,7 @@ impl SdkPackageStorage {
     let relationship_target = relationship_target_from_source(&source_part_path, &child_path);
     let part_id = self.push_part(
       child_path,
-      descriptor.content_type,
+      &descriptor.content_type,
       Some(descriptor.relationship_type),
     );
     self
@@ -680,10 +688,10 @@ impl SdkPackageStorage {
       )));
     }
 
-    let part_path = self.package_part_path(descriptor, target_mode)?;
+    let part_path = self.package_part_path(&descriptor, target_mode)?;
     let part_id = self.push_part(
       part_path.clone(),
-      descriptor.content_type,
+      &descriptor.content_type,
       Some(descriptor.relationship_type),
     );
     self.package_relationships.add_internal_part_relationship(
@@ -698,7 +706,7 @@ impl SdkPackageStorage {
   fn push_part(
     &mut self,
     path: String,
-    content_type: &'static str,
+    content_type: &str,
     relationship_type: Option<&'static str>,
   ) -> PartId {
     let part_id = PartId::from_index(self.parts.len());
@@ -716,6 +724,36 @@ impl SdkPackageStorage {
     self.by_path.insert(path.clone().into_boxed_str(), part_id);
     self.add_content_type_override(&path, content_type);
     part_id
+  }
+
+  pub fn set_part_data(
+    &mut self,
+    part_id: PartId,
+    data: impl Into<Vec<u8>>,
+  ) -> Result<(), SdkError> {
+    let part = self.part_mut(part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      ))
+    })?;
+    *part.data.bytes_mut() = data.into();
+    Ok(())
+  }
+
+  pub fn feed_part_data<R: Read>(
+    &mut self,
+    part_id: PartId,
+    reader: &mut R,
+  ) -> Result<(), SdkError> {
+    let part = self.part_mut(part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      ))
+    })?;
+    let bytes = part.data.bytes_mut();
+    bytes.clear();
+    reader.read_to_end(bytes)?;
+    Ok(())
   }
 
   fn add_content_type_override(&mut self, path: &str, content_type: &str) {
@@ -772,7 +810,7 @@ impl SdkPackageStorage {
 
   fn package_part_path(
     &self,
-    descriptor: NewPartDescriptor,
+    descriptor: &NewPartDescriptor,
     target_mode: NewPartTargetMode,
   ) -> Result<String, SdkError> {
     let directory_path = package_part_directory_path(descriptor.path_prefix);

@@ -292,9 +292,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut part_ref_relationship_id_arms: Vec<TokenStream> = vec![];
   let mut part_ref_child_descriptor_arms: Vec<TokenStream> = vec![];
   let mut part_ref_modeled_relationships_arms: Vec<TokenStream> = vec![];
-  let mut part_ref_modeled_graph_arms: Vec<TokenStream> = vec![];
   let mut part_ref_collect_relationships_arms: Vec<TokenStream> = vec![];
-  let mut part_ref_collect_graph_arms: Vec<TokenStream> = vec![];
   let mut part_ref_downcast_arms: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_branches: Vec<TokenStream> = vec![];
@@ -391,20 +389,10 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       #( #part_attrs )*
       PartRef::#struct_ident(part) => part.modeled_relationships(package)
     });
-    part_ref_modeled_graph_arms.push(quote! {
-      #( #part_attrs )*
-      PartRef::#struct_ident(part) => part.modeled_relationship_graph(package)
-    });
     part_ref_collect_relationships_arms.push(quote! {
       #( #part_attrs )*
       PartRef::#struct_ident(part) => {
         crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
-      }
-    });
-    part_ref_collect_graph_arms.push(quote! {
-      #( #part_attrs )*
-      PartRef::#struct_ident(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
       }
     });
     part_ref_downcast_arms.push(quote! {
@@ -495,16 +483,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
       }
 
-      pub fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-      ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-        match self {
-          #( #part_ref_modeled_graph_arms, )*
-          PartRef::ExtendedPart(part) => part.modeled_relationship_graph(package),
-        }
-      }
-
       pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,
@@ -527,22 +505,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           #( #part_ref_collect_relationships_arms, )*
           PartRef::ExtendedPart(part) => {
             crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
-          }
-        }
-      }
-
-      pub fn collect_modeled_part_relationship_graphs<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-        graphs: &mut std::collections::HashMap<
-          crate::common::PartId,
-          crate::common::RelationshipGraph,
-        >,
-      ) -> Result<(), crate::common::SdkError> {
-        match self {
-          #( #part_ref_collect_graph_arms, )*
-          PartRef::ExtendedPart(part) => {
-            crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, package, graphs)
           }
         }
       }

@@ -339,22 +339,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       },
     }
   });
-  let package_collect_child_stmts = child_infos.iter().map(|child| {
-    let field_ident = &child.field_ident;
-    match child.kind {
-      PartChildKind::Repeated => quote! {
-        for part in &self.#field_ident {
-          crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, self, graphs)?;
-        }
-      },
-      PartChildKind::Required | PartChildKind::Optional => quote! {
-        if let Some(part) = self.#field_ident.as_deref() {
-          crate::sdk::SdkPartHandle::collect_modeled_part_relationship_graphs(part, self, graphs)?;
-        }
-      },
-    }
-  });
-
   Ok(quote! {
     impl crate::sdk::SdkPackage for #ident {
       const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
@@ -395,12 +379,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Ok(relationships)
       }
 
-      fn modeled_relationship_graph(
-        &self,
-      ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-        Ok(self.modeled_relationships()?.to_relationship_graph())
-      }
-
       fn refresh_relationship_model_from_storage(&mut self) {
         let (
           #( #child_field_tuple_values, )*
@@ -429,20 +407,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         self.data_part_reference_relationships = data_part_reference_relationships;
         self.reference_relationships = reference_relationships;
         self.raw_relationships = raw_relationships;
-      }
-
-      fn collect_modeled_part_relationship_graphs(
-        &self,
-        graphs: &mut std::collections::HashMap<
-          crate::common::PartId,
-          crate::common::RelationshipGraph,
-        >,
-      ) -> Result<(), crate::common::SdkError> {
-        #( #package_collect_child_stmts )*
-        for part in &self.fallback_parts {
-          part.collect_modeled_part_relationship_graphs(self, graphs)?;
-        }
-        Ok(())
       }
 
       fn collect_modeled_part_relationships(
@@ -494,19 +458,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
       pub fn relationships_mut(&mut self) -> &mut crate::common::RelationshipSet {
         self.#storage_ident.package_relationships_mut()
-      }
-
-      #[inline]
-      pub fn relationship_graph(&self) -> crate::common::RelationshipGraph {
-        crate::sdk::SdkPackage::relationship_graph(self)
-      }
-
-      #[inline]
-      pub fn replace_relationships_from_graph(
-        &mut self,
-        graph: crate::common::RelationshipGraph,
-      ) {
-        crate::sdk::SdkPackage::replace_relationships_from_graph(self, graph)
       }
 
       #[inline]
@@ -799,12 +750,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       #main_part_method
 
       #package_relationship_methods
-
-      pub fn modeled_relationship_graph(
-        &self,
-      ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-        crate::sdk::SdkPackage::modeled_relationship_graph(self)
-      }
 
       pub fn modeled_relationships(
         &self,

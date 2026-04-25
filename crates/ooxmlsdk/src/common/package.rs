@@ -124,25 +124,6 @@ pub enum ReferenceRelationshipKind {
   Video,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RelationshipGraphEdge {
-  relationship: RelationshipInfo,
-  kind: RelationshipGraphEdgeKind,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RelationshipGraphEdgeKind {
-  Part,
-  Reference(ReferenceRelationshipKind),
-  Raw,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct RelationshipGraph {
-  relationships: Vec<RelationshipGraphEdge>,
-  by_id: HashMap<Box<str>, usize>,
-}
-
 impl RelationshipInfo {
   fn internal_part(
     id: String,
@@ -246,258 +227,6 @@ impl RelationshipInfo {
       r#type: self.relationship_type().to_string(),
       target: self.target().to_string(),
       target_mode: self.target_mode,
-    }
-  }
-}
-
-impl RelationshipGraphEdge {
-  fn new(relationship: RelationshipInfo) -> Self {
-    let kind = if let Some(reference_kind) = relationship.reference_kind() {
-      RelationshipGraphEdgeKind::Reference(reference_kind)
-    } else if relationship.target_kind() == RelationshipTargetKind::InternalPart {
-      RelationshipGraphEdgeKind::Part
-    } else {
-      RelationshipGraphEdgeKind::Raw
-    };
-    Self { relationship, kind }
-  }
-
-  #[inline]
-  pub fn relationship(&self) -> &RelationshipInfo {
-    &self.relationship
-  }
-
-  #[inline]
-  pub fn into_relationship(self) -> RelationshipInfo {
-    self.relationship
-  }
-
-  #[inline]
-  pub fn kind(&self) -> RelationshipGraphEdgeKind {
-    self.kind
-  }
-
-  #[inline]
-  pub fn is_part_relationship(&self) -> bool {
-    self.kind == RelationshipGraphEdgeKind::Part
-  }
-
-  #[inline]
-  pub fn is_reference_relationship(&self) -> bool {
-    matches!(self.kind, RelationshipGraphEdgeKind::Reference(_))
-  }
-
-  #[inline]
-  pub fn is_raw_relationship(&self) -> bool {
-    self.kind == RelationshipGraphEdgeKind::Raw
-  }
-}
-
-impl RelationshipGraph {
-  #[inline]
-  pub fn is_empty(&self) -> bool {
-    self.relationships.is_empty()
-  }
-
-  #[inline]
-  pub fn len(&self) -> usize {
-    self.relationships.len()
-  }
-
-  #[inline]
-  pub fn iter(&self) -> impl Iterator<Item = &RelationshipGraphEdge> {
-    self.relationships.iter()
-  }
-
-  #[inline]
-  pub fn get(&self, relationship_id: &str) -> Option<&RelationshipGraphEdge> {
-    self
-      .by_id
-      .get(relationship_id)
-      .and_then(|index| self.relationships.get(*index))
-  }
-
-  #[inline]
-  pub fn part_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
-    self
-      .relationships
-      .iter()
-      .filter(|edge| edge.is_part_relationship())
-      .map(RelationshipGraphEdge::relationship)
-  }
-
-  #[inline]
-  pub fn reference_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
-    self
-      .relationships
-      .iter()
-      .filter(|edge| edge.is_reference_relationship())
-      .map(RelationshipGraphEdge::relationship)
-  }
-
-  #[inline]
-  pub fn raw_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
-    self
-      .relationships
-      .iter()
-      .filter(|edge| edge.is_raw_relationship())
-      .map(RelationshipGraphEdge::relationship)
-  }
-
-  pub fn add_internal_part_relationship(
-    &mut self,
-    relationship_id: impl Into<String>,
-    relationship_type: impl Into<String>,
-    target: impl Into<String>,
-    target_part_id: PartId,
-  ) -> Result<&RelationshipGraphEdge, SdkError> {
-    self.push_relationship(RelationshipInfo::internal_part(
-      relationship_id.into(),
-      relationship_type.into(),
-      target.into(),
-      target_part_id,
-    ))
-  }
-
-  pub fn add_external_relationship(
-    &mut self,
-    relationship_id: impl Into<String>,
-    relationship_type: impl Into<String>,
-    target: impl Into<String>,
-  ) -> Result<&RelationshipGraphEdge, SdkError> {
-    self.push_relationship(RelationshipInfo::external(
-      relationship_id.into(),
-      relationship_type.into(),
-      target.into(),
-      Some(TargetMode::External),
-    ))
-  }
-
-  pub fn add_hyperlink_relationship(
-    &mut self,
-    relationship_id: impl Into<String>,
-    target: impl Into<String>,
-  ) -> Result<&RelationshipGraphEdge, SdkError> {
-    self.add_external_relationship(
-      relationship_id,
-      RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE,
-      target,
-    )
-  }
-
-  pub fn add_relationship_info(
-    &mut self,
-    relationship: RelationshipInfo,
-  ) -> Result<&RelationshipGraphEdge, SdkError> {
-    self.push_relationship(relationship)
-  }
-
-  pub fn remove(&mut self, relationship_id: &str) -> Option<RelationshipGraphEdge> {
-    let index = *self.by_id.get(relationship_id)?;
-    let removed = self.relationships.remove(index);
-    self.rebuild_index();
-    Some(removed)
-  }
-
-  pub fn change_relationship_id(
-    &mut self,
-    relationship_id: &str,
-    new_relationship_id: impl Into<String>,
-  ) -> Result<(), SdkError> {
-    let new_relationship_id = new_relationship_id.into();
-    if relationship_id == new_relationship_id {
-      return Ok(());
-    }
-    if self.by_id.contains_key(new_relationship_id.as_str()) {
-      return Err(SdkError::CommonError(format!(
-        "relationship id {new_relationship_id} already exists"
-      )));
-    }
-
-    let Some(index) = self.by_id.get(relationship_id).copied() else {
-      return Err(SdkError::CommonError(format!(
-        "relationship id {relationship_id} does not exist"
-      )));
-    };
-
-    self.relationships[index].relationship.id = new_relationship_id.into_boxed_str();
-    self.rebuild_index();
-    Ok(())
-  }
-
-  pub fn to_relationship_set(&self) -> RelationshipSet {
-    RelationshipSet::from_relationship_infos(
-      self
-        .relationships
-        .iter()
-        .map(|edge| edge.relationship.clone()),
-    )
-  }
-
-  pub fn reorder_by_ids(&mut self, relationship_ids: &[Box<str>]) {
-    if self.relationships.len() <= 1 || relationship_ids.is_empty() {
-      return;
-    }
-
-    let mut ordered = Vec::with_capacity(self.relationships.len());
-    let mut used = vec![false; self.relationships.len()];
-    for relationship_id in relationship_ids {
-      if let Some(index) = self.by_id.get(relationship_id.as_ref()).copied() {
-        if !used[index] {
-          used[index] = true;
-          ordered.push(self.relationships[index].clone());
-        }
-      }
-    }
-
-    for (index, edge) in self.relationships.iter().enumerate() {
-      if !used[index] {
-        ordered.push(edge.clone());
-      }
-    }
-
-    self.relationships = ordered;
-    self.rebuild_index();
-  }
-
-  fn from_relationship_set(relationships: &RelationshipSet) -> Self {
-    let mut graph = Self {
-      relationships: Vec::with_capacity(relationships.len()),
-      by_id: HashMap::with_capacity(relationships.len()),
-    };
-    for relationship in relationships.iter().cloned() {
-      graph.push_relationship_unchecked(relationship);
-    }
-    graph
-  }
-
-  fn push_relationship(
-    &mut self,
-    relationship: RelationshipInfo,
-  ) -> Result<&RelationshipGraphEdge, SdkError> {
-    if self.by_id.contains_key(relationship.id()) {
-      return Err(SdkError::CommonError(format!(
-        "relationship id {} already exists",
-        relationship.id()
-      )));
-    }
-    self.push_relationship_unchecked(relationship);
-    Ok(self.relationships.last().expect("pushed relationship"))
-  }
-
-  fn push_relationship_unchecked(&mut self, relationship: RelationshipInfo) {
-    let index = self.relationships.len();
-    self.by_id.insert(relationship.id.clone(), index);
-    self
-      .relationships
-      .push(RelationshipGraphEdge::new(relationship));
-  }
-
-  fn rebuild_index(&mut self) {
-    self.by_id.clear();
-    self.by_id.reserve(self.relationships.len());
-    for (index, edge) in self.relationships.iter().enumerate() {
-      self.by_id.insert(edge.relationship.id.clone(), index);
     }
   }
 }
@@ -706,11 +435,6 @@ impl RelationshipSet {
     })
   }
 
-  #[inline]
-  pub fn to_relationship_graph(&self) -> RelationshipGraph {
-    RelationshipGraph::from_relationship_set(self)
-  }
-
   pub fn reorder_by_ids(&mut self, relationship_ids: &[Box<str>]) {
     if self.relationships.len() <= 1 || relationship_ids.is_empty() {
       return;
@@ -719,11 +443,11 @@ impl RelationshipSet {
     let mut ordered = Vec::with_capacity(self.relationships.len());
     let mut used = vec![false; self.relationships.len()];
     for relationship_id in relationship_ids {
-      if let Some(index) = self.by_id.get(relationship_id.as_ref()).copied() {
-        if !used[index] {
-          used[index] = true;
-          ordered.push(self.relationships[index].clone());
-        }
+      if let Some(index) = self.by_id.get(relationship_id.as_ref()).copied()
+        && !used[index]
+      {
+        used[index] = true;
+        ordered.push(self.relationships[index].clone());
       }
     }
 
@@ -781,19 +505,6 @@ impl RelationshipSet {
       set.push_relationship_unchecked(info);
     }
 
-    set
-  }
-
-  fn from_relationship_infos(relationships: impl IntoIterator<Item = RelationshipInfo>) -> Self {
-    let relationships = relationships.into_iter();
-    let (lower, _) = relationships.size_hint();
-    let mut set = Self {
-      relationships: Vec::with_capacity(lower),
-      by_id: HashMap::with_capacity(lower),
-    };
-    for relationship in relationships {
-      set.push_relationship_unchecked(relationship);
-    }
     set
   }
 
@@ -980,16 +691,6 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn package_relationship_graph(&self) -> RelationshipGraph {
-    self.package_relationships.to_relationship_graph()
-  }
-
-  #[inline]
-  pub fn replace_package_relationships_from_graph(&mut self, graph: RelationshipGraph) {
-    self.package_relationships = graph.to_relationship_set();
-  }
-
-  #[inline]
   pub fn open_mode(&self) -> PackageOpenMode {
     self.open_mode
   }
@@ -1042,27 +743,6 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn relationship_graph(&self, part_id: PartId) -> Option<RelationshipGraph> {
-    self
-      .relationships(part_id)
-      .map(RelationshipSet::to_relationship_graph)
-  }
-
-  pub fn replace_relationships_from_graph(
-    &mut self,
-    part_id: PartId,
-    graph: RelationshipGraph,
-  ) -> Result<(), SdkError> {
-    let relationships = self.relationships_mut(part_id).ok_or_else(|| {
-      SdkError::CommonError(format!(
-        "part id {part_id:?} is not present in package storage"
-      ))
-    })?;
-    *relationships = graph.to_relationship_set();
-    Ok(())
-  }
-
-  #[inline]
   pub fn target_part_id(&self, source_part_id: PartId, relationship_id: &str) -> Option<PartId> {
     self
       .relationships(source_part_id)?
@@ -1079,19 +759,18 @@ impl SdkPackageStorage {
     let relationship_id = relationship_id.into();
     match source_part_id {
       Some(part_id) => {
-        if let Some(relationships) = self.relationships(part_id) {
-          if let Some(relationship) = relationships.get(&relationship_id) {
-            if relationship.target_part_id() == Some(target_part_id) {
-              return Ok(relationship.clone());
-            }
-          }
+        if let Some(relationships) = self.relationships(part_id)
+          && let Some(relationship) = relationships.get(&relationship_id)
+          && relationship.target_part_id() == Some(target_part_id)
+        {
+          return Ok(relationship.clone());
         }
       }
       None => {
-        if let Some(relationship) = self.package_relationships().get(&relationship_id) {
-          if relationship.target_part_id() == Some(target_part_id) {
-            return Ok(relationship.clone());
-          }
+        if let Some(relationship) = self.package_relationships().get(&relationship_id)
+          && relationship.target_part_id() == Some(target_part_id)
+        {
+          return Ok(relationship.clone());
         }
       }
     }

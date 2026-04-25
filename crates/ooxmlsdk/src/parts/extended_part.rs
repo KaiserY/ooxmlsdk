@@ -136,26 +136,6 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
   fn set_relationship_id(&mut self, relationship_id: String) {
     self.relationship_id = Some(relationship_id);
   }
-  fn collect_modeled_part_relationship_graphs<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-    graphs: &mut std::collections::HashMap<crate::common::PartId, crate::common::RelationshipGraph>,
-  ) -> Result<(), crate::common::SdkError> {
-    let Some(part) = package.storage().part(self.id) else {
-      return Ok(());
-    };
-    if part.is_deleted() {
-      return Ok(());
-    }
-    if graphs.contains_key(&self.id) {
-      return Ok(());
-    }
-    graphs.insert(self.id, self.modeled_relationship_graph(package)?);
-    for part in &self.fallback_parts {
-      part.collect_modeled_part_relationship_graphs(package, graphs)?;
-    }
-    Ok(())
-  }
   fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -204,11 +184,5 @@ impl ExtendedPart {
     }
     relationships.reorder_by_ids(&self.relationship_order);
     Ok(relationships)
-  }
-  pub fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-    Ok(self.modeled_relationships(package)?.to_relationship_graph())
   }
 }

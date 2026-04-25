@@ -3,8 +3,7 @@
 use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{
-  ReferenceRelationshipKind, RelationshipGraphEdgeKind, RelationshipSet, RelationshipTargetKind,
-  StoredPartDataKind,
+  ReferenceRelationshipKind, RelationshipSet, RelationshipTargetKind, StoredPartDataKind,
 };
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
@@ -122,38 +121,9 @@ fn package_relationships_resolve_with_container_local_part_factory() {
 }
 
 #[test]
-fn package_relationship_graph_round_trips_relationship_set() {
-  let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
-  let graph = package.relationship_graph();
-
-  assert_eq!(graph.len(), package.relationships().len());
-  assert_eq!(graph.part_relationships().count(), package.parts().count());
-  assert!(graph.reference_relationships().next().is_none());
-  assert!(graph.raw_relationships().next().is_none());
-
-  let rebuilt = graph.to_relationship_set();
-  assert_eq!(
-    rebuilt.to_relationship_graph(),
-    package.relationship_graph()
-  );
-  assert!(matches!(
-    graph
-      .get(
-        package
-          .get_id_of_part(&package.main_document_part().unwrap())
-          .unwrap()
-      )
-      .unwrap()
-      .kind(),
-    RelationshipGraphEdgeKind::Part
-  ));
-}
-
-#[test]
-fn package_relationship_graph_can_be_edited_and_written_back() {
+fn package_relationship_set_can_be_edited_and_written_back() {
   let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
-  let mut graph = package.relationship_graph();
-  graph
+  package
     .add_external_relationship(
       "rIdGraphExternal",
       "http://example.com/relationships/custom",
@@ -161,7 +131,6 @@ fn package_relationship_graph_can_be_edited_and_written_back() {
     )
     .unwrap();
 
-  package.replace_relationships_from_graph(graph);
   let mut saved = Cursor::new(Vec::new());
   package.save(&mut saved).unwrap();
   saved.set_position(0);
@@ -176,12 +145,8 @@ fn package_relationship_graph_can_be_edited_and_written_back() {
   assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
   assert!(matches!(relationship.target_mode(), TargetMode::External));
   assert!(matches!(
-    reopened
-      .relationship_graph()
-      .get("rIdGraphExternal")
-      .unwrap()
-      .kind(),
-    RelationshipGraphEdgeKind::Reference(ReferenceRelationshipKind::External)
+    relationship.reference_kind(),
+    Some(ReferenceRelationshipKind::External)
   ));
 }
 
@@ -314,24 +279,23 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
 }
 
 #[test]
-fn part_relationship_graph_classifies_children_and_references() {
+fn part_relationship_set_classifies_children_and_references() {
   let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let graph = main_part.relationship_graph(&package).unwrap();
   let relationships = main_part.relationships(&package).unwrap();
 
-  assert_eq!(graph.len(), relationships.len());
+  assert_eq!(relationships.part_relationships().count(), 13);
   assert_eq!(
-    graph.part_relationships().count(),
-    relationships.part_relationships().count()
+    relationships
+      .iter()
+      .filter(|rel| rel.is_reference_relationship())
+      .count(),
+    71
   );
-  assert_eq!(graph.reference_relationships().count(), 71);
-  assert_eq!(graph.raw_relationships().count(), 0);
   assert!(matches!(
-    graph.get("rId18").unwrap().kind(),
-    RelationshipGraphEdgeKind::Reference(ReferenceRelationshipKind::Hyperlink)
+    relationships.get("rId18").unwrap().reference_kind(),
+    Some(ReferenceRelationshipKind::Hyperlink)
   ));
-  assert_eq!(graph.to_relationship_set().to_relationship_graph(), graph);
 }
 
 #[test]

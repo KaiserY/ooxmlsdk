@@ -27,9 +27,8 @@ pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub use package::{
   NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, ReferenceRelationshipKind,
-  RelationshipGraph, RelationshipGraphEdge, RelationshipGraphEdgeKind, RelationshipInfo,
-  RelationshipSet, RelationshipTargetKind, SdkPackageStorage, StoredPart, StoredPartData,
-  StoredPartDataKind,
+  RelationshipInfo, RelationshipSet, RelationshipTargetKind, SdkPackageStorage, StoredPart,
+  StoredPartData, StoredPartDataKind,
 };
 #[cfg(feature = "parts")]
 pub use part::{

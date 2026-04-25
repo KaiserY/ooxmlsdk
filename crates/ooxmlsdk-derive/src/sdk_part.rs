@@ -1201,6 +1201,40 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_image_part<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<crate::parts::image_part::ImagePart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_image_part(
+          self,
+          package,
+          content_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_image_part_with_id<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::image_part::ImagePart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_image_part_with_id(
+          self,
+          package,
+          content_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn remove_relationship<P: crate::sdk::SdkPackage>(
         self,
         package: &mut P,

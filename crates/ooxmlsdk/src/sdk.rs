@@ -543,6 +543,38 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
   }
 
   #[inline]
+  fn add_image_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::image_part::ImagePart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<P, crate::parts::image_part::ImagePart>(
+      package,
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_image_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::image_part::ImagePart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<P, crate::parts::image_part::ImagePart>(
+      package,
+      relationship_id,
+      content_type,
+    )
+  }
+
+  #[inline]
   fn remove_relationship<P: SdkPackage>(
     self,
     package: &mut P,

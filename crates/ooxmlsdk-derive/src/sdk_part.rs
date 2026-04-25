@@ -1581,6 +1581,82 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_embedded_control_persistence_binary_data_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedControlPersistenceBinaryDataPartType,
+      ) -> Result<
+        crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_control_persistence_binary_data_part_by_type(
+          self, package, part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_control_persistence_binary_data_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedControlPersistenceBinaryDataPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<
+        crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_control_persistence_binary_data_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_control_persistence_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedControlPersistencePartType,
+      ) -> Result<
+        crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_control_persistence_part_by_type(
+          self, package, part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_embedded_control_persistence_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::EmbeddedControlPersistencePartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<
+        crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_embedded_control_persistence_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn remove_relationship<P: crate::sdk::SdkPackage>(
         self,
         package: &mut P,

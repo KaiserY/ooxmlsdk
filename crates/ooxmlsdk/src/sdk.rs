@@ -399,6 +399,53 @@ impl MailMergeRecipientDataPartType {
 
 #[cfg(feature = "parts")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EmbeddedControlPersistenceBinaryDataPartType {
+  ActiveXBin,
+}
+
+#[cfg(feature = "parts")]
+impl EmbeddedControlPersistenceBinaryDataPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::ActiveXBin => "application/vnd.ms-office.activeX",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    ".bin"
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EmbeddedControlPersistencePartType {
+  ActiveX,
+  ActiveXBin,
+}
+
+#[cfg(feature = "parts")]
+impl EmbeddedControlPersistencePartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::ActiveX => "application/vnd.ms-office.activeX+xml",
+      Self::ActiveXBin => "application/vnd.ms-office.activeX",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    match self {
+      Self::ActiveX => ".xml",
+      Self::ActiveXBin => ".bin",
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ThumbnailPartType {
   Jpeg,
   Emf,
@@ -1472,6 +1519,164 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
     self.add_new_part_with_content_type_and_extension::<
       P,
       crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    >(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_binary_data_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_binary_data_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<
+      P,
+      crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    >(package, relationship_id, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_binary_data_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedControlPersistenceBinaryDataPartType,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension_auto_id::<
+      P,
+      crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    >(package, part_type.content_type(), part_type.extension())
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_binary_data_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedControlPersistenceBinaryDataPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<
+      P,
+      crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    >(
+      package,
+      relationship_id,
+      part_type.content_type(),
+      part_type.extension(),
+    )
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<
+      P,
+      crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    >(package, relationship_id, content_type)
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedControlPersistencePartType,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension_auto_id::<
+      P,
+      crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    >(package, part_type.content_type(), part_type.extension())
+  }
+
+  #[inline]
+  fn add_embedded_control_persistence_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: EmbeddedControlPersistencePartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_and_extension::<
+      P,
+      crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
     >(
       package,
       relationship_id,

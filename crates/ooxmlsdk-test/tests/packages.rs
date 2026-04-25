@@ -5,7 +5,10 @@ use std::io::{Cursor, Write};
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
-  custom_xml_part::CustomXmlPart, document_settings_part::DocumentSettingsPart,
+  custom_property_part::CustomPropertyPart, custom_xml_part::CustomXmlPart,
+  document_settings_part::DocumentSettingsPart,
+  embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+  embedded_control_persistence_part::EmbeddedControlPersistencePart,
   embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
   font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
   image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
@@ -20,9 +23,10 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, Document, Header,
 };
 use ooxmlsdk::sdk::{
-  AlternativeFormatImportPartType, CustomXmlPartType, EmbeddedObjectPartType,
-  EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType, SdkPackage,
-  ThumbnailPartType,
+  AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
+  EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
+  EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
+  SdkPackage, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -1116,6 +1120,142 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
   assert_eq!(
     reopened_recipients.data(&reopened),
     Some(&b"<recipients/>"[..])
+  );
+}
+
+#[test]
+fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
+  // Source: upstream WorksheetPart supported relationship constraints for custom properties and controls.
+  let mut package =
+    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let workbook_part = package.workbook_part().unwrap();
+  let worksheet = workbook_part.worksheet_parts(&package).next().unwrap();
+
+  let custom_property = worksheet
+    .add_custom_property_part_by_type(&mut package, CustomPropertyPartType::Spreadsheet)
+    .unwrap();
+  custom_property
+    .set_data(&mut package, b"<customProperty/>".to_vec())
+    .unwrap();
+  let custom_property_id = worksheet
+    .get_id_of_part(&package, custom_property)
+    .unwrap()
+    .to_string();
+
+  let control = worksheet
+    .add_embedded_control_persistence_part_by_type(
+      &mut package,
+      EmbeddedControlPersistencePartType::ActiveX,
+    )
+    .unwrap();
+  control
+    .set_data(&mut package, b"<control/>".to_vec())
+    .unwrap();
+  let control_id = worksheet
+    .get_id_of_part(&package, control)
+    .unwrap()
+    .to_string();
+
+  let direct_binary = worksheet
+    .add_embedded_control_persistence_binary_data_part_by_type(
+      &mut package,
+      EmbeddedControlPersistenceBinaryDataPartType::ActiveXBin,
+    )
+    .unwrap();
+  direct_binary
+    .set_data(&mut package, b"worksheet activeX bin".to_vec())
+    .unwrap();
+  let direct_binary_id = worksheet
+    .get_id_of_part(&package, direct_binary)
+    .unwrap()
+    .to_string();
+
+  let child_binary = control
+    .add_embedded_control_persistence_binary_data_part_by_type(
+      &mut package,
+      EmbeddedControlPersistenceBinaryDataPartType::ActiveXBin,
+    )
+    .unwrap();
+  child_binary
+    .set_data(&mut package, b"control activeX bin".to_vec())
+    .unwrap();
+  let child_binary_id = control
+    .get_id_of_part(&package, child_binary)
+    .unwrap()
+    .to_string();
+
+  assert_eq!(
+    custom_property.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.spreadsheetml.customProperty")
+  );
+  assert_eq!(
+    control.content_type(&package),
+    Some("application/vnd.ms-office.activeX+xml")
+  );
+  assert_eq!(
+    direct_binary.content_type(&package),
+    Some("application/vnd.ms-office.activeX")
+  );
+  assert!(
+    package
+      .storage()
+      .part(custom_property.part_id())
+      .unwrap()
+      .path()
+      .ends_with(".xml")
+  );
+  assert!(
+    package
+      .storage()
+      .part(control.part_id())
+      .unwrap()
+      .path()
+      .ends_with(".xml")
+  );
+  assert!(
+    package
+      .storage()
+      .part(direct_binary.part_id())
+      .unwrap()
+      .path()
+      .ends_with(".bin")
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = SpreadsheetDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_workbook = reopened.workbook_part().unwrap();
+  let reopened_worksheet = reopened_workbook.worksheet_parts(&reopened).next().unwrap();
+  let reopened_custom_property = reopened_worksheet
+    .get_part_by_id(&reopened, custom_property_id.as_str())
+    .and_then(PartRef::downcast::<CustomPropertyPart>)
+    .unwrap();
+  let reopened_control = reopened_worksheet
+    .get_part_by_id(&reopened, control_id.as_str())
+    .and_then(PartRef::downcast::<EmbeddedControlPersistencePart>)
+    .unwrap();
+  let reopened_direct_binary = reopened_worksheet
+    .get_part_by_id(&reopened, direct_binary_id.as_str())
+    .and_then(PartRef::downcast::<EmbeddedControlPersistenceBinaryDataPart>)
+    .unwrap();
+  let reopened_child_binary = reopened_control
+    .get_part_by_id(&reopened, child_binary_id.as_str())
+    .and_then(PartRef::downcast::<EmbeddedControlPersistenceBinaryDataPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_custom_property.data(&reopened),
+    Some(&b"<customProperty/>"[..])
+  );
+  assert_eq!(reopened_control.data(&reopened), Some(&b"<control/>"[..]));
+  assert_eq!(
+    reopened_direct_binary.data(&reopened),
+    Some(&b"worksheet activeX bin"[..])
+  );
+  assert_eq!(
+    reopened_child_binary.data(&reopened),
+    Some(&b"control activeX bin"[..])
   );
 }
 

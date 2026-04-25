@@ -2,7 +2,9 @@
 
 use std::io::{Cursor, Write};
 
-use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
+use ooxmlsdk::common::{
+  ReferenceRelationshipKind, RelationshipSet, RelationshipTargetKind, StoredPartDataKind,
+};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
   core_file_properties_part::CoreFilePropertiesPart,
@@ -527,6 +529,10 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     audio_relationship.relationship_type(),
     RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
   );
+  assert_eq!(
+    audio_relationship.reference_kind(),
+    Some(ReferenceRelationshipKind::Audio)
+  );
   assert_eq!(audio_relationship.target_part_id(), wav.part_id());
   assert_eq!(
     audio_relationship.target_kind(),
@@ -541,6 +547,10 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     media_relationship.relationship_type(),
     RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
   );
+  assert_eq!(
+    media_relationship.reference_kind(),
+    Some(ReferenceRelationshipKind::Media)
+  );
   assert_eq!(media_relationship.target_part_id(), avi.part_id());
   assert_eq!(
     media_relationship.target_kind(),
@@ -554,6 +564,10 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
   assert_eq!(
     video_relationship.relationship_type(),
     RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(
+    video_relationship.reference_kind(),
+    Some(ReferenceRelationshipKind::Video)
   );
   assert_eq!(video_relationship.target_part_id(), avi.part_id());
   assert_eq!(
@@ -610,6 +624,45 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
   assert_eq!(
     reopened_video_relationship.target_part_id(),
     reopened_media_relationship.target_part_id()
+  );
+}
+
+#[test]
+fn media_data_part_rejects_foreign_package_relationships() {
+  // Source: OpenXmlPartContainer.AddDataPartReferenceRelationship foreign MediaDataPart guard.
+  let mut foreign_package = WordprocessingDocument::new(empty_package()).unwrap();
+  let foreign_media_data_part = foreign_package
+    .create_media_data_part_by_type(MediaDataPartType::Mp3)
+    .unwrap();
+  foreign_media_data_part
+    .set_data(&mut foreign_package, b"foreign mp3 bytes".to_vec())
+    .unwrap();
+
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  assert!(
+    foreign_media_data_part.path(&package).is_none(),
+    "foreign media data part should not resolve against another package"
+  );
+  assert!(
+    foreign_media_data_part
+      .set_data(&mut package, b"wrong package".to_vec())
+      .is_err()
+  );
+  assert!(
+    main_part
+      .add_audio_reference_relationship(&mut package, &foreign_media_data_part)
+      .is_err()
+  );
+  assert_eq!(
+    main_part
+      .data_part_reference_relationships(&package)
+      .count(),
+    0
   );
 }
 
@@ -853,6 +906,10 @@ fn part_hyperlink_relationship_mutation_is_saved() {
   assert_eq!(relationship.target(), target);
   assert!(matches!(relationship.target_mode(), TargetMode::External));
   assert_eq!(relationship.target_kind(), RelationshipTargetKind::External);
+  assert_eq!(
+    relationship.reference_kind(),
+    Some(ReferenceRelationshipKind::Hyperlink)
+  );
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();

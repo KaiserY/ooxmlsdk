@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::schemas::opc_content_types::{Types, TypesChoice};
 use crate::schemas::opc_relationships::{Relationship, Relationships, TargetMode};
@@ -28,6 +29,16 @@ impl PartId {
   #[inline]
   pub const fn index(self) -> usize {
     self.0 as usize
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct PackageId(u64);
+
+impl PackageId {
+  fn new() -> Self {
+    static NEXT_PACKAGE_ID: AtomicU64 = AtomicU64::new(1);
+    Self(NEXT_PACKAGE_ID.fetch_add(1, Ordering::Relaxed))
   }
 }
 
@@ -104,6 +115,15 @@ pub enum RelationshipTargetKind {
   Missing,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReferenceRelationshipKind {
+  External,
+  Hyperlink,
+  Audio,
+  Media,
+  Video,
+}
+
 impl RelationshipInfo {
   fn internal_part(
     id: String,
@@ -169,8 +189,36 @@ impl RelationshipInfo {
 
   #[inline]
   pub fn is_reference_relationship(&self) -> bool {
-    self.target_kind == RelationshipTargetKind::External
-      || is_data_part_reference_relationship_type(self.relationship_type())
+    self.reference_kind().is_some()
+  }
+
+  #[inline]
+  pub fn reference_kind(&self) -> Option<ReferenceRelationshipKind> {
+    if super::relationship_type_matches(
+      self.relationship_type(),
+      RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE,
+    ) {
+      Some(ReferenceRelationshipKind::Hyperlink)
+    } else if super::relationship_type_matches(
+      self.relationship_type(),
+      RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE,
+    ) {
+      Some(ReferenceRelationshipKind::Audio)
+    } else if super::relationship_type_matches(
+      self.relationship_type(),
+      RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE,
+    ) {
+      Some(ReferenceRelationshipKind::Media)
+    } else if super::relationship_type_matches(
+      self.relationship_type(),
+      RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE,
+    ) {
+      Some(ReferenceRelationshipKind::Video)
+    } else if self.target_kind == RelationshipTargetKind::External {
+      Some(ReferenceRelationshipKind::External)
+    } else {
+      None
+    }
   }
 
   fn to_relationship(&self) -> Relationship {
@@ -508,13 +556,27 @@ impl StoredPart {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SdkPackageStorage {
+  id: PackageId,
   content_types: Types,
   package_relationships: RelationshipSet,
   parts: Vec<StoredPart>,
   by_path: HashMap<Box<str>, PartId>,
   open_mode: PackageOpenMode,
+}
+
+impl Clone for SdkPackageStorage {
+  fn clone(&self) -> Self {
+    Self {
+      id: PackageId::new(),
+      content_types: self.content_types.clone(),
+      package_relationships: self.package_relationships.clone(),
+      parts: self.parts.clone(),
+      by_path: self.by_path.clone(),
+      open_mode: self.open_mode,
+    }
+  }
 }
 
 impl SdkPackageStorage {
@@ -566,12 +628,18 @@ impl SdkPackageStorage {
     }
 
     Ok(Self {
+      id: PackageId::new(),
       content_types,
       package_relationships,
       parts,
       by_path,
       open_mode,
     })
+  }
+
+  #[inline]
+  pub(crate) fn id(&self) -> PackageId {
+    self.id
   }
 
   #[inline]

@@ -6,6 +6,7 @@ use super::SdkError;
 
 #[derive(Clone, Debug, Default)]
 pub struct MediaDataPart {
+  pub(crate) package_id: Option<crate::common::PackageId>,
   pub(crate) id: Option<crate::common::PartId>,
   pub inner_path: String,
   pub part_content: Vec<u8>,
@@ -13,8 +14,13 @@ pub struct MediaDataPart {
 
 impl MediaDataPart {
   #[inline]
-  pub(crate) fn from_part_id(part_id: crate::common::PartId, path: impl Into<String>) -> Self {
+  pub(crate) fn from_part_id(
+    package_id: crate::common::PackageId,
+    part_id: crate::common::PartId,
+    path: impl Into<String>,
+  ) -> Self {
     Self {
+      package_id: Some(package_id),
       id: Some(part_id),
       inner_path: path.into(),
       part_content: Vec::new(),
@@ -27,14 +33,41 @@ impl MediaDataPart {
   }
 
   #[inline]
+  pub(crate) fn part_id_for_package<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<crate::common::PartId, SdkError> {
+    let part_id = self
+      .id
+      .ok_or_else(|| SdkError::CommonError("media data part is not package-backed".to_string()))?;
+    if self.package_id != Some(package.storage().id()) {
+      return Err(SdkError::CommonError(
+        "media data part belongs to a different package".to_string(),
+      ));
+    }
+    if package.storage().part(part_id).is_none() {
+      return Err(SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      )));
+    }
+    Ok(part_id)
+  }
+
+  #[inline]
   pub fn path<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a str> {
     let part_id = self.id?;
+    if self.package_id != Some(package.storage().id()) {
+      return None;
+    }
     package.storage().part(part_id).map(|part| part.path())
   }
 
   #[inline]
   pub fn content_type<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a str> {
     let part_id = self.id?;
+    if self.package_id != Some(package.storage().id()) {
+      return None;
+    }
     package
       .storage()
       .part(part_id)
@@ -44,6 +77,9 @@ impl MediaDataPart {
   #[inline]
   pub fn data<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a [u8]> {
     let part_id = self.id?;
+    if self.package_id != Some(package.storage().id()) {
+      return None;
+    }
     package
       .storage()
       .part(part_id)
@@ -55,7 +91,10 @@ impl MediaDataPart {
     &'a self,
     package: &'a P,
   ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
-    self.id.into_iter().flat_map(move |part_id| {
+    let part_id = (self.package_id == Some(package.storage().id()))
+      .then_some(self.id)
+      .flatten();
+    part_id.into_iter().flat_map(move |part_id| {
       package
         .storage()
         .data_part_reference_relationships_to(part_id)
@@ -68,9 +107,7 @@ impl MediaDataPart {
     package: &mut P,
     data: Vec<u8>,
   ) -> Result<(), SdkError> {
-    let part_id = self
-      .id
-      .ok_or_else(|| SdkError::CommonError("media data part is not package-backed".to_string()))?;
+    let part_id = self.part_id_for_package(package)?;
     let part = package.storage_mut().part_mut(part_id).ok_or_else(|| {
       SdkError::CommonError(format!(
         "part id {part_id:?} is not present in package storage"
@@ -90,6 +127,7 @@ impl MediaDataPart {
     zip_entry.read_to_end(&mut part_content)?;
 
     Ok(Self {
+      package_id: None,
       id: None,
       inner_path: path.to_string(),
       part_content,

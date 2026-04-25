@@ -695,10 +695,9 @@ pub trait SdkPackage {
 
   #[inline]
   fn media_data_parts(&self) -> impl Iterator<Item = crate::common::MediaDataPart> + '_ {
-    self
-      .storage()
-      .media_data_parts()
-      .map(|(part_id, part)| crate::common::MediaDataPart::from_part_id(part_id, part.path()))
+    self.storage().media_data_parts().map(|(part_id, part)| {
+      crate::common::MediaDataPart::from_part_id(self.storage().id(), part_id, part.path())
+    })
   }
 
   #[inline]
@@ -887,7 +886,11 @@ pub trait SdkPackage {
       })?
       .path()
       .to_string();
-    Ok(crate::common::MediaDataPart::from_part_id(part_id, path))
+    Ok(crate::common::MediaDataPart::from_part_id(
+      self.storage().id(),
+      part_id,
+      path,
+    ))
   }
 
   #[inline]
@@ -1413,9 +1416,7 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
     relationship_type: &str,
     relationship_id: impl Into<String>,
   ) -> Result<String, crate::common::SdkError> {
-    let target_part_id = media_data_part.part_id().ok_or_else(|| {
-      crate::common::SdkError::CommonError("media data part is not package-backed".to_string())
-    })?;
+    let target_part_id = media_data_part.part_id_for_package(package)?;
     package.storage_mut().add_data_part_reference_relationship(
       self.part_id(),
       relationship_id,

@@ -23,9 +23,12 @@ pub use error::{
 #[cfg(feature = "parts")]
 pub use extended_part::ExtendedPart;
 #[cfg(feature = "parts")]
+pub(crate) use package::PackageId;
+#[cfg(feature = "parts")]
 pub use package::{
-  NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, RelationshipInfo, RelationshipSet,
-  RelationshipTargetKind, SdkPackageStorage, StoredPart, StoredPartData, StoredPartDataKind,
+  NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, ReferenceRelationshipKind,
+  RelationshipInfo, RelationshipSet, RelationshipTargetKind, SdkPackageStorage, StoredPart,
+  StoredPartData, StoredPartDataKind,
 };
 #[cfg(feature = "parts")]
 pub use part::{

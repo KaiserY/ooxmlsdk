@@ -156,16 +156,39 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
     }
     Ok(())
   }
-}
-impl ExtendedPart {
-  pub fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
+  fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
-  ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-    let mut graph = crate::common::RelationshipGraph::default();
+    relationships: &mut std::collections::HashMap<
+      crate::common::PartId,
+      crate::common::RelationshipSet,
+    >,
+  ) -> Result<(), crate::common::SdkError> {
+    let Some(part) = package.storage().part(self.id) else {
+      return Ok(());
+    };
+    if part.is_deleted() {
+      return Ok(());
+    }
+    if relationships.contains_key(&self.id) {
+      return Ok(());
+    }
+    relationships.insert(self.id, self.modeled_relationships(package)?);
     for part in &self.fallback_parts {
-      crate::sdk::add_part_ref_to_relationship_graph(
-        &mut graph,
+      part.collect_modeled_part_relationships(package, relationships)?;
+    }
+    Ok(())
+  }
+}
+impl ExtendedPart {
+  pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+    let mut relationships = crate::common::RelationshipSet::default();
+    for part in &self.fallback_parts {
+      crate::sdk::add_part_ref_to_relationship_set(
+        &mut relationships,
         package.storage(),
         Some(self.id),
         part,
@@ -177,9 +200,15 @@ impl ExtendedPart {
       .chain(self.reference_relationships.iter())
       .chain(self.raw_relationships.iter())
     {
-      graph.add_relationship_info(relationship.clone())?;
+      relationships.add_relationship_info(relationship.clone())?;
     }
-    graph.reorder_by_ids(&self.relationship_order);
-    Ok(graph)
+    relationships.reorder_by_ids(&self.relationship_order);
+    Ok(relationships)
+  }
+  pub fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
+    Ok(self.modeled_relationships(package)?.to_relationship_graph())
   }
 }

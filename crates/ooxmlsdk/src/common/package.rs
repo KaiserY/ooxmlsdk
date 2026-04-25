@@ -502,7 +502,7 @@ impl RelationshipGraph {
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RelationshipSet {
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
@@ -593,6 +593,13 @@ impl RelationshipSet {
       target.into(),
       target_part_id,
     ))
+  }
+
+  pub fn add_relationship_info(
+    &mut self,
+    relationship: RelationshipInfo,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    self.push_relationship(relationship)
   }
 
   pub fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
@@ -702,6 +709,32 @@ impl RelationshipSet {
   #[inline]
   pub fn to_relationship_graph(&self) -> RelationshipGraph {
     RelationshipGraph::from_relationship_set(self)
+  }
+
+  pub fn reorder_by_ids(&mut self, relationship_ids: &[Box<str>]) {
+    if self.relationships.len() <= 1 || relationship_ids.is_empty() {
+      return;
+    }
+
+    let mut ordered = Vec::with_capacity(self.relationships.len());
+    let mut used = vec![false; self.relationships.len()];
+    for relationship_id in relationship_ids {
+      if let Some(index) = self.by_id.get(relationship_id.as_ref()).copied() {
+        if !used[index] {
+          used[index] = true;
+          ordered.push(self.relationships[index].clone());
+        }
+      }
+    }
+
+    for (index, relationship) in self.relationships.iter().enumerate() {
+      if !used[index] {
+        ordered.push(relationship.clone());
+      }
+    }
+
+    self.relationships = ordered;
+    self.rebuild_index();
   }
 
   #[inline]

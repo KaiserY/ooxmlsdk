@@ -198,6 +198,13 @@ fn package_save_writes_package_relationships_from_modeled_parts() {
     package.relationships_mut().remove(&relationship_id);
   }
   assert!(package.relationships().is_empty());
+  let modeled_relationships = package.modeled_relationships().unwrap();
+  assert_eq!(modeled_relationships.len(), 3);
+  assert!(
+    modeled_relationships
+      .iter()
+      .any(|relationship| { relationship.target_part_id() == Some(main_part_id) })
+  );
 
   let mut saved = Cursor::new(Vec::new());
   package.save(&mut saved).unwrap();
@@ -237,6 +244,14 @@ fn package_save_writes_part_relationships_from_modeled_parts() {
     main_part
       .get_part_by_id(&package, &header_relationship_id)
       .is_none()
+  );
+  assert!(
+    package
+      .main_document_part()
+      .unwrap()
+      .modeled_relationships(&package)
+      .unwrap()
+      .contains_id(&header_relationship_id)
   );
 
   let mut saved = Cursor::new(Vec::new());

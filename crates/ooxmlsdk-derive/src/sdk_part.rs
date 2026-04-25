@@ -1123,8 +1123,8 @@ fn expand_part_handle(
     match child.kind {
       PartChildKind::Repeated => quote! {
         for part in &self.#field_ident {
-          crate::sdk::add_part_handle_to_relationship_graph(
-            &mut graph,
+          crate::sdk::add_part_handle_to_relationship_set(
+            &mut relationships,
             package.storage(),
             Some(self.id),
             part,
@@ -1133,12 +1133,27 @@ fn expand_part_handle(
       },
       PartChildKind::Required | PartChildKind::Optional => quote! {
         if let Some(part) = self.#field_ident.as_deref() {
-          crate::sdk::add_part_handle_to_relationship_graph(
-            &mut graph,
+          crate::sdk::add_part_handle_to_relationship_set(
+            &mut relationships,
             package.storage(),
             Some(self.id),
             part,
           )?;
+        }
+      },
+    }
+  });
+  let collect_relationship_child_stmts = child_infos.iter().map(|child| {
+    let field_ident = &child.field_ident;
+    match child.kind {
+      PartChildKind::Repeated => quote! {
+        for part in &self.#field_ident {
+          crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)?;
+        }
+      },
+      PartChildKind::Required | PartChildKind::Optional => quote! {
+        if let Some(part) = self.#field_ident.as_deref() {
+          crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)?;
         }
       },
     }
@@ -1258,15 +1273,15 @@ fn expand_part_handle(
         self.relationship_id.as_deref()
       }
 
-      fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
+      fn modeled_relationships<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,
-      ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-        let mut graph = crate::common::RelationshipGraph::default();
+      ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+        let mut relationships = crate::common::RelationshipSet::default();
         #( #modeled_child_stmts )*
         for part in &self.fallback_parts {
-          crate::sdk::add_part_ref_to_relationship_graph(
-            &mut graph,
+          crate::sdk::add_part_ref_to_relationship_set(
+            &mut relationships,
             package.storage(),
             Some(self.id),
             part,
@@ -1278,10 +1293,42 @@ fn expand_part_handle(
           .chain(self.reference_relationships.iter())
           .chain(self.raw_relationships.iter())
         {
-          graph.add_relationship_info(relationship.clone())?;
+          relationships.add_relationship_info(relationship.clone())?;
         }
-        graph.reorder_by_ids(&self.relationship_order);
-        Ok(graph)
+        relationships.reorder_by_ids(&self.relationship_order);
+        Ok(relationships)
+      }
+
+      fn modeled_relationship_graph<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
+        Ok(self.modeled_relationships(package)?.to_relationship_graph())
+      }
+
+      fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+        relationships: &mut std::collections::HashMap<
+          crate::common::PartId,
+          crate::common::RelationshipSet,
+        >,
+      ) -> Result<(), crate::common::SdkError> {
+        let Some(part) = package.storage().part(self.id) else {
+          return Ok(());
+        };
+        if part.is_deleted() {
+          return Ok(());
+        }
+        if relationships.contains_key(&self.id) {
+          return Ok(());
+        }
+        relationships.insert(self.id, self.modeled_relationships(package)?);
+        #( #collect_relationship_child_stmts )*
+        for part in &self.fallback_parts {
+          part.collect_modeled_part_relationships(package, relationships)?;
+        }
+        Ok(())
       }
 
       fn collect_modeled_part_relationship_graphs<P: crate::sdk::SdkPackage>(
@@ -1330,6 +1377,13 @@ fn expand_part_handle(
         package: &P,
       ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::modeled_relationship_graph(self, package)
+      }
+
+      pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::modeled_relationships(self, package)
       }
 
       #[inline]

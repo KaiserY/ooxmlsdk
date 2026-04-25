@@ -146,6 +146,28 @@ pub fn add_part_handle_to_relationship_graph<T: SdkPartHandle>(
 }
 
 #[cfg(feature = "parts")]
+pub fn add_part_handle_to_relationship_set<T: SdkPartHandle>(
+  relationships: &mut crate::common::RelationshipSet,
+  storage: &crate::common::SdkPackageStorage,
+  source_part_id: Option<crate::common::PartId>,
+  part: &T,
+) -> Result<(), crate::common::SdkError> {
+  let Some(relationship_id) = part.relationship_id() else {
+    return Ok(());
+  };
+  let Some(stored_part) = storage.part(part.part_id()) else {
+    return Ok(());
+  };
+  if stored_part.is_deleted() {
+    return Ok(());
+  }
+  let relationship =
+    storage.internal_part_relationship_info(source_part_id, relationship_id, part.part_id())?;
+  relationships.add_relationship_info(relationship)?;
+  Ok(())
+}
+
+#[cfg(feature = "parts")]
 pub fn add_part_ref_to_relationship_graph(
   graph: &mut crate::common::RelationshipGraph,
   storage: &crate::common::SdkPackageStorage,
@@ -164,6 +186,28 @@ pub fn add_part_ref_to_relationship_graph(
   let relationship =
     storage.internal_part_relationship_info(source_part_id, relationship_id, part.part_id())?;
   graph.add_relationship_info(relationship)?;
+  Ok(())
+}
+
+#[cfg(feature = "parts")]
+pub fn add_part_ref_to_relationship_set(
+  relationships: &mut crate::common::RelationshipSet,
+  storage: &crate::common::SdkPackageStorage,
+  source_part_id: Option<crate::common::PartId>,
+  part: &crate::parts::PartRef,
+) -> Result<(), crate::common::SdkError> {
+  let Some(relationship_id) = part.relationship_id() else {
+    return Ok(());
+  };
+  let Some(stored_part) = storage.part(part.part_id()) else {
+    return Ok(());
+  };
+  if stored_part.is_deleted() {
+    return Ok(());
+  }
+  let relationship =
+    storage.internal_part_relationship_info(source_part_id, relationship_id, part.part_id())?;
+  relationships.add_relationship_info(relationship)?;
   Ok(())
 }
 
@@ -707,27 +751,49 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn modeled_relationships(
+    &self,
+  ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+    Ok(self.relationships().clone())
+  }
+
+  #[inline]
   fn modeled_relationship_graph(
     &self,
   ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-    Ok(self.relationship_graph())
+    Ok(self.modeled_relationships()?.to_relationship_graph())
   }
 
   #[inline]
   fn refresh_relationship_model_from_storage(&mut self) {}
 
-  fn collect_modeled_part_relationship_graphs(
+  fn collect_modeled_part_relationships(
     &self,
-    graphs: &mut std::collections::HashMap<crate::common::PartId, crate::common::RelationshipGraph>,
+    relationships: &mut std::collections::HashMap<
+      crate::common::PartId,
+      crate::common::RelationshipSet,
+    >,
   ) -> Result<(), crate::common::SdkError> {
     for (index, part) in self.storage().parts().iter().enumerate() {
       if part.is_deleted() {
         continue;
       }
       let part_id = crate::common::PartId::from_index(index);
-      if let Some(graph) = self.storage().relationship_graph(part_id) {
-        graphs.insert(part_id, graph);
+      if let Some(part_relationships) = self.storage().relationships(part_id) {
+        relationships.insert(part_id, part_relationships.clone());
       }
+    }
+    Ok(())
+  }
+
+  fn collect_modeled_part_relationship_graphs(
+    &self,
+    graphs: &mut std::collections::HashMap<crate::common::PartId, crate::common::RelationshipGraph>,
+  ) -> Result<(), crate::common::SdkError> {
+    let mut relationships = std::collections::HashMap::new();
+    self.collect_modeled_part_relationships(&mut relationships)?;
+    for (part_id, relationship_set) in relationships {
+      graphs.insert(part_id, relationship_set.to_relationship_graph());
     }
     Ok(())
   }
@@ -1476,16 +1542,45 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
-  fn modeled_relationship_graph<P: SdkPackage>(
+  fn modeled_relationships<P: SdkPackage>(
     &self,
     package: &P,
-  ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
-    self.relationship_graph(package).ok_or_else(|| {
+  ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+    self.relationships(package).cloned().ok_or_else(|| {
       crate::common::SdkError::CommonError(format!(
         "part id {:?} is not present in package storage",
         self.part_id()
       ))
     })
+  }
+
+  #[inline]
+  fn modeled_relationship_graph<P: SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<crate::common::RelationshipGraph, crate::common::SdkError> {
+    Ok(self.modeled_relationships(package)?.to_relationship_graph())
+  }
+
+  fn collect_modeled_part_relationships<P: SdkPackage>(
+    &self,
+    package: &P,
+    relationships: &mut std::collections::HashMap<
+      crate::common::PartId,
+      crate::common::RelationshipSet,
+    >,
+  ) -> Result<(), crate::common::SdkError> {
+    let Some(part) = package.storage().part(self.part_id()) else {
+      return Ok(());
+    };
+    if part.is_deleted() {
+      return Ok(());
+    }
+    if relationships.contains_key(&self.part_id()) {
+      return Ok(());
+    }
+    relationships.insert(self.part_id(), self.modeled_relationships(package)?);
+    Ok(())
   }
 
   fn collect_modeled_part_relationship_graphs<P: SdkPackage>(
@@ -1502,7 +1597,10 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
     if graphs.contains_key(&self.part_id()) {
       return Ok(());
     }
-    graphs.insert(self.part_id(), self.modeled_relationship_graph(package)?);
+    graphs.insert(
+      self.part_id(),
+      self.modeled_relationships(package)?.to_relationship_graph(),
+    );
     Ok(())
   }
 

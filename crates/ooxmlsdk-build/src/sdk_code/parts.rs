@@ -291,7 +291,9 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut part_ref_part_id_arms: Vec<TokenStream> = vec![];
   let mut part_ref_relationship_id_arms: Vec<TokenStream> = vec![];
   let mut part_ref_child_descriptor_arms: Vec<TokenStream> = vec![];
+  let mut part_ref_modeled_relationships_arms: Vec<TokenStream> = vec![];
   let mut part_ref_modeled_graph_arms: Vec<TokenStream> = vec![];
+  let mut part_ref_collect_relationships_arms: Vec<TokenStream> = vec![];
   let mut part_ref_collect_graph_arms: Vec<TokenStream> = vec![];
   let mut part_ref_downcast_arms: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
@@ -385,9 +387,19 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         <#part_ty as crate::sdk::SdkPartHandle>::child_descriptors()
       }
     });
+    part_ref_modeled_relationships_arms.push(quote! {
+      #( #part_attrs )*
+      PartRef::#struct_ident(part) => part.modeled_relationships(package)
+    });
     part_ref_modeled_graph_arms.push(quote! {
       #( #part_attrs )*
       PartRef::#struct_ident(part) => part.modeled_relationship_graph(package)
+    });
+    part_ref_collect_relationships_arms.push(quote! {
+      #( #part_attrs )*
+      PartRef::#struct_ident(part) => {
+        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+      }
     });
     part_ref_collect_graph_arms.push(quote! {
       #( #part_attrs )*
@@ -490,6 +502,32 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         match self {
           #( #part_ref_modeled_graph_arms, )*
           PartRef::ExtendedPart(part) => part.modeled_relationship_graph(package),
+        }
+      }
+
+      pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+        match self {
+          #( #part_ref_modeled_relationships_arms, )*
+          PartRef::ExtendedPart(part) => part.modeled_relationships(package),
+        }
+      }
+
+      pub fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+        relationships: &mut std::collections::HashMap<
+          crate::common::PartId,
+          crate::common::RelationshipSet,
+        >,
+      ) -> Result<(), crate::common::SdkError> {
+        match self {
+          #( #part_ref_collect_relationships_arms, )*
+          PartRef::ExtendedPart(part) => {
+            crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+          }
         }
       }
 
@@ -682,7 +720,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       let mut entry_set = std::collections::HashSet::<String>::new();
       let storage = crate::sdk::SdkPackage::storage(package);
       let mut modeled_part_relationships = std::collections::HashMap::new();
-      crate::sdk::SdkPackage::collect_modeled_part_relationship_graphs(
+      crate::sdk::SdkPackage::collect_modeled_part_relationships(
         package,
         &mut modeled_part_relationships,
       )?;
@@ -690,8 +728,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       zip.start_file("[Content_Types].xml", options)?;
       zip.write_all(&storage.content_types().to_xml_bytes()?)?;
 
-      let package_relationships = crate::sdk::SdkPackage::modeled_relationship_graph(package)?
-        .to_relationship_set();
+      let package_relationships = crate::sdk::SdkPackage::modeled_relationships(package)?;
       if !package_relationships.is_empty() {
         if entry_set.insert("_rels".to_string()) {
           zip.add_directory("_rels", options)?;
@@ -711,10 +748,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           zip.add_directory(directory_path, options)?;
         }
 
-        let relationships = modeled_part_relationships
-          .remove(&part_id)
-          .unwrap_or_default()
-          .to_relationship_set();
+        let relationships = modeled_part_relationships.remove(&part_id).unwrap_or_default();
         if !relationships.is_empty() {
           let rels_dir_path = crate::common::part_relationships_directory_path(part.path());
           if !rels_dir_path.is_empty() && entry_set.insert(rels_dir_path.clone()) {

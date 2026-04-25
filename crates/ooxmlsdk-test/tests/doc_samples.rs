@@ -269,9 +269,14 @@ fn assert_modeled_relationship_graphs_match_relationship_sets<P: SdkPackage>(
   file_name: &str,
 ) {
   assert_eq!(
+    package.modeled_relationships().unwrap(),
+    package.storage().package_relationships().clone(),
+    "package relationship fields do not model RelationshipSet for {file_name}"
+  );
+  assert_eq!(
     package.modeled_relationship_graph().unwrap(),
     package.storage().package_relationship_graph(),
-    "package relationship fields do not model RelationshipSet for {file_name}"
+    "package relationship fields do not model relationship graph for {file_name}"
   );
 
   for (index, part) in package.storage().parts().iter().enumerate() {
@@ -284,14 +289,25 @@ fn assert_modeled_relationship_graphs_match_relationship_sets<P: SdkPackage>(
       continue;
     };
     let modeled_graph = part_ref.modeled_relationship_graph(package).unwrap();
+    let modeled_relationships = part_ref.modeled_relationships(package).unwrap();
     let relationship_graph = package
       .storage()
       .relationship_graph(part_id)
       .expect("active part has relationships");
+    let relationships = package
+      .storage()
+      .relationships(part_id)
+      .expect("active part has relationships");
+    assert_eq!(
+      modeled_relationships,
+      relationships.clone(),
+      "part relationship fields do not model RelationshipSet for {file_name}:{}",
+      part.path()
+    );
     assert_eq!(
       modeled_graph,
       relationship_graph,
-      "part relationship fields do not model RelationshipSet for {file_name}:{}",
+      "part relationship fields do not model relationship graph for {file_name}:{}",
       part.path()
     );
   }

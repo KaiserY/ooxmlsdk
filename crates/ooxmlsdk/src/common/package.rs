@@ -41,11 +41,11 @@ pub enum StoredPartDataKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NewPartDescriptor {
-  pub relationship_type: &'static str,
+  pub relationship_type: Cow<'static, str>,
   pub content_type: Cow<'static, str>,
   pub path_prefix: &'static str,
   pub target_name: &'static str,
-  pub extension: &'static str,
+  pub extension: Cow<'static, str>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -639,20 +639,20 @@ impl SdkPackageStorage {
       &source_part_path,
       descriptor.path_prefix,
       descriptor.target_name,
-      descriptor.extension,
+      descriptor.extension.as_ref(),
     );
     let relationship_target = relationship_target_from_source(&source_part_path, &child_path);
     let part_id = self.push_part(
       child_path,
       &descriptor.content_type,
-      Some(descriptor.relationship_type),
+      Some(descriptor.relationship_type.as_ref()),
     );
     self
       .relationships_mut(source_part_id)
       .expect("source part was already resolved")
       .add_internal_part_relationship(
         relationship_id,
-        descriptor.relationship_type,
+        descriptor.relationship_type.as_ref(),
         relationship_target,
         part_id,
       )?;
@@ -692,11 +692,11 @@ impl SdkPackageStorage {
     let part_id = self.push_part(
       part_path.clone(),
       &descriptor.content_type,
-      Some(descriptor.relationship_type),
+      Some(descriptor.relationship_type.as_ref()),
     );
     self.package_relationships.add_internal_part_relationship(
       relationship_id,
-      descriptor.relationship_type,
+      descriptor.relationship_type.as_ref(),
       part_path,
       part_id,
     )?;
@@ -707,7 +707,7 @@ impl SdkPackageStorage {
     &mut self,
     path: String,
     content_type: &str,
-    relationship_type: Option<&'static str>,
+    relationship_type: Option<&str>,
   ) -> PartId {
     let part_id = PartId::from_index(self.parts.len());
     let data_kind = data_kind_for_content_type(content_type);
@@ -814,7 +814,7 @@ impl SdkPackageStorage {
     target_mode: NewPartTargetMode,
   ) -> Result<String, SdkError> {
     let directory_path = package_part_directory_path(descriptor.path_prefix);
-    let extension = normalized_part_extension(descriptor.extension);
+    let extension = normalized_part_extension(descriptor.extension.as_ref());
 
     if matches!(target_mode, NewPartTargetMode::Fixed) {
       let path = if directory_path.is_empty() {

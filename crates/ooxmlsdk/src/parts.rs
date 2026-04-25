@@ -50,6 +50,7 @@ pub mod excel_attached_toolbars_part;
 #[cfg(feature = "microsoft365")]
 pub mod extended_chart_part;
 pub mod extended_file_properties_part;
+pub mod extended_part;
 pub mod external_workbook_part;
 #[cfg(feature = "microsoft365")]
 pub mod feature_property_bags_part;
@@ -240,6 +241,7 @@ pub enum PartRef {
     ExtendedFilePropertiesPart(
         crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
     ),
+    ExtendedPart(crate::parts::extended_part::ExtendedPart),
     ExternalWorkbookPart(crate::parts::external_workbook_part::ExternalWorkbookPart),
     #[cfg(feature = "microsoft365")]
     FeaturePropertyBagsPart(
@@ -461,6 +463,9 @@ impl PartRef {
       #[cfg(feature = "microsoft365")]
       PartRef::ExtendedChartPart(part) => part.part_id(),
       PartRef::ExtendedFilePropertiesPart(part) => part.part_id(),
+      PartRef::ExtendedPart(part) => {
+        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::part_id(part)
+      }
       PartRef::ExternalWorkbookPart(part) => part.part_id(),
       #[cfg(feature = "microsoft365")]
       PartRef::FeaturePropertyBagsPart(part) => part.part_id(),
@@ -737,6 +742,10 @@ impl PartRef {
         any.downcast_ref::<T>().copied()
       }
       PartRef::ExtendedFilePropertiesPart(part) => {
+        let any: &dyn std::any::Any = &part;
+        any.downcast_ref::<T>().copied()
+      }
+      PartRef::ExtendedPart(part) => {
         let any: &dyn std::any::Any = &part;
         any.downcast_ref::<T>().copied()
       }
@@ -1123,7 +1132,13 @@ impl PartRef {
     part_id: crate::common::PartId,
   ) -> Option<Self> {
     let part = package.storage().part(part_id)?;
-    let relationship_type = part.relationship_type()?;
+    let Some(relationship_type) = part.relationship_type() else {
+      return Some(PartRef::ExtendedPart(
+        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(
+          part_id,
+        ),
+      ));
+    };
     if crate::common::relationship_type_matches(
       relationship_type,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
@@ -2586,7 +2601,11 @@ impl PartRef {
                 ),
             );
     }
-    None
+    Some(PartRef::ExtendedPart(
+      <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(
+        part_id,
+      ),
+    ))
   }
 }
 #[derive(Clone, Copy, Debug)]

@@ -683,11 +683,11 @@ pub trait SdkPackage {
     let part_id = self.storage_mut().add_package_part(
       relationship_id,
       crate::common::NewPartDescriptor {
-        relationship_type: T::RELATIONSHIP_TYPE,
+        relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
         content_type: std::borrow::Cow::Borrowed(T::CONTENT_TYPE),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
-        extension: T::EXTENSION,
+        extension: std::borrow::Cow::Borrowed(T::EXTENSION),
       },
       target_mode,
     )?;
@@ -765,7 +765,7 @@ pub trait SdkPackage {
     &mut self,
     relationship_id: impl Into<String>,
     content_type: impl Into<std::borrow::Cow<'static, str>>,
-    extension: &'static str,
+    extension: impl Into<std::borrow::Cow<'static, str>>,
     target_mode: crate::common::NewPartTargetMode,
   ) -> Result<T, crate::common::SdkError>
   where
@@ -775,11 +775,11 @@ pub trait SdkPackage {
     let part_id = self.storage_mut().add_package_part(
       relationship_id,
       crate::common::NewPartDescriptor {
-        relationship_type: T::RELATIONSHIP_TYPE,
+        relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
         content_type: content_type.into(),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
-        extension,
+        extension: extension.into(),
       },
       target_mode,
     )?;
@@ -843,6 +843,53 @@ pub trait SdkPackage {
         part_type.extension(),
         crate::common::NewPartTargetMode::Indexed,
       )
+  }
+
+  #[inline]
+  fn add_extended_part(
+    &mut self,
+    relationship_type: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    target_extension: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_extended_part_with_id(
+      relationship_type,
+      content_type,
+      target_extension,
+      relationship_id,
+    )
+  }
+
+  #[inline]
+  fn add_extended_part_with_id(
+    &mut self,
+    relationship_type: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    target_extension: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let part_id = self.storage_mut().add_package_part(
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: std::borrow::Cow::Owned(relationship_type.into()),
+        content_type: content_type.into(),
+        path_prefix: "",
+        target_name: "extendedPart",
+        extension: target_extension.into(),
+      },
+      crate::common::NewPartTargetMode::Indexed,
+    )?;
+    self.push_root_element_slot();
+    Ok(crate::parts::extended_part::ExtendedPart::from_part_id(
+      part_id,
+    ))
   }
 }
 
@@ -948,11 +995,11 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       self.part_id(),
       relationship_id,
       crate::common::NewPartDescriptor {
-        relationship_type: T::RELATIONSHIP_TYPE,
+        relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
         content_type: std::borrow::Cow::Borrowed(T::CONTENT_TYPE),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
-        extension: T::EXTENSION,
+        extension: std::borrow::Cow::Borrowed(T::EXTENSION),
       },
     )?;
     package.push_root_element_slot();
@@ -974,11 +1021,11 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       self.part_id(),
       relationship_id,
       crate::common::NewPartDescriptor {
-        relationship_type: T::RELATIONSHIP_TYPE,
+        relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
         content_type: content_type.into(),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
-        extension: T::EXTENSION,
+        extension: std::borrow::Cow::Borrowed(T::EXTENSION),
       },
     )?;
     package.push_root_element_slot();
@@ -1031,7 +1078,7 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
     package: &mut P,
     relationship_id: impl Into<String>,
     content_type: impl Into<std::borrow::Cow<'static, str>>,
-    extension: &'static str,
+    extension: impl Into<std::borrow::Cow<'static, str>>,
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
@@ -1041,11 +1088,11 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       self.part_id(),
       relationship_id,
       crate::common::NewPartDescriptor {
-        relationship_type: T::RELATIONSHIP_TYPE,
+        relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
         content_type: content_type.into(),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
-        extension,
+        extension: extension.into(),
       },
     )?;
     package.push_root_element_slot();
@@ -1057,7 +1104,7 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
     self,
     package: &mut P,
     content_type: impl Into<std::borrow::Cow<'static, str>>,
-    extension: &'static str,
+    extension: impl Into<std::borrow::Cow<'static, str>>,
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
@@ -1078,6 +1125,64 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       content_type,
       extension,
     )
+  }
+
+  #[inline]
+  fn add_extended_part<P>(
+    self,
+    package: &mut P,
+    relationship_type: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    target_extension: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_extended_part_with_id(
+      package,
+      relationship_type,
+      content_type,
+      target_extension,
+      relationship_id,
+    )
+  }
+
+  #[inline]
+  fn add_extended_part_with_id<P>(
+    self,
+    package: &mut P,
+    relationship_type: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    target_extension: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    let part_id = package.storage_mut().add_child_part(
+      self.part_id(),
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: std::borrow::Cow::Owned(relationship_type.into()),
+        content_type: content_type.into(),
+        path_prefix: ".",
+        target_name: "extendedPart",
+        extension: target_extension.into(),
+      },
+    )?;
+    package.push_root_element_slot();
+    Ok(crate::parts::extended_part::ExtendedPart::from_part_id(
+      part_id,
+    ))
   }
 
   #[inline]

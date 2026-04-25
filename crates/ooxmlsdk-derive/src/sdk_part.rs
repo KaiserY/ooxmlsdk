@@ -1201,6 +1201,48 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_extended_part<P>(
+        self,
+        package: &mut P,
+        relationship_type: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        target_extension: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_extended_part(
+          self,
+          package,
+          relationship_type,
+          content_type,
+          target_extension,
+        )
+      }
+
+      #[inline]
+      pub fn add_extended_part_with_id<P>(
+        self,
+        package: &mut P,
+        relationship_type: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        target_extension: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_extended_part_with_id(
+          self,
+          package,
+          relationship_type,
+          content_type,
+          target_extension,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn add_image_part<P>(
         self,
         package: &mut P,
@@ -1885,9 +1927,12 @@ fn part_handle_child_methods_tokens(
   let part_ref_from_relationship = if child_infos.is_empty() {
     quote! {
       fn part_ref_from_relationship(
-        _relationship: &crate::common::RelationshipInfo,
+        relationship: &crate::common::RelationshipInfo,
       ) -> Option<crate::parts::PartRef> {
-        None
+        let part_id = relationship.target_part_id()?;
+        Some(crate::parts::PartRef::ExtendedPart(
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
+        ))
       }
     }
   } else {
@@ -1898,7 +1943,9 @@ fn part_handle_child_methods_tokens(
         let part_id = relationship.target_part_id()?;
         let relationship_type = relationship.relationship_type();
         #( #child_branches )*
-        None
+        Some(crate::parts::PartRef::ExtendedPart(
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(part_id),
+        ))
       }
     }
   };

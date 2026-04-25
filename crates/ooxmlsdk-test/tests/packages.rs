@@ -12,12 +12,13 @@ use ooxmlsdk::parts::{
   embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
   embedded_control_persistence_part::EmbeddedControlPersistencePart,
   embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
-  extended_file_properties_part::ExtendedFilePropertiesPart, font_part::FontPart,
-  font_table_part::FontTablePart, header_part::HeaderPart, image_part::ImagePart,
-  mail_merge_recipient_data_part::MailMergeRecipientDataPart, main_document_part::MainDocumentPart,
-  presentation_document::PresentationDocument, ribbon_extensibility_part::RibbonExtensibilityPart,
-  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
-  thumbnail_part::ThumbnailPart, wordprocessing_comments_part::WordprocessingCommentsPart,
+  extended_file_properties_part::ExtendedFilePropertiesPart, extended_part::ExtendedPart,
+  font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
+  image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
+  ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
+  style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
+  wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
@@ -28,7 +29,7 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  SdkPackage, ThumbnailPartType,
+  SdkPackage, SdkPartHandle, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -1335,6 +1336,143 @@ fn add_thumbnail_part_with_id_uses_content_type_and_relationship_id() {
     Some("image/jpg")
   );
   assert_eq!(reopened_thumbnail.data(&reopened), Some(jpeg.as_slice()));
+}
+
+#[test]
+fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
+  // Source: upstream AddExtendedPart(..., rId) coverage on packages, parts, and ExtendedPart.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let package_extended = package
+    .add_extended_part_with_id(
+      "http://temp/package",
+      "text/xml",
+      ".xml",
+      "rIdSdkPackageExtended",
+    )
+    .unwrap();
+  package_extended
+    .set_data(&mut package, b"<packageExtended/>".to_vec())
+    .unwrap();
+
+  let part_extended = main_part
+    .add_extended_part_with_id(
+      &mut package,
+      "http://temp/main",
+      "application/custom+xml",
+      "xml",
+      "rIdSdkMainExtended",
+    )
+    .unwrap();
+  part_extended
+    .set_data(&mut package, b"<mainExtended/>".to_vec())
+    .unwrap();
+
+  let nested_extended = part_extended
+    .add_extended_part_with_id(
+      &mut package,
+      "http://temp/nested",
+      "text/plain",
+      "txt",
+      "rIdSdkNestedExtended",
+    )
+    .unwrap();
+  nested_extended
+    .set_data(&mut package, b"nested extended".to_vec())
+    .unwrap();
+
+  assert_eq!(
+    package.get_id_of_part(package_extended),
+    Some("rIdSdkPackageExtended")
+  );
+  assert_eq!(
+    main_part.get_id_of_part(&package, part_extended),
+    Some("rIdSdkMainExtended")
+  );
+  assert_eq!(
+    part_extended.get_id_of_part(&package, nested_extended),
+    Some("rIdSdkNestedExtended")
+  );
+  assert_eq!(package_extended.content_type(&package), Some("text/xml"));
+  assert_eq!(
+    part_extended.content_type(&package),
+    Some("application/custom+xml")
+  );
+  assert_eq!(nested_extended.content_type(&package), Some("text/plain"));
+  assert!(
+    package_extended
+      .path(&package)
+      .is_some_and(|path| path.starts_with("extendedPart") && path.ends_with(".xml"))
+  );
+  assert!(
+    part_extended
+      .path(&package)
+      .is_some_and(|path| path.starts_with("word/extendedPart") && path.ends_with(".xml"))
+  );
+  assert!(
+    nested_extended
+      .path(&package)
+      .is_some_and(|path| path.starts_with("word/extendedPart") && path.ends_with(".txt"))
+  );
+
+  let package_relationship = package
+    .relationships()
+    .get("rIdSdkPackageExtended")
+    .unwrap();
+  assert_eq!(
+    package_relationship.relationship_type(),
+    "http://temp/package"
+  );
+  let part_relationship = main_part
+    .relationships(&package)
+    .unwrap()
+    .get("rIdSdkMainExtended")
+    .unwrap();
+  assert_eq!(part_relationship.relationship_type(), "http://temp/main");
+  let nested_relationship = part_extended
+    .relationships(&package)
+    .unwrap()
+    .get("rIdSdkNestedExtended")
+    .unwrap();
+  assert_eq!(
+    nested_relationship.relationship_type(),
+    "http://temp/nested"
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_package_extended = reopened
+    .get_part_by_id("rIdSdkPackageExtended")
+    .and_then(PartRef::downcast::<ExtendedPart>)
+    .unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_part_extended = reopened_main
+    .get_part_by_id(&reopened, "rIdSdkMainExtended")
+    .and_then(PartRef::downcast::<ExtendedPart>)
+    .unwrap();
+  let reopened_nested_extended = reopened_part_extended
+    .get_part_by_id(&reopened, "rIdSdkNestedExtended")
+    .and_then(PartRef::downcast::<ExtendedPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_package_extended.data(&reopened),
+    Some(&b"<packageExtended/>"[..])
+  );
+  assert_eq!(
+    reopened_part_extended.data(&reopened),
+    Some(&b"<mainExtended/>"[..])
+  );
+  assert_eq!(
+    reopened_nested_extended.data(&reopened),
+    Some(&b"nested extended"[..])
+  );
 }
 
 #[test]

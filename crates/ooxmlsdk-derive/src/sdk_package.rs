@@ -463,6 +463,44 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
+      #[inline]
+      pub fn add_extended_part(
+        &mut self,
+        relationship_type: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        target_extension: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_extended_part(
+          self,
+          relationship_type,
+          content_type,
+          target_extension,
+        )
+      }
+
+      #[inline]
+      pub fn add_extended_part_with_id(
+        &mut self,
+        relationship_type: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        target_extension: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_extended_part_with_id(
+          self,
+          relationship_type,
+          content_type,
+          target_extension,
+          relationship_id,
+        )
+      }
+
       pub fn save<W: std::io::Write + std::io::Seek>(
         &self,
         writer: W,

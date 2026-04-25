@@ -299,22 +299,31 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
 
   Ok(quote! {
     #( #mod_list )*
+    pub mod extended_part;
 
     #[derive(Clone, Copy, Debug)]
     pub enum PartRef {
       #( #part_ref_variants )*
+      ExtendedPart(crate::parts::extended_part::ExtendedPart),
     }
 
     impl PartRef {
       pub fn part_id(self) -> crate::common::PartId {
         match self {
           #( #part_ref_part_id_arms, )*
+          PartRef::ExtendedPart(part) => {
+            <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::part_id(part)
+          }
         }
       }
 
       pub fn downcast<T: crate::sdk::SdkPartHandle + 'static>(self) -> Option<T> {
         match self {
           #( #part_ref_downcast_arms, )*
+          PartRef::ExtendedPart(part) => {
+            let any: &dyn std::any::Any = &part;
+            any.downcast_ref::<T>().copied()
+          }
         }
       }
 
@@ -323,9 +332,19 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         part_id: crate::common::PartId,
       ) -> Option<Self> {
         let part = package.storage().part(part_id)?;
-        let relationship_type = part.relationship_type()?;
+        let Some(relationship_type) = part.relationship_type() else {
+          return Some(PartRef::ExtendedPart(
+            <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(
+              part_id,
+            ),
+          ));
+        };
         #( #part_ref_from_relationship_type_branches )*
-        None
+        Some(PartRef::ExtendedPart(
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id(
+            part_id,
+          ),
+        ))
       }
     }
 
@@ -584,10 +603,13 @@ mod tests {
 
     let rendered = gen_parts_mod(&[&part]).unwrap().to_string();
     assert!(rendered.contains("pub enum PartRef"));
+    assert!(rendered.contains("pub mod extended_part"));
     assert!(
       rendered
         .contains("MainDocumentPart (crate :: parts :: main_document_part :: MainDocumentPart)")
     );
+    assert!(rendered.contains("ExtendedPart (crate :: parts :: extended_part :: ExtendedPart)"));
+    assert!(rendered.contains("PartRef :: ExtendedPart"));
     assert!(rendered.contains("pub fn downcast < T : crate :: sdk :: SdkPartHandle"));
     assert!(rendered.contains("pub struct IdPartPair < 'a >"));
     assert!(rendered.contains("pub enum PartRootElement"));

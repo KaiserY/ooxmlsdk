@@ -1700,6 +1700,74 @@ fn delete_parts_recursively_of_type_removes_descendant_matches() {
 }
 
 #[test]
+fn add_part_and_create_relationship_to_part_share_existing_parts() {
+  // Source: upstream AddPart(existing part) / CreateRelationshipToPart same-package semantics.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let image = main_part
+    .add_image_part_with_id(&mut package, "image/png", "rIdMainImage")
+    .unwrap();
+  image
+    .set_data(&mut package, b"shared image".to_vec())
+    .unwrap();
+  let image_path = image.path(&package).unwrap().to_string();
+  let extended = main_part
+    .add_extended_part_with_id(
+      &mut package,
+      "http://temp",
+      "text/xml",
+      ".xml",
+      "rIdExtended",
+    )
+    .unwrap();
+
+  let shared_id = extended
+    .create_relationship_to_part_with_id(&mut package, image, "rIdSharedImage")
+    .unwrap();
+  assert_eq!(shared_id, "rIdSharedImage");
+  assert_eq!(
+    extended
+      .create_relationship_to_part(&mut package, image)
+      .unwrap(),
+    "rIdSharedImage"
+  );
+  assert!(
+    extended
+      .add_part_with_id(&mut package, image, "rIdDifferentSharedImage")
+      .is_err()
+  );
+  assert_eq!(
+    extended.get_id_of_part(&package, image),
+    Some("rIdSharedImage")
+  );
+
+  assert!(main_part.delete_part(&mut package, image).unwrap());
+  assert!(main_part.get_part_by_id(&package, "rIdMainImage").is_none());
+  assert_eq!(image.data(&package), Some(&b"shared image"[..]));
+
+  let mut shared_buffer = Cursor::new(Vec::new());
+  package.save(&mut shared_buffer).unwrap();
+  assert!(package_entry_exists(
+    shared_buffer.into_inner(),
+    image_path.as_str()
+  ));
+
+  assert!(extended.delete_part(&mut package, image).unwrap());
+  assert!(package.storage().part(image.part_id()).is_none());
+
+  let mut deleted_buffer = Cursor::new(Vec::new());
+  package.save(&mut deleted_buffer).unwrap();
+  assert!(!package_entry_exists(
+    deleted_buffer.into_inner(),
+    image_path.as_str()
+  ));
+}
+
+#[test]
 fn add_main_document_part_creates_fixed_main_part_path() {
   // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();

@@ -2079,6 +2079,61 @@ fn part_handle_child_methods_tokens(
         )
       }
 
+      #[inline]
+      pub fn add_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        self,
+        package: &mut P,
+        part: T,
+      ) -> Result<T, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_part(self, package, part)
+      }
+
+      #[inline]
+      pub fn add_part_with_id<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        self,
+        package: &mut P,
+        part: T,
+        relationship_id: impl Into<String>,
+      ) -> Result<T, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_part_with_id(
+          self,
+          package,
+          part,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn create_relationship_to_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        self,
+        package: &mut P,
+        part: T,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::create_relationship_to_part(
+          self,
+          package,
+          part,
+        )
+      }
+
+      #[inline]
+      pub fn create_relationship_to_part_with_id<
+        P: crate::sdk::SdkPackage,
+        T: crate::sdk::SdkPartHandle,
+      >(
+        self,
+        package: &mut P,
+        part: T,
+        relationship_id: impl Into<String>,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::create_relationship_to_part_with_id(
+          self,
+          package,
+          part,
+          relationship_id,
+        )
+      }
+
       #part_ref_from_relationship
 
       #( #accessors )*

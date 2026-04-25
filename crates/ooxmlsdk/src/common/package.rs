@@ -644,6 +644,105 @@ impl SdkPackageStorage {
     Ok(true)
   }
 
+  pub fn add_package_relationship_to_part(
+    &mut self,
+    relationship_id: impl Into<String>,
+    target_part_id: PartId,
+  ) -> Result<String, SdkError> {
+    let relationship_id = relationship_id.into();
+    if let Some(existing_relationship_id) =
+      self.existing_relationship_id_for_target(None, target_part_id)
+    {
+      if existing_relationship_id == relationship_id {
+        return Ok(existing_relationship_id);
+      }
+      return Err(SdkError::CommonError(format!(
+        "part id {target_part_id:?} is already referenced by relationship id {existing_relationship_id}"
+      )));
+    }
+
+    let (relationship_type, target) = {
+      let target_part = self.part(target_part_id).ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {target_part_id:?} is not present in package storage"
+        ))
+      })?;
+      let relationship_type = target_part.relationship_type().ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {target_part_id:?} does not have a relationship type"
+        ))
+      })?;
+      (
+        relationship_type.to_string(),
+        target_part.path().to_string(),
+      )
+    };
+
+    self.package_relationships.add_internal_part_relationship(
+      relationship_id.clone(),
+      relationship_type,
+      target,
+      target_part_id,
+    )?;
+    Ok(relationship_id)
+  }
+
+  pub fn add_child_relationship_to_part(
+    &mut self,
+    source_part_id: PartId,
+    relationship_id: impl Into<String>,
+    target_part_id: PartId,
+  ) -> Result<String, SdkError> {
+    let relationship_id = relationship_id.into();
+    if let Some(existing_relationship_id) =
+      self.existing_relationship_id_for_target(Some(source_part_id), target_part_id)
+    {
+      if existing_relationship_id == relationship_id {
+        return Ok(existing_relationship_id);
+      }
+      return Err(SdkError::CommonError(format!(
+        "part id {target_part_id:?} is already referenced by relationship id {existing_relationship_id}"
+      )));
+    }
+
+    let (relationship_type, relationship_target) = {
+      let source_part_path = self
+        .part(source_part_id)
+        .ok_or_else(|| {
+          SdkError::CommonError(format!(
+            "part id {source_part_id:?} is not present in package storage"
+          ))
+        })?
+        .path()
+        .to_string();
+      let target_part = self.part(target_part_id).ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {target_part_id:?} is not present in package storage"
+        ))
+      })?;
+      let relationship_type = target_part.relationship_type().ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {target_part_id:?} does not have a relationship type"
+        ))
+      })?;
+      (
+        relationship_type.to_string(),
+        relationship_target_from_source(&source_part_path, target_part.path()),
+      )
+    };
+
+    self
+      .relationships_mut(source_part_id)
+      .expect("source part was already resolved")
+      .add_internal_part_relationship(
+        relationship_id.clone(),
+        relationship_type,
+        relationship_target,
+        target_part_id,
+      )?;
+    Ok(relationship_id)
+  }
+
   pub fn add_child_part(
     &mut self,
     source_part_id: PartId,
@@ -831,6 +930,20 @@ impl SdkPackageStorage {
     self.content_types.xml_children.retain(|child| {
       !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
     });
+  }
+
+  fn existing_relationship_id_for_target(
+    &self,
+    source_part_id: Option<PartId>,
+    target_part_id: PartId,
+  ) -> Option<String> {
+    let relationships = match source_part_id {
+      Some(source_part_id) => self.relationships(source_part_id)?,
+      None => self.package_relationships(),
+    };
+    relationships.iter().find_map(|relationship| {
+      (relationship.target_part_id() == Some(target_part_id)).then(|| relationship.id().to_string())
+    })
   }
 
   fn is_part_reachable(&self, target_part_id: PartId) -> bool {

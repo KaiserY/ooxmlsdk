@@ -667,6 +667,44 @@ fn package_relationship_method_tokens(
       crate::sdk::SdkPackage::delete_parts_recursively_of_type::<T>(self)
     }
 
+    #[inline]
+    pub fn add_part<T: crate::sdk::SdkPartHandle>(
+      &mut self,
+      part: T,
+    ) -> Result<T, crate::common::SdkError> {
+      crate::sdk::SdkPackage::add_part(self, part)
+    }
+
+    #[inline]
+    pub fn add_part_with_id<T: crate::sdk::SdkPartHandle>(
+      &mut self,
+      part: T,
+      relationship_id: impl Into<String>,
+    ) -> Result<T, crate::common::SdkError> {
+      crate::sdk::SdkPackage::add_part_with_id(self, part, relationship_id)
+    }
+
+    #[inline]
+    pub fn create_relationship_to_part<T: crate::sdk::SdkPartHandle>(
+      &mut self,
+      part: T,
+    ) -> Result<String, crate::common::SdkError> {
+      crate::sdk::SdkPackage::create_relationship_to_part(self, part)
+    }
+
+    #[inline]
+    pub fn create_relationship_to_part_with_id<T: crate::sdk::SdkPartHandle>(
+      &mut self,
+      part: T,
+      relationship_id: impl Into<String>,
+    ) -> Result<String, crate::common::SdkError> {
+      crate::sdk::SdkPackage::create_relationship_to_part_with_id(
+        self,
+        part,
+        relationship_id,
+      )
+    }
+
     #( #accessors )*
   }
 }

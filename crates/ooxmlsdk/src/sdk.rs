@@ -719,6 +719,50 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn add_part<T: SdkPartHandle>(&mut self, part: T) -> Result<T, crate::common::SdkError> {
+    if self.get_id_of_part(part).is_some() {
+      return Ok(part);
+    }
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_part_with_id(part, relationship_id)
+  }
+
+  #[inline]
+  fn add_part_with_id<T: SdkPartHandle>(
+    &mut self,
+    part: T,
+    relationship_id: impl Into<String>,
+  ) -> Result<T, crate::common::SdkError> {
+    self
+      .storage_mut()
+      .add_package_relationship_to_part(relationship_id, part.part_id())?;
+    Ok(part)
+  }
+
+  #[inline]
+  fn create_relationship_to_part<T: SdkPartHandle>(
+    &mut self,
+    part: T,
+  ) -> Result<String, crate::common::SdkError> {
+    if let Some(relationship_id) = self.get_id_of_part(part) {
+      return Ok(relationship_id.to_string());
+    }
+    let relationship_id = self.relationships().next_relationship_id();
+    self.create_relationship_to_part_with_id(part, relationship_id)
+  }
+
+  #[inline]
+  fn create_relationship_to_part_with_id<T: SdkPartHandle>(
+    &mut self,
+    part: T,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    self
+      .storage_mut()
+      .add_package_relationship_to_part(relationship_id, part.part_id())
+  }
+
+  #[inline]
   fn add_new_part<T>(
     &mut self,
     relationship_id: impl Into<String>,
@@ -2223,6 +2267,77 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       delete_parts_recursively_from_part_id::<P, T>(package, child_part_id)?;
     }
     Ok(())
+  }
+
+  #[inline]
+  fn add_part<P: SdkPackage, T: SdkPartHandle>(
+    self,
+    package: &mut P,
+    part: T,
+  ) -> Result<T, crate::common::SdkError> {
+    if self.get_id_of_part(package, part).is_some() {
+      return Ok(part);
+    }
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_part_with_id(package, part, relationship_id)
+  }
+
+  #[inline]
+  fn add_part_with_id<P: SdkPackage, T: SdkPartHandle>(
+    self,
+    package: &mut P,
+    part: T,
+    relationship_id: impl Into<String>,
+  ) -> Result<T, crate::common::SdkError> {
+    package.storage_mut().add_child_relationship_to_part(
+      self.part_id(),
+      relationship_id,
+      part.part_id(),
+    )?;
+    Ok(part)
+  }
+
+  #[inline]
+  fn create_relationship_to_part<P: SdkPackage, T: SdkPartHandle>(
+    self,
+    package: &mut P,
+    part: T,
+  ) -> Result<String, crate::common::SdkError> {
+    if let Some(relationship_id) = self.get_id_of_part(package, part) {
+      return Ok(relationship_id.to_string());
+    }
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.create_relationship_to_part_with_id(package, part, relationship_id)
+  }
+
+  #[inline]
+  fn create_relationship_to_part_with_id<P: SdkPackage, T: SdkPartHandle>(
+    self,
+    package: &mut P,
+    part: T,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    package.storage_mut().add_child_relationship_to_part(
+      self.part_id(),
+      relationship_id,
+      part.part_id(),
+    )
   }
 }
 

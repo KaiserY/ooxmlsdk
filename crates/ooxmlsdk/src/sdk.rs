@@ -870,6 +870,14 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn create_media_data_part_with_content_type(
+    &mut self,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
+    self.create_media_data_part(content_type, ".bin")
+  }
+
+  #[inline]
   fn create_media_data_part_by_type(
     &mut self,
     part_type: MediaDataPartType,
@@ -1306,6 +1314,39 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       package,
       media_data_part,
       crate::common::RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE,
+      relationship_id,
+    )
+  }
+
+  #[inline]
+  fn add_video_reference_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+  ) -> Result<String, crate::common::SdkError> {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_video_reference_relationship_with_id(package, media_data_part, relationship_id)
+  }
+
+  #[inline]
+  fn add_video_reference_relationship_with_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    self.add_data_part_reference_relationship_with_id(
+      package,
+      media_data_part,
+      crate::common::RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE,
       relationship_id,
     )
   }

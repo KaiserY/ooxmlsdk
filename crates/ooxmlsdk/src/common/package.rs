@@ -770,7 +770,7 @@ impl SdkPackageStorage {
       ));
     }
     let extension = normalized_part_extension(extension.as_ref());
-    let path = self.next_data_part_path("media/media", &extension);
+    let path = self.next_data_part_path("media/mediadata", &extension);
     let part_id = self.push_part(path, &content_type, None);
     Ok(part_id)
   }

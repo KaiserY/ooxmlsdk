@@ -479,6 +479,18 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
 
+  let default_ext = package
+    .create_media_data_part_with_content_type("application/octet-stream")
+    .unwrap();
+  default_ext
+    .set_data(&mut package, b"default media bytes".to_vec())
+    .unwrap();
+  assert_eq!(
+    default_ext.content_type(&package),
+    Some("application/octet-stream")
+  );
+  assert!(default_ext.path(&package).unwrap().ends_with(".bin"));
+
   let wav = package.create_media_data_part("audio/wav", ".wav").unwrap();
   wav.set_data(&mut package, b"wav bytes".to_vec()).unwrap();
   assert_eq!(wav.content_type(&package), Some("audio/wav"));
@@ -497,8 +509,12 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
   let media_relationship_id = main_part
     .add_media_reference_relationship_with_id(&mut package, &avi, "rIdSdkMedia")
     .unwrap();
+  let video_relationship_id = main_part
+    .add_video_reference_relationship_with_id(&mut package, &avi, "rIdSdkVideo")
+    .unwrap();
   assert_eq!(audio_relationship_id, "rIdSdkAudio");
   assert_eq!(media_relationship_id, "rIdSdkMedia");
+  assert_eq!(video_relationship_id, "rIdSdkVideo");
 
   let relationships: Vec<_> = main_part
     .data_part_reference_relationships(&package)
@@ -531,12 +547,28 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     RelationshipTargetKind::InternalPart
   );
 
+  let video_relationship = relationships
+    .iter()
+    .find(|relationship| relationship.id() == "rIdSdkVideo")
+    .unwrap();
+  assert_eq!(
+    video_relationship.relationship_type(),
+    RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(video_relationship.target_part_id(), avi.part_id());
+  assert_eq!(
+    video_relationship.target_kind(),
+    RelationshipTargetKind::InternalPart
+  );
+
+  let default_ext_path = default_ext.path(&package).unwrap().to_string();
   let wav_path = wav.path(&package).unwrap().to_string();
   let avi_path = avi.path(&package).unwrap().to_string();
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
   let bytes = buffer.into_inner();
 
+  assert!(package_entry_exists(bytes.clone(), &default_ext_path));
   assert!(package_entry_exists(bytes.clone(), &wav_path));
   assert!(package_entry_exists(bytes.clone(), &avi_path));
 
@@ -566,6 +598,19 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     .unwrap();
   assert_eq!(reopened_media_part.content_type(), "video/avi");
   assert_eq!(reopened_media_part.data().bytes(), b"avi bytes");
+
+  let reopened_video_relationship = reopened_relationships
+    .iter()
+    .find(|relationship| relationship.id() == "rIdSdkVideo")
+    .unwrap();
+  assert_eq!(
+    reopened_video_relationship.relationship_type(),
+    RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(
+    reopened_video_relationship.target_part_id(),
+    reopened_media_relationship.target_part_id()
+  );
 }
 
 #[test]

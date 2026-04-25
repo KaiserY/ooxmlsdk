@@ -720,6 +720,14 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
+    pub fn create_media_data_part_with_content_type(
+      &mut self,
+      content_type: impl Into<std::borrow::Cow<'static, str>>,
+    ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
+      crate::sdk::SdkPackage::create_media_data_part_with_content_type(self, content_type)
+    }
+
+    #[inline]
     pub fn create_media_data_part_by_type(
       &mut self,
       part_type: crate::sdk::MediaDataPartType,

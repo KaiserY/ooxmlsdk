@@ -361,6 +361,42 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn add_core_file_properties_part(
+        &mut self,
+      ) -> Result<crate::parts::core_file_properties_part::CoreFilePropertiesPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_core_file_properties_part(self)
+      }
+
+      #[inline]
+      pub fn add_extended_file_properties_part(
+        &mut self,
+      ) -> Result<
+        crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
+        crate::common::SdkError,
+      >
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_extended_file_properties_part(self)
+      }
+
+      #[inline]
+      pub fn add_custom_file_properties_part(
+        &mut self,
+      ) -> Result<
+        crate::parts::custom_file_properties_part::CustomFilePropertiesPart,
+        crate::common::SdkError,
+      >
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_custom_file_properties_part(self)
+      }
+
+      #[inline]
       pub fn add_thumbnail_part(
         &mut self,
         content_type: impl Into<std::borrow::Cow<'static, str>>,

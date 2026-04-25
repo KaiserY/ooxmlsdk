@@ -696,6 +696,55 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn add_core_file_properties_part(
+    &mut self,
+  ) -> Result<
+    crate::parts::core_file_properties_part::CoreFilePropertiesPart,
+    crate::common::SdkError,
+  >
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_new_part_with_target_mode::<crate::parts::core_file_properties_part::CoreFilePropertiesPart>(
+      relationship_id,
+      crate::common::NewPartTargetMode::Fixed,
+    )
+  }
+
+  #[inline]
+  fn add_extended_file_properties_part(
+    &mut self,
+  ) -> Result<
+    crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
+    crate::common::SdkError,
+  >
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_new_part_with_target_mode::<
+      crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
+    >(relationship_id, crate::common::NewPartTargetMode::Fixed)
+  }
+
+  #[inline]
+  fn add_custom_file_properties_part(
+    &mut self,
+  ) -> Result<
+    crate::parts::custom_file_properties_part::CustomFilePropertiesPart,
+    crate::common::SdkError,
+  >
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_new_part_with_target_mode::<
+      crate::parts::custom_file_properties_part::CustomFilePropertiesPart,
+    >(relationship_id, crate::common::NewPartTargetMode::Fixed)
+  }
+
+  #[inline]
   fn add_new_part_with_content_type_and_extension<T>(
     &mut self,
     relationship_id: impl Into<String>,

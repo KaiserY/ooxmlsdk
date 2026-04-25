@@ -5,17 +5,18 @@ use std::io::{Cursor, Write};
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
-  custom_property_part::CustomPropertyPart, custom_xml_part::CustomXmlPart,
-  document_settings_part::DocumentSettingsPart,
+  core_file_properties_part::CoreFilePropertiesPart,
+  custom_file_properties_part::CustomFilePropertiesPart, custom_property_part::CustomPropertyPart,
+  custom_xml_part::CustomXmlPart, document_settings_part::DocumentSettingsPart,
   embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
   embedded_control_persistence_part::EmbeddedControlPersistencePart,
   embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
-  font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
-  image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
-  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
-  style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
-  wordprocessing_comments_part::WordprocessingCommentsPart,
+  extended_file_properties_part::ExtendedFilePropertiesPart, font_part::FontPart,
+  font_table_part::FontTablePart, header_part::HeaderPart, image_part::ImagePart,
+  mail_merge_recipient_data_part::MailMergeRecipientDataPart, main_document_part::MainDocumentPart,
+  presentation_document::PresentationDocument, ribbon_extensibility_part::RibbonExtensibilityPart,
+  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
+  thumbnail_part::ThumbnailPart, wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
@@ -1360,6 +1361,104 @@ fn add_main_document_part_creates_fixed_main_part_path() {
   assert_eq!(
     main_document_body_child_count(reopened_main.root_element(&mut reopened).unwrap()),
     0
+  );
+}
+
+#[test]
+fn add_file_properties_parts_create_fixed_package_relationships() {
+  // Source: upstream W050/X006 AddCoreFilePropertiesPart/AddExtendedFilePropertiesPart/AddCustomFilePropertiesPart coverage.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let core = package.add_core_file_properties_part().unwrap();
+  core
+    .set_data(
+      &mut package,
+      br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>hello</dc:title></cp:coreProperties>"#
+        .to_vec(),
+    )
+    .unwrap();
+
+  let extended = package.add_extended_file_properties_part().unwrap();
+  extended
+    .set_data(
+      &mut package,
+      br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>ooxmlsdk</Application></Properties>"#
+        .to_vec(),
+    )
+    .unwrap();
+
+  let custom = package.add_custom_file_properties_part().unwrap();
+  custom
+    .set_data(
+      &mut package,
+      br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="Sdk"><vt:lpwstr>yes</vt:lpwstr></property></Properties>"#
+        .to_vec(),
+    )
+    .unwrap();
+
+  assert_eq!(core.path(&package), Some("docProps/core.xml"));
+  assert_eq!(extended.path(&package), Some("docProps/app.xml"));
+  assert_eq!(custom.path(&package), Some("docProps/custom.xml"));
+  assert_eq!(
+    core.content_type(&package),
+    Some("application/vnd.openxmlformats-package.core-properties+xml")
+  );
+  assert_eq!(
+    extended.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.extended-properties+xml")
+  );
+  assert_eq!(
+    custom.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.custom-properties+xml")
+  );
+  assert!(package.add_core_file_properties_part().is_err());
+  assert!(package.add_extended_file_properties_part().is_err());
+  assert!(package.add_custom_file_properties_part().is_err());
+
+  let core_id = package.get_id_of_part(core).unwrap().to_string();
+  let extended_id = package.get_id_of_part(extended).unwrap().to_string();
+  let custom_id = package.get_id_of_part(custom).unwrap().to_string();
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_core = reopened
+    .get_part_by_id(core_id.as_str())
+    .and_then(PartRef::downcast::<CoreFilePropertiesPart>)
+    .unwrap();
+  let reopened_extended = reopened
+    .get_part_by_id(extended_id.as_str())
+    .and_then(PartRef::downcast::<ExtendedFilePropertiesPart>)
+    .unwrap();
+  let reopened_custom = reopened
+    .get_part_by_id(custom_id.as_str())
+    .and_then(PartRef::downcast::<CustomFilePropertiesPart>)
+    .unwrap();
+
+  assert_eq!(reopened_core.path(&reopened), Some("docProps/core.xml"));
+  assert_eq!(reopened_extended.path(&reopened), Some("docProps/app.xml"));
+  assert_eq!(reopened_custom.path(&reopened), Some("docProps/custom.xml"));
+  assert!(reopened_core.data(&reopened).is_some_and(|data| {
+    data
+      .windows(b"hello".len())
+      .any(|window| window == b"hello")
+  }));
+  assert!(reopened_extended.data(&reopened).is_some_and(|data| {
+    data
+      .windows(b"ooxmlsdk".len())
+      .any(|window| window == b"ooxmlsdk")
+  }));
+  assert!(
+    reopened_custom
+      .data(&reopened)
+      .is_some_and(|data| data.windows(b"Sdk".len()).any(|window| window == b"Sdk"))
   );
 }
 

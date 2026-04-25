@@ -2134,6 +2134,62 @@ fn part_handle_child_methods_tokens(
         )
       }
 
+      #[inline]
+      pub fn add_audio_reference_relationship<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        media_data_part: &crate::common::MediaDataPart,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_audio_reference_relationship(
+          self,
+          package,
+          media_data_part,
+        )
+      }
+
+      #[inline]
+      pub fn add_audio_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        media_data_part: &crate::common::MediaDataPart,
+        relationship_id: impl Into<String>,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_audio_reference_relationship_with_id(
+          self,
+          package,
+          media_data_part,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_media_reference_relationship<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        media_data_part: &crate::common::MediaDataPart,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_media_reference_relationship(
+          self,
+          package,
+          media_data_part,
+        )
+      }
+
+      #[inline]
+      pub fn add_media_reference_relationship_with_id<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        media_data_part: &crate::common::MediaDataPart,
+        relationship_id: impl Into<String>,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_media_reference_relationship_with_id(
+          self,
+          package,
+          media_data_part,
+          relationship_id,
+        )
+      }
+
       #part_ref_from_relationship
 
       #( #accessors )*

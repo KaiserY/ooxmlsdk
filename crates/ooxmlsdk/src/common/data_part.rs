@@ -6,11 +6,68 @@ use super::SdkError;
 
 #[derive(Clone, Debug, Default)]
 pub struct MediaDataPart {
+  pub(crate) id: Option<crate::common::PartId>,
   pub inner_path: String,
   pub part_content: Vec<u8>,
 }
 
 impl MediaDataPart {
+  #[inline]
+  pub(crate) fn from_part_id(part_id: crate::common::PartId, path: impl Into<String>) -> Self {
+    Self {
+      id: Some(part_id),
+      inner_path: path.into(),
+      part_content: Vec::new(),
+    }
+  }
+
+  #[inline]
+  pub fn part_id(&self) -> Option<crate::common::PartId> {
+    self.id
+  }
+
+  #[inline]
+  pub fn path<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a str> {
+    let part_id = self.id?;
+    package.storage().part(part_id).map(|part| part.path())
+  }
+
+  #[inline]
+  pub fn content_type<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a str> {
+    let part_id = self.id?;
+    package
+      .storage()
+      .part(part_id)
+      .map(|part| part.content_type())
+  }
+
+  #[inline]
+  pub fn data<'a, P: crate::sdk::SdkPackage>(&'a self, package: &'a P) -> Option<&'a [u8]> {
+    let part_id = self.id?;
+    package
+      .storage()
+      .part(part_id)
+      .map(|part| part.data().bytes())
+  }
+
+  #[inline]
+  pub fn set_data<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &mut P,
+    data: Vec<u8>,
+  ) -> Result<(), SdkError> {
+    let part_id = self
+      .id
+      .ok_or_else(|| SdkError::CommonError("media data part is not package-backed".to_string()))?;
+    let part = package.storage_mut().part_mut(part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {part_id:?} is not present in package storage"
+      ))
+    })?;
+    *part.data_mut().bytes_mut() = data;
+    Ok(())
+  }
+
   pub(crate) fn new_from_archive<R: Read + Seek>(
     path: &str,
     part_index: usize,
@@ -21,6 +78,7 @@ impl MediaDataPart {
     zip_entry.read_to_end(&mut part_content)?;
 
     Ok(Self {
+      id: None,
       inner_path: path.to_string(),
       part_content,
     })

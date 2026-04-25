@@ -29,7 +29,7 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  SdkPackage, SdkPartHandle, ThumbnailPartType,
+  MediaDataPartType, SdkPackage, SdkPartHandle, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -278,6 +278,134 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
 
   assert_eq!(internal_media_reference_count, 3);
   assert_eq!(external_null_audio_reference_count, 1);
+}
+
+#[test]
+fn media_data_part_type_maps_upstream_content_types_and_extensions() {
+  // Source: src/DocumentFormat.OpenXml.Framework/Packaging/MediaDataPartTypeInfo.cs
+  let cases = [
+    (MediaDataPartType::Aiff, "audio/aiff", ".aiff"),
+    (MediaDataPartType::Midi, "audio/midi", ".midi"),
+    (MediaDataPartType::Mp3, "audio/mp3", ".mp3"),
+    (MediaDataPartType::MpegUrl, "audio/mpegurl", ".m3u"),
+    (MediaDataPartType::Wav, "audio/wav", ".wav"),
+    (MediaDataPartType::Wma, "audio/x-ms-wma", ".wma"),
+    (MediaDataPartType::MpegAudio, "audio/mpeg", ".mpeg"),
+    (MediaDataPartType::OggAudio, "audio/ogg", ".ogg"),
+    (MediaDataPartType::Asx, "video/x-ms-asf-plugin", ".asx"),
+    (MediaDataPartType::Avi, "video/avi", ".avi"),
+    (MediaDataPartType::Mpg, "video/mpg", ".mpg"),
+    (MediaDataPartType::MpegVideo, "video/mpeg", ".mpeg"),
+    (MediaDataPartType::Wmv, "video/x-ms-wmv", ".wmv"),
+    (MediaDataPartType::Wmx, "video/x-ms-wmx", ".wmx"),
+    (MediaDataPartType::Wvx, "video/x-ms-wvx", ".wvx"),
+    (MediaDataPartType::Quicktime, "video/quicktime", ".mov"),
+    (MediaDataPartType::OggVideo, "video/ogg", ".ogg"),
+    (MediaDataPartType::Vc1, "video/vc1", ".wmv"),
+    (MediaDataPartType::Mp4, "video/mp4", ".mp4"),
+  ];
+
+  for (part_type, content_type, extension) in cases {
+    assert_eq!(part_type.content_type(), content_type);
+    assert_eq!(part_type.extension(), extension);
+  }
+}
+
+#[test]
+fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
+  //   MediaDataPartReferenceTest
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  let wav = package.create_media_data_part("audio/wav", ".wav").unwrap();
+  wav.set_data(&mut package, b"wav bytes".to_vec()).unwrap();
+  assert_eq!(wav.content_type(&package), Some("audio/wav"));
+  assert!(wav.path(&package).unwrap().ends_with(".wav"));
+
+  let avi = package
+    .create_media_data_part_by_type(MediaDataPartType::Avi)
+    .unwrap();
+  avi.set_data(&mut package, b"avi bytes".to_vec()).unwrap();
+  assert_eq!(avi.content_type(&package), Some("video/avi"));
+  assert!(avi.path(&package).unwrap().ends_with(".avi"));
+
+  let audio_relationship_id = main_part
+    .add_audio_reference_relationship_with_id(&mut package, &wav, "rIdSdkAudio")
+    .unwrap();
+  let media_relationship_id = main_part
+    .add_media_reference_relationship_with_id(&mut package, &avi, "rIdSdkMedia")
+    .unwrap();
+  assert_eq!(audio_relationship_id, "rIdSdkAudio");
+  assert_eq!(media_relationship_id, "rIdSdkMedia");
+
+  let relationships: Vec<_> = main_part
+    .data_part_reference_relationships(&package)
+    .collect();
+  let audio_relationship = relationships
+    .iter()
+    .find(|relationship| relationship.id() == "rIdSdkAudio")
+    .unwrap();
+  assert_eq!(
+    audio_relationship.relationship_type(),
+    RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(audio_relationship.target_part_id(), wav.part_id());
+  assert_eq!(
+    audio_relationship.target_kind(),
+    RelationshipTargetKind::InternalPart
+  );
+
+  let media_relationship = relationships
+    .iter()
+    .find(|relationship| relationship.id() == "rIdSdkMedia")
+    .unwrap();
+  assert_eq!(
+    media_relationship.relationship_type(),
+    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(media_relationship.target_part_id(), avi.part_id());
+  assert_eq!(
+    media_relationship.target_kind(),
+    RelationshipTargetKind::InternalPart
+  );
+
+  let wav_path = wav.path(&package).unwrap().to_string();
+  let avi_path = avi.path(&package).unwrap().to_string();
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+  let bytes = buffer.into_inner();
+
+  assert!(package_entry_exists(bytes.clone(), &wav_path));
+  assert!(package_entry_exists(bytes.clone(), &avi_path));
+
+  let reopened = WordprocessingDocument::new(Cursor::new(bytes)).unwrap();
+  let reopened_main_part = reopened.main_document_part().unwrap();
+  let reopened_relationships: Vec<_> = reopened_main_part
+    .data_part_reference_relationships(&reopened)
+    .collect();
+  let reopened_audio_relationship = reopened_relationships
+    .iter()
+    .find(|relationship| relationship.id() == "rIdSdkAudio")
+    .unwrap();
+  let reopened_audio_part = reopened
+    .storage()
+    .part(reopened_audio_relationship.target_part_id().unwrap())
+    .unwrap();
+  assert_eq!(reopened_audio_part.content_type(), "audio/wav");
+  assert_eq!(reopened_audio_part.data().bytes(), b"wav bytes");
+
+  let reopened_media_relationship = reopened_relationships
+    .iter()
+    .find(|relationship| relationship.id() == "rIdSdkMedia")
+    .unwrap();
+  let reopened_media_part = reopened
+    .storage()
+    .part(reopened_media_relationship.target_part_id().unwrap())
+    .unwrap();
+  assert_eq!(reopened_media_part.content_type(), "video/avi");
+  assert_eq!(reopened_media_part.data().bytes(), b"avi bytes");
 }
 
 #[test]

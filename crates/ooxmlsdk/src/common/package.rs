@@ -474,6 +474,11 @@ impl StoredPart {
   pub fn data(&self) -> &StoredPartData {
     &self.data
   }
+
+  #[inline]
+  pub fn data_mut(&mut self) -> &mut StoredPartData {
+    &mut self.data
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -729,6 +734,61 @@ impl SdkPackageStorage {
         relationship_type.to_string(),
         relationship_target_from_source(&source_part_path, target_part.path()),
       )
+    };
+
+    self
+      .relationships_mut(source_part_id)
+      .expect("source part was already resolved")
+      .add_internal_part_relationship(
+        relationship_id.clone(),
+        relationship_type,
+        relationship_target,
+        target_part_id,
+      )?;
+    Ok(relationship_id)
+  }
+
+  pub fn create_media_data_part(
+    &mut self,
+    content_type: impl Into<String>,
+    extension: impl AsRef<str>,
+  ) -> Result<PartId, SdkError> {
+    let content_type = content_type.into();
+    if content_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a media data part with an empty content type".to_string(),
+      ));
+    }
+    let extension = normalized_part_extension(extension.as_ref());
+    let path = self.next_data_part_path("media/media", &extension);
+    let part_id = self.push_part(path, &content_type, None);
+    Ok(part_id)
+  }
+
+  pub fn add_data_part_reference_relationship(
+    &mut self,
+    source_part_id: PartId,
+    relationship_id: impl Into<String>,
+    relationship_type: &str,
+    target_part_id: PartId,
+  ) -> Result<String, SdkError> {
+    let relationship_id = relationship_id.into();
+    let relationship_target = {
+      let source_part_path = self
+        .part(source_part_id)
+        .ok_or_else(|| {
+          SdkError::CommonError(format!(
+            "part id {source_part_id:?} is not present in package storage"
+          ))
+        })?
+        .path()
+        .to_string();
+      let target_part = self.part(target_part_id).ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {target_part_id:?} is not present in package storage"
+        ))
+      })?;
+      relationship_target_from_source(&source_part_path, target_part.path())
     };
 
     self
@@ -1069,6 +1129,17 @@ impl SdkPackageStorage {
     }
 
     unreachable!("usize iteration should always find a free part path")
+  }
+
+  fn next_data_part_path(&self, stem: &str, extension: &str) -> String {
+    for index in 1.. {
+      let path = format!("{stem}{index}{extension}");
+      if !self.by_path.contains_key(path.as_str()) {
+        return path;
+      }
+    }
+
+    unreachable!("usize iteration should always find a free data part path")
   }
 }
 

@@ -519,6 +519,83 @@ impl ThumbnailPartType {
 }
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MediaDataPartType {
+  Aiff,
+  Midi,
+  Mp3,
+  MpegUrl,
+  Wav,
+  Wma,
+  MpegAudio,
+  OggAudio,
+  Asx,
+  Avi,
+  Mpg,
+  MpegVideo,
+  Wmv,
+  Wmx,
+  Wvx,
+  Quicktime,
+  OggVideo,
+  Vc1,
+  Mp4,
+}
+
+#[cfg(feature = "parts")]
+impl MediaDataPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Aiff => "audio/aiff",
+      Self::Midi => "audio/midi",
+      Self::Mp3 => "audio/mp3",
+      Self::MpegUrl => "audio/mpegurl",
+      Self::Wav => "audio/wav",
+      Self::Wma => "audio/x-ms-wma",
+      Self::MpegAudio => "audio/mpeg",
+      Self::OggAudio => "audio/ogg",
+      Self::Asx => "video/x-ms-asf-plugin",
+      Self::Avi => "video/avi",
+      Self::Mpg => "video/mpg",
+      Self::MpegVideo => "video/mpeg",
+      Self::Wmv => "video/x-ms-wmv",
+      Self::Wmx => "video/x-ms-wmx",
+      Self::Wvx => "video/x-ms-wvx",
+      Self::Quicktime => "video/quicktime",
+      Self::OggVideo => "video/ogg",
+      Self::Vc1 => "video/vc1",
+      Self::Mp4 => "video/mp4",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    match self {
+      Self::Aiff => ".aiff",
+      Self::Midi => ".midi",
+      Self::Mp3 => ".mp3",
+      Self::MpegUrl => ".m3u",
+      Self::Wav => ".wav",
+      Self::Wma => ".wma",
+      Self::MpegAudio => ".mpeg",
+      Self::OggAudio => ".ogg",
+      Self::Asx => ".asx",
+      Self::Avi => ".avi",
+      Self::Mpg => ".mpg",
+      Self::MpegVideo => ".mpeg",
+      Self::Wmv => ".wmv",
+      Self::Wmx => ".wmx",
+      Self::Wvx => ".wvx",
+      Self::Quicktime => ".mov",
+      Self::OggVideo => ".ogg",
+      Self::Vc1 => ".wmv",
+      Self::Mp4 => ".mp4",
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
 pub trait SdkPackage {
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 
@@ -760,6 +837,36 @@ pub trait SdkPackage {
     self
       .storage_mut()
       .add_package_relationship_to_part(relationship_id, part.part_id())
+  }
+
+  #[inline]
+  fn create_media_data_part(
+    &mut self,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    extension: impl AsRef<str>,
+  ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
+    let part_id = self
+      .storage_mut()
+      .create_media_data_part(content_type.into().into_owned(), extension)?;
+    let path = self
+      .storage()
+      .part(part_id)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {part_id:?} is not present in package storage"
+        ))
+      })?
+      .path()
+      .to_string();
+    Ok(crate::common::MediaDataPart::from_part_id(part_id, path))
+  }
+
+  #[inline]
+  fn create_media_data_part_by_type(
+    &mut self,
+    part_type: MediaDataPartType,
+  ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
+    self.create_media_data_part(part_type.content_type(), part_type.extension())
   }
 
   #[inline]
@@ -1127,6 +1234,91 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
         ))
       })?
       .add_hyperlink_relationship(relationship_id, target)
+  }
+
+  #[inline]
+  fn add_audio_reference_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+  ) -> Result<String, crate::common::SdkError> {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_audio_reference_relationship_with_id(package, media_data_part, relationship_id)
+  }
+
+  #[inline]
+  fn add_audio_reference_relationship_with_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    self.add_data_part_reference_relationship_with_id(
+      package,
+      media_data_part,
+      crate::common::RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE,
+      relationship_id,
+    )
+  }
+
+  #[inline]
+  fn add_media_reference_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+  ) -> Result<String, crate::common::SdkError> {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_media_reference_relationship_with_id(package, media_data_part, relationship_id)
+  }
+
+  #[inline]
+  fn add_media_reference_relationship_with_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    self.add_data_part_reference_relationship_with_id(
+      package,
+      media_data_part,
+      crate::common::RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE,
+      relationship_id,
+    )
+  }
+
+  #[inline]
+  fn add_data_part_reference_relationship_with_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    media_data_part: &crate::common::MediaDataPart,
+    relationship_type: &str,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    let target_part_id = media_data_part.part_id().ok_or_else(|| {
+      crate::common::SdkError::CommonError("media data part is not package-backed".to_string())
+    })?;
+    package.storage_mut().add_data_part_reference_relationship(
+      self.part_id(),
+      relationship_id,
+      relationship_type,
+      target_part_id,
+    )
   }
 
   #[inline]

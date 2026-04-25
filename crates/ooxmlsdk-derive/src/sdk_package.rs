@@ -705,6 +705,23 @@ fn package_relationship_method_tokens(
       )
     }
 
+    #[inline]
+    pub fn create_media_data_part(
+      &mut self,
+      content_type: impl Into<std::borrow::Cow<'static, str>>,
+      extension: impl AsRef<str>,
+    ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
+      crate::sdk::SdkPackage::create_media_data_part(self, content_type, extension)
+    }
+
+    #[inline]
+    pub fn create_media_data_part_by_type(
+      &mut self,
+      part_type: crate::sdk::MediaDataPartType,
+    ) -> Result<crate::common::MediaDataPart, crate::common::SdkError> {
+      crate::sdk::SdkPackage::create_media_data_part_by_type(self, part_type)
+    }
+
     #( #accessors )*
   }
 }

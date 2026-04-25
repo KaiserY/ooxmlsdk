@@ -275,6 +275,22 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn get_reference_relationship(
+        &self,
+        relationship_id: &str,
+      ) -> Option<&crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::get_reference_relationship(self, relationship_id)
+      }
+
+      #[inline]
+      pub fn delete_reference_relationship(
+        &mut self,
+        relationship_id: &str,
+      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::delete_reference_relationship(self, relationship_id)
+      }
+
+      #[inline]
       pub fn change_relationship_id(
         &mut self,
         relationship_id: &str,

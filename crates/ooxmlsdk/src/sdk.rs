@@ -645,6 +645,27 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn get_reference_relationship(
+    &self,
+    relationship_id: &str,
+  ) -> Option<&crate::common::RelationshipInfo> {
+    self
+      .relationships()
+      .get(relationship_id)
+      .filter(|relationship| relationship.is_reference_relationship())
+  }
+
+  #[inline]
+  fn delete_reference_relationship(
+    &mut self,
+    relationship_id: &str,
+  ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+    self
+      .relationships_mut()
+      .remove_reference_relationship(relationship_id)
+  }
+
+  #[inline]
   fn change_relationship_id(
     &mut self,
     relationship_id: &str,
@@ -1348,6 +1369,39 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       media_data_part,
       crate::common::RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE,
       relationship_id,
+    )
+  }
+
+  #[inline]
+  fn add_data_part_reference_relationship_from_existing<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship: &crate::common::RelationshipInfo,
+  ) -> Result<String, crate::common::SdkError> {
+    if !relationship.is_reference_relationship()
+      || !matches!(
+        relationship.relationship_type(),
+        crate::common::RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+          | crate::common::RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+          | crate::common::RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+      )
+    {
+      return Err(crate::common::SdkError::CommonError(format!(
+        "relationship id {} is not a data part reference relationship",
+        relationship.id()
+      )));
+    }
+    let target_part_id = relationship.target_part_id().ok_or_else(|| {
+      crate::common::SdkError::CommonError(format!(
+        "data part reference relationship id {} does not target a package part",
+        relationship.id()
+      ))
+    })?;
+    package.storage_mut().add_data_part_reference_relationship(
+      self.part_id(),
+      relationship.id(),
+      relationship.relationship_type(),
+      target_part_id,
     )
   }
 
@@ -2251,6 +2305,35 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
     relationship_id: &str,
   ) -> Option<crate::common::RelationshipInfo> {
     self.relationships_mut(package)?.remove(relationship_id)
+  }
+
+  #[inline]
+  fn get_reference_relationship<'a, P: SdkPackage>(
+    self,
+    package: &'a P,
+    relationship_id: &str,
+  ) -> Option<&'a crate::common::RelationshipInfo> {
+    self
+      .relationships(package)?
+      .get(relationship_id)
+      .filter(|relationship| relationship.is_reference_relationship())
+  }
+
+  #[inline]
+  fn delete_reference_relationship<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: &str,
+  ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+    self
+      .relationships_mut(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .remove_reference_relationship(relationship_id)
   }
 
   #[inline]

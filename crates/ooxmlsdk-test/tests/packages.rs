@@ -614,6 +614,74 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
 }
 
 #[test]
+fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target() {
+  // Source: src/DocumentFormat.OpenXml.Framework/Packaging/OpenXmlPartContainer.cs
+  //   AddDataPartReferenceRelationship(DataPartReferenceRelationship)
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let header = main_part
+    .add_new_part::<_, HeaderPart>(&mut package, "rIdSdkHeaderForDataRef")
+    .unwrap();
+  header
+    .set_root_element(&mut package, Header::default())
+    .unwrap();
+
+  let media_data_part = package
+    .create_media_data_part_by_type(MediaDataPartType::Mp3)
+    .unwrap();
+  media_data_part
+    .set_data(&mut package, b"mp3 bytes".to_vec())
+    .unwrap();
+  main_part
+    .add_media_reference_relationship_with_id(&mut package, &media_data_part, "rIdSdkDataRef")
+    .unwrap();
+  let existing_relationship = main_part
+    .get_reference_relationship(&package, "rIdSdkDataRef")
+    .unwrap()
+    .clone();
+
+  let copied_relationship_id = header
+    .add_data_part_reference_relationship_from_existing(&mut package, &existing_relationship)
+    .unwrap();
+  assert_eq!(copied_relationship_id, "rIdSdkDataRef");
+  let copied_relationship = header
+    .get_reference_relationship(&package, "rIdSdkDataRef")
+    .unwrap();
+  assert_eq!(
+    copied_relationship.relationship_type(),
+    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(
+    copied_relationship.target_part_id(),
+    media_data_part.part_id()
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_header = reopened_main
+    .header_parts(&reopened)
+    .find(|part| reopened_main.get_id_of_part(&reopened, *part) == Some("rIdSdkHeaderForDataRef"))
+    .unwrap();
+  let reopened_relationship = reopened_header
+    .get_reference_relationship(&reopened, "rIdSdkDataRef")
+    .unwrap();
+  assert_eq!(
+    reopened_relationship.relationship_type(),
+    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+  );
+  let reopened_media_part = reopened
+    .storage()
+    .part(reopened_relationship.target_part_id().unwrap())
+    .unwrap();
+  assert_eq!(reopened_media_part.content_type(), "audio/mp3");
+  assert_eq!(reopened_media_part.data().bytes(), b"mp3 bytes");
+}
+
+#[test]
 fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: HyperlinkRelationshipTest
   let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
@@ -834,6 +902,11 @@ fn part_external_relationship_ids_can_change_and_remove() {
       )
       .is_err()
   );
+  assert!(
+    main_part
+      .get_reference_relationship(&package, relationship_id)
+      .is_some()
+  );
 
   main_part
     .change_relationship_id(&mut package, relationship_id, changed_relationship_id)
@@ -853,9 +926,14 @@ fn part_external_relationship_ids_can_change_and_remove() {
   );
 
   let removed = main_part
-    .remove_relationship(&mut package, changed_relationship_id)
+    .delete_reference_relationship(&mut package, changed_relationship_id)
     .unwrap();
   assert_eq!(removed.id(), changed_relationship_id);
+  assert!(
+    main_part
+      .delete_reference_relationship(&mut package, changed_relationship_id)
+      .is_err()
+  );
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
@@ -881,6 +959,11 @@ fn package_external_relationship_mutation_is_saved() {
   package
     .add_external_relationship(relationship_id.as_str(), relationship_type, target)
     .unwrap();
+  assert!(
+    package
+      .get_reference_relationship(&relationship_id)
+      .is_some()
+  );
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();

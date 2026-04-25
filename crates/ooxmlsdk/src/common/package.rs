@@ -167,6 +167,12 @@ impl RelationshipInfo {
     self.target_part_id
   }
 
+  #[inline]
+  pub fn is_reference_relationship(&self) -> bool {
+    self.target_kind == RelationshipTargetKind::External
+      || is_data_part_reference_relationship_type(self.relationship_type())
+  }
+
   fn to_relationship(&self) -> Relationship {
     Relationship {
       id: self.id().to_string(),
@@ -275,6 +281,27 @@ impl RelationshipSet {
     let removed = self.relationships.remove(index);
     self.rebuild_index();
     Some(removed)
+  }
+
+  pub fn remove_reference_relationship(
+    &mut self,
+    relationship_id: &str,
+  ) -> Result<RelationshipInfo, SdkError> {
+    let relationship = self.get(relationship_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "reference relationship id {relationship_id} does not exist"
+      ))
+    })?;
+    if !relationship.is_reference_relationship() {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {relationship_id} is not a reference relationship"
+      )));
+    }
+    Ok(
+      self
+        .remove(relationship_id)
+        .expect("relationship was already resolved"),
+    )
   }
 
   pub fn change_relationship_id(

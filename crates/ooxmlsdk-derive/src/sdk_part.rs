@@ -1712,6 +1712,32 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn get_reference_relationship<'a, P: crate::sdk::SdkPackage>(
+        self,
+        package: &'a P,
+        relationship_id: &str,
+      ) -> Option<&'a crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::get_reference_relationship(
+          self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn delete_reference_relationship<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        relationship_id: &str,
+      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::delete_reference_relationship(
+          self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn change_relationship_id<P: crate::sdk::SdkPackage>(
         self,
         package: &mut P,
@@ -2215,6 +2241,19 @@ fn part_handle_child_methods_tokens(
           package,
           media_data_part,
           relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_data_part_reference_relationship_from_existing<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        relationship: &crate::common::RelationshipInfo,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_data_part_reference_relationship_from_existing(
+          self,
+          package,
+          relationship,
         )
       }
 

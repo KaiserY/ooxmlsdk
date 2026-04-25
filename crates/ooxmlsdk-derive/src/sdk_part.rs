@@ -1315,6 +1315,74 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_custom_xml_part<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_custom_xml_part(
+          self,
+          package,
+          content_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_custom_xml_part_with_id<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_custom_xml_part_with_id(
+          self,
+          package,
+          content_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_custom_xml_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::CustomXmlPartType,
+      ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_custom_xml_part_by_type(
+          self,
+          package,
+          part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_custom_xml_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::CustomXmlPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_custom_xml_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn remove_relationship<P: crate::sdk::SdkPackage>(
         self,
         package: &mut P,

@@ -196,6 +196,28 @@ impl AlternativeFormatImportPartType {
 }
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CustomXmlPartType {
+  AdditionalCharacteristicsInfo,
+  Bibliography,
+  CustomXml,
+  InkContent,
+}
+
+#[cfg(feature = "parts")]
+impl CustomXmlPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::AdditionalCharacteristicsInfo | Self::Bibliography | Self::CustomXml => {
+        "application/xml"
+      }
+      Self::InkContent => "application/inkml+xml",
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
 pub trait SdkPackage {
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 
@@ -668,6 +690,63 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       part_type.content_type(),
       relationship_id,
     )
+  }
+
+  #[inline]
+  fn add_custom_xml_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<P, crate::parts::custom_xml_part::CustomXmlPart>(
+      package,
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_custom_xml_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<P, crate::parts::custom_xml_part::CustomXmlPart>(
+      package,
+      relationship_id,
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_custom_xml_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: CustomXmlPartType,
+  ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_custom_xml_part(package, part_type.content_type())
+  }
+
+  #[inline]
+  fn add_custom_xml_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: CustomXmlPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_custom_xml_part_with_id(package, part_type.content_type(), relationship_id)
   }
 
   #[inline]

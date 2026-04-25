@@ -5,9 +5,10 @@ use std::io::{Cursor, Write};
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
-  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
-  presentation_document::PresentationDocument, ribbon_extensibility_part::RibbonExtensibilityPart,
-  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
+  custom_xml_part::CustomXmlPart, header_part::HeaderPart, image_part::ImagePart,
+  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
+  ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
+  style_definitions_part::StyleDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -15,7 +16,7 @@ use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, Document, Header,
 };
-use ooxmlsdk::sdk::{AlternativeFormatImportPartType, SdkPackage};
+use ooxmlsdk::sdk::{AlternativeFormatImportPartType, CustomXmlPartType, SdkPackage};
 use ooxmlsdk_test::fixtures;
 
 fn doc_sample(file_name: &str) -> std::path::PathBuf {
@@ -881,6 +882,90 @@ fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
     reopened_chunk.data(&reopened),
     Some(&b"<html xmlns=\"http://www.w3.org/1999/xhtml\"/>"[..])
   );
+}
+
+#[test]
+fn add_custom_xml_part_by_type_feeds_data_and_saves() {
+  // Source: upstream AddCustomXmlPart(CustomXmlPartType.CustomXml) coverage.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let xml = b"<properties><property name=\"sdk\">custom xml</property></properties>".to_vec();
+
+  let custom_xml = main_part
+    .add_custom_xml_part_by_type(&mut package, CustomXmlPartType::CustomXml)
+    .unwrap();
+  custom_xml
+    .feed_data(&mut package, &mut Cursor::new(xml.clone()))
+    .unwrap();
+  let relationship_id = main_part
+    .get_id_of_part(&package, custom_xml)
+    .unwrap()
+    .to_string();
+
+  assert!(relationship_id.starts_with("rId"));
+  assert_eq!(
+    main_part.relationships(&package).unwrap().len(),
+    relationship_count + 1
+  );
+  assert_eq!(custom_xml.content_type(&package), Some("application/xml"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_custom_xml = reopened_main
+    .get_part_by_id(&reopened, relationship_id.as_str())
+    .and_then(PartRef::downcast::<CustomXmlPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_custom_xml.content_type(&reopened),
+    Some("application/xml")
+  );
+  assert_eq!(reopened_custom_xml.data(&reopened), Some(xml.as_slice()));
+}
+
+#[test]
+fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
+  // Source: upstream AddCustomXmlPart(contentType, id) supported relationship overload.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkCustomXml";
+  let inkml = b"<ink xmlns=\"http://www.w3.org/2003/InkML\"/>".to_vec();
+
+  let custom_xml = main_part
+    .add_custom_xml_part_with_id(&mut package, "application/inkml+xml", relationship_id)
+    .unwrap();
+  custom_xml.set_data(&mut package, inkml.clone()).unwrap();
+
+  assert_eq!(
+    main_part.get_id_of_part(&package, custom_xml),
+    Some(relationship_id)
+  );
+  assert_eq!(
+    custom_xml.content_type(&package),
+    Some("application/inkml+xml")
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_custom_xml = reopened_main
+    .get_part_by_id(&reopened, relationship_id)
+    .and_then(PartRef::downcast::<CustomXmlPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_custom_xml.content_type(&reopened),
+    Some("application/inkml+xml")
+  );
+  assert_eq!(reopened_custom_xml.data(&reopened), Some(inkml.as_slice()));
 }
 
 #[test]

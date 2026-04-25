@@ -653,6 +653,20 @@ fn package_relationship_method_tokens(
       crate::sdk::SdkPackage::delete_parts(self, parts)
     }
 
+    #[inline]
+    pub fn delete_parts_of_type<T: crate::sdk::SdkPartHandle + 'static>(
+      &mut self,
+    ) -> Result<(), crate::common::SdkError> {
+      crate::sdk::SdkPackage::delete_parts_of_type::<T>(self)
+    }
+
+    #[inline]
+    pub fn delete_parts_recursively_of_type<T: crate::sdk::SdkPartHandle + 'static>(
+      &mut self,
+    ) -> Result<(), crate::common::SdkError> {
+      crate::sdk::SdkPackage::delete_parts_recursively_of_type::<T>(self)
+    }
+
     #( #accessors )*
   }
 }

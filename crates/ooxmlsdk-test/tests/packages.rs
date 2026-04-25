@@ -1589,6 +1589,117 @@ fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
 }
 
 #[test]
+fn delete_parts_of_type_only_removes_direct_children() {
+  // Source: upstream OpenXmlPartContainer.DeletePartsOfType<T>() direct-child semantics.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let direct_image = main_part
+    .add_image_part_with_id(&mut package, "image/png", "rIdDirectImage")
+    .unwrap();
+  direct_image
+    .set_data(&mut package, b"direct".to_vec())
+    .unwrap();
+  let extended = main_part
+    .add_extended_part_with_id(
+      &mut package,
+      "http://temp",
+      "text/xml",
+      ".xml",
+      "rIdExtended",
+    )
+    .unwrap();
+  let nested_image = extended
+    .add_image_part_with_id(&mut package, "image/png", "rIdNestedImage")
+    .unwrap();
+  nested_image
+    .set_data(&mut package, b"nested".to_vec())
+    .unwrap();
+  let direct_image_path = direct_image.path(&package).unwrap().to_string();
+  let nested_image_path = nested_image.path(&package).unwrap().to_string();
+
+  main_part
+    .delete_parts_of_type::<_, ImagePart>(&mut package)
+    .unwrap();
+
+  assert!(
+    main_part
+      .get_part_by_id(&package, "rIdDirectImage")
+      .is_none()
+  );
+  assert!(package.storage().part(direct_image.part_id()).is_none());
+  assert!(
+    extended
+      .get_part_by_id(&package, "rIdNestedImage")
+      .and_then(PartRef::downcast::<ImagePart>)
+      .is_some()
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+  let bytes = buffer.into_inner();
+
+  assert!(!package_entry_exists(bytes.clone(), &direct_image_path));
+  assert!(package_entry_exists(bytes, &nested_image_path));
+}
+
+#[test]
+fn delete_parts_recursively_of_type_removes_descendant_matches() {
+  // Source: upstream OpenXmlPackage.DeletePartsRecursivelyOfType<T>() traversal semantics.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let direct_image = main_part
+    .add_image_part_with_id(&mut package, "image/png", "rIdDirectImage")
+    .unwrap();
+  let extended = main_part
+    .add_extended_part_with_id(
+      &mut package,
+      "http://temp",
+      "text/xml",
+      ".xml",
+      "rIdExtended",
+    )
+    .unwrap();
+  let nested_image = extended
+    .add_image_part_with_id(&mut package, "image/png", "rIdNestedImage")
+    .unwrap();
+  let direct_image_path = direct_image.path(&package).unwrap().to_string();
+  let nested_image_path = nested_image.path(&package).unwrap().to_string();
+
+  package
+    .delete_parts_recursively_of_type::<ImagePart>()
+    .unwrap();
+
+  assert!(
+    main_part
+      .get_part_by_id(&package, "rIdDirectImage")
+      .is_none()
+  );
+  assert!(
+    extended
+      .get_part_by_id(&package, "rIdNestedImage")
+      .is_none()
+  );
+  assert!(package.storage().part(direct_image.part_id()).is_none());
+  assert!(package.storage().part(nested_image.part_id()).is_none());
+  assert!(main_part.get_part_by_id(&package, "rIdExtended").is_some());
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+  let bytes = buffer.into_inner();
+
+  assert!(!package_entry_exists(bytes.clone(), &direct_image_path));
+  assert!(!package_entry_exists(bytes, &nested_image_path));
+}
+
+#[test]
 fn add_main_document_part_creates_fixed_main_part_path() {
   // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();

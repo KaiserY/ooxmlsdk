@@ -2049,6 +2049,36 @@ fn part_handle_child_methods_tokens(
         <Self as crate::sdk::SdkPartHandle>::delete_parts(self, package, parts)
       }
 
+      #[inline]
+      pub fn delete_parts_of_type<P, T>(
+        self,
+        package: &mut P,
+      ) -> Result<(), crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage,
+        T: crate::sdk::SdkPartHandle + 'static,
+      {
+        <Self as crate::sdk::SdkPartHandle>::delete_parts_of_type::<P, T>(
+          self,
+          package,
+        )
+      }
+
+      #[inline]
+      pub fn delete_parts_recursively_of_type<P, T>(
+        self,
+        package: &mut P,
+      ) -> Result<(), crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage,
+        T: crate::sdk::SdkPartHandle + 'static,
+      {
+        <Self as crate::sdk::SdkPartHandle>::delete_parts_recursively_of_type::<P, T>(
+          self,
+          package,
+        )
+      }
+
       #part_ref_from_relationship
 
       #( #accessors )*

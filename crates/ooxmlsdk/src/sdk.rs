@@ -117,6 +117,51 @@ impl<T> PartialEq for PartRoot<T> {
 }
 
 #[cfg(feature = "parts")]
+fn delete_parts_recursively_from_part_id<P, T>(
+  package: &mut P,
+  source_part_id: crate::common::PartId,
+) -> Result<(), crate::common::SdkError>
+where
+  P: SdkPackage + Sized,
+  T: SdkPartHandle + 'static,
+{
+  let relationship_ids: Vec<_> = package
+    .storage()
+    .relationships(source_part_id)
+    .into_iter()
+    .flat_map(|relationships| relationships.iter())
+    .filter_map(|relationship| {
+      let part_id = relationship.target_part_id()?;
+      let part = crate::parts::PartRef::from_part_id(package, part_id)?;
+      part
+        .downcast::<T>()
+        .is_some()
+        .then(|| relationship.id().to_string())
+    })
+    .collect();
+
+  for relationship_id in relationship_ids {
+    package
+      .storage_mut()
+      .delete_child_part(source_part_id, &relationship_id)?;
+  }
+
+  let child_part_ids: Vec<_> = package
+    .storage()
+    .relationships(source_part_id)
+    .into_iter()
+    .flat_map(crate::common::RelationshipSet::part_relationships)
+    .filter_map(crate::common::RelationshipInfo::target_part_id)
+    .collect();
+
+  for child_part_id in child_part_ids {
+    delete_parts_recursively_from_part_id::<P, T>(package, child_part_id)?;
+  }
+
+  Ok(())
+}
+
+#[cfg(feature = "parts")]
 impl PartDescriptor {
   pub const fn new(
     relationship_type: &'static str,
@@ -639,6 +684,36 @@ pub trait SdkPackage {
       .collect();
     for relationship_id in relationship_ids {
       self.delete_part_by_id(&relationship_id)?;
+    }
+    Ok(())
+  }
+
+  #[inline]
+  fn delete_parts_of_type<T: SdkPartHandle + 'static>(
+    &mut self,
+  ) -> Result<(), crate::common::SdkError>
+  where
+    Self: Sized,
+  {
+    let parts: Vec<_> = self.get_parts_of_type::<T>().collect();
+    self.delete_parts(parts)
+  }
+
+  #[inline]
+  fn delete_parts_recursively_of_type<T: SdkPartHandle + 'static>(
+    &mut self,
+  ) -> Result<(), crate::common::SdkError>
+  where
+    Self: Sized,
+  {
+    self.delete_parts_of_type::<T>()?;
+    let child_part_ids: Vec<_> = self
+      .relationships()
+      .part_relationships()
+      .filter_map(crate::common::RelationshipInfo::target_part_id)
+      .collect();
+    for child_part_id in child_part_ids {
+      delete_parts_recursively_from_part_id::<Self, T>(self, child_part_id)?;
     }
     Ok(())
   }
@@ -2114,6 +2189,38 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       .collect();
     for relationship_id in relationship_ids {
       self.delete_part_by_id(package, &relationship_id)?;
+    }
+    Ok(())
+  }
+
+  #[inline]
+  fn delete_parts_of_type<P, T>(self, package: &mut P) -> Result<(), crate::common::SdkError>
+  where
+    P: SdkPackage + Sized,
+    T: SdkPartHandle + 'static,
+  {
+    let parts: Vec<_> = self.get_parts_of_type::<P, T>(package).collect();
+    self.delete_parts::<P, T, _>(package, parts)
+  }
+
+  #[inline]
+  fn delete_parts_recursively_of_type<P, T>(
+    self,
+    package: &mut P,
+  ) -> Result<(), crate::common::SdkError>
+  where
+    P: SdkPackage + Sized,
+    T: SdkPartHandle + 'static,
+  {
+    self.delete_parts_of_type::<P, T>(package)?;
+    let child_part_ids: Vec<_> = self
+      .relationships(package)
+      .into_iter()
+      .flat_map(crate::common::RelationshipSet::part_relationships)
+      .filter_map(crate::common::RelationshipInfo::target_part_id)
+      .collect();
+    for child_part_id in child_part_ids {
+      delete_parts_recursively_from_part_id::<P, T>(package, child_part_id)?;
     }
     Ok(())
   }

@@ -172,6 +172,30 @@ pub trait SdkChoice: Sized {
 }
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AlternativeFormatImportPartType {
+  Html,
+  Xhtml,
+  Xml,
+  WordprocessingMl,
+}
+
+#[cfg(feature = "parts")]
+impl AlternativeFormatImportPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Html => "text/html",
+      Self::Xhtml => "application/xhtml+xml",
+      Self::Xml => "application/xml",
+      Self::WordprocessingMl => {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+      }
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
 pub trait SdkPackage {
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 
@@ -571,6 +595,78 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       package,
       relationship_id,
       content_type,
+    )
+  }
+
+  #[inline]
+  fn add_alternative_format_import_part<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<
+    crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<
+      P,
+      crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    >(package, content_type)
+  }
+
+  #[inline]
+  fn add_alternative_format_import_part_with_id<P>(
+    self,
+    package: &mut P,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<
+      P,
+      crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    >(package, relationship_id, content_type)
+  }
+
+  #[inline]
+  fn add_alternative_format_import_part_by_type<P>(
+    self,
+    package: &mut P,
+    part_type: AlternativeFormatImportPartType,
+  ) -> Result<
+    crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_alternative_format_import_part(package, part_type.content_type())
+  }
+
+  #[inline]
+  fn add_alternative_format_import_part_by_type_with_id<P>(
+    self,
+    package: &mut P,
+    part_type: AlternativeFormatImportPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<
+    crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    crate::common::SdkError,
+  >
+  where
+    P: SdkPackage + crate::parts::PartRootCache,
+  {
+    self.add_alternative_format_import_part_with_id(
+      package,
+      part_type.content_type(),
+      relationship_id,
     )
   }
 

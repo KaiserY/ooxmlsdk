@@ -4,10 +4,10 @@ use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{RelationshipSet, RelationshipTargetKind, StoredPartDataKind};
 use ooxmlsdk::parts::{
-  PartRef, PartRootCache, header_part::HeaderPart, image_part::ImagePart,
-  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
-  style_definitions_part::StyleDefinitionsPart,
+  PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
+  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
+  presentation_document::PresentationDocument, ribbon_extensibility_part::RibbonExtensibilityPart,
+  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -15,7 +15,7 @@ use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, Document, Header,
 };
-use ooxmlsdk::sdk::SdkPackage;
+use ooxmlsdk::sdk::{AlternativeFormatImportPartType, SdkPackage};
 use ooxmlsdk_test::fixtures;
 
 fn doc_sample(file_name: &str) -> std::path::PathBuf {
@@ -786,6 +786,101 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
 
   assert_eq!(reopened_image.content_type(&reopened), Some("image/jpeg"));
   assert_eq!(reopened_image.data(&reopened), Some(&b"jpeg bytes"[..]));
+}
+
+#[test]
+fn add_alternative_format_import_part_with_id_feeds_data_and_saves() {
+  // Source: upstream AddAlternativeFormatImportPart(type, id).GetStream(Create) coverage.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkAltChunk";
+  let html = b"<!doctype html><html><body>alt chunk</body></html>".to_vec();
+
+  let alt_chunk = main_part
+    .add_alternative_format_import_part_by_type_with_id(
+      &mut package,
+      AlternativeFormatImportPartType::Html,
+      relationship_id,
+    )
+    .unwrap();
+  alt_chunk
+    .feed_data(&mut package, &mut Cursor::new(html.clone()))
+    .unwrap();
+
+  assert_eq!(
+    main_part.get_id_of_part(&package, alt_chunk),
+    Some(relationship_id)
+  );
+  assert_eq!(alt_chunk.content_type(&package), Some("text/html"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_chunk = reopened_main
+    .get_part_by_id(&reopened, relationship_id)
+    .and_then(PartRef::downcast::<AlternativeFormatImportPart>)
+    .unwrap();
+
+  assert_eq!(reopened_chunk.content_type(&reopened), Some("text/html"));
+  assert_eq!(reopened_chunk.data(&reopened), Some(html.as_slice()));
+}
+
+#[test]
+fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
+  // Source: upstream AddAlternativeFormatImportPart(type) coverage.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_count = main_part.relationships(&package).unwrap().len();
+
+  let alt_chunk = main_part
+    .add_alternative_format_import_part_by_type(
+      &mut package,
+      AlternativeFormatImportPartType::Xhtml,
+    )
+    .unwrap();
+  alt_chunk
+    .set_data(
+      &mut package,
+      b"<html xmlns=\"http://www.w3.org/1999/xhtml\"/>".to_vec(),
+    )
+    .unwrap();
+  let relationship_id = main_part
+    .get_id_of_part(&package, alt_chunk)
+    .unwrap()
+    .to_string();
+
+  assert!(relationship_id.starts_with("rId"));
+  assert_eq!(
+    main_part.relationships(&package).unwrap().len(),
+    relationship_count + 1
+  );
+  assert_eq!(
+    alt_chunk.content_type(&package),
+    Some("application/xhtml+xml")
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_chunk = reopened_main
+    .get_part_by_id(&reopened, relationship_id.as_str())
+    .and_then(PartRef::downcast::<AlternativeFormatImportPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_chunk.content_type(&reopened),
+    Some("application/xhtml+xml")
+  );
+  assert_eq!(
+    reopened_chunk.data(&reopened),
+    Some(&b"<html xmlns=\"http://www.w3.org/1999/xhtml\"/>"[..])
+  );
 }
 
 #[test]

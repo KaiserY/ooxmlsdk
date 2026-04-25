@@ -1235,6 +1235,86 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_alternative_format_import_part<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<
+        crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_alternative_format_import_part(
+          self,
+          package,
+          content_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_alternative_format_import_part_with_id<P>(
+        self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<
+        crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_alternative_format_import_part_with_id(
+          self,
+          package,
+          content_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_alternative_format_import_part_by_type<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::AlternativeFormatImportPartType,
+      ) -> Result<
+        crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_alternative_format_import_part_by_type(
+          self,
+          package,
+          part_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_alternative_format_import_part_by_type_with_id<P>(
+        self,
+        package: &mut P,
+        part_type: crate::sdk::AlternativeFormatImportPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<
+        crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+        crate::common::SdkError,
+      >
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_alternative_format_import_part_by_type_with_id(
+          self,
+          package,
+          part_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn remove_relationship<P: crate::sdk::SdkPackage>(
         self,
         package: &mut P,

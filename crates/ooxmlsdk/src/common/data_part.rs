@@ -51,6 +51,18 @@ impl MediaDataPart {
   }
 
   #[inline]
+  pub fn data_part_reference_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
+    self.id.into_iter().flat_map(move |part_id| {
+      package
+        .storage()
+        .data_part_reference_relationships_to(part_id)
+    })
+  }
+
+  #[inline]
   pub fn set_data<P: crate::sdk::SdkPackage>(
     &self,
     package: &mut P,

@@ -281,6 +281,166 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
 }
 
 #[test]
+fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
+  //   LoadPackageWithMediaReferenceTest
+  let mut package =
+    PresentationDocument::new_from_file_lazy(doc_sample("mediareference.pptx")).unwrap();
+  let media_data_parts: Vec<_> = package.media_data_parts().collect();
+  assert_eq!(media_data_parts.len(), 1);
+  let media_data_part = media_data_parts[0].clone();
+  assert_eq!(media_data_part.content_type(&package), Some("audio/wav"));
+  assert_eq!(
+    media_data_part
+      .data_part_reference_relationships(&package)
+      .count(),
+    3
+  );
+
+  let presentation_part = package.presentation_part().unwrap();
+  let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
+  let slide1 = slides[0];
+  let slide2 = slides[1];
+
+  let slide1_relationships: Vec<_> = slide1.data_part_reference_relationships(&package).collect();
+  let slide1_media_relationships: Vec<_> = slide1_relationships
+    .iter()
+    .copied()
+    .filter(|relationship| relationship.target_part_id() == media_data_part.part_id())
+    .collect();
+  assert_eq!(slide1_media_relationships.len(), 1);
+  assert_eq!(
+    slide1_media_relationships[0].relationship_type(),
+    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+  );
+  let old_slide1_reference_id = slide1_media_relationships[0].id().to_string();
+
+  assert_eq!(
+    slide2.data_part_reference_relationships(&package).count(),
+    2
+  );
+
+  let new_reference_id = slide1
+    .add_audio_reference_relationship(&mut package, &media_data_part)
+    .unwrap();
+  let slide1_relationships: Vec<_> = slide1.data_part_reference_relationships(&package).collect();
+  let slide1_media_relationships: Vec<_> = slide1_relationships
+    .iter()
+    .copied()
+    .filter(|relationship| relationship.target_part_id() == media_data_part.part_id())
+    .collect();
+  assert_eq!(slide1_media_relationships.len(), 2);
+  let new_reference = slide1_relationships
+    .iter()
+    .find(|relationship| relationship.id() == new_reference_id)
+    .unwrap();
+  assert_eq!(
+    new_reference.relationship_type(),
+    RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(new_reference.target_part_id(), media_data_part.part_id());
+
+  let removed = slide1
+    .remove_relationship(&mut package, &old_slide1_reference_id)
+    .unwrap();
+  assert_eq!(removed.id(), old_slide1_reference_id);
+  assert_eq!(
+    slide1
+      .data_part_reference_relationships(&package)
+      .filter(|relationship| relationship.target_part_id() == media_data_part.part_id())
+      .count(),
+    1
+  );
+
+  let slide2_reference_id = slide2
+    .data_part_reference_relationships(&package)
+    .find(|relationship| relationship.target_part_id() == media_data_part.part_id())
+    .unwrap()
+    .id()
+    .to_string();
+  let removed = slide2
+    .remove_relationship(&mut package, &slide2_reference_id)
+    .unwrap();
+  assert_eq!(removed.id(), slide2_reference_id);
+  assert_eq!(
+    slide2.data_part_reference_relationships(&package).count(),
+    1
+  );
+  assert_eq!(
+    media_data_part
+      .data_part_reference_relationships(&package)
+      .count(),
+    2
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let mut reopened = PresentationDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_media_data_parts: Vec<_> = reopened.media_data_parts().collect();
+  assert_eq!(reopened_media_data_parts.len(), 1);
+  let reopened_media_data_part = reopened_media_data_parts[0].clone();
+  assert_eq!(
+    reopened_media_data_part.content_type(&reopened),
+    Some("audio/wav")
+  );
+  assert_eq!(
+    reopened_media_data_part
+      .data_part_reference_relationships(&reopened)
+      .count(),
+    2
+  );
+
+  let reopened_presentation_part = reopened.presentation_part().unwrap();
+  let reopened_slides: Vec<_> = reopened_presentation_part.slide_parts(&reopened).collect();
+  let reopened_slide1 = reopened_slides[0];
+  let reopened_slide2 = reopened_slides[1];
+  let reopened_slide1_relationships: Vec<_> = reopened_slide1
+    .data_part_reference_relationships(&reopened)
+    .filter(|relationship| relationship.target_part_id() == reopened_media_data_part.part_id())
+    .collect();
+  assert_eq!(reopened_slide1_relationships.len(), 1);
+  assert_eq!(
+    reopened_slide1_relationships[0].relationship_type(),
+    RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+  );
+  assert_eq!(
+    reopened_slide1_relationships[0].target_part_id(),
+    reopened_media_data_part.part_id()
+  );
+  assert_eq!(
+    reopened_slide2
+      .data_part_reference_relationships(&reopened)
+      .filter(|relationship| relationship.target_part_id() == reopened_media_data_part.part_id())
+      .count(),
+    1
+  );
+
+  let reopened_slide1_reference_id = reopened_slide1_relationships[0].id().to_string();
+  reopened_slide1
+    .remove_relationship(&mut reopened, &reopened_slide1_reference_id)
+    .unwrap();
+  let reopened_slide2_reference_id = reopened_slide2
+    .data_part_reference_relationships(&reopened)
+    .find(|relationship| relationship.target_part_id() == reopened_media_data_part.part_id())
+    .unwrap()
+    .id()
+    .to_string();
+  reopened_slide2
+    .remove_relationship(&mut reopened, &reopened_slide2_reference_id)
+    .unwrap();
+
+  let remaining_media_data_parts: Vec<_> = reopened.media_data_parts().collect();
+  assert_eq!(remaining_media_data_parts.len(), 1);
+  assert_eq!(
+    remaining_media_data_parts[0]
+      .data_part_reference_relationships(&reopened)
+      .count(),
+    0
+  );
+}
+
+#[test]
 fn media_data_part_type_maps_upstream_content_types_and_extensions() {
   // Source: src/DocumentFormat.OpenXml.Framework/Packaging/MediaDataPartTypeInfo.cs
   let cases = [

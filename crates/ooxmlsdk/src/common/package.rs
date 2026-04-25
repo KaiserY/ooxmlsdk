@@ -595,6 +595,16 @@ impl SdkPackageStorage {
   }
 
   #[inline]
+  pub fn media_data_parts(&self) -> impl Iterator<Item = (PartId, &StoredPart)> {
+    self
+      .parts
+      .iter()
+      .enumerate()
+      .filter(|(_, part)| !part.is_deleted() && is_media_data_part(part))
+      .map(|(index, part)| (PartId::from_index(index), part))
+  }
+
+  #[inline]
   pub fn relationships(&self, part_id: PartId) -> Option<&RelationshipSet> {
     self.part(part_id).map(StoredPart::relationships)
   }
@@ -801,6 +811,23 @@ impl SdkPackageStorage {
         target_part_id,
       )?;
     Ok(relationship_id)
+  }
+
+  #[inline]
+  pub fn data_part_reference_relationships_to(
+    &self,
+    target_part_id: PartId,
+  ) -> impl Iterator<Item = &RelationshipInfo> {
+    std::iter::once(self.package_relationships())
+      .chain(
+        self
+          .parts
+          .iter()
+          .filter(|part| !part.is_deleted())
+          .map(StoredPart::relationships),
+      )
+      .flat_map(RelationshipSet::data_part_reference_relationships)
+      .filter(move |relationship| relationship.target_part_id() == Some(target_part_id))
   }
 
   pub fn add_child_part(
@@ -1251,6 +1278,22 @@ fn is_data_part_reference_relationship_type(relationship_type: &str) -> bool {
       | "http://schemas.microsoft.com/office/2007/relationships/media"
       | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video"
   )
+}
+
+fn is_media_data_part(part: &StoredPart) -> bool {
+  part
+    .relationship_type()
+    .is_some_and(is_data_part_reference_relationship_type)
+    || media_data_part_content_type(part.content_type())
+    || part
+      .path()
+      .rsplit('/')
+      .next()
+      .is_some_and(|file_name| file_name.starts_with("media"))
+}
+
+fn media_data_part_content_type(content_type: &str) -> bool {
+  content_type.starts_with("audio/") || content_type.starts_with("video/")
 }
 
 fn read_content_types<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> Result<Types, SdkError> {

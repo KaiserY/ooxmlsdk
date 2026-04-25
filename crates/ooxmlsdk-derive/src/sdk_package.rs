@@ -305,6 +305,11 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn media_data_parts(&self) -> impl Iterator<Item = crate::common::MediaDataPart> + '_ {
+        crate::sdk::SdkPackage::media_data_parts(self)
+      }
+
+      #[inline]
       pub fn relationships_by_type(
         &self,
         relationship_type: &str,

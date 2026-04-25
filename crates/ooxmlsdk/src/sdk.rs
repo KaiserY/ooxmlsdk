@@ -673,6 +673,14 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn media_data_parts(&self) -> impl Iterator<Item = crate::common::MediaDataPart> + '_ {
+    self
+      .storage()
+      .media_data_parts()
+      .map(|(part_id, part)| crate::common::MediaDataPart::from_part_id(part_id, part.path()))
+  }
+
+  #[inline]
   fn relationships_by_type(
     &self,
     relationship_type: &str,

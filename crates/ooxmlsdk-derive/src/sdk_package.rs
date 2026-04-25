@@ -333,6 +333,87 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         crate::sdk::SdkPackage::add_new_part_auto_id(self)
       }
 
+      #[inline]
+      pub fn add_new_part_with_content_type<T: crate::sdk::SdkPartHandle>(
+        &mut self,
+        relationship_id: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_new_part_with_content_type(
+          self,
+          relationship_id,
+          content_type,
+        )
+      }
+
+      #[inline]
+      pub fn add_new_part_with_content_type_auto_id<T: crate::sdk::SdkPartHandle>(
+        &mut self,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_new_part_with_content_type_auto_id(self, content_type)
+      }
+
+      #[inline]
+      pub fn add_thumbnail_part(
+        &mut self,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_thumbnail_part(self, content_type)
+      }
+
+      #[inline]
+      pub fn add_thumbnail_part_with_id(
+        &mut self,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_thumbnail_part_with_id(
+          self,
+          content_type,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn add_thumbnail_part_by_type(
+        &mut self,
+        part_type: crate::sdk::ThumbnailPartType,
+      ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_thumbnail_part_by_type(self, part_type)
+      }
+
+      #[inline]
+      pub fn add_thumbnail_part_by_type_with_id(
+        &mut self,
+        part_type: crate::sdk::ThumbnailPartType,
+        relationship_id: impl Into<String>,
+      ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_thumbnail_part_by_type_with_id(
+          self,
+          part_type,
+          relationship_id,
+        )
+      }
+
       pub fn save<W: std::io::Write + std::io::Seek>(
         &self,
         writer: W,

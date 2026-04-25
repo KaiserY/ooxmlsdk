@@ -8,7 +8,7 @@ use ooxmlsdk::parts::{
   custom_xml_part::CustomXmlPart, header_part::HeaderPart, image_part::ImagePart,
   main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
   ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
-  style_definitions_part::StyleDefinitionsPart,
+  style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -16,7 +16,9 @@ use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, Document, Header,
 };
-use ooxmlsdk::sdk::{AlternativeFormatImportPartType, CustomXmlPartType, SdkPackage};
+use ooxmlsdk::sdk::{
+  AlternativeFormatImportPartType, CustomXmlPartType, SdkPackage, ThumbnailPartType,
+};
 use ooxmlsdk_test::fixtures;
 
 fn doc_sample(file_name: &str) -> std::path::PathBuf {
@@ -966,6 +968,82 @@ fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
     Some("application/inkml+xml")
   );
   assert_eq!(reopened_custom_xml.data(&reopened), Some(inkml.as_slice()));
+}
+
+#[test]
+fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
+  // Source: upstream AddThumbnailPart(ThumbnailPartType.Jpeg) package coverage.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let relationship_count = package.relationships().len();
+  let jpeg = b"thumbnail jpeg bytes".to_vec();
+
+  let thumbnail = package
+    .add_thumbnail_part_by_type(ThumbnailPartType::Jpeg)
+    .unwrap();
+  thumbnail
+    .feed_data(&mut package, &mut Cursor::new(jpeg.clone()))
+    .unwrap();
+  let relationship_id = package.get_id_of_part(thumbnail).unwrap().to_string();
+  let thumbnail_path = package
+    .storage()
+    .part(thumbnail.part_id())
+    .unwrap()
+    .path()
+    .to_string();
+
+  assert!(relationship_id.starts_with("rId"));
+  assert_eq!(package.relationships().len(), relationship_count + 1);
+  assert_eq!(thumbnail.content_type(&package), Some("image/jpeg"));
+  assert!(thumbnail_path.starts_with("docProps/thumbnail"));
+  assert!(thumbnail_path.ends_with(".jpg"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_thumbnail = reopened
+    .get_part_by_id(relationship_id.as_str())
+    .and_then(PartRef::downcast::<ThumbnailPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_thumbnail.content_type(&reopened),
+    Some("image/jpeg")
+  );
+  assert_eq!(reopened_thumbnail.data(&reopened), Some(jpeg.as_slice()));
+}
+
+#[test]
+fn add_thumbnail_part_with_id_uses_content_type_and_relationship_id() {
+  // Source: upstream AddThumbnailPart(contentType) package coverage.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let relationship_id = "rIdSdkThumbnail";
+  let jpeg = b"thumbnail jpg bytes".to_vec();
+
+  let thumbnail = package
+    .add_thumbnail_part_with_id("image/jpg", relationship_id)
+    .unwrap();
+  thumbnail.set_data(&mut package, jpeg.clone()).unwrap();
+
+  assert_eq!(package.get_id_of_part(thumbnail), Some(relationship_id));
+  assert_eq!(thumbnail.content_type(&package), Some("image/jpg"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_thumbnail = reopened
+    .get_part_by_id(relationship_id)
+    .and_then(PartRef::downcast::<ThumbnailPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_thumbnail.content_type(&reopened),
+    Some("image/jpg")
+  );
+  assert_eq!(reopened_thumbnail.data(&reopened), Some(jpeg.as_slice()));
 }
 
 #[test]

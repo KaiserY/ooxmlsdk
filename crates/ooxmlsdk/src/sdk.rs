@@ -218,6 +218,35 @@ impl CustomXmlPartType {
 }
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ThumbnailPartType {
+  Jpeg,
+  Emf,
+  Wmf,
+}
+
+#[cfg(feature = "parts")]
+impl ThumbnailPartType {
+  #[inline]
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Jpeg => "image/jpeg",
+      Self::Emf => "image/x-emf",
+      Self::Wmf => "image/x-wmf",
+    }
+  }
+
+  #[inline]
+  pub const fn extension(self) -> &'static str {
+    match self {
+      Self::Jpeg => ".jpg",
+      Self::Emf => ".emf",
+      Self::Wmf => ".wmf",
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
 pub trait SdkPackage {
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 
@@ -384,6 +413,37 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn add_new_part_with_content_type<T>(
+    &mut self,
+    relationship_id: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    self.add_new_part_with_content_type_and_extension::<T>(
+      relationship_id,
+      content_type,
+      T::EXTENSION,
+      crate::common::NewPartTargetMode::Indexed,
+    )
+  }
+
+  #[inline]
+  fn add_new_part_with_content_type_auto_id<T>(
+    &mut self,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_new_part_with_content_type::<T>(relationship_id, content_type)
+  }
+
+  #[inline]
   fn add_new_part_with_target_mode<T>(
     &mut self,
     relationship_id: impl Into<String>,
@@ -406,6 +466,91 @@ pub trait SdkPackage {
     )?;
     self.push_root_element_slot();
     Ok(T::from_part_id(part_id))
+  }
+
+  #[inline]
+  fn add_new_part_with_content_type_and_extension<T>(
+    &mut self,
+    relationship_id: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    extension: &'static str,
+    target_mode: crate::common::NewPartTargetMode,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+    T: SdkPartHandle,
+  {
+    let part_id = self.storage_mut().add_package_part(
+      relationship_id,
+      crate::common::NewPartDescriptor {
+        relationship_type: T::RELATIONSHIP_TYPE,
+        content_type: content_type.into(),
+        path_prefix: T::PATH_PREFIX,
+        target_name: T::TARGET_NAME,
+        extension,
+      },
+      target_mode,
+    )?;
+    self.push_root_element_slot();
+    Ok(T::from_part_id(part_id))
+  }
+
+  #[inline]
+  fn add_thumbnail_part(
+    &mut self,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+  ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type_auto_id::<crate::parts::thumbnail_part::ThumbnailPart>(
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_thumbnail_part_with_id(
+    &mut self,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    self.add_new_part_with_content_type::<crate::parts::thumbnail_part::ThumbnailPart>(
+      relationship_id,
+      content_type,
+    )
+  }
+
+  #[inline]
+  fn add_thumbnail_part_by_type(
+    &mut self,
+    part_type: ThumbnailPartType,
+  ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_thumbnail_part_by_type_with_id(part_type, relationship_id)
+  }
+
+  #[inline]
+  fn add_thumbnail_part_by_type_with_id(
+    &mut self,
+    part_type: ThumbnailPartType,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::thumbnail_part::ThumbnailPart, crate::common::SdkError>
+  where
+    Self: crate::parts::PartRootCache,
+  {
+    self
+      .add_new_part_with_content_type_and_extension::<crate::parts::thumbnail_part::ThumbnailPart>(
+        relationship_id,
+        part_type.content_type(),
+        part_type.extension(),
+        crate::common::NewPartTargetMode::Indexed,
+      )
   }
 }
 

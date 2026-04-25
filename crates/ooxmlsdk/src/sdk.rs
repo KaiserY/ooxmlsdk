@@ -615,6 +615,35 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn delete_part_by_id(&mut self, relationship_id: &str) -> Result<bool, crate::common::SdkError> {
+    self.storage_mut().delete_package_part(relationship_id)
+  }
+
+  #[inline]
+  fn delete_part<T: SdkPartHandle>(&mut self, part: T) -> Result<bool, crate::common::SdkError> {
+    let Some(relationship_id) = self.get_id_of_part(part).map(str::to_string) else {
+      return Ok(false);
+    };
+    self.delete_part_by_id(&relationship_id)
+  }
+
+  #[inline]
+  fn delete_parts<T, I>(&mut self, parts: I) -> Result<(), crate::common::SdkError>
+  where
+    T: SdkPartHandle,
+    I: IntoIterator<Item = T>,
+  {
+    let relationship_ids: Vec<_> = parts
+      .into_iter()
+      .filter_map(|part| self.get_id_of_part(part).map(str::to_string))
+      .collect();
+    for relationship_id in relationship_ids {
+      self.delete_part_by_id(&relationship_id)?;
+    }
+    Ok(())
+  }
+
+  #[inline]
   fn add_new_part<T>(
     &mut self,
     relationship_id: impl Into<String>,
@@ -2047,6 +2076,46 @@ pub trait SdkPartHandle: Copy + Sized + 'static {
       .find_map(|relationship| {
         (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
       })
+  }
+
+  #[inline]
+  fn delete_part_by_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: &str,
+  ) -> Result<bool, crate::common::SdkError> {
+    package
+      .storage_mut()
+      .delete_child_part(self.part_id(), relationship_id)
+  }
+
+  #[inline]
+  fn delete_part<P: SdkPackage, T: SdkPartHandle>(
+    self,
+    package: &mut P,
+    part: T,
+  ) -> Result<bool, crate::common::SdkError> {
+    let Some(relationship_id) = self.get_id_of_part(package, part).map(str::to_string) else {
+      return Ok(false);
+    };
+    self.delete_part_by_id(package, &relationship_id)
+  }
+
+  #[inline]
+  fn delete_parts<P, T, I>(self, package: &mut P, parts: I) -> Result<(), crate::common::SdkError>
+  where
+    P: SdkPackage,
+    T: SdkPartHandle,
+    I: IntoIterator<Item = T>,
+  {
+    let relationship_ids: Vec<_> = parts
+      .into_iter()
+      .filter_map(|part| self.get_id_of_part(package, part).map(str::to_string))
+      .collect();
+    for relationship_id in relationship_ids {
+      self.delete_part_by_id(package, &relationship_id)?;
+    }
+    Ok(())
   }
 }
 

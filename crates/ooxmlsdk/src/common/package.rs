@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 
 use crate::schemas::opc_content_types::{Types, TypesChoice};
@@ -436,9 +436,15 @@ pub struct StoredPart {
   relationship_type: Option<Box<str>>,
   relationships: RelationshipSet,
   data: StoredPartData,
+  deleted: bool,
 }
 
 impl StoredPart {
+  #[inline]
+  pub fn is_deleted(&self) -> bool {
+    self.deleted
+  }
+
   #[inline]
   pub fn path(&self) -> &str {
     &self.path
@@ -523,6 +529,7 @@ impl SdkPackageStorage {
           kind: raw_part.data_kind,
           bytes: raw_part.bytes,
         },
+        deleted: false,
       });
     }
 
@@ -562,12 +569,18 @@ impl SdkPackageStorage {
 
   #[inline]
   pub fn part(&self, part_id: PartId) -> Option<&StoredPart> {
-    self.parts.get(part_id.index())
+    self
+      .parts
+      .get(part_id.index())
+      .filter(|part| !part.is_deleted())
   }
 
   #[inline]
   pub fn part_mut(&mut self, part_id: PartId) -> Option<&mut StoredPart> {
-    self.parts.get_mut(part_id.index())
+    self
+      .parts
+      .get_mut(part_id.index())
+      .filter(|part| !part.is_deleted())
   }
 
   #[inline]
@@ -592,6 +605,43 @@ impl SdkPackageStorage {
       .relationships(source_part_id)?
       .get(relationship_id)?
       .target_part_id()
+  }
+
+  pub fn delete_package_part(&mut self, relationship_id: &str) -> Result<bool, SdkError> {
+    let Some(target_part_id) = self
+      .package_relationships
+      .get(relationship_id)
+      .and_then(RelationshipInfo::target_part_id)
+    else {
+      return Ok(false);
+    };
+
+    self.package_relationships.remove(relationship_id);
+    if !self.is_part_reachable(target_part_id) {
+      self.delete_unreachable_part_tree(target_part_id);
+    }
+    Ok(true)
+  }
+
+  pub fn delete_child_part(
+    &mut self,
+    source_part_id: PartId,
+    relationship_id: &str,
+  ) -> Result<bool, SdkError> {
+    let Some(target_part_id) = self.target_part_id(source_part_id, relationship_id) else {
+      return Ok(false);
+    };
+
+    let relationships = self.relationships_mut(source_part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "part id {source_part_id:?} is not present in package storage"
+      ))
+    })?;
+    relationships.remove(relationship_id);
+    if !self.is_part_reachable(target_part_id) {
+      self.delete_unreachable_part_tree(target_part_id);
+    }
+    Ok(true)
   }
 
   pub fn add_child_part(
@@ -720,6 +770,7 @@ impl SdkPackageStorage {
         kind: data_kind,
         bytes: Vec::new(),
       },
+      deleted: false,
     });
     self.by_path.insert(path.clone().into_boxed_str(), part_id);
     self.add_content_type_override(&path, content_type);
@@ -773,6 +824,66 @@ impl SdkPackageStorage {
           part_name,
         },
       )));
+  }
+
+  fn remove_content_type_override(&mut self, path: &str) {
+    let part_name = format!("/{path}");
+    self.content_types.xml_children.retain(|child| {
+      !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
+    });
+  }
+
+  fn is_part_reachable(&self, target_part_id: PartId) -> bool {
+    let mut visited = HashSet::new();
+    let mut stack: Vec<_> = self
+      .package_relationships
+      .part_relationships()
+      .filter_map(RelationshipInfo::target_part_id)
+      .collect();
+
+    while let Some(part_id) = stack.pop() {
+      if !visited.insert(part_id) {
+        continue;
+      }
+      let Some(part) = self.part(part_id) else {
+        continue;
+      };
+      if part_id == target_part_id {
+        return true;
+      }
+      stack.extend(
+        part
+          .relationships()
+          .part_relationships()
+          .filter_map(RelationshipInfo::target_part_id),
+      );
+    }
+
+    false
+  }
+
+  fn delete_unreachable_part_tree(&mut self, part_id: PartId) {
+    let Some(part) = self.part(part_id) else {
+      return;
+    };
+    let child_part_ids: Vec<_> = part
+      .relationships()
+      .part_relationships()
+      .filter_map(RelationshipInfo::target_part_id)
+      .collect();
+    let path = part.path().to_string();
+
+    if let Some(part) = self.parts.get_mut(part_id.index()) {
+      part.deleted = true;
+    }
+    self.by_path.remove(path.as_str());
+    self.remove_content_type_override(&path);
+
+    for child_part_id in child_part_ids {
+      if !self.is_part_reachable(child_part_id) {
+        self.delete_unreachable_part_tree(child_part_id);
+      }
+    }
   }
 
   fn next_child_part_path(

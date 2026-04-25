@@ -2013,6 +2013,42 @@ fn part_handle_child_methods_tokens(
         })
       }
 
+      #[inline]
+      pub fn delete_part_by_id<P: crate::sdk::SdkPackage>(
+        self,
+        package: &mut P,
+        relationship_id: &str,
+      ) -> Result<bool, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::delete_part_by_id(
+          self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn delete_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        self,
+        package: &mut P,
+        part: T,
+      ) -> Result<bool, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::delete_part(self, package, part)
+      }
+
+      #[inline]
+      pub fn delete_parts<P, T, I>(
+        self,
+        package: &mut P,
+        parts: I,
+      ) -> Result<(), crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage,
+        T: crate::sdk::SdkPartHandle,
+        I: IntoIterator<Item = T>,
+      {
+        <Self as crate::sdk::SdkPartHandle>::delete_parts(self, package, parts)
+      }
+
       #part_ref_from_relationship
 
       #( #accessors )*

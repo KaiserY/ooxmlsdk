@@ -6636,6 +6636,9 @@ where
     )?;
   }
   for (index, part) in storage.parts().iter().enumerate() {
+    if part.is_deleted() {
+      continue;
+    }
     let part_id = crate::common::PartId::from_index(index);
     let parent_path = crate::common::parent_zip_path(part.path());
     let directory_path = parent_path.strip_suffix('/').unwrap_or(&parent_path);

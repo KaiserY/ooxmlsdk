@@ -74,6 +74,11 @@ fn empty_package() -> Cursor<Vec<u8>> {
   buffer
 }
 
+fn package_entry_exists(bytes: Vec<u8>, path: &str) -> bool {
+  let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+  archive.by_name(path).is_ok()
+}
+
 #[test]
 fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
   let path = doc_sample("Of16-01.docx");
@@ -1473,6 +1478,114 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
     reopened_nested_extended.data(&reopened),
     Some(&b"nested extended"[..])
   );
+}
+
+#[test]
+fn delete_package_part_removes_relationship_part_and_content_type() {
+  // Source: upstream Docx/Xlsx/Pptx DeletePart(package part) coverage.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let thumbnail = package
+    .add_thumbnail_part_with_id("image/jpeg", "rIdSdkThumbnail")
+    .unwrap();
+  thumbnail
+    .set_data(&mut package, b"thumbnail".to_vec())
+    .unwrap();
+  let thumbnail_path = thumbnail.path(&package).unwrap().to_string();
+
+  assert!(package.delete_part(thumbnail).unwrap());
+  assert!(!package.delete_part_by_id("rIdSdkThumbnail").unwrap());
+  assert!(package.get_part_by_id("rIdSdkThumbnail").is_none());
+  assert!(package.storage().part(thumbnail.part_id()).is_none());
+  assert!(
+    !package
+      .storage()
+      .content_types()
+      .xml_children
+      .iter()
+      .any(|child| matches!(
+        child,
+        ooxmlsdk::schemas::opc_content_types::TypesChoice::Override(override_type)
+          if override_type.part_name == format!("/{thumbnail_path}")
+      ))
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+  let bytes = buffer.into_inner();
+
+  assert!(!package_entry_exists(bytes.clone(), &thumbnail_path));
+  assert!(!package_entry_exists(bytes, "_rels/.rels"));
+}
+
+#[test]
+fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
+  // Source: upstream OpenXmlPartContainer.DeletePart/DeleteParts and ExtendedPart child coverage.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let extended = main_part
+    .add_extended_part_with_id(&mut package, "http://temp", "text/xml", ".xml", "tempId")
+    .unwrap();
+  extended
+    .set_data(&mut package, b"<extended/>".to_vec())
+    .unwrap();
+  let nested = extended
+    .add_extended_part_with_id(
+      &mut package,
+      "http://temp/nested",
+      "text/xml",
+      ".xml",
+      "tempId2",
+    )
+    .unwrap();
+  nested
+    .set_data(&mut package, b"<nested/>".to_vec())
+    .unwrap();
+  let extended_path = extended.path(&package).unwrap().to_string();
+  let nested_path = nested.path(&package).unwrap().to_string();
+
+  assert!(extended.delete_part(&mut package, nested).unwrap());
+  assert!(!extended.delete_part_by_id(&mut package, "tempId2").unwrap());
+  assert!(extended.get_part_by_id(&package, "tempId2").is_none());
+  assert!(package.storage().part(nested.part_id()).is_none());
+
+  assert!(main_part.delete_part(&mut package, extended).unwrap());
+  assert!(main_part.get_part_by_id(&package, "tempId").is_none());
+  assert!(package.storage().part(extended.part_id()).is_none());
+
+  let image1 = main_part
+    .add_image_part_with_id(&mut package, "image/png", "rIdDeleteImage1")
+    .unwrap();
+  let image2 = main_part
+    .add_image_part_with_id(&mut package, "image/png", "rIdDeleteImage2")
+    .unwrap();
+  let image1_path = image1.path(&package).unwrap().to_string();
+  let image2_path = image2.path(&package).unwrap().to_string();
+  main_part
+    .delete_parts::<_, ImagePart, _>(&mut package, [image1, image2])
+    .unwrap();
+  assert!(
+    main_part
+      .get_part_by_id(&package, "rIdDeleteImage1")
+      .is_none()
+  );
+  assert!(
+    main_part
+      .get_part_by_id(&package, "rIdDeleteImage2")
+      .is_none()
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+  let bytes = buffer.into_inner();
+
+  assert!(!package_entry_exists(bytes.clone(), &nested_path));
+  assert!(!package_entry_exists(bytes.clone(), &extended_path));
+  assert!(!package_entry_exists(bytes.clone(), &image1_path));
+  assert!(!package_entry_exists(bytes, &image2_path));
 }
 
 #[test]

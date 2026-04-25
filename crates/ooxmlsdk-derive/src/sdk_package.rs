@@ -628,6 +628,31 @@ fn package_relationship_method_tokens(
       crate::sdk::SdkPackage::get_id_of_part(self, part)
     }
 
+    #[inline]
+    pub fn delete_part_by_id(
+      &mut self,
+      relationship_id: &str,
+    ) -> Result<bool, crate::common::SdkError> {
+      crate::sdk::SdkPackage::delete_part_by_id(self, relationship_id)
+    }
+
+    #[inline]
+    pub fn delete_part<T: crate::sdk::SdkPartHandle>(
+      &mut self,
+      part: T,
+    ) -> Result<bool, crate::common::SdkError> {
+      crate::sdk::SdkPackage::delete_part(self, part)
+    }
+
+    #[inline]
+    pub fn delete_parts<T, I>(&mut self, parts: I) -> Result<(), crate::common::SdkError>
+    where
+      T: crate::sdk::SdkPartHandle,
+      I: IntoIterator<Item = T>,
+    {
+      crate::sdk::SdkPackage::delete_parts(self, parts)
+    }
+
     #( #accessors )*
   }
 }

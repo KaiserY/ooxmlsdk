@@ -480,21 +480,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     }
   });
   let package_unordered_child_stmts = package_modeled_child_stmts.iter();
-  let package_collect_relationship_child_stmts = child_infos.iter().map(|child| {
-    let field_ident = &child.field_ident;
-    match child.kind {
-      PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
-        for part in &self.#field_ident {
-          crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, self, relationships)?;
-        }
-      },
-      PartChildKind::Required | PartChildKind::Optional => quote! {
-        if let Some(part) = self.#field_ident.as_deref() {
-          crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, self, relationships)?;
-        }
-      },
-    }
-  });
   let child_descriptors_assoc = package_child_descriptors_tokens(&child_infos);
   Ok(quote! {
     impl crate::sdk::SdkPackageInternal for #ident {
@@ -575,20 +560,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         self.fallback_parts = fallback_parts;
         self.relationship_order = relationship_order;
         self.modeled_relationships = modeled_relationships;
-      }
-
-      fn collect_modeled_part_relationships(
-        &self,
-        relationships: &mut std::collections::HashMap<
-          crate::common::PartId,
-          crate::common::RelationshipSet,
-        >,
-      ) -> Result<(), crate::common::SdkError> {
-        #( #package_collect_relationship_child_stmts )*
-        for part in &self.fallback_parts {
-          part.collect_modeled_part_relationships(self, relationships)?;
-        }
-        Ok(())
       }
 
     }

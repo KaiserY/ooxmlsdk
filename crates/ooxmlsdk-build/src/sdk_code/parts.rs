@@ -237,7 +237,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut part_ref_variants: Vec<TokenStream> = vec![];
   let mut part_ref_part_id_arms: Vec<TokenStream> = vec![];
   let mut part_ref_relationship_id_arms: Vec<TokenStream> = vec![];
-  let mut part_ref_collect_relationships_arms: Vec<TokenStream> = vec![];
   let mut part_ref_downcast_impls: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_branches: Vec<TokenStream> = vec![];
@@ -324,12 +323,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       #( #part_attrs )*
       PartRef::#struct_ident(part) => {
         <#part_ty as crate::sdk::SdkPartHandle>::relationship_id(part)
-      }
-    });
-    part_ref_collect_relationships_arms.push(quote! {
-      #( #part_attrs )*
-      PartRef::#struct_ident(part) => {
-        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, package, relationships)
       }
     });
     part_ref_downcast_impls.push(quote! {
@@ -465,22 +458,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           #( #part_ref_relationship_id_arms, )*
           PartRef::ExtendedPart(part) => {
             <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::relationship_id(part)
-          }
-        }
-      }
-
-      pub(crate) fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-        relationships: &mut std::collections::HashMap<
-          crate::common::PartId,
-          crate::common::RelationshipSet,
-        >,
-      ) -> Result<(), crate::common::SdkError> {
-        match self {
-          #( #part_ref_collect_relationships_arms, )*
-          PartRef::ExtendedPart(part) => {
-            crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, package, relationships)
           }
         }
       }

@@ -1603,17 +1603,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
     storage: &crate::common::SdkPackageStorage,
     part_id: crate::common::PartId,
   ) -> Self {
-    let mut visited = std::collections::HashSet::new();
-    Self::from_part_id_with_relationships_visited(storage, part_id, &mut visited)
-  }
-
-  fn from_part_id_with_relationships_visited(
-    storage: &crate::common::SdkPackageStorage,
-    part_id: crate::common::PartId,
-    visited: &mut std::collections::HashSet<crate::common::PartId>,
-  ) -> Self {
     let _ = storage;
-    let _ = visited;
     Self::from_part_id(part_id)
   }
 
@@ -1622,22 +1612,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
     relationship_id: impl Into<String>,
     part_id: crate::common::PartId,
   ) -> Self {
-    let mut visited = std::collections::HashSet::new();
-    Self::from_relationship_id_with_relationships_visited(
-      storage,
-      relationship_id,
-      part_id,
-      &mut visited,
-    )
-  }
-
-  fn from_relationship_id_with_relationships_visited(
-    storage: &crate::common::SdkPackageStorage,
-    relationship_id: impl Into<String>,
-    part_id: crate::common::PartId,
-    visited: &mut std::collections::HashSet<crate::common::PartId>,
-  ) -> Self {
-    let mut part = Self::from_part_id_with_relationships_visited(storage, part_id, visited);
+    let mut part = Self::from_part_id_with_relationships(storage, part_id);
     part.set_relationship_id(relationship_id.into());
     part
   }
@@ -3419,51 +3394,6 @@ pub(crate) trait SdkPartHandleInternal: Clone + Sized + 'static {
     Self: SdkPartHandle,
   {
     crate::sdk::SdkPackageInternal::storage_mut(package).relationships_mut(self.part_id())
-  }
-
-  #[inline]
-  fn modeled_relationships<P: SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Result<crate::common::RelationshipSet, crate::common::SdkError>
-  where
-    Self: SdkPartHandle,
-  {
-    <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)
-      .cloned()
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })
-  }
-
-  fn collect_modeled_part_relationships<P: SdkPackage>(
-    &self,
-    package: &P,
-    relationships: &mut std::collections::HashMap<
-      crate::common::PartId,
-      crate::common::RelationshipSet,
-    >,
-  ) -> Result<(), crate::common::SdkError>
-  where
-    Self: SdkPartHandle,
-  {
-    let Some(part) = crate::sdk::SdkPackageInternal::storage(package).part(self.part_id()) else {
-      return Ok(());
-    };
-    if part.is_deleted() {
-      return Ok(());
-    }
-    if relationships.contains_key(&self.part_id()) {
-      return Ok(());
-    }
-    relationships.insert(
-      self.part_id(),
-      <Self as crate::sdk::SdkPartHandleInternal>::modeled_relationships(self, package)?,
-    );
-    Ok(())
   }
 }
 

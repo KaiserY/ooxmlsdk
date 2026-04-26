@@ -264,18 +264,6 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
           storage: &crate::common::SdkPackageStorage,
           part_id: crate::common::PartId,
         ) -> Self {
-          let mut visited = std::collections::HashSet::new();
-          Self::from_part_id_with_relationships_visited(storage, part_id, &mut visited)
-        }
-
-        fn from_part_id_with_relationships_visited(
-          storage: &crate::common::SdkPackageStorage,
-          part_id: crate::common::PartId,
-          visited: &mut std::collections::HashSet<crate::common::PartId>,
-        ) -> Self {
-          if !visited.insert(part_id) {
-            return Self::from_part_id(part_id);
-          }
           let mut part = Self::from_part_id(part_id);
           if let Some(relationships) = storage.relationships(part_id) {
             for relationship in relationships.iter() {
@@ -311,22 +299,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
           relationship_id: impl Into<String>,
           part_id: crate::common::PartId,
         ) -> Self {
-          let mut visited = std::collections::HashSet::new();
-          Self::from_relationship_id_with_relationships_visited(
-            storage,
-            relationship_id,
-            part_id,
-            &mut visited,
-          )
-        }
-
-        fn from_relationship_id_with_relationships_visited(
-          storage: &crate::common::SdkPackageStorage,
-          relationship_id: impl Into<String>,
-          part_id: crate::common::PartId,
-          visited: &mut std::collections::HashSet<crate::common::PartId>,
-        ) -> Self {
-          let mut part = Self::from_part_id_with_relationships_visited(storage, part_id, visited);
+          let mut part = Self::from_part_id_with_relationships(storage, part_id);
           part.relationship_id = Some(relationship_id.into());
           part
         }
@@ -337,79 +310,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
 
       }
 
-      impl crate::sdk::SdkPartHandleInternal for ExtendedPart {
-        fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
-          &self,
-          package: &P,
-          relationships: &mut std::collections::HashMap<
-            crate::common::PartId,
-            crate::common::RelationshipSet,
-          >,
-        ) -> Result<(), crate::common::SdkError> {
-          let Some(part) = crate::sdk::SdkPackageInternal::storage(package).part(self.id) else {
-            return Ok(());
-          };
-          if part.is_deleted() {
-            return Ok(());
-          }
-          if relationships.contains_key(&self.id) {
-            return Ok(());
-          }
-          relationships.insert(
-            self.id,
-            <Self as crate::sdk::SdkPartHandleInternal>::modeled_relationships(self, package)?,
-          );
-          for part in &self.fallback_parts {
-            part.collect_modeled_part_relationships(package, relationships)?;
-          }
-          Ok(())
-        }
-
-        fn modeled_relationships<P: crate::sdk::SdkPackage>(
-          &self,
-          package: &P,
-        ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
-          let storage = crate::sdk::SdkPackageInternal::storage(package);
-          let mut relationships = crate::common::RelationshipSet::default();
-          if self.relationship_order.is_empty() {
-            for part in &self.fallback_parts {
-              crate::sdk::add_part_ref_to_relationship_set(
-                &mut relationships,
-                storage,
-                Some(self.id),
-                part,
-              )?;
-            }
-            for relationship in &self.modeled_relationships {
-              relationships.add_relationship_info(relationship.clone())?;
-            }
-            return Ok(relationships);
-          }
-
-          for entry in &self.relationship_order {
-            match entry {
-              crate::sdk::RelationshipModelEntry::Child { .. } => {}
-              crate::sdk::RelationshipModelEntry::Fallback(item_index) => {
-                if let Some(part) = self.fallback_parts.get(*item_index) {
-                  crate::sdk::add_part_ref_to_relationship_set(
-                    &mut relationships,
-                    storage,
-                    Some(self.id),
-                    part,
-                  )?;
-                }
-              }
-              crate::sdk::RelationshipModelEntry::Relationship(item_index) => {
-                if let Some(relationship) = self.modeled_relationships.get(*item_index) {
-                  relationships.add_relationship_info(relationship.clone())?;
-                }
-              }
-            }
-          }
-          Ok(relationships)
-        }
-
-      }
+      impl crate::sdk::SdkPartHandleInternal for ExtendedPart {}
     },
   )?;
 

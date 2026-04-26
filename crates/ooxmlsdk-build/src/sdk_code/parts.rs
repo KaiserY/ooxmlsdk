@@ -252,7 +252,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut part_ref_child_descriptor_arms: Vec<TokenStream> = vec![];
   let mut part_ref_modeled_relationships_arms: Vec<TokenStream> = vec![];
   let mut part_ref_collect_relationships_arms: Vec<TokenStream> = vec![];
-  let mut part_ref_downcast_arms: Vec<TokenStream> = vec![];
+  let mut part_ref_downcast_impls: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_branches: Vec<TokenStream> = vec![];
   let mut part_ref_from_part_id_groups: BTreeMap<String, Vec<TokenStream>> = BTreeMap::new();
@@ -356,11 +356,16 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
       }
     });
-    part_ref_downcast_arms.push(quote! {
+    part_ref_downcast_impls.push(quote! {
       #( #part_attrs )*
-      PartRef::#struct_ident(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
+      impl PartRefDowncast for #part_ty {
+        #[inline]
+        fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+          match part_ref {
+            PartRef::#struct_ident(part) => Some(part),
+            _ => None,
+          }
+        }
       }
     });
     let relationship_type_str = part.relationship_type.as_str();
@@ -453,6 +458,22 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       ExtendedPart(crate::parts::extended_part::ExtendedPart),
     }
 
+    pub trait PartRefDowncast: crate::sdk::SdkPartHandle {
+      fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self>;
+    }
+
+    #( #part_ref_downcast_impls )*
+
+    impl PartRefDowncast for crate::parts::extended_part::ExtendedPart {
+      #[inline]
+      fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+        match part_ref {
+          PartRef::ExtendedPart(part) => Some(part),
+          _ => None,
+        }
+      }
+    }
+
     impl PartRef {
       pub fn part_id(&self) -> crate::common::PartId {
         match self {
@@ -505,14 +526,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
       }
 
-      pub fn downcast<T: crate::sdk::SdkPartHandle + 'static>(self) -> Option<T> {
-        match &self {
-          #( #part_ref_downcast_arms, )*
-          PartRef::ExtendedPart(part) => {
-            let any: &dyn std::any::Any = part;
-            any.downcast_ref::<T>().cloned()
-          }
-        }
+      pub fn downcast<T: PartRefDowncast>(self) -> Option<T> {
+        T::downcast_from_part_ref(self)
       }
 
       pub fn from_part_id<P: crate::sdk::SdkPackage>(
@@ -939,7 +954,8 @@ mod tests {
     );
     assert!(rendered.contains("ExtendedPart (crate :: parts :: extended_part :: ExtendedPart)"));
     assert!(rendered.contains("PartRef :: ExtendedPart"));
-    assert!(rendered.contains("pub fn downcast < T : crate :: sdk :: SdkPartHandle"));
+    assert!(rendered.contains("pub trait PartRefDowncast"));
+    assert!(rendered.contains("pub fn downcast < T : PartRefDowncast"));
     assert!(rendered.contains("pub struct IdPartPair < 'a >"));
     assert!(rendered.contains("pub enum PartRootElement"));
     assert!(rendered.contains("pub trait PartRootCache"));

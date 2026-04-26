@@ -414,6 +414,1204 @@ pub enum PartRef {
     XmlSignaturePart(crate::parts::xml_signature_part::XmlSignaturePart),
     ExtendedPart(crate::parts::extended_part::ExtendedPart),
 }
+pub trait PartRefDowncast: crate::sdk::SdkPartHandle {
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self>;
+}
+impl PartRefDowncast for crate::parts::alternative_format_import_part::AlternativeFormatImportPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::AlternativeFormatImportPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::calculation_chain_part::CalculationChainPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CalculationChainPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::cell_metadata_part::CellMetadataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CellMetadataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::chart_color_style_part::ChartColorStylePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ChartColorStylePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::chart_drawing_part::ChartDrawingPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ChartDrawingPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::chart_part::ChartPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ChartPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::chart_style_part::ChartStylePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ChartStylePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::chartsheet_part::ChartsheetPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ChartsheetPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::comment_authors_part::CommentAuthorsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CommentAuthorsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::connections_part::ConnectionsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ConnectionsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::control_properties_part::ControlPropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ControlPropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::core_file_properties_part::CoreFilePropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CoreFilePropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::custom_data_part::CustomDataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomDataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::custom_data_properties_part::CustomDataPropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomDataPropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::custom_file_properties_part::CustomFilePropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomFilePropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::custom_property_part::CustomPropertyPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomPropertyPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomXmlMappingsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::custom_xml_part::CustomXmlPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomXmlPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomXmlPropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::customization_part::CustomizationPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::CustomizationPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::diagram_colors_part::DiagramColorsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DiagramColorsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::diagram_data_part::DiagramDataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DiagramDataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DiagramLayoutDefinitionPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DiagramPersistLayoutPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::diagram_style_part::DiagramStylePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DiagramStylePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::dialogsheet_part::DialogsheetPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DialogsheetPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DigitalSignatureOriginPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::document_settings_part::DocumentSettingsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DocumentSettingsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::document_tasks_part::DocumentTasksPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DocumentTasksPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::drawings_part::DrawingsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::DrawingsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast
+for crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart {
+    #[inline]
+    fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+        match part_ref {
+            PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => Some(part),
+            _ => None,
+        }
+    }
+}
+impl PartRefDowncast
+  for crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::EmbeddedControlPersistencePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::embedded_object_part::EmbeddedObjectPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::EmbeddedObjectPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::embedded_package_part::EmbeddedPackagePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::EmbeddedPackagePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::endnotes_part::EndnotesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::EndnotesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ExcelAttachedToolbarsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::extended_chart_part::ExtendedChartPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ExtendedChartPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ExtendedFilePropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::external_workbook_part::ExternalWorkbookPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ExternalWorkbookPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::feature_property_bags_part::FeaturePropertyBagsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::FeaturePropertyBagsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::font_part::FontPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::FontPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::font_table_part::FontTablePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::FontTablePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::footer_part::FooterPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::FooterPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::footnotes_part::FootnotesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::FootnotesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::glossary_document_part::GlossaryDocumentPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::GlossaryDocumentPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::handout_master_part::HandoutMasterPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::HandoutMasterPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::header_part::HeaderPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::HeaderPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::image_part::ImagePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ImagePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::international_macro_sheet_part::InternationalMacroSheetPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::InternationalMacroSheetPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::label_info_part::LabelInfoPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::LabelInfoPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::LegacyDiagramTextInfoPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::LegacyDiagramTextPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::macro_sheet_part::MacroSheetPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::MacroSheetPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::MailMergeRecipientDataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::main_document_part::MainDocumentPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::MainDocumentPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::Model3DReferenceRelationshipPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::named_sheet_views_part::NamedSheetViewsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::NamedSheetViewsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::notes_master_part::NotesMasterPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::NotesMasterPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::notes_slide_part::NotesSlidePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::NotesSlidePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::numbering_definitions_part::NumberingDefinitionsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::NumberingDefinitionsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast
+  for crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PivotTableCacheDefinitionPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PivotTableCacheRecordsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::pivot_table_part::PivotTablePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PivotTablePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::power_point_authors_part::PowerPointAuthorsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PowerPointAuthorsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::power_point_comment_part::PowerPointCommentPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PowerPointCommentPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::presentation_part::PresentationPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PresentationPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::presentation_properties_part::PresentationPropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::PresentationPropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::query_table_part::QueryTablePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::QueryTablePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast
+  for crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::QuickAccessToolbarCustomizationsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::rd_array_part::RdArrayPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdArrayPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::rd_rich_value_part::RdRichValuePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdRichValuePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdRichValueStructurePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::rd_rich_value_types_part::RdRichValueTypesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdRichValueTypesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdRichValueWebImagePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdSupportingPropertyBagPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RdSupportingPropertyBagStructurePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RibbonAndBackstageCustomizationsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RibbonExtensibilityPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::rich_styles_part::RichStylesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::RichStylesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::shared_string_table_part::SharedStringTablePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SharedStringTablePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::single_cell_table_part::SingleCellTablePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SingleCellTablePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::slicer_cache_part::SlicerCachePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlicerCachePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::slicers_part::SlicersPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlicersPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::slide_comments_part::SlideCommentsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlideCommentsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::slide_layout_part::SlideLayoutPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlideLayoutPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::slide_master_part::SlideMasterPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlideMasterPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::slide_part::SlidePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlidePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::slide_sync_data_part::SlideSyncDataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SlideSyncDataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast
+  for crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::SpreadsheetPrinterSettingsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::style_definitions_part::StyleDefinitionsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::StyleDefinitionsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::styles_with_effects_part::StylesWithEffectsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::StylesWithEffectsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::table_definition_part::TableDefinitionPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::TableDefinitionPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::table_styles_part::TableStylesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::TableStylesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::theme_override_part::ThemeOverridePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ThemeOverridePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::theme_part::ThemePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ThemePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::thumbnail_part::ThumbnailPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ThumbnailPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::time_line_cache_part::TimeLineCachePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::TimeLineCachePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::time_line_part::TimeLinePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::TimeLinePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::user_defined_tags_part::UserDefinedTagsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::UserDefinedTagsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::vba_data_part::VbaDataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::VbaDataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::vba_project_part::VbaProjectPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::VbaProjectPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::view_properties_part::ViewPropertiesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ViewPropertiesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::vml_drawing_part::VmlDrawingPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::VmlDrawingPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::volatile_dependencies_part::VolatileDependenciesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::VolatileDependenciesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WebExTaskpanesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::web_extension_part::WebExtensionPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WebExtensionPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::web_settings_part::WebSettingsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WebSettingsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordAttachedToolbarsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordCommentsExtensiblePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordprocessingCommentsExPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordprocessingCommentsIdsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordprocessingCommentsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::wordprocessing_people_part::WordprocessingPeoplePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordprocessingPeoplePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast
+  for crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WordprocessingPrinterSettingsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::workbook_part::WorkbookPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorkbookPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast for crate::parts::workbook_person_part::WorkbookPersonPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorkbookPersonPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorkbookRevisionHeaderPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorkbookRevisionLogPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::workbook_styles_part::WorkbookStylesPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorkbookStylesPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::workbook_user_data_part::WorkbookUserDataPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorkbookUserDataPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::worksheet_comments_part::WorksheetCommentsPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorksheetCommentsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::worksheet_part::WorksheetPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorksheetPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::worksheet_sort_map_part::WorksheetSortMapPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorksheetSortMapPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+#[cfg(feature = "microsoft365")]
+impl PartRefDowncast
+  for crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart
+{
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::WorksheetThreadedCommentsPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::xml_signature_part::XmlSignaturePart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::XmlSignaturePart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
+impl PartRefDowncast for crate::parts::extended_part::ExtendedPart {
+  #[inline]
+  fn downcast_from_part_ref(part_ref: PartRef) -> Option<Self> {
+    match part_ref {
+      PartRef::ExtendedPart(part) => Some(part),
+      _ => None,
+    }
+  }
+}
 impl PartRef {
   pub fn part_id(&self) -> crate::common::PartId {
     match self {
@@ -2265,549 +3463,8 @@ impl PartRef {
       }
     }
   }
-  pub fn downcast<T: crate::sdk::SdkPartHandle + 'static>(self) -> Option<T> {
-    match &self {
-      PartRef::AlternativeFormatImportPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CalculationChainPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CellMetadataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::ChartColorStylePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ChartDrawingPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ChartPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::ChartStylePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ChartsheetPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CommentAuthorsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ConnectionsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::ControlPropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CoreFilePropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::CustomDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::CustomDataPropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CustomFilePropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CustomPropertyPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CustomXmlMappingsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CustomXmlPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CustomXmlPropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::CustomizationPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DiagramColorsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DiagramDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DiagramLayoutDefinitionPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::DiagramPersistLayoutPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DiagramStylePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DialogsheetPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DigitalSignatureOriginPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DocumentSettingsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::DocumentTasksPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::DrawingsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::EmbeddedControlPersistencePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::EmbeddedObjectPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::EmbeddedPackagePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::EndnotesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ExcelAttachedToolbarsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::ExtendedChartPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ExtendedFilePropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ExternalWorkbookPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::FeaturePropertyBagsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::FontPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::FontTablePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::FooterPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::FootnotesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::GlossaryDocumentPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::HandoutMasterPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::HeaderPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ImagePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::InternationalMacroSheetPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::LabelInfoPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::LegacyDiagramTextInfoPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::LegacyDiagramTextPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::MacroSheetPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::MailMergeRecipientDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::MainDocumentPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::Model3DReferenceRelationshipPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::NamedSheetViewsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::NotesMasterPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::NotesSlidePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::NumberingDefinitionsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::PivotTableCacheDefinitionPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::PivotTableCacheRecordsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::PivotTablePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::PowerPointAuthorsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::PowerPointCommentPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::PresentationPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::PresentationPropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::QueryTablePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::QuickAccessToolbarCustomizationsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdArrayPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValuePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValueStructurePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValueTypesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdRichValueWebImagePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdSupportingPropertyBagPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RdSupportingPropertyBagStructurePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RibbonAndBackstageCustomizationsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::RibbonExtensibilityPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::RichStylesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SharedStringTablePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SingleCellTablePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::SlicerCachePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::SlicersPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SlideCommentsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SlideLayoutPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SlideMasterPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SlidePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SlideSyncDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::SpreadsheetPrinterSettingsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::StyleDefinitionsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::StylesWithEffectsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::TableDefinitionPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::TableStylesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ThemeOverridePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ThemePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ThumbnailPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::TimeLineCachePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::TimeLinePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::UserDefinedTagsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::VbaDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::VbaProjectPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ViewPropertiesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::VmlDrawingPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::VolatileDependenciesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WebExTaskpanesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WebExtensionPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WebSettingsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WordAttachedToolbarsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WordCommentsExtensiblePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WordprocessingCommentsExPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WordprocessingCommentsIdsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WordprocessingCommentsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WordprocessingPeoplePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WordprocessingPrinterSettingsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorkbookPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WorkbookPersonPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorkbookRevisionHeaderPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorkbookRevisionLogPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorkbookStylesPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorkbookUserDataPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorksheetCommentsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorksheetPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::WorksheetSortMapPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      #[cfg(feature = "microsoft365")]
-      PartRef::WorksheetThreadedCommentsPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::XmlSignaturePart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-      PartRef::ExtendedPart(part) => {
-        let any: &dyn std::any::Any = part;
-        any.downcast_ref::<T>().cloned()
-      }
-    }
+  pub fn downcast<T: PartRefDowncast>(self) -> Option<T> {
+    T::downcast_from_part_ref(self)
   }
   pub fn from_part_id<P: crate::sdk::SdkPackage>(
     package: &P,

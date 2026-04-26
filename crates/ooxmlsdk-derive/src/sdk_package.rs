@@ -1221,14 +1221,14 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
-    pub fn get_parts_of_type<T: crate::sdk::SdkPartHandle + 'static>(
+    pub fn get_parts_of_type<T: crate::parts::PartRefDowncast>(
       &self,
     ) -> impl Iterator<Item = T> + '_ {
       crate::sdk::SdkPackage::get_parts_of_type(self)
     }
 
     #[inline]
-    pub fn get_sub_part_of_type<T: crate::sdk::SdkPartHandle + 'static>(&self) -> Option<T> {
+    pub fn get_sub_part_of_type<T: crate::parts::PartRefDowncast>(&self) -> Option<T> {
       crate::sdk::SdkPackage::get_sub_part_of_type(self)
     }
 
@@ -1280,14 +1280,14 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
-    pub fn delete_parts_of_type<T: crate::sdk::SdkPartHandle + 'static>(
+    pub fn delete_parts_of_type<T: crate::parts::PartRefDowncast>(
       &mut self,
     ) -> Result<(), crate::common::SdkError> {
       crate::sdk::SdkPackage::delete_parts_of_type::<T>(self)
     }
 
     #[inline]
-    pub fn delete_parts_recursively_of_type<T: crate::sdk::SdkPartHandle + 'static>(
+    pub fn delete_parts_recursively_of_type<T: crate::parts::PartRefDowncast>(
       &mut self,
     ) -> Result<(), crate::common::SdkError> {
       crate::sdk::SdkPackage::delete_parts_recursively_of_type::<T>(self)

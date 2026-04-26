@@ -195,7 +195,7 @@ fn delete_parts_recursively_from_part_id<P, T>(
 ) -> Result<(), crate::common::SdkError>
 where
   P: SdkPackage + Sized,
-  T: SdkPartHandle + 'static,
+  T: crate::parts::PartRefDowncast,
 {
   let relationship_ids: Vec<_> = package
     .storage()
@@ -1117,7 +1117,7 @@ pub trait SdkPackage {
   }
 
   #[inline]
-  fn get_parts_of_type<T: SdkPartHandle + 'static>(&self) -> impl Iterator<Item = T> + '_
+  fn get_parts_of_type<T: crate::parts::PartRefDowncast>(&self) -> impl Iterator<Item = T> + '_
   where
     Self: Sized,
   {
@@ -1125,7 +1125,7 @@ pub trait SdkPackage {
   }
 
   #[inline]
-  fn get_sub_part_of_type<T: SdkPartHandle + 'static>(&self) -> Option<T>
+  fn get_sub_part_of_type<T: crate::parts::PartRefDowncast>(&self) -> Option<T>
   where
     Self: Sized,
   {
@@ -1198,7 +1198,7 @@ pub trait SdkPackage {
   }
 
   #[inline]
-  fn delete_parts_of_type<T: SdkPartHandle + 'static>(
+  fn delete_parts_of_type<T: crate::parts::PartRefDowncast>(
     &mut self,
   ) -> Result<(), crate::common::SdkError>
   where
@@ -1209,7 +1209,7 @@ pub trait SdkPackage {
   }
 
   #[inline]
-  fn delete_parts_recursively_of_type<T: SdkPartHandle + 'static>(
+  fn delete_parts_recursively_of_type<T: crate::parts::PartRefDowncast>(
     &mut self,
   ) -> Result<(), crate::common::SdkError>
   where
@@ -3316,7 +3316,7 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
-  fn get_parts_of_type<'a, P: SdkPackage + Sized, T: SdkPartHandle + 'static>(
+  fn get_parts_of_type<'a, P: SdkPackage + Sized, T: crate::parts::PartRefDowncast>(
     &'a self,
     package: &'a P,
   ) -> impl Iterator<Item = T> + 'a {
@@ -3326,7 +3326,7 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
-  fn get_sub_part_of_type<'a, P: SdkPackage + Sized, T: SdkPartHandle + 'static>(
+  fn get_sub_part_of_type<'a, P: SdkPackage + Sized, T: crate::parts::PartRefDowncast>(
     &'a self,
     package: &'a P,
   ) -> Option<T> {
@@ -3423,7 +3423,7 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   fn delete_parts_of_type<P, T>(&self, package: &mut P) -> Result<(), crate::common::SdkError>
   where
     P: SdkPackage + Sized,
-    T: SdkPartHandle + 'static,
+    T: crate::parts::PartRefDowncast,
   {
     let parts: Vec<_> = self.get_parts_of_type::<P, T>(package).collect();
     self.delete_parts::<P, T, _>(package, parts)
@@ -3436,7 +3436,7 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   ) -> Result<(), crate::common::SdkError>
   where
     P: SdkPackage + Sized,
-    T: SdkPartHandle + 'static,
+    T: crate::parts::PartRefDowncast,
   {
     self.delete_parts_of_type::<P, T>(package)?;
     let child_part_ids: Vec<_> = self

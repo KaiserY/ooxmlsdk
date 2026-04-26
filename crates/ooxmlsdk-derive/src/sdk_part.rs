@@ -839,40 +839,11 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         #( .chain(#part_iter_chains) )*
     }
 
-    pub fn get_parts_of_type<T: crate::sdk::SdkPart + 'static>(
-      &self,
-    ) -> impl Iterator<Item = &T> + '_ {
-      self
-        .parts()
-        .filter_map(|entry| entry.part.downcast_ref::<T>())
-    }
-
-    pub fn get_sub_part_of_type<T: crate::sdk::SdkPart + 'static>(&self) -> Option<&T> {
-      self.get_parts_of_type::<T>().next()
-    }
-
     pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef<'_>> {
       self
         .parts()
         .find(|entry| entry.relationship_id == relationship_id)
         .map(|entry| entry.part)
-    }
-
-    pub fn get_part_by_id_as<T: crate::sdk::SdkPart + 'static>(
-      &self,
-      relationship_id: &str,
-    ) -> Option<&T> {
-      self
-        .parts()
-        .find(|entry| entry.relationship_id == relationship_id)
-        .and_then(|entry| entry.part.downcast_ref::<T>())
-    }
-
-    pub fn get_id_of_part<T: crate::sdk::SdkPart + 'static>(&self, part: &T) -> Option<&str> {
-      self.parts().find_map(|entry| {
-        let candidate = entry.part.downcast_ref::<T>()?;
-        std::ptr::eq(candidate, part).then_some(entry.relationship_id)
-      })
     }
   };
 
@@ -2689,7 +2660,7 @@ fn part_handle_child_methods_tokens(
         self.get_part_by_id(package, relationship_id)
       }
 
-      pub fn get_parts_of_type<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle + 'static>(
+      pub fn get_parts_of_type<'a, P: crate::sdk::SdkPackage, T: crate::parts::PartRefDowncast>(
         &'a self,
         package: &'a P,
       ) -> impl Iterator<Item = T> + 'a {
@@ -2698,7 +2669,7 @@ fn part_handle_child_methods_tokens(
 
       pub fn get_sub_part_of_type<'a,
         P: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPartHandle + 'static,
+        T: crate::parts::PartRefDowncast,
       >(
         &'a self,
         package: &'a P,
@@ -2783,7 +2754,7 @@ fn part_handle_child_methods_tokens(
       ) -> Result<(), crate::common::SdkError>
       where
         P: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPartHandle + 'static,
+        T: crate::parts::PartRefDowncast,
       {
         <Self as crate::sdk::SdkPartHandle>::delete_parts_of_type::<P, T>(
           self,
@@ -2798,7 +2769,7 @@ fn part_handle_child_methods_tokens(
       ) -> Result<(), crate::common::SdkError>
       where
         P: crate::sdk::SdkPackage,
-        T: crate::sdk::SdkPartHandle + 'static,
+        T: crate::parts::PartRefDowncast,
       {
         <Self as crate::sdk::SdkPartHandle>::delete_parts_recursively_of_type::<P, T>(
           self,

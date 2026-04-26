@@ -4870,8 +4870,7 @@ fn expand_named_struct(
 
       pub fn to_xml(&self) -> Result<String, std::fmt::Error> {
         let bytes = self.to_xml_bytes().map_err(|_| std::fmt::Error)?;
-        // SAFETY: XML serialization only writes UTF-8 data via byte literals and UTF-8 strings.
-        Ok(unsafe { String::from_utf8_unchecked(bytes) })
+        String::from_utf8(bytes).map_err(|_| std::fmt::Error)
       }
 
       pub(crate) fn write_xml<W: std::io::Write>(

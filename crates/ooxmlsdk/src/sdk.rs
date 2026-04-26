@@ -889,15 +889,6 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn remove_relationship(&mut self, relationship_id: &str) -> Option<crate::common::Relationship> {
-    let removed = crate::sdk::SdkPackageInternal::relationships_mut(self).remove(relationship_id);
-    if removed.is_some() {
-      crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(self);
-    }
-    removed.map(Into::into)
-  }
-
-  #[inline]
   fn get_reference_relationship(
     &self,
     relationship_id: &str,
@@ -1001,16 +992,6 @@ pub trait SdkPackage: SdkPackageInternal {
   #[inline]
   fn delete_unused_media_data_parts(&mut self) -> usize {
     crate::sdk::SdkPackageInternal::storage_mut(self).delete_unused_media_data_parts()
-  }
-
-  #[inline]
-  fn relationships_by_type(
-    &self,
-    relationship_type: &str,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> {
-    crate::sdk::SdkPackageInternal::relationships(self)
-      .by_relationship_type(relationship_type)
-      .map(Into::into)
   }
 
   #[inline]
@@ -2810,20 +2791,6 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn remove_relationship<P: SdkPackage>(
-    &self,
-    package: &mut P,
-    relationship_id: &str,
-  ) -> Option<crate::common::Relationship> {
-    let removed = <Self as crate::sdk::SdkPartHandleInternal>::relationships_mut(self, package)?
-      .remove(relationship_id);
-    if removed.is_some() {
-      crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
-    }
-    removed.map(Into::into)
-  }
-
-  #[inline]
   fn get_reference_relationship<'a, P: SdkPackage>(
     &'a self,
     package: &'a P,
@@ -2951,19 +2918,6 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
       .relationships(package)
       .into_iter()
       .flat_map(crate::common::RelationshipSet::data_part_reference_relationships)
-      .map(Into::into)
-  }
-
-  #[inline]
-  fn relationships_by_type<'a, P: SdkPackage>(
-    &'a self,
-    package: &'a P,
-    relationship_type: &'a str,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> {
-    self
-      .relationships(package)
-      .into_iter()
-      .flat_map(move |relationships| relationships.by_relationship_type(relationship_type))
       .map(Into::into)
   }
 
@@ -3394,6 +3348,22 @@ pub(crate) trait SdkPartHandleInternal: Clone + Sized + 'static {
     Self: SdkPartHandle,
   {
     crate::sdk::SdkPackageInternal::storage_mut(package).relationships_mut(self.part_id())
+  }
+
+  #[inline]
+  fn relationships_by_type<'a, P: SdkPackage>(
+    &'a self,
+    package: &'a P,
+    relationship_type: &'a str,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>>
+  where
+    Self: SdkPartHandle,
+  {
+    self
+      .relationships(package)
+      .into_iter()
+      .flat_map(move |relationships| relationships.by_relationship_type(relationship_type))
+      .map(Into::into)
   }
 }
 

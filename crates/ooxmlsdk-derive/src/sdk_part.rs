@@ -1963,18 +1963,6 @@ fn expand_part_handle(
       }
 
       #[inline]
-      pub fn remove_relationship<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &mut P,
-        relationship_id: &str,
-      ) -> Option<crate::common::Relationship> {
-        <Self as crate::sdk::SdkPartHandle>::remove_relationship(self,
-          package,
-          relationship_id,
-        )
-      }
-
-      #[inline]
       pub fn get_reference_relationship<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
@@ -2230,7 +2218,7 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
           let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartHandle>::relationships_by_type(
+          <Self as crate::sdk::SdkPartHandleInternal>::relationships_by_type(
             self,
             package,
             #relationship_type,
@@ -2254,7 +2242,7 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
           let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartHandle>::relationships_by_type(
+          <Self as crate::sdk::SdkPartHandleInternal>::relationships_by_type(
             self,
             package,
             #relationship_type,

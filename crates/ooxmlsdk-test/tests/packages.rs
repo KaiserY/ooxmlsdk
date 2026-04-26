@@ -700,7 +700,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
   assert_eq!(new_reference.target_part_id(), media_data_part.part_id());
 
   let removed = slide1
-    .remove_relationship(&mut package, &old_slide1_reference_id)
+    .delete_reference_relationship(&mut package, &old_slide1_reference_id)
     .unwrap();
   assert_eq!(removed.id(), old_slide1_reference_id);
   assert_eq!(
@@ -718,7 +718,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
     .id()
     .to_string();
   let removed = slide2
-    .remove_relationship(&mut package, &slide2_reference_id)
+    .delete_reference_relationship(&mut package, &slide2_reference_id)
     .unwrap();
   assert_eq!(removed.id(), slide2_reference_id);
   assert_eq!(
@@ -777,7 +777,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
 
   let reopened_slide1_reference_id = reopened_slide1_relationships[0].id().to_string();
   reopened_slide1
-    .remove_relationship(&mut reopened, &reopened_slide1_reference_id)
+    .delete_reference_relationship(&mut reopened, &reopened_slide1_reference_id)
     .unwrap();
   let reopened_slide2_reference_id = reopened_slide2
     .data_part_reference_relationships(&reopened)
@@ -786,7 +786,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
     .id()
     .to_string();
   reopened_slide2
-    .remove_relationship(&mut reopened, &reopened_slide2_reference_id)
+    .delete_reference_relationship(&mut reopened, &reopened_slide2_reference_id)
     .unwrap();
 
   let remaining_media_data_parts: Vec<_> = reopened.media_data_parts().collect();

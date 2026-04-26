@@ -659,14 +659,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
-      pub fn remove_relationship(
-        &mut self,
-        relationship_id: &str,
-      ) -> Option<crate::common::Relationship> {
-        crate::sdk::SdkPackage::remove_relationship(self, relationship_id)
-      }
-
-      #[inline]
       pub fn get_reference_relationship(
         &self,
         relationship_id: &str,
@@ -1054,7 +1046,9 @@ fn package_relationship_method_tokens(
             &self,
           ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> + '_ {
             let _ = self.#field_ident;
-            crate::sdk::SdkPackage::relationships_by_type(self, #relationship_type)
+            crate::sdk::SdkPackageInternal::relationships(self)
+              .by_relationship_type(#relationship_type)
+              .map(Into::into)
           }
 
           #( #attrs )*
@@ -1068,7 +1062,9 @@ fn package_relationship_method_tokens(
             &self,
           ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> + '_ {
             let _ = self.#field_ident;
-            crate::sdk::SdkPackage::relationships_by_type(self, #relationship_type)
+            crate::sdk::SdkPackageInternal::relationships(self)
+              .by_relationship_type(#relationship_type)
+              .map(Into::into)
           }
 
           #( #attrs )*

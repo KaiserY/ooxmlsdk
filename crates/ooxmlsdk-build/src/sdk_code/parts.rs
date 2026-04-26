@@ -249,7 +249,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut part_ref_variants: Vec<TokenStream> = vec![];
   let mut part_ref_part_id_arms: Vec<TokenStream> = vec![];
   let mut part_ref_relationship_id_arms: Vec<TokenStream> = vec![];
-  let mut part_ref_child_descriptor_arms: Vec<TokenStream> = vec![];
   let mut part_ref_collect_relationships_arms: Vec<TokenStream> = vec![];
   let mut part_ref_downcast_impls: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
@@ -337,12 +336,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       #( #part_attrs )*
       PartRef::#struct_ident(part) => {
         <#part_ty as crate::sdk::SdkPartHandle>::relationship_id(part)
-      }
-    });
-    part_ref_child_descriptor_arms.push(quote! {
-      #( #part_attrs )*
-      PartRef::#struct_ident(_) => {
-        <#part_ty as crate::sdk::SdkPartHandle>::child_descriptors()
       }
     });
     part_ref_collect_relationships_arms.push(quote! {
@@ -488,13 +481,6 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
       }
 
-      pub fn child_descriptors(&self) -> &'static [crate::sdk::PartChildDescriptor] {
-        match self {
-          #( #part_ref_child_descriptor_arms, )*
-          PartRef::ExtendedPart(_) => &[],
-        }
-      }
-
       pub(crate) fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,
@@ -515,7 +501,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         T::downcast_from_part_ref(self)
       }
 
-      pub fn from_part_id<P: crate::sdk::SdkPackage>(
+      pub(crate) fn from_part_id<P: crate::sdk::SdkPackage>(
         package: &P,
         part_id: crate::common::PartId,
       ) -> Option<Self> {
@@ -542,14 +528,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         ))
       }
 
-      pub fn from_relationship<P: crate::sdk::SdkPackage>(
-        package: &P,
-        relationship: &crate::common::RelationshipInfo,
-      ) -> Option<Self> {
-        Self::from_relationship_storage(package.storage(), relationship)
-      }
-
-      pub fn from_relationship_storage(
+      pub(crate) fn from_relationship_storage(
         storage: &crate::common::SdkPackageStorage,
         relationship: &crate::common::RelationshipInfo,
       ) -> Option<Self> {

@@ -1455,12 +1455,12 @@ fn expand_part_handle(
 
     impl #ident {
       #[inline]
-      pub const fn part_id(&self) -> crate::common::PartId {
+      pub(crate) const fn part_id(&self) -> crate::common::PartId {
         self.id
       }
 
       #[inline]
-      pub fn relationships<'a, P: crate::sdk::SdkPackage>(
+      pub(crate) fn relationships<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
       ) -> Option<crate::common::RelationshipView> {
@@ -1468,7 +1468,7 @@ fn expand_part_handle(
       }
 
       #[inline]
-      pub fn try_relationships<P: crate::sdk::SdkPackage>(
+      pub(crate) fn try_relationships<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,
       ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {

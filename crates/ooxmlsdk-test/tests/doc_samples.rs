@@ -7,9 +7,9 @@ use std::{
   path::Path,
 };
 
-use ooxmlsdk::common::{PartId, RelationshipInfo};
+use ooxmlsdk::common::PartId;
 use ooxmlsdk::parts::{
-  PartRef, presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
+  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
@@ -32,7 +32,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
   match kind {
     DocSampleKind::Wordprocessing => {
       let original = WordprocessingDocument::new_from_file(&path).unwrap();
-      assert_relationship_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
@@ -43,7 +42,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
     }
     DocSampleKind::Spreadsheet => {
       let original = SpreadsheetDocument::new_from_file(&path).unwrap();
-      assert_relationship_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
@@ -54,7 +52,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
     }
     DocSampleKind::Presentation => {
       let original = PresentationDocument::new_from_file(&path).unwrap();
-      assert_relationship_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
@@ -255,79 +252,6 @@ fn assert_relationship_sets_round_trip<P: SdkPackage>(
       original_part.path()
     );
   }
-}
-
-fn assert_relationship_child_descriptor_coverage<P: SdkPackage>(package: &P, file_name: &str) {
-  let package_descriptors = P::child_descriptors();
-  for relationship in package
-    .storage()
-    .package_relationships()
-    .part_relationships()
-  {
-    assert_relationship_covered_by_descriptors(
-      package,
-      package_descriptors,
-      relationship,
-      file_name,
-      "package",
-    );
-  }
-
-  for (index, part) in package.storage().parts().iter().enumerate() {
-    if part.is_deleted() {
-      continue;
-    }
-
-    let part_id = PartId::from_index(index);
-    let Some(part_ref) = ooxmlsdk::parts::PartRef::from_part_id(package, part_id) else {
-      continue;
-    };
-    let descriptors = part_ref.child_descriptors();
-    let Some(relationships) = package.storage().relationships(part_id) else {
-      continue;
-    };
-
-    for relationship in relationships.part_relationships() {
-      assert_relationship_covered_by_descriptors(
-        package,
-        descriptors,
-        relationship,
-        file_name,
-        part.path(),
-      );
-    }
-  }
-}
-
-fn assert_relationship_covered_by_descriptors(
-  package: &impl SdkPackage,
-  descriptors: &[ooxmlsdk::sdk::PartChildDescriptor],
-  relationship: &RelationshipInfo,
-  file_name: &str,
-  source: &str,
-) {
-  assert!(
-    descriptors.iter().any(|descriptor| {
-      ooxmlsdk::common::relationship_type_matches(
-        relationship.relationship_type(),
-        descriptor.relationship_type,
-      )
-    }) || relationship_targets_extended_part(package, relationship),
-    "relationship is not covered by generated part child descriptors for {file_name}:{source}: id={} type={} target={}",
-    relationship.id(),
-    relationship.relationship_type(),
-    relationship.target()
-  );
-}
-
-fn relationship_targets_extended_part(
-  package: &impl SdkPackage,
-  relationship: &RelationshipInfo,
-) -> bool {
-  relationship
-    .target_part_id()
-    .and_then(|part_id| PartRef::from_part_id(package, part_id))
-    .is_some_and(|part| matches!(part, PartRef::ExtendedPart(_)))
 }
 
 fn part_path<'a, P, T>(package: &'a P, part: &T) -> &'a str

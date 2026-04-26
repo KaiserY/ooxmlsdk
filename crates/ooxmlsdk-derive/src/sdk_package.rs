@@ -664,13 +664,13 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Self::new_lazy(std::io::BufReader::new(std::fs::File::open(path)?))
       }
 
-      pub fn relationships(&self) -> crate::common::RelationshipView {
+      pub(crate) fn relationships(&self) -> crate::common::RelationshipView {
         self
           .try_relationships()
           .expect("package relationships could not be modeled")
       }
 
-      pub fn try_relationships(
+      pub(crate) fn try_relationships(
         &self,
       ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {
         crate::sdk::SdkPackage::modeled_relationships(self).map(Into::into)

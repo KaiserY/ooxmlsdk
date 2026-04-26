@@ -151,6 +151,57 @@ fn package_relationship_set_can_be_edited_and_written_back() {
 }
 
 #[test]
+fn package_relationship_helpers_match_openxml_container_api_shape() {
+  // Source: adapted from OpenXmlPartContainer external relationship and required lookup APIs.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let main_part_id = package
+    .get_id_of_part_required(&main_part)
+    .unwrap()
+    .to_string();
+  assert!(
+    package
+      .get_part_by_id_required(&main_part_id)
+      .unwrap()
+      .downcast::<MainDocumentPart>()
+      .is_some()
+  );
+  assert!(package.get_part_by_id_required("rIdMissing").is_err());
+
+  let relationship = package
+    .add_external_relationship_auto_id(
+      "http://example.com/package/external",
+      "https://example.com/package-external",
+    )
+    .unwrap();
+  let relationship_id = relationship.id().to_string();
+  assert_eq!(
+    package
+      .get_external_relationship(&relationship_id)
+      .unwrap()
+      .target(),
+    "https://example.com/package-external"
+  );
+  assert!(
+    package
+      .get_hyperlink_relationship(&relationship_id)
+      .is_none()
+  );
+  assert_eq!(
+    package
+      .delete_external_relationship(&relationship_id)
+      .unwrap()
+      .id(),
+    relationship_id
+  );
+  assert!(
+    package
+      .get_external_relationship(&relationship_id)
+      .is_none()
+  );
+}
+
+#[test]
 fn package_save_writes_package_relationships_from_modeled_parts() {
   let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part_id = package.main_document_part().unwrap().part_id();
@@ -375,9 +426,12 @@ fn part_relationship_ids_can_change_for_child_parts() {
     .to_string();
   let relationship_count = main_part.relationships(&package).unwrap().len();
 
-  main_part
-    .change_relationship_id(&mut package, &comments_original_id, "rIdSdkComments")
-    .unwrap();
+  assert_eq!(
+    main_part
+      .change_id_of_part(&mut package, &comments_part, "rIdSdkComments")
+      .unwrap(),
+    comments_original_id
+  );
   main_part
     .change_relationship_id(&mut package, &image_original_id, &comments_original_id)
     .unwrap();
@@ -1164,6 +1218,65 @@ fn part_hyperlink_relationship_mutation_is_saved() {
 }
 
 #[test]
+fn part_hyperlink_relationship_supports_internal_targets() {
+  // Source: adapted from OpenXmlPartContainer.AddHyperlinkRelationship(uri, isExternal).
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkInternalHyperlink";
+
+  let relationship = main_part
+    .add_hyperlink_relationship_with_mode(
+      &mut package,
+      relationship_id,
+      "#SdkBookmark",
+      TargetMode::Internal,
+    )
+    .unwrap();
+  assert_eq!(relationship.id(), relationship_id);
+  assert_eq!(relationship.target(), "#SdkBookmark");
+  assert!(matches!(relationship.target_mode(), TargetMode::Internal));
+  assert_eq!(
+    relationship.reference_kind(),
+    Some(ReferenceRelationshipKind::Hyperlink)
+  );
+
+  let auto_relationship = main_part
+    .add_hyperlink_relationship_auto_id(
+      &mut package,
+      "https://example.com/auto-hyperlink",
+      TargetMode::External,
+    )
+    .unwrap();
+  let auto_relationship_id = auto_relationship.id().to_string();
+  assert_eq!(
+    main_part
+      .get_hyperlink_relationship(&package, &auto_relationship_id)
+      .unwrap()
+      .target(),
+    "https://example.com/auto-hyperlink"
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_relationship = reopened_main
+    .get_hyperlink_relationship(&reopened, relationship_id)
+    .unwrap();
+  assert_eq!(reopened_relationship.target(), "#SdkBookmark");
+  assert!(matches!(
+    reopened_relationship.target_mode(),
+    TargetMode::Internal
+  ));
+  assert!(
+    reopened_main
+      .get_hyperlink_relationship(&reopened, &auto_relationship_id)
+      .is_some()
+  );
+}
+
+#[test]
 fn part_external_relationship_ids_can_change_and_remove() {
   // Source: adapted from OpenXmlPartContainer external relationship mutation coverage.
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
@@ -1232,6 +1345,43 @@ fn part_external_relationship_ids_can_change_and_remove() {
       .relationships(&reopened)
       .unwrap()
       .contains_id(changed_relationship_id)
+  );
+}
+
+#[test]
+fn part_external_relationship_helpers_are_kind_specific() {
+  // Source: adapted from OpenXmlPartContainer external relationship get/delete coverage.
+  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship = main_part
+    .add_external_relationship_auto_id(
+      &mut package,
+      "http://example.com/relationships/custom",
+      "https://example.com/part-external",
+    )
+    .unwrap();
+  let relationship_id = relationship.id().to_string();
+
+  assert_eq!(
+    main_part
+      .get_external_relationship(&package, &relationship_id)
+      .unwrap()
+      .target(),
+    "https://example.com/part-external"
+  );
+  assert!(
+    main_part
+      .get_hyperlink_relationship(&package, &relationship_id)
+      .is_none()
+  );
+  let removed = main_part
+    .delete_external_relationship(&mut package, &relationship_id)
+    .unwrap();
+  assert_eq!(removed.id(), relationship_id);
+  assert!(
+    main_part
+      .delete_external_relationship(&mut package, &relationship_id)
+      .is_err()
   );
 }
 

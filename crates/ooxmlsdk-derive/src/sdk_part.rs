@@ -1432,6 +1432,20 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_external_relationship_auto_id<'a, P: crate::sdk::SdkPackage>(
+        &self,
+        package: &'a mut P,
+        relationship_type: impl Into<String>,
+        target: impl Into<String>,
+      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_external_relationship_auto_id(self,
+          package,
+          relationship_type,
+          target,
+        )
+      }
+
+      #[inline]
       pub fn add_hyperlink_relationship<'a, P: crate::sdk::SdkPackage>(
         &self,
         package: &'a mut P,
@@ -1442,6 +1456,36 @@ fn expand_part_handle(
           package,
           relationship_id,
           target,
+        )
+      }
+
+      #[inline]
+      pub fn add_hyperlink_relationship_with_mode<'a, P: crate::sdk::SdkPackage>(
+        &self,
+        package: &'a mut P,
+        relationship_id: impl Into<String>,
+        target: impl Into<String>,
+        target_mode: crate::schemas::opc_relationships::TargetMode,
+      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_hyperlink_relationship_with_mode(self,
+          package,
+          relationship_id,
+          target,
+          target_mode,
+        )
+      }
+
+      #[inline]
+      pub fn add_hyperlink_relationship_auto_id<'a, P: crate::sdk::SdkPackage>(
+        &self,
+        package: &'a mut P,
+        target: impl Into<String>,
+        target_mode: crate::schemas::opc_relationships::TargetMode,
+      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_hyperlink_relationship_auto_id(self,
+          package,
+          target,
+          target_mode,
         )
       }
 
@@ -2003,12 +2047,48 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn get_external_relationship<'a, P: crate::sdk::SdkPackage>(
+        &'a self,
+        package: &'a P,
+        relationship_id: &str,
+      ) -> Option<&'a crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::get_external_relationship(self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn get_hyperlink_relationship<'a, P: crate::sdk::SdkPackage>(
+        &'a self,
+        package: &'a P,
+        relationship_id: &str,
+      ) -> Option<&'a crate::common::RelationshipInfo> {
+        <Self as crate::sdk::SdkPartHandle>::get_hyperlink_relationship(self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn delete_reference_relationship<P: crate::sdk::SdkPackage>(
         &self,
         package: &mut P,
         relationship_id: &str,
       ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::delete_reference_relationship(self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn delete_external_relationship<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &mut P,
+        relationship_id: &str,
+      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::delete_external_relationship(self,
           package,
           relationship_id,
         )
@@ -2291,6 +2371,32 @@ fn part_handle_child_methods_tokens(
       }
 
       #[inline]
+      pub fn target_part_id_required<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+        relationship_id: &str,
+      ) -> Result<crate::common::PartId, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::target_part_id_required(
+          self,
+          package,
+          relationship_id,
+        )
+      }
+
+      #[inline]
+      pub fn get_part_by_id_required<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+        relationship_id: &str,
+      ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
+        self.get_part_by_id(package, relationship_id).ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part relationship id {relationship_id} does not exist"
+          ))
+        })
+      }
+
+      #[inline]
       pub fn try_get_part_by_id<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,
@@ -2325,6 +2431,30 @@ fn part_handle_child_methods_tokens(
         self.relationships(package)?.iter().find_map(|relationship| {
           (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
         })
+      }
+
+      #[inline]
+      pub fn get_id_of_part_required<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        &'a self,
+        package: &'a P,
+        part: &T,
+      ) -> Result<&'a str, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::get_id_of_part_required(self, package, part)
+      }
+
+      #[inline]
+      pub fn change_id_of_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        &self,
+        package: &mut P,
+        part: &T,
+        new_relationship_id: impl Into<String>,
+      ) -> Result<String, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::change_id_of_part(
+          self,
+          package,
+          part,
+          new_relationship_id,
+        )
       }
 
       #[inline]

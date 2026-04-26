@@ -753,6 +753,16 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn add_external_relationship_auto_id(
+    &mut self,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_external_relationship(relationship_id, relationship_type, target)
+  }
+
+  #[inline]
   fn add_hyperlink_relationship(
     &mut self,
     relationship_id: impl Into<String>,
@@ -769,6 +779,36 @@ pub trait SdkPackage {
         .get(&relationship_id)
         .expect("relationship was just added"),
     )
+  }
+
+  #[inline]
+  fn add_hyperlink_relationship_with_mode(
+    &mut self,
+    relationship_id: impl Into<String>,
+    target: impl Into<String>,
+    target_mode: crate::schemas::opc_relationships::TargetMode,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship_id = relationship_id.into();
+    self
+      .relationships_mut()
+      .add_hyperlink_relationship_with_mode(relationship_id.clone(), target, target_mode)?;
+    self.refresh_relationship_model_from_storage();
+    Ok(
+      self
+        .relationships()
+        .get(&relationship_id)
+        .expect("relationship was just added"),
+    )
+  }
+
+  #[inline]
+  fn add_hyperlink_relationship_auto_id(
+    &mut self,
+    target: impl Into<String>,
+    target_mode: crate::schemas::opc_relationships::TargetMode,
+  ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship_id = self.relationships().next_relationship_id();
+    self.add_hyperlink_relationship_with_mode(relationship_id, target, target_mode)
   }
 
   #[inline]
@@ -795,6 +835,26 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn get_external_relationship(
+    &self,
+    relationship_id: &str,
+  ) -> Option<&crate::common::RelationshipInfo> {
+    self
+      .relationships()
+      .get_external_relationship(relationship_id)
+  }
+
+  #[inline]
+  fn get_hyperlink_relationship(
+    &self,
+    relationship_id: &str,
+  ) -> Option<&crate::common::RelationshipInfo> {
+    self
+      .relationships()
+      .get_hyperlink_relationship(relationship_id)
+  }
+
+  #[inline]
   fn delete_reference_relationship(
     &mut self,
     relationship_id: &str,
@@ -802,6 +862,18 @@ pub trait SdkPackage {
     let relationship = self
       .relationships_mut()
       .remove_reference_relationship(relationship_id)?;
+    self.refresh_relationship_model_from_storage();
+    Ok(relationship)
+  }
+
+  #[inline]
+  fn delete_external_relationship(
+    &mut self,
+    relationship_id: &str,
+  ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship = self
+      .relationships_mut()
+      .remove_external_relationship(relationship_id)?;
     self.refresh_relationship_model_from_storage();
     Ok(relationship)
   }
@@ -876,6 +948,21 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn get_part_by_id_required(
+    &self,
+    relationship_id: &str,
+  ) -> Result<crate::parts::PartRef, crate::common::SdkError>
+  where
+    Self: Sized,
+  {
+    self.get_part_by_id(relationship_id).ok_or_else(|| {
+      crate::common::SdkError::CommonError(format!(
+        "part relationship id {relationship_id} does not exist"
+      ))
+    })
+  }
+
+  #[inline]
   fn try_get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef>
   where
     Self: Sized,
@@ -905,6 +992,30 @@ pub trait SdkPackage {
     self.relationships().iter().find_map(|relationship| {
       (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
     })
+  }
+
+  #[inline]
+  fn get_id_of_part_required<T: SdkPartHandle>(
+    &self,
+    part: &T,
+  ) -> Result<&str, crate::common::SdkError> {
+    self.get_id_of_part(part).ok_or_else(|| {
+      crate::common::SdkError::CommonError(format!(
+        "part id {:?} is not referenced by this package",
+        part.part_id()
+      ))
+    })
+  }
+
+  #[inline]
+  fn change_id_of_part<T: SdkPartHandle>(
+    &mut self,
+    part: &T,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    let old_relationship_id = self.get_id_of_part_required(part)?.to_string();
+    self.change_relationship_id(&old_relationship_id, new_relationship_id)?;
+    Ok(old_relationship_id)
   }
 
   #[inline]
@@ -1520,6 +1631,25 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
+  fn add_external_relationship_auto_id<'a, P: SdkPackage>(
+    &self,
+    package: &'a mut P,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_external_relationship(package, relationship_id, relationship_type, target)
+  }
+
+  #[inline]
   fn add_hyperlink_relationship<'a, P: SdkPackage>(
     &self,
     package: &'a mut P,
@@ -1544,6 +1674,53 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
         .and_then(|relationships| relationships.get(&relationship_id))
         .expect("relationship was just added"),
     )
+  }
+
+  #[inline]
+  fn add_hyperlink_relationship_with_mode<'a, P: SdkPackage>(
+    &self,
+    package: &'a mut P,
+    relationship_id: impl Into<String>,
+    target: impl Into<String>,
+    target_mode: crate::schemas::opc_relationships::TargetMode,
+  ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship_id = relationship_id.into();
+    self
+      .relationships_mut(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .add_hyperlink_relationship_with_mode(relationship_id.clone(), target, target_mode)?;
+    package.refresh_relationship_model_from_storage();
+    Ok(
+      package
+        .storage()
+        .relationships(self.part_id())
+        .and_then(|relationships| relationships.get(&relationship_id))
+        .expect("relationship was just added"),
+    )
+  }
+
+  #[inline]
+  fn add_hyperlink_relationship_auto_id<'a, P: SdkPackage>(
+    &self,
+    package: &'a mut P,
+    target: impl Into<String>,
+    target_mode: crate::schemas::opc_relationships::TargetMode,
+  ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship_id = self
+      .relationships(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .next_relationship_id();
+    self.add_hyperlink_relationship_with_mode(package, relationship_id, target, target_mode)
   }
 
   #[inline]
@@ -2605,6 +2782,28 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
+  fn get_external_relationship<'a, P: SdkPackage>(
+    &'a self,
+    package: &'a P,
+    relationship_id: &str,
+  ) -> Option<&'a crate::common::RelationshipInfo> {
+    self
+      .relationships(package)?
+      .get_external_relationship(relationship_id)
+  }
+
+  #[inline]
+  fn get_hyperlink_relationship<'a, P: SdkPackage>(
+    &'a self,
+    package: &'a P,
+    relationship_id: &str,
+  ) -> Option<&'a crate::common::RelationshipInfo> {
+    self
+      .relationships(package)?
+      .get_hyperlink_relationship(relationship_id)
+  }
+
+  #[inline]
   fn delete_reference_relationship<P: SdkPackage>(
     &self,
     package: &mut P,
@@ -2619,6 +2818,25 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
         ))
       })?
       .remove_reference_relationship(relationship_id)?;
+    package.refresh_relationship_model_from_storage();
+    Ok(relationship)
+  }
+
+  #[inline]
+  fn delete_external_relationship<P: SdkPackage>(
+    &self,
+    package: &mut P,
+    relationship_id: &str,
+  ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+    let relationship = self
+      .relationships_mut(package)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package storage",
+          self.part_id()
+        ))
+      })?
+      .remove_external_relationship(relationship_id)?;
     package.refresh_relationship_model_from_storage();
     Ok(relationship)
   }
@@ -2750,6 +2968,21 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
+  fn target_part_id_required<P: SdkPackage>(
+    &self,
+    package: &P,
+    relationship_id: &str,
+  ) -> Result<crate::common::PartId, crate::common::SdkError> {
+    self
+      .target_part_id(package, relationship_id)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part relationship id {relationship_id} does not target an internal part"
+        ))
+      })
+  }
+
+  #[inline]
   fn parts<'a, P: SdkPackage + Sized>(
     &'a self,
     package: &'a P,
@@ -2773,6 +3006,21 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   ) -> Option<crate::parts::PartRef> {
     let part_id = self.target_part_id(package, relationship_id)?;
     crate::parts::PartRef::from_part_id(package, part_id)
+  }
+
+  #[inline]
+  fn get_part_by_id_required<P: SdkPackage + Sized>(
+    &self,
+    package: &P,
+    relationship_id: &str,
+  ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
+    self
+      .get_part_by_id(package, relationship_id)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "part relationship id {relationship_id} does not exist"
+        ))
+      })
   }
 
   #[inline]
@@ -2815,6 +3063,33 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
       .find_map(|relationship| {
         (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
       })
+  }
+
+  #[inline]
+  fn get_id_of_part_required<'a, P: SdkPackage, T: SdkPartHandle>(
+    &'a self,
+    package: &'a P,
+    part: &T,
+  ) -> Result<&'a str, crate::common::SdkError> {
+    self.get_id_of_part(package, part).ok_or_else(|| {
+      crate::common::SdkError::CommonError(format!(
+        "part id {:?} is not referenced by part id {:?}",
+        part.part_id(),
+        self.part_id()
+      ))
+    })
+  }
+
+  #[inline]
+  fn change_id_of_part<P: SdkPackage, T: SdkPartHandle>(
+    &self,
+    package: &mut P,
+    part: &T,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    let old_relationship_id = self.get_id_of_part_required(package, part)?.to_string();
+    self.change_relationship_id(package, &old_relationship_id, new_relationship_id)?;
+    Ok(old_relationship_id)
   }
 
   #[inline]

@@ -483,12 +483,53 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn add_external_relationship_auto_id(
+        &mut self,
+        relationship_type: impl Into<String>,
+        target: impl Into<String>,
+      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::add_external_relationship_auto_id(
+          self,
+          relationship_type,
+          target,
+        )
+      }
+
+      #[inline]
       pub fn add_hyperlink_relationship(
         &mut self,
         relationship_id: impl Into<String>,
         target: impl Into<String>,
       ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
         crate::sdk::SdkPackage::add_hyperlink_relationship(self, relationship_id, target)
+      }
+
+      #[inline]
+      pub fn add_hyperlink_relationship_with_mode(
+        &mut self,
+        relationship_id: impl Into<String>,
+        target: impl Into<String>,
+        target_mode: crate::schemas::opc_relationships::TargetMode,
+      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::add_hyperlink_relationship_with_mode(
+          self,
+          relationship_id,
+          target,
+          target_mode,
+        )
+      }
+
+      #[inline]
+      pub fn add_hyperlink_relationship_auto_id(
+        &mut self,
+        target: impl Into<String>,
+        target_mode: crate::schemas::opc_relationships::TargetMode,
+      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::add_hyperlink_relationship_auto_id(
+          self,
+          target,
+          target_mode,
+        )
       }
 
       #[inline]
@@ -508,11 +549,35 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn get_external_relationship(
+        &self,
+        relationship_id: &str,
+      ) -> Option<&crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::get_external_relationship(self, relationship_id)
+      }
+
+      #[inline]
+      pub fn get_hyperlink_relationship(
+        &self,
+        relationship_id: &str,
+      ) -> Option<&crate::common::RelationshipInfo> {
+        crate::sdk::SdkPackage::get_hyperlink_relationship(self, relationship_id)
+      }
+
+      #[inline]
       pub fn delete_reference_relationship(
         &mut self,
         relationship_id: &str,
       ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
         crate::sdk::SdkPackage::delete_reference_relationship(self, relationship_id)
+      }
+
+      #[inline]
+      pub fn delete_external_relationship(
+        &mut self,
+        relationship_id: &str,
+      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+        crate::sdk::SdkPackage::delete_external_relationship(self, relationship_id)
       }
 
       #[inline]
@@ -849,6 +914,14 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
+    pub fn get_part_by_id_required(
+      &self,
+      relationship_id: &str,
+    ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
+      crate::sdk::SdkPackage::get_part_by_id_required(self, relationship_id)
+    }
+
+    #[inline]
     pub fn try_get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
       crate::sdk::SdkPackage::try_get_part_by_id(self, relationship_id)
     }
@@ -868,6 +941,23 @@ fn package_relationship_method_tokens(
     #[inline]
     pub fn get_id_of_part<T: crate::sdk::SdkPartHandle>(&self, part: &T) -> Option<&str> {
       crate::sdk::SdkPackage::get_id_of_part(self, part)
+    }
+
+    #[inline]
+    pub fn get_id_of_part_required<T: crate::sdk::SdkPartHandle>(
+      &self,
+      part: &T,
+    ) -> Result<&str, crate::common::SdkError> {
+      crate::sdk::SdkPackage::get_id_of_part_required(self, part)
+    }
+
+    #[inline]
+    pub fn change_id_of_part<T: crate::sdk::SdkPartHandle>(
+      &mut self,
+      part: &T,
+      new_relationship_id: impl Into<String>,
+    ) -> Result<String, crate::common::SdkError> {
+      crate::sdk::SdkPackage::change_id_of_part(self, part, new_relationship_id)
     }
 
     #[inline]

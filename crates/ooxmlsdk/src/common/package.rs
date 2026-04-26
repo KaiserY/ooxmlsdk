@@ -157,6 +157,30 @@ impl RelationshipInfo {
     }
   }
 
+  fn reference(
+    id: String,
+    relationship_type: String,
+    target: String,
+    target_mode: Option<TargetMode>,
+  ) -> Self {
+    let effective_target_mode = target_mode.unwrap_or(TargetMode::Internal);
+    let target_kind = if matches!(effective_target_mode, TargetMode::External) {
+      RelationshipTargetKind::External
+    } else if target.eq_ignore_ascii_case("NULL") {
+      RelationshipTargetKind::Null
+    } else {
+      RelationshipTargetKind::Missing
+    };
+    Self {
+      id: id.into_boxed_str(),
+      relationship_type: relationship_type.into_boxed_str(),
+      target: target.into_boxed_str(),
+      target_mode,
+      target_kind,
+      target_part_id: None,
+    }
+  }
+
   #[inline]
   pub fn id(&self) -> &str {
     &self.id
@@ -301,12 +325,48 @@ impl RelationshipSet {
     ))
   }
 
+  pub fn add_external_relationship_auto_id(
+    &mut self,
+    relationship_type: impl Into<String>,
+    target: impl Into<String>,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    let relationship_id = self.next_relationship_id();
+    self.add_external_relationship(relationship_id, relationship_type, target)
+  }
+
   pub fn add_hyperlink_relationship(
     &mut self,
     relationship_id: impl Into<String>,
     target: impl Into<String>,
   ) -> Result<&RelationshipInfo, SdkError> {
-    self.add_external_relationship(relationship_id, Self::HYPERLINK_RELATIONSHIP_TYPE, target)
+    self.add_hyperlink_relationship_with_mode(relationship_id, target, TargetMode::External)
+  }
+
+  pub fn add_hyperlink_relationship_with_mode(
+    &mut self,
+    relationship_id: impl Into<String>,
+    target: impl Into<String>,
+    target_mode: TargetMode,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    let target_mode = match target_mode {
+      TargetMode::External => Some(TargetMode::External),
+      TargetMode::Internal => None,
+    };
+    self.push_relationship(RelationshipInfo::reference(
+      relationship_id.into(),
+      Self::HYPERLINK_RELATIONSHIP_TYPE.to_string(),
+      target.into(),
+      target_mode,
+    ))
+  }
+
+  pub fn add_hyperlink_relationship_auto_id(
+    &mut self,
+    target: impl Into<String>,
+    target_mode: TargetMode,
+  ) -> Result<&RelationshipInfo, SdkError> {
+    let relationship_id = self.next_relationship_id();
+    self.add_hyperlink_relationship_with_mode(relationship_id, target, target_mode)
   }
 
   pub fn add_internal_part_relationship(
@@ -357,6 +417,48 @@ impl RelationshipSet {
         .remove(relationship_id)
         .expect("relationship was already resolved"),
     )
+  }
+
+  pub fn get_external_relationship(&self, relationship_id: &str) -> Option<&RelationshipInfo> {
+    self.get(relationship_id).filter(|relationship| {
+      matches!(
+        relationship.reference_kind(),
+        Some(ReferenceRelationshipKind::External)
+      )
+    })
+  }
+
+  pub fn remove_external_relationship(
+    &mut self,
+    relationship_id: &str,
+  ) -> Result<RelationshipInfo, SdkError> {
+    let relationship = self.get(relationship_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "external relationship id {relationship_id} does not exist"
+      ))
+    })?;
+    if !matches!(
+      relationship.reference_kind(),
+      Some(ReferenceRelationshipKind::External)
+    ) {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {relationship_id} is not an external relationship"
+      )));
+    }
+    Ok(
+      self
+        .remove(relationship_id)
+        .expect("relationship was already resolved"),
+    )
+  }
+
+  pub fn get_hyperlink_relationship(&self, relationship_id: &str) -> Option<&RelationshipInfo> {
+    self.get(relationship_id).filter(|relationship| {
+      matches!(
+        relationship.reference_kind(),
+        Some(ReferenceRelationshipKind::Hyperlink)
+      )
+    })
   }
 
   pub fn change_relationship_id(

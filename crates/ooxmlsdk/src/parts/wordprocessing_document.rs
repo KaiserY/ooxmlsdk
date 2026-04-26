@@ -16,35 +16,42 @@ pub struct WordprocessingDocument {
   pub(crate) root_elements: Vec<Option<crate::parts::PartRootElement>>,
   #[sdk(package_main(accessor = "main_document_part"))]
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+    kind = "required"
   ))]
   pub(crate) main_document_part: Option<Box<crate::parts::main_document_part::MainDocumentPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"
+    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+    kind = "optional"
   ))]
   pub(crate) core_file_properties_part:
     Option<Box<crate::parts::core_file_properties_part::CoreFilePropertiesPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+    kind = "optional"
   ))]
   pub(crate) extended_file_properties_part:
     Option<Box<crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
+    kind = "optional"
   ))]
   pub(crate) custom_file_properties_part:
     Option<Box<crate::parts::custom_file_properties_part::CustomFilePropertiesPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
+    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
+    kind = "optional"
   ))]
   pub(crate) thumbnail_part: Option<Box<crate::parts::thumbnail_part::ThumbnailPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin"
+    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin",
+    kind = "optional"
   ))]
   pub(crate) digital_signature_origin_part:
     Option<Box<crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization",
+    kind = "optional"
   ))]
   pub(crate) quick_access_toolbar_customizations_part: Option<
     Box<
@@ -52,13 +59,15 @@ pub struct WordprocessingDocument {
     >,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility",
+    kind = "optional"
   ))]
   pub(crate) ribbon_extensibility_part:
     Option<Box<crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart>>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility",
+    kind = "optional"
   ))]
   pub(crate) ribbon_and_backstage_customizations_part: Option<
     Box<
@@ -67,13 +76,15 @@ pub struct WordprocessingDocument {
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes",
+    kind = "optional"
   ))]
   pub(crate) web_ex_taskpanes_part:
     Option<Box<crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart>>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels"
+    relationship_type = "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels",
+    kind = "optional"
   ))]
   pub(crate) label_info_part: Option<Box<crate::parts::label_info_part::LabelInfoPart>>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -81,77 +92,4 @@ pub struct WordprocessingDocument {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl WordprocessingDocument {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "main_document_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-      "crate::parts::main_document_part::MainDocumentPart",
-      crate::sdk::PartChildCardinality::Required,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "core_file_properties_part",
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
-      "crate::parts::core_file_properties_part::CoreFilePropertiesPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "extended_file_properties_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
-      "crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "custom_file_properties_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
-      "crate::parts::custom_file_properties_part::CustomFilePropertiesPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "thumbnail_part",
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
-      "crate::parts::thumbnail_part::ThumbnailPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "digital_signature_origin_part",
-      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin",
-      "crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "quick_access_toolbar_customizations_part",
-      "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization",
-      "crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "ribbon_extensibility_part",
-      "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility",
-      "crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "ribbon_and_backstage_customizations_part",
-      "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility",
-      "crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "web_ex_taskpanes_part",
-      "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes",
-      "crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "label_info_part",
-      "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels",
-      "crate::parts::label_info_part::LabelInfoPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-  ];
 }

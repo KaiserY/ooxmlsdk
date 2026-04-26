@@ -20,7 +20,8 @@ pub struct ViewPropertiesPart {
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+    kind = "repeated"
   ))]
   pub(crate) slide_parts: Vec<crate::parts::slide_part::SlidePart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -28,13 +29,4 @@ pub struct ViewPropertiesPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl ViewPropertiesPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "slide_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-      "crate::parts::slide_part::SlidePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    )];
 }

@@ -20,12 +20,14 @@ pub struct DocumentSettingsPart {
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Settings,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
+    kind = "optional"
   ))]
   pub(crate) mail_merge_recipient_data_part:
     Option<Box<crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
   ))]
   pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -33,20 +35,4 @@ pub struct DocumentSettingsPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl DocumentSettingsPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "mail_merge_recipient_data_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
-      "crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "image_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-      "crate::parts::image_part::ImagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

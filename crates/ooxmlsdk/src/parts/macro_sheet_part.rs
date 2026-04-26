@@ -18,37 +18,45 @@ pub struct MacroSheetPart {
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_excel_2006_main::Macrosheet>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+    kind = "repeated"
   ))]
   pub(crate) spreadsheet_printer_settings_parts:
     Vec<crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+    kind = "optional"
   ))]
   pub(crate) drawings_part: Option<Box<crate::parts::drawings_part::DrawingsPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+    kind = "repeated"
   ))]
   pub(crate) vml_drawing_parts: Vec<crate::parts::vml_drawing_part::VmlDrawingPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+    kind = "optional"
   ))]
   pub(crate) worksheet_comments_part:
     Option<Box<crate::parts::worksheet_comments_part::WorksheetCommentsPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty",
+    kind = "repeated"
   ))]
   pub(crate) custom_property_parts: Vec<crate::parts::custom_property_part::CustomPropertyPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+    kind = "repeated"
   ))]
   pub(crate) embedded_object_parts: Vec<crate::parts::embedded_object_part::EmbeddedObjectPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
+    kind = "repeated"
   ))]
   pub(crate) embedded_package_parts: Vec<crate::parts::embedded_package_part::EmbeddedPackagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
   ))]
   pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -56,56 +64,4 @@ pub struct MacroSheetPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl MacroSheetPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "spreadsheet_printer_settings_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-      "crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "drawings_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-      "crate::parts::drawings_part::DrawingsPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "vml_drawing_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-      "crate::parts::vml_drawing_part::VmlDrawingPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "worksheet_comments_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
-      "crate::parts::worksheet_comments_part::WorksheetCommentsPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "custom_property_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty",
-      "crate::parts::custom_property_part::CustomPropertyPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_object_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-      "crate::parts::embedded_object_part::EmbeddedObjectPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_package_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-      "crate::parts::embedded_package_part::EmbeddedPackagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "image_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-      "crate::parts::image_part::ImagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

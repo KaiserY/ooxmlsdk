@@ -20,7 +20,8 @@ pub struct WorkbookRevisionHeaderPart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
+    kind = "repeated"
   ))]
   pub(crate) workbook_revision_log_parts:
     Vec<crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>,
@@ -29,13 +30,4 @@ pub struct WorkbookRevisionHeaderPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl WorkbookRevisionHeaderPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "workbook_revision_log_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
-      "crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    )];
 }

@@ -20,15 +20,18 @@ pub struct DiagramDataPart {
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::DataModelRoot,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
   ))]
   pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+    kind = "repeated"
   ))]
   pub(crate) slide_parts: Vec<crate::parts::slide_part::SlidePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+    kind = "repeated"
   ))]
   pub(crate) worksheet_parts: Vec<crate::parts::worksheet_part::WorksheetPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -36,26 +39,4 @@ pub struct DiagramDataPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl DiagramDataPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "image_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-      "crate::parts::image_part::ImagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "slide_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-      "crate::parts::slide_part::SlidePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "worksheet_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
-      "crate::parts::worksheet_part::WorksheetPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

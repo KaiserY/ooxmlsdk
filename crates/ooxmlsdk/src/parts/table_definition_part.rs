@@ -19,7 +19,8 @@ pub struct TableDefinitionPart {
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
+    kind = "repeated"
   ))]
   pub(crate) query_table_parts: Vec<crate::parts::query_table_part::QueryTablePart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -27,13 +28,4 @@ pub struct TableDefinitionPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl TableDefinitionPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "query_table_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
-      "crate::parts::query_table_part::QueryTablePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    )];
 }

@@ -15,7 +15,8 @@ pub struct DigitalSignatureOriginPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
+    relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+    kind = "repeated"
   ))]
   pub(crate) xml_signature_parts: Vec<crate::parts::xml_signature_part::XmlSignaturePart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -23,13 +24,4 @@ pub struct DigitalSignatureOriginPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl DigitalSignatureOriginPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "xml_signature_parts",
-      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
-      "crate::parts::xml_signature_part::XmlSignaturePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    )];
 }

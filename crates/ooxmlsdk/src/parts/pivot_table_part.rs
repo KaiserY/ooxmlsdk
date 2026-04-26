@@ -20,7 +20,8 @@ pub struct PivotTablePart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
+    kind = "required"
   ))]
   pub(crate) pivot_table_cache_definition_part:
     Option<Box<crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart>>,
@@ -29,13 +30,4 @@ pub struct PivotTablePart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl PivotTablePart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "pivot_table_cache_definition_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
-      "crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart",
-      crate::sdk::PartChildCardinality::Required,
-    )];
 }

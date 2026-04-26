@@ -63,6 +63,7 @@ pub fn sdk_package(input: TokenStream) -> TokenStream {
 #[derive(Clone, Copy)]
 enum PartChildKind {
   Repeated,
+  RequiredRepeated,
   Required,
   Optional,
 }
@@ -310,7 +311,7 @@ fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInf
 
   if let Some(explicit) = parse_part_child_attr(&field.attrs)? {
     let inner_ty = match explicit.kind {
-      PartChildKind::Repeated => unwrap_vec_inner(&field.ty),
+      PartChildKind::Repeated | PartChildKind::RequiredRepeated => unwrap_vec_inner(&field.ty),
       PartChildKind::Required => unwrap_box_inner(&field.ty),
       PartChildKind::Optional => unwrap_optional_box_inner(&field.ty),
     }
@@ -351,7 +352,7 @@ fn parse_part_data_ref_field(field: &syn::Field) -> syn::Result<Option<PartDataR
 
   if let Some(explicit) = parse_part_data_ref_attr(&field.attrs)? {
     let inner_ty = match explicit.kind {
-      PartChildKind::Repeated => unwrap_vec_inner(&field.ty),
+      PartChildKind::Repeated | PartChildKind::RequiredRepeated => unwrap_vec_inner(&field.ty),
       PartChildKind::Required => unwrap_box_inner(&field.ty),
       PartChildKind::Optional => unwrap_optional_box_inner(&field.ty),
     }
@@ -522,6 +523,7 @@ fn parse_part_child_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildAtt
               "optional" => PartChildKind::Optional,
               "required" => PartChildKind::Required,
               "repeated" => PartChildKind::Repeated,
+              "required_repeated" => PartChildKind::RequiredRepeated,
               _ => return Err(nested.error("unsupported sdk part_child kind")),
             });
             Ok(())
@@ -582,6 +584,44 @@ fn parse_part_child_relationship_type_attr(attrs: &[Attribute]) -> syn::Result<O
   Ok(None)
 }
 
+fn parse_part_child_kind_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildKind>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::List(meta) = meta
+        && meta.path.is_ident("part_child")
+      {
+        let mut kind = None;
+        meta.parse_nested_meta(|nested| {
+          if nested.path.is_ident("relationship_type") {
+            let _value: LitStr = nested.value()?.parse()?;
+            Ok(())
+          } else if nested.path.is_ident("kind") {
+            let value: LitStr = nested.value()?.parse()?;
+            kind = Some(match value.value().as_str() {
+              "optional" => PartChildKind::Optional,
+              "required" => PartChildKind::Required,
+              "repeated" => PartChildKind::Repeated,
+              "required_repeated" => PartChildKind::RequiredRepeated,
+              _ => return Err(nested.error("unsupported sdk part_child kind")),
+            });
+            Ok(())
+          } else {
+            Err(nested.error("unsupported sdk part_child attribute"))
+          }
+        })?;
+        return Ok(kind);
+      }
+    }
+  }
+
+  Ok(None)
+}
+
 fn parse_part_data_ref_attr(attrs: &[Attribute]) -> syn::Result<Option<PartDataRefAttr>> {
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
@@ -607,6 +647,7 @@ fn parse_part_data_ref_attr(attrs: &[Attribute]) -> syn::Result<Option<PartDataR
               "optional" => PartChildKind::Optional,
               "required" => PartChildKind::Required,
               "repeated" => PartChildKind::Repeated,
+              "required_repeated" => PartChildKind::RequiredRepeated,
               _ => return Err(nested.error("unsupported sdk part_data_ref kind")),
             });
             Ok(())
@@ -714,6 +755,21 @@ fn infer_part_field_kind_and_inner_type(field: &syn::Field) -> Option<(PartChild
     return Some((PartChildKind::Required, inner));
   }
   None
+}
+
+fn part_child_cardinality_tokens(kind: PartChildKind) -> proc_macro2::TokenStream {
+  match kind {
+    PartChildKind::Optional => quote! { crate::sdk::PartChildCardinality::Optional },
+    PartChildKind::Required => quote! { crate::sdk::PartChildCardinality::Required },
+    PartChildKind::Repeated => quote! { crate::sdk::PartChildCardinality::Repeated },
+    PartChildKind::RequiredRepeated => {
+      quote! { crate::sdk::PartChildCardinality::RequiredRepeated }
+    }
+  }
+}
+
+fn part_child_type_name(ty: &Type) -> String {
+  quote!(#ty).to_string().replace(" :: ", "::")
 }
 
 fn is_string_type(ty: &Type) -> bool {

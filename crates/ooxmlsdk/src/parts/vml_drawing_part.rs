@@ -15,11 +15,13 @@ pub struct VmlDrawingPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
   ))]
   pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
+    kind = "repeated"
   ))]
   pub(crate) legacy_diagram_text_parts:
     Vec<crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>,
@@ -28,20 +30,4 @@ pub struct VmlDrawingPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl VmlDrawingPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "image_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-      "crate::parts::image_part::ImagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "legacy_diagram_text_parts",
-      "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
-      "crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

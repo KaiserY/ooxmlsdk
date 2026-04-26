@@ -66,18 +66,6 @@ fn gen_package_module(
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = package_marker_fields(part)?;
-  let child_descriptors = generated_child_descriptors(part)?;
-  let child_descriptors_impl = if child_descriptors.is_empty() {
-    quote! {}
-  } else {
-    quote! {
-      impl #struct_name_ident {
-        pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-          #( #child_descriptors, )*
-        ];
-      }
-    }
-  };
   let package_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
     pub struct #struct_name_ident {
@@ -95,7 +83,6 @@ fn gen_package_module(
     #target_name_stmt
     #extension_stmt
     #package_struct
-    #child_descriptors_impl
   })
 }
 
@@ -125,10 +112,11 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     } else {
       quote! {}
     };
+    let kind = part_child_kind_value(*cardinality);
     fields.push(quote! {
       #( #attrs )*
       #main_attr
-      #[sdk(part_child(relationship_type = #relationship_type))]
+      #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
       pub(crate) #field_ident: #field_ty,
     });
   }
@@ -162,18 +150,6 @@ fn gen_part_handle_module(
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = part_marker_fields(part)?;
-  let child_descriptors = generated_child_descriptors(part)?;
-  let child_descriptors_impl = if child_descriptors.is_empty() {
-    quote! {}
-  } else {
-    quote! {
-      impl #struct_name_ident {
-        pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-          #( #child_descriptors, )*
-        ];
-      }
-    }
-  };
   let part_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
     pub struct #struct_name_ident {
@@ -190,7 +166,6 @@ fn gen_part_handle_module(
     #target_name_stmt
     #extension_stmt
     #part_struct
-    #child_descriptors_impl
   })
 }
 
@@ -222,9 +197,10 @@ fn part_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     let field_ident: Ident = parse_str(&field.rust_name)?;
     let part_ty: Type = parse_str(&field.rust_type)?;
     let field_ty = part_child_field_type(*cardinality, &part_ty);
+    let kind = part_child_kind_value(*cardinality);
     fields.push(quote! {
       #( #attrs )*
-      #[sdk(part_child(relationship_type = #relationship_type))]
+      #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
       pub(crate) #field_ident: #field_ty,
     });
   }
@@ -259,47 +235,12 @@ fn part_child_field_type(cardinality: PartChildCardinality, part_ty: &Type) -> T
   }
 }
 
-fn generated_child_descriptors(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
-  let mut descriptors = Vec::new();
-
-  for field in &part.fields {
-    let PartFieldKind::ChildPart {
-      relationship_type,
-      cardinality,
-    } = &field.kind
-    else {
-      continue;
-    };
-    if relationship_type.is_empty() {
-      continue;
-    }
-
-    let attrs = part_field_attrs(field);
-    let field_name = field.rust_name.as_str();
-    let child_part_type = field.rust_type.as_str();
-    let cardinality = part_child_cardinality_value(*cardinality);
-    descriptors.push(quote! {
-      #( #attrs )*
-      crate::sdk::PartChildDescriptor::new(
-        #field_name,
-        #relationship_type,
-        #child_part_type,
-        #cardinality,
-      )
-    });
-  }
-
-  Ok(descriptors)
-}
-
-fn part_child_cardinality_value(cardinality: PartChildCardinality) -> TokenStream {
+fn part_child_kind_value(cardinality: PartChildCardinality) -> &'static str {
   match cardinality {
-    PartChildCardinality::Optional => quote! { crate::sdk::PartChildCardinality::Optional },
-    PartChildCardinality::Required => quote! { crate::sdk::PartChildCardinality::Required },
-    PartChildCardinality::Repeated => quote! { crate::sdk::PartChildCardinality::Repeated },
-    PartChildCardinality::RequiredRepeated => {
-      quote! { crate::sdk::PartChildCardinality::RequiredRepeated }
-    }
+    PartChildCardinality::Optional => "optional",
+    PartChildCardinality::Required => "required",
+    PartChildCardinality::Repeated => "repeated",
+    PartChildCardinality::RequiredRepeated => "required_repeated",
   }
 }
 

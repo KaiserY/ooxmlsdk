@@ -20,7 +20,8 @@ pub struct WebExTaskpanesPart {
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension",
+    kind = "repeated"
   ))]
   pub(crate) web_extension_parts: Vec<crate::parts::web_extension_part::WebExtensionPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -28,15 +29,4 @@ pub struct WebExTaskpanesPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl WebExTaskpanesPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "web_extension_parts",
-      "http://schemas.microsoft.com/office/2011/relationships/webextension",
-      "crate::parts::web_extension_part::WebExtensionPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

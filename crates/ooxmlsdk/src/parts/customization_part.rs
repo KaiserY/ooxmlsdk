@@ -19,7 +19,8 @@ pub struct CustomizationPart {
     crate::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
+    kind = "optional"
   ))]
   pub(crate) word_attached_toolbars_part:
     Option<Box<crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>>,
@@ -28,13 +29,4 @@ pub struct CustomizationPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl CustomizationPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "word_attached_toolbars_part",
-      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
-      "crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart",
-      crate::sdk::PartChildCardinality::Optional,
-    )];
 }

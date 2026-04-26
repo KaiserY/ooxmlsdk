@@ -15,7 +15,8 @@ pub struct VbaProjectPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wordVbaData"
+    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+    kind = "optional"
   ))]
   pub(crate) vba_data_part: Option<Box<crate::parts::vba_data_part::VbaDataPart>>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -23,13 +24,4 @@ pub struct VbaProjectPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl VbaProjectPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "vba_data_part",
-      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
-      "crate::parts::vba_data_part::VbaDataPart",
-      crate::sdk::PartChildCardinality::Optional,
-    )];
 }

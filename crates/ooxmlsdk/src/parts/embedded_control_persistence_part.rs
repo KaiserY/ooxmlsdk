@@ -16,7 +16,8 @@ pub struct EmbeddedControlPersistencePart {
     pub(crate) id: crate::common::PartId,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary"
+            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+            kind = "repeated"
         )
     )]
     pub(crate) embedded_control_persistence_binary_data_parts: Vec<
@@ -27,14 +28,4 @@ pub struct EmbeddedControlPersistencePart {
     pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
     pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
     pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl EmbeddedControlPersistencePart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_control_persistence_binary_data_parts",
-      "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
-      "crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

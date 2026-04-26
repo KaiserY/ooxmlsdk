@@ -20,7 +20,8 @@ pub struct FontTablePart {
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    kind = "repeated"
   ))]
   pub(crate) font_parts: Vec<crate::parts::font_part::FontPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -28,13 +29,4 @@ pub struct FontTablePart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl FontTablePart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    &[crate::sdk::PartChildDescriptor::new(
-      "font_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-      "crate::parts::font_part::FontPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    )];
 }

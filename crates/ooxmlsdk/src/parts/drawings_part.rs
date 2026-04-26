@@ -19,48 +19,58 @@ pub struct DrawingsPart {
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing::WorksheetDrawing,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+    kind = "repeated"
   ))]
   pub(crate) chart_parts: Vec<crate::parts::chart_part::ChartPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx"
+    relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+    kind = "repeated"
   ))]
   pub(crate) extended_chart_parts: Vec<crate::parts::extended_chart_part::ExtendedChartPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+    kind = "repeated"
   ))]
   pub(crate) diagram_colors_parts: Vec<crate::parts::diagram_colors_part::DiagramColorsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+    kind = "repeated"
   ))]
   pub(crate) diagram_data_parts: Vec<crate::parts::diagram_data_part::DiagramDataPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+    kind = "repeated"
   ))]
   pub(crate) diagram_persist_layout_parts:
     Vec<crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+    kind = "repeated"
   ))]
   pub(crate) diagram_layout_definition_parts:
     Vec<crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+    kind = "repeated"
   ))]
   pub(crate) diagram_style_parts: Vec<crate::parts::diagram_style_part::DiagramStylePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+    kind = "repeated"
   ))]
   pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+    kind = "repeated"
   ))]
   pub(crate) custom_xml_parts: Vec<crate::parts::custom_xml_part::CustomXmlPart>,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension"
+    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension",
+    kind = "repeated"
   ))]
   pub(crate) web_extension_parts: Vec<crate::parts::web_extension_part::WebExtensionPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -68,71 +78,4 @@ pub struct DrawingsPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl DrawingsPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "chart_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-      "crate::parts::chart_part::ChartPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "extended_chart_parts",
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-      "crate::parts::extended_chart_part::ExtendedChartPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_colors_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
-      "crate::parts::diagram_colors_part::DiagramColorsPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_data_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-      "crate::parts::diagram_data_part::DiagramDataPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_persist_layout_parts",
-      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
-      "crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_layout_definition_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
-      "crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_style_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-      "crate::parts::diagram_style_part::DiagramStylePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "image_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-      "crate::parts::image_part::ImagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "custom_xml_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-      "crate::parts::custom_xml_part::CustomXmlPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "web_extension_parts",
-      "http://schemas.microsoft.com/office/2011/relationships/webextension",
-      "crate::parts::web_extension_part::WebExtensionPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

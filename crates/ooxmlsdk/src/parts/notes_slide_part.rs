@@ -21,20 +21,23 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+            kind = "repeated"
         )
     )]
     pub(crate) custom_xml_parts: Vec<crate::parts::custom_xml_part::CustomXmlPart>,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
+            kind = "repeated"
         )
     )]
     pub(crate) chart_parts: Vec<crate::parts::chart_part::ChartPart>,
     #[cfg(feature = "microsoft365")]
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx"
+            relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+            kind = "repeated"
         )
     )]
     pub(crate) extended_chart_parts: Vec<
@@ -42,7 +45,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+            kind = "repeated"
         )
     )]
     pub(crate) diagram_colors_parts: Vec<
@@ -50,14 +54,16 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+            kind = "repeated"
         )
     )]
     pub(crate) diagram_data_parts: Vec<crate::parts::diagram_data_part::DiagramDataPart>,
     #[cfg(feature = "microsoft365")]
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"
+            relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+            kind = "repeated"
         )
     )]
     pub(crate) diagram_persist_layout_parts: Vec<
@@ -65,7 +71,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+            kind = "repeated"
         )
     )]
     pub(crate) diagram_layout_definition_parts: Vec<
@@ -73,7 +80,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+            kind = "repeated"
         )
     )]
     pub(crate) diagram_style_parts: Vec<
@@ -81,7 +89,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+            kind = "repeated"
         )
     )]
     pub(crate) embedded_object_parts: Vec<
@@ -89,7 +98,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
+            kind = "repeated"
         )
     )]
     pub(crate) embedded_package_parts: Vec<
@@ -97,19 +107,22 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+            kind = "repeated"
         )
     )]
     pub(crate) image_parts: Vec<crate::parts::image_part::ImagePart>,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+            kind = "repeated"
         )
     )]
     pub(crate) vml_drawing_parts: Vec<crate::parts::vml_drawing_part::VmlDrawingPart>,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary"
+            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+            kind = "repeated"
         )
     )]
     pub(crate) embedded_control_persistence_binary_data_parts: Vec<
@@ -118,7 +131,8 @@ pub struct NotesSlidePart {
     #[cfg(feature = "microsoft365")]
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d"
+            relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
+            kind = "repeated"
         )
     )]
     pub(crate) model3_d_reference_relationship_parts: Vec<
@@ -126,7 +140,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+            kind = "optional"
         )
     )]
     pub(crate) notes_master_part: Option<
@@ -134,7 +149,8 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
+            kind = "optional"
         )
     )]
     pub(crate) theme_override_part: Option<
@@ -142,13 +158,15 @@ pub struct NotesSlidePart {
     >,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+            kind = "optional"
         )
     )]
     pub(crate) slide_part: Option<Box<crate::parts::slide_part::SlidePart>>,
     #[sdk(
         part_child(
-            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags"
+            relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+            kind = "repeated"
         )
     )]
     pub(crate) user_defined_tags_parts: Vec<
@@ -159,119 +177,4 @@ pub struct NotesSlidePart {
     pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
     pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
     pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl NotesSlidePart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "custom_xml_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-      "crate::parts::custom_xml_part::CustomXmlPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "chart_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-      "crate::parts::chart_part::ChartPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "extended_chart_parts",
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-      "crate::parts::extended_chart_part::ExtendedChartPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_colors_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
-      "crate::parts::diagram_colors_part::DiagramColorsPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_data_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-      "crate::parts::diagram_data_part::DiagramDataPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_persist_layout_parts",
-      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
-      "crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_layout_definition_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
-      "crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "diagram_style_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-      "crate::parts::diagram_style_part::DiagramStylePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_object_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-      "crate::parts::embedded_object_part::EmbeddedObjectPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_package_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-      "crate::parts::embedded_package_part::EmbeddedPackagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "image_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-      "crate::parts::image_part::ImagePart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "vml_drawing_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-      "crate::parts::vml_drawing_part::VmlDrawingPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_control_persistence_binary_data_parts",
-      "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
-      "crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "model3_d_reference_relationship_parts",
-      "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
-      "crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "notes_master_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
-      "crate::parts::notes_master_part::NotesMasterPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "theme_override_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
-      "crate::parts::theme_override_part::ThemeOverridePart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "slide_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-      "crate::parts::slide_part::SlidePart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "user_defined_tags_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
-      "crate::parts::user_defined_tags_part::UserDefinedTagsPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

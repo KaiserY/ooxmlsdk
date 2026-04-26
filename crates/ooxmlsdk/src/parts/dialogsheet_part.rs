@@ -20,20 +20,24 @@ pub struct DialogsheetPart {
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet,
   >,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+    kind = "repeated"
   ))]
   pub(crate) spreadsheet_printer_settings_parts:
     Vec<crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+    kind = "optional"
   ))]
   pub(crate) drawings_part: Option<Box<crate::parts::drawings_part::DrawingsPart>>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+    kind = "repeated"
   ))]
   pub(crate) vml_drawing_parts: Vec<crate::parts::vml_drawing_part::VmlDrawingPart>,
   #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"
+    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+    kind = "repeated"
   ))]
   pub(crate) embedded_object_parts: Vec<crate::parts::embedded_object_part::EmbeddedObjectPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -41,32 +45,4 @@ pub struct DialogsheetPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl DialogsheetPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    crate::sdk::PartChildDescriptor::new(
-      "spreadsheet_printer_settings_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-      "crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "drawings_part",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-      "crate::parts::drawings_part::DrawingsPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "vml_drawing_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-      "crate::parts::vml_drawing_part::VmlDrawingPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-    crate::sdk::PartChildDescriptor::new(
-      "embedded_object_parts",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-      "crate::parts::embedded_object_part::EmbeddedObjectPart",
-      crate::sdk::PartChildCardinality::Repeated,
-    ),
-  ];
 }

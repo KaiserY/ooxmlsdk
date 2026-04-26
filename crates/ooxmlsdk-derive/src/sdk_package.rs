@@ -71,7 +71,7 @@ fn package_child_init_tokens(
   let part_ty = &child.part_ty;
   let field_index = field_index as u16;
   match child.kind {
-    PartChildKind::Repeated => (
+    PartChildKind::Repeated | PartChildKind::RequiredRepeated => (
       quote! {
         let mut #field_ident: Vec<#part_ty> = Vec::new();
       },
@@ -169,6 +169,33 @@ fn package_relationship_dispatch_tokens(
   }
 }
 
+fn package_child_descriptors_tokens(child_infos: &[PackageChildInfo]) -> proc_macro2::TokenStream {
+  if child_infos.is_empty() {
+    return quote! {};
+  }
+
+  let descriptors = child_infos.iter().map(|child| {
+    let field_name = child.field_ident.to_string();
+    let relationship_type = child.relationship_type.as_str();
+    let child_part_type = part_child_type_name(&child.part_ty);
+    let cardinality = part_child_cardinality_tokens(child.kind);
+    quote! {
+      crate::sdk::PartChildDescriptor::new(
+        #field_name,
+        #relationship_type,
+        #child_part_type,
+        #cardinality,
+      )
+    }
+  });
+
+  quote! {
+    const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
+      #( #descriptors, )*
+    ];
+  }
+}
+
 pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -246,7 +273,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       attrs: passthrough_attrs(&field.attrs),
       field_ident: field_ident.clone(),
       part_ty: marker.part_ty,
-      kind: marker.kind,
+      kind: parse_part_child_kind_attr(&field.attrs)?.unwrap_or(marker.kind),
       relationship_type,
       main_accessor_ident: parse_package_main_accessor(&field.attrs)?,
     });
@@ -426,7 +453,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   let package_modeled_child_stmts: Vec<_> = child_infos.iter().map(|child| {
     let field_ident = &child.field_ident;
     match child.kind {
-      PartChildKind::Repeated => quote! {
+      PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
         for part in &self.#field_ident {
           crate::sdk::add_part_handle_to_relationship_set(&mut relationships, &self.#storage_ident, None, part)?;
         }
@@ -442,7 +469,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let field_index = field_index as u16;
     let field_ident = &child.field_ident;
     match child.kind {
-      PartChildKind::Repeated => quote! {
+      PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
         #field_index => {
           if let Some(part) = self.#field_ident.get(*item_index) {
             crate::sdk::add_part_handle_to_relationship_set(
@@ -474,7 +501,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   let package_collect_relationship_child_stmts = child_infos.iter().map(|child| {
     let field_ident = &child.field_ident;
     match child.kind {
-      PartChildKind::Repeated => quote! {
+      PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
         for part in &self.#field_ident {
           crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, self, relationships)?;
         }
@@ -486,14 +513,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       },
     }
   });
-  let child_descriptors_assoc = if child_infos.is_empty() {
-    quote! {}
-  } else {
-    quote! {
-      const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-        Self::GENERATED_CHILD_DESCRIPTORS;
-    }
-  };
+  let child_descriptors_assoc = package_child_descriptors_tokens(&child_infos);
   Ok(quote! {
     impl crate::sdk::SdkPackage for #ident {
       #child_descriptors_assoc
@@ -1127,7 +1147,7 @@ fn package_relationship_method_tokens(
       let part_ty = &child.part_ty;
       let relationship_type = &child.relationship_type;
       match child.kind {
-        PartChildKind::Repeated => quote! {
+        PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
           #( #attrs )*
           pub fn #relationship_method_ident(
             &self,

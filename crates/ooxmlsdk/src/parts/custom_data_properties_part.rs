@@ -20,7 +20,8 @@ pub struct CustomDataPropertiesPart {
   >,
   #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData"
+    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData",
+    kind = "optional"
   ))]
   pub(crate) custom_data_part: Option<Box<crate::parts::custom_data_part::CustomDataPart>>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
@@ -28,15 +29,4 @@ pub struct CustomDataPropertiesPart {
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
-}
-impl CustomDataPropertiesPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-    #[cfg(feature = "microsoft365")]
-    crate::sdk::PartChildDescriptor::new(
-      "custom_data_part",
-      "http://schemas.microsoft.com/office/2007/relationships/customData",
-      "crate::parts::custom_data_part::CustomDataPart",
-      crate::sdk::PartChildCardinality::Optional,
-    ),
-  ];
 }

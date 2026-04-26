@@ -36,7 +36,7 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  MediaDataPartType, SdkPackage, SdkPartHandle, ThumbnailPartType,
+  MediaDataPartType, PartChildCardinality, SdkPackage, SdkPartHandle, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -79,6 +79,45 @@ fn empty_package() -> Cursor<Vec<u8>> {
   }
   buffer.set_position(0);
   buffer
+}
+
+#[test]
+fn part_child_descriptors_are_generated_from_static_field_metadata() {
+  let slide_master_descriptor = PresentationPart::child_descriptors()
+    .iter()
+    .find(|descriptor| descriptor.field_name == "slide_master_parts")
+    .expect("presentation slide master child descriptor");
+
+  assert_eq!(
+    slide_master_descriptor.relationship_type,
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster"
+  );
+  assert_eq!(
+    slide_master_descriptor.child_part_type,
+    "crate::parts::slide_master_part::SlideMasterPart"
+  );
+  assert_eq!(
+    slide_master_descriptor.cardinality,
+    PartChildCardinality::RequiredRepeated
+  );
+
+  let main_document_descriptor = WordprocessingDocument::child_descriptors()
+    .iter()
+    .find(|descriptor| descriptor.field_name == "main_document_part")
+    .expect("wordprocessing main document child descriptor");
+
+  assert_eq!(
+    main_document_descriptor.relationship_type,
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+  );
+  assert_eq!(
+    main_document_descriptor.child_part_type,
+    "crate::parts::main_document_part::MainDocumentPart"
+  );
+  assert_eq!(
+    main_document_descriptor.cardinality,
+    PartChildCardinality::Required
+  );
 }
 
 fn package_entry_exists(bytes: Vec<u8>, path: &str) -> bool {

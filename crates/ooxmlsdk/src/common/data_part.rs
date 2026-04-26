@@ -90,7 +90,7 @@ impl MediaDataPart {
   pub fn data_part_reference_relationships<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
-  ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
     let part_id = (self.package_id == Some(package.storage().id()))
       .then_some(self.id)
       .flatten();
@@ -98,6 +98,7 @@ impl MediaDataPart {
       package
         .storage()
         .data_part_reference_relationships_to(part_id)
+        .map(Into::into)
     })
   }
 

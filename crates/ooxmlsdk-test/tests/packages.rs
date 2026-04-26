@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{
-  MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipSet, RelationshipTargetKind,
+  MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipRef, RelationshipTargetKind,
   StoredPartDataKind,
 };
 use ooxmlsdk::parts::{
@@ -670,7 +670,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
   assert_eq!(slide1_media_relationships.len(), 1);
   assert_eq!(
     slide1_media_relationships[0].relationship_type(),
-    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::MEDIA_REFERENCE_RELATIONSHIP_TYPE
   );
   let old_slide1_reference_id = slide1_media_relationships[0].id().to_string();
 
@@ -695,7 +695,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
     .unwrap();
   assert_eq!(
     new_reference.relationship_type(),
-    RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::AUDIO_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(new_reference.target_part_id(), media_data_part.part_id());
 
@@ -761,7 +761,7 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
   assert_eq!(reopened_slide1_relationships.len(), 1);
   assert_eq!(
     reopened_slide1_relationships[0].relationship_type(),
-    RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::AUDIO_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(
     reopened_slide1_relationships[0].target_part_id(),
@@ -888,7 +888,7 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     .unwrap();
   assert_eq!(
     audio_relationship.relationship_type(),
-    RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::AUDIO_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(
     audio_relationship.reference_kind(),
@@ -906,7 +906,7 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     .unwrap();
   assert_eq!(
     media_relationship.relationship_type(),
-    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::MEDIA_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(
     media_relationship.reference_kind(),
@@ -924,7 +924,7 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     .unwrap();
   assert_eq!(
     video_relationship.relationship_type(),
-    RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::VIDEO_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(
     video_relationship.reference_kind(),
@@ -992,7 +992,7 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     .unwrap();
   assert_eq!(
     reopened_video_relationship.relationship_type(),
-    RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::VIDEO_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(
     reopened_video_relationship.target_part_id(),
@@ -1062,13 +1062,13 @@ fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target(
   main_part
     .add_media_reference_relationship_with_id(&mut package, &media_data_part, "rIdSdkDataRef")
     .unwrap();
-  let existing_relationship = main_part
+  let existing_relationship: ooxmlsdk::common::Relationship = main_part
     .get_reference_relationship(&package, "rIdSdkDataRef")
     .unwrap()
-    .clone();
+    .into();
 
   let copied_relationship_id = header
-    .add_data_part_reference_relationship_from_existing(&mut package, &existing_relationship)
+    .add_data_part_reference_relationship_from_existing(&mut package, existing_relationship)
     .unwrap();
   assert_eq!(copied_relationship_id, "rIdSdkDataRef");
   let copied_relationship = header
@@ -1076,7 +1076,7 @@ fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target(
     .unwrap();
   assert_eq!(
     copied_relationship.relationship_type(),
-    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::MEDIA_REFERENCE_RELATIONSHIP_TYPE
   );
   assert_eq!(
     copied_relationship.target_part_id(),
@@ -1097,7 +1097,7 @@ fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target(
     .unwrap();
   assert_eq!(
     reopened_relationship.relationship_type(),
-    RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+    RelationshipRef::MEDIA_REFERENCE_RELATIONSHIP_TYPE
   );
   let reopened_media_part =
     media_data_part_by_id(&reopened, reopened_relationship.target_part_id().unwrap());
@@ -1124,7 +1124,7 @@ fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test()
     main_part
       .external_relationships(&package)
       .all(|relationship| relationship.relationship_type()
-        != ooxmlsdk::common::RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE)
+        != ooxmlsdk::common::RelationshipRef::HYPERLINK_RELATIONSHIP_TYPE)
   );
   assert!(
     main_part
@@ -1286,7 +1286,7 @@ fn part_hyperlink_relationship_mutation_is_saved() {
   assert_eq!(relationship.id(), relationship_id);
   assert_eq!(
     relationship.relationship_type(),
-    RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE
+    RelationshipRef::HYPERLINK_RELATIONSHIP_TYPE
   );
   assert_eq!(relationship.target(), target);
   assert!(matches!(relationship.target_mode(), TargetMode::External));
@@ -1308,7 +1308,7 @@ fn part_hyperlink_relationship_mutation_is_saved() {
   assert_eq!(reopened_relationship.target(), target);
   assert_eq!(
     reopened_relationship.relationship_type(),
-    RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE
+    RelationshipRef::HYPERLINK_RELATIONSHIP_TYPE
   );
   assert!(matches!(
     reopened_relationship.target_mode(),

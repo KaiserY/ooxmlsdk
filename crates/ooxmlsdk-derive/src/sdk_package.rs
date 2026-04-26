@@ -679,7 +679,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         relationship_id: impl Into<String>,
         relationship_type: impl Into<String>,
         target: impl Into<String>,
-      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'_>, crate::common::SdkError> {
         crate::sdk::SdkPackage::add_external_relationship(
           self,
           relationship_id,
@@ -693,7 +693,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         &mut self,
         relationship_type: impl Into<String>,
         target: impl Into<String>,
-      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'_>, crate::common::SdkError> {
         crate::sdk::SdkPackage::add_external_relationship_auto_id(
           self,
           relationship_type,
@@ -706,7 +706,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         &mut self,
         relationship_id: impl Into<String>,
         target: impl Into<String>,
-      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'_>, crate::common::SdkError> {
         crate::sdk::SdkPackage::add_hyperlink_relationship(self, relationship_id, target)
       }
 
@@ -716,7 +716,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         relationship_id: impl Into<String>,
         target: impl Into<String>,
         target_mode: crate::schemas::opc_relationships::TargetMode,
-      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'_>, crate::common::SdkError> {
         crate::sdk::SdkPackage::add_hyperlink_relationship_with_mode(
           self,
           relationship_id,
@@ -730,7 +730,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         &mut self,
         target: impl Into<String>,
         target_mode: crate::schemas::opc_relationships::TargetMode,
-      ) -> Result<&crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'_>, crate::common::SdkError> {
         crate::sdk::SdkPackage::add_hyperlink_relationship_auto_id(
           self,
           target,
@@ -742,7 +742,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn remove_relationship(
         &mut self,
         relationship_id: &str,
-      ) -> Option<crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::Relationship> {
         crate::sdk::SdkPackage::remove_relationship(self, relationship_id)
       }
 
@@ -750,7 +750,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn get_reference_relationship(
         &self,
         relationship_id: &str,
-      ) -> Option<&crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::RelationshipRef<'_>> {
         crate::sdk::SdkPackage::get_reference_relationship(self, relationship_id)
       }
 
@@ -758,7 +758,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn get_external_relationship(
         &self,
         relationship_id: &str,
-      ) -> Option<&crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::RelationshipRef<'_>> {
         crate::sdk::SdkPackage::get_external_relationship(self, relationship_id)
       }
 
@@ -766,7 +766,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn get_hyperlink_relationship(
         &self,
         relationship_id: &str,
-      ) -> Option<&crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::RelationshipRef<'_>> {
         crate::sdk::SdkPackage::get_hyperlink_relationship(self, relationship_id)
       }
 
@@ -774,7 +774,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn delete_reference_relationship(
         &mut self,
         relationship_id: &str,
-      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::Relationship, crate::common::SdkError> {
         crate::sdk::SdkPackage::delete_reference_relationship(self, relationship_id)
       }
 
@@ -782,7 +782,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn delete_external_relationship(
         &mut self,
         relationship_id: &str,
-      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::Relationship, crate::common::SdkError> {
         crate::sdk::SdkPackage::delete_external_relationship(self, relationship_id)
       }
 
@@ -800,19 +800,19 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
-      pub fn external_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+      pub fn external_relationships(&self) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> {
         crate::sdk::SdkPackage::external_relationships(self)
       }
 
       #[inline]
-      pub fn hyperlink_relationships(&self) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+      pub fn hyperlink_relationships(&self) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> {
         crate::sdk::SdkPackage::hyperlink_relationships(self)
       }
 
       #[inline]
       pub fn data_part_reference_relationships(
         &self,
-      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
+      ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> {
         crate::sdk::SdkPackage::data_part_reference_relationships(self)
       }
 
@@ -1134,7 +1134,7 @@ fn package_relationship_method_tokens(
           #( #attrs )*
           pub fn #relationship_method_ident(
             &self,
-          ) -> impl Iterator<Item = &crate::common::RelationshipInfo> + '_ {
+          ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> + '_ {
             let _ = self.#field_ident;
             crate::sdk::SdkPackage::relationships_by_type(self, #relationship_type)
           }
@@ -1148,7 +1148,7 @@ fn package_relationship_method_tokens(
           #( #attrs )*
           pub fn #relationship_method_ident(
             &self,
-          ) -> impl Iterator<Item = &crate::common::RelationshipInfo> + '_ {
+          ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> + '_ {
             let _ = self.#field_ident;
             crate::sdk::SdkPackage::relationships_by_type(self, #relationship_type)
           }

@@ -27,9 +27,11 @@ pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub use package::{
   NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, ReferenceRelationshipKind,
-  RelationshipInfo, RelationshipSet, RelationshipTargetKind, RelationshipView, SdkPackageStorage,
-  StoredPart, StoredPartData, StoredPartDataKind,
+  Relationship, RelationshipRef, RelationshipTargetKind, SdkPackageStorage, StoredPart,
+  StoredPartData, StoredPartDataKind,
 };
+#[cfg(feature = "parts")]
+pub(crate) use package::{RelationshipInfo, RelationshipSet, RelationshipView};
 #[cfg(feature = "parts")]
 pub use part::{
   load_data_part_reference, load_extended_part, load_part_relationships, load_typed_child_part,

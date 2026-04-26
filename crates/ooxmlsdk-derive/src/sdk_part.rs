@@ -1548,7 +1548,7 @@ fn expand_part_handle(
       pub fn external_relationships<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
-      ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> {
+      ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> {
         <Self as crate::sdk::SdkPartHandle>::external_relationships(self, package)
       }
 
@@ -1556,7 +1556,7 @@ fn expand_part_handle(
       pub fn hyperlink_relationships<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
-      ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> {
+      ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> {
         <Self as crate::sdk::SdkPartHandle>::hyperlink_relationships(self, package)
       }
 
@@ -1564,7 +1564,7 @@ fn expand_part_handle(
       pub fn data_part_reference_relationships<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
-      ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> {
+      ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> {
         <Self as crate::sdk::SdkPartHandle>::data_part_reference_relationships(self, package)
       }
 
@@ -1575,7 +1575,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
         relationship_type: impl Into<String>,
         target: impl Into<String>,
-      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::add_external_relationship(self,
           package,
           relationship_id,
@@ -1590,7 +1590,7 @@ fn expand_part_handle(
         package: &'a mut P,
         relationship_type: impl Into<String>,
         target: impl Into<String>,
-      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::add_external_relationship_auto_id(self,
           package,
           relationship_type,
@@ -1604,7 +1604,7 @@ fn expand_part_handle(
         package: &'a mut P,
         relationship_id: impl Into<String>,
         target: impl Into<String>,
-      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::add_hyperlink_relationship(self,
           package,
           relationship_id,
@@ -1619,7 +1619,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
         target: impl Into<String>,
         target_mode: crate::schemas::opc_relationships::TargetMode,
-      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::add_hyperlink_relationship_with_mode(self,
           package,
           relationship_id,
@@ -1634,7 +1634,7 @@ fn expand_part_handle(
         package: &'a mut P,
         target: impl Into<String>,
         target_mode: crate::schemas::opc_relationships::TargetMode,
-      ) -> Result<&'a crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::add_hyperlink_relationship_auto_id(self,
           package,
           target,
@@ -2218,7 +2218,7 @@ fn expand_part_handle(
         &self,
         package: &mut P,
         relationship_id: &str,
-      ) -> Option<crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::Relationship> {
         <Self as crate::sdk::SdkPartHandle>::remove_relationship(self,
           package,
           relationship_id,
@@ -2230,7 +2230,7 @@ fn expand_part_handle(
         &'a self,
         package: &'a P,
         relationship_id: &str,
-      ) -> Option<&'a crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::RelationshipRef<'a>> {
         <Self as crate::sdk::SdkPartHandle>::get_reference_relationship(self,
           package,
           relationship_id,
@@ -2242,7 +2242,7 @@ fn expand_part_handle(
         &'a self,
         package: &'a P,
         relationship_id: &str,
-      ) -> Option<&'a crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::RelationshipRef<'a>> {
         <Self as crate::sdk::SdkPartHandle>::get_external_relationship(self,
           package,
           relationship_id,
@@ -2254,7 +2254,7 @@ fn expand_part_handle(
         &'a self,
         package: &'a P,
         relationship_id: &str,
-      ) -> Option<&'a crate::common::RelationshipInfo> {
+      ) -> Option<crate::common::RelationshipRef<'a>> {
         <Self as crate::sdk::SdkPartHandle>::get_hyperlink_relationship(self,
           package,
           relationship_id,
@@ -2266,7 +2266,7 @@ fn expand_part_handle(
         &self,
         package: &mut P,
         relationship_id: &str,
-      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::Relationship, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::delete_reference_relationship(self,
           package,
           relationship_id,
@@ -2278,7 +2278,7 @@ fn expand_part_handle(
         &self,
         package: &mut P,
         relationship_id: &str,
-      ) -> Result<crate::common::RelationshipInfo, crate::common::SdkError> {
+      ) -> Result<crate::common::Relationship, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::delete_external_relationship(self,
           package,
           relationship_id,
@@ -2479,7 +2479,7 @@ fn part_handle_child_methods_tokens(
         pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
           &'a self,
           package: &'a P,
-        ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
+        ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
           let _ = &self.#method_ident;
           <Self as crate::sdk::SdkPartHandle>::relationships_by_type(
             self,
@@ -2503,7 +2503,7 @@ fn part_handle_child_methods_tokens(
         pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
           &'a self,
           package: &'a P,
-        ) -> impl Iterator<Item = &'a crate::common::RelationshipInfo> + 'a {
+        ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
           let _ = &self.#method_ident;
           <Self as crate::sdk::SdkPartHandle>::relationships_by_type(
             self,
@@ -2869,7 +2869,7 @@ fn part_handle_child_methods_tokens(
       pub fn add_data_part_reference_relationship_from_existing<P: crate::sdk::SdkPackage>(
         &self,
         package: &mut P,
-        relationship: &crate::common::RelationshipInfo,
+        relationship: crate::common::Relationship,
       ) -> Result<String, crate::common::SdkError> {
         <Self as crate::sdk::SdkPartHandle>::add_data_part_reference_relationship_from_existing(self,
           package,

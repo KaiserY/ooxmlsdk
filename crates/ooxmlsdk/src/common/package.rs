@@ -4,7 +4,9 @@ use std::io::{Read, Seek};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::schemas::opc_content_types::{Types, TypesChoice};
-use crate::schemas::opc_relationships::{Relationship, Relationships, TargetMode};
+use crate::schemas::opc_relationships::{
+  Relationship as OpcRelationship, Relationships, TargetMode,
+};
 
 use super::{
   SdkError, part_relationships_path, resolve_relationship_target_path, resolve_zip_file_path,
@@ -98,7 +100,7 @@ impl StoredPartData {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RelationshipInfo {
+pub(crate) struct RelationshipInfo {
   id: Box<str>,
   relationship_type: Box<str>,
   target: Box<str>,
@@ -245,8 +247,8 @@ impl RelationshipInfo {
     }
   }
 
-  fn to_relationship(&self) -> Relationship {
-    Relationship {
+  fn to_relationship(&self) -> OpcRelationship {
+    OpcRelationship {
       id: self.id().to_string(),
       r#type: self.relationship_type().to_string(),
       target: self.target().to_string(),
@@ -255,18 +257,156 @@ impl RelationshipInfo {
   }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Relationship {
+  inner: RelationshipInfo,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RelationshipRef<'a> {
+  inner: &'a RelationshipInfo,
+}
+
+macro_rules! impl_relationship_accessors {
+  ($ident:ident) => {
+    impl $ident {
+      #[inline]
+      pub fn id(&self) -> &str {
+        self.inner.id()
+      }
+
+      #[inline]
+      pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+      }
+
+      #[inline]
+      pub fn target(&self) -> &str {
+        self.inner.target()
+      }
+
+      #[inline]
+      pub fn target_mode(&self) -> TargetMode {
+        self.inner.target_mode()
+      }
+
+      #[inline]
+      pub fn target_kind(&self) -> RelationshipTargetKind {
+        self.inner.target_kind()
+      }
+
+      #[inline]
+      pub fn target_part_id(&self) -> Option<PartId> {
+        self.inner.target_part_id()
+      }
+
+      #[inline]
+      pub fn reference_kind(&self) -> Option<ReferenceRelationshipKind> {
+        self.inner.reference_kind()
+      }
+
+      #[inline]
+      pub fn is_reference_relationship(&self) -> bool {
+        self.inner.is_reference_relationship()
+      }
+    }
+  };
+}
+
+impl_relationship_accessors!(Relationship);
+
+impl<'a> RelationshipRef<'a> {
+  pub const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+  pub const AUDIO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
+  pub const MEDIA_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.microsoft.com/office/2007/relationships/media";
+  pub const VIDEO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
+
+  #[inline]
+  pub(crate) const fn new(inner: &'a RelationshipInfo) -> Self {
+    Self { inner }
+  }
+
+  #[inline]
+  pub fn id(&self) -> &'a str {
+    self.inner.id()
+  }
+
+  #[inline]
+  pub fn relationship_type(&self) -> &'a str {
+    self.inner.relationship_type()
+  }
+
+  #[inline]
+  pub fn target(&self) -> &'a str {
+    self.inner.target()
+  }
+
+  #[inline]
+  pub fn target_mode(&self) -> TargetMode {
+    self.inner.target_mode()
+  }
+
+  #[inline]
+  pub fn target_kind(&self) -> RelationshipTargetKind {
+    self.inner.target_kind()
+  }
+
+  #[inline]
+  pub fn target_part_id(&self) -> Option<PartId> {
+    self.inner.target_part_id()
+  }
+
+  #[inline]
+  pub fn reference_kind(&self) -> Option<ReferenceRelationshipKind> {
+    self.inner.reference_kind()
+  }
+
+  #[inline]
+  pub fn is_reference_relationship(&self) -> bool {
+    self.inner.is_reference_relationship()
+  }
+}
+
+impl From<RelationshipInfo> for Relationship {
+  #[inline]
+  fn from(inner: RelationshipInfo) -> Self {
+    Self { inner }
+  }
+}
+
+impl From<RelationshipRef<'_>> for Relationship {
+  #[inline]
+  fn from(value: RelationshipRef<'_>) -> Self {
+    Self {
+      inner: value.inner.clone(),
+    }
+  }
+}
+
+impl<'a> From<&'a RelationshipInfo> for RelationshipRef<'a> {
+  #[inline]
+  fn from(inner: &'a RelationshipInfo) -> Self {
+    Self::new(inner)
+  }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct RelationshipSet {
+pub(crate) struct RelationshipSet {
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct RelationshipView {
+pub(crate) struct RelationshipView {
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
 }
 
+#[allow(dead_code)]
 impl RelationshipView {
   #[inline]
   pub fn is_empty(&self) -> bool {
@@ -383,6 +523,7 @@ fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a Relationship
   format!("rId{next}")
 }
 
+#[allow(dead_code)]
 impl RelationshipSet {
   pub const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
@@ -940,7 +1081,7 @@ impl SdkPackageStorage {
       .target_part_id()
   }
 
-  pub fn internal_part_relationship_info(
+  pub(crate) fn internal_part_relationship_info(
     &self,
     source_part_id: Option<PartId>,
     relationship_id: impl Into<String>,
@@ -1249,7 +1390,7 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn data_part_reference_relationships_to(
+  pub(crate) fn data_part_reference_relationships_to(
     &self,
     target_part_id: PartId,
   ) -> impl Iterator<Item = &RelationshipInfo> {
@@ -1946,7 +2087,7 @@ fn read_relationships<R: Read + Seek>(
 }
 
 fn relationship_info(
-  relationship: Relationship,
+  relationship: OpcRelationship,
   source_parent_path: &str,
   by_path: &HashMap<Box<str>, PartId>,
 ) -> RelationshipInfo {

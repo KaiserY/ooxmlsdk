@@ -1040,6 +1040,42 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
+    pub fn add_part_from_package<
+      P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      T: crate::sdk::SdkPartHandle,
+    >(
+      &mut self,
+      source_package: &P,
+      part: &T,
+    ) -> Result<T, crate::common::SdkError>
+    where
+      Self: crate::parts::PartRootCache,
+    {
+      crate::sdk::SdkPackage::add_part_from_package(self, source_package, part)
+    }
+
+    #[inline]
+    pub fn add_part_from_package_with_id<
+      P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+      T: crate::sdk::SdkPartHandle,
+    >(
+      &mut self,
+      source_package: &P,
+      part: &T,
+      relationship_id: impl Into<String>,
+    ) -> Result<T, crate::common::SdkError>
+    where
+      Self: crate::parts::PartRootCache,
+    {
+      crate::sdk::SdkPackage::add_part_from_package_with_id(
+        self,
+        source_package,
+        part,
+        relationship_id,
+      )
+    }
+
+    #[inline]
     pub fn create_relationship_to_part<T: crate::sdk::SdkPartHandle>(
       &mut self,
       part: T,

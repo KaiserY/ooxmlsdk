@@ -2597,6 +2597,46 @@ fn part_handle_child_methods_tokens(
       }
 
       #[inline]
+      pub fn add_part_from_package<
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        S: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      >(
+        &self,
+        package: &mut P,
+        source_package: &S,
+        part: &T,
+      ) -> Result<T, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_part_from_package(
+          self,
+          package,
+          source_package,
+          part,
+        )
+      }
+
+      #[inline]
+      pub fn add_part_from_package_with_id<
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        S: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      >(
+        &self,
+        package: &mut P,
+        source_package: &S,
+        part: &T,
+        relationship_id: impl Into<String>,
+      ) -> Result<T, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::add_part_from_package_with_id(
+          self,
+          package,
+          source_package,
+          part,
+          relationship_id,
+        )
+      }
+
+      #[inline]
       pub fn create_relationship_to_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
         &self,
         package: &mut P,

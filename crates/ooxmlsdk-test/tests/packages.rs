@@ -2757,6 +2757,127 @@ fn create_relationship_to_part_reuses_existing_parts_from_package() {
 }
 
 #[test]
+fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
+  // Source: adapted from OpenXmlPartContainer.AddPart cross-package copy behavior.
+  let mut source = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let source_main = source.main_document_part().unwrap();
+  let source_header = source_main
+    .add_new_part_auto_id::<_, HeaderPart>(&mut source)
+    .unwrap();
+  source_header
+    .set_root_element(&mut source, Header::default())
+    .unwrap();
+  let source_image = source_header
+    .add_image_part(&mut source, "image/png")
+    .unwrap();
+  source_image
+    .set_data(&mut source, b"imported image".to_vec())
+    .unwrap();
+  source_header
+    .add_external_relationship(
+      &mut source,
+      "rIdSourceExternal",
+      "http://example.com/relationships/custom",
+      "https://example.com/source",
+    )
+    .unwrap();
+  source_header
+    .add_hyperlink_relationship_with_mode(
+      &mut source,
+      "rIdSourceHyperlink",
+      "#SourceBookmark",
+      TargetMode::Internal,
+    )
+    .unwrap();
+  let source_media = source
+    .create_media_data_part_by_type(MediaDataPartType::Mp3)
+    .unwrap();
+  source_media
+    .set_data(&mut source, b"imported media".to_vec())
+    .unwrap();
+  source_header
+    .add_media_reference_relationship_with_id(&mut source, &source_media, "rIdSourceMedia")
+    .unwrap();
+
+  let mut target = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-02.docx")).unwrap();
+  let target_main = target.main_document_part().unwrap();
+  let imported_header = target_main
+    .add_part_from_package_with_id(&mut target, &source, &source_header, "rIdImportedHeader")
+    .unwrap();
+
+  assert_eq!(
+    target_main.get_id_of_part(&target, &imported_header),
+    Some("rIdImportedHeader")
+  );
+  assert!(target_main.is_child_part(&target, &imported_header));
+  assert!(
+    imported_header
+      .root_element(&mut target)
+      .unwrap()
+      .xml_children
+      .is_empty()
+  );
+
+  let imported_image = imported_header
+    .get_part_by_relationship_type(&target, ImagePart::RELATIONSHIP_TYPE)
+    .and_then(PartRef::downcast::<ImagePart>)
+    .unwrap();
+  assert_eq!(imported_image.data(&target).unwrap(), b"imported image");
+
+  let external = imported_header
+    .get_external_relationship(&target, "rIdSourceExternal")
+    .unwrap();
+  assert_eq!(external.target(), "https://example.com/source");
+  let hyperlink = imported_header
+    .get_hyperlink_relationship(&target, "rIdSourceHyperlink")
+    .unwrap();
+  assert_eq!(hyperlink.target(), "#SourceBookmark");
+  assert!(matches!(hyperlink.target_mode(), TargetMode::Internal));
+
+  let data_refs: Vec<_> = imported_header
+    .data_part_reference_relationships(&target)
+    .collect();
+  assert_eq!(data_refs.len(), 1);
+  assert_eq!(data_refs[0].id(), "rIdSourceMedia");
+  let imported_media_part_id = data_refs[0].target_part_id().unwrap();
+  let imported_media_part = target.storage().part(imported_media_part_id).unwrap();
+  assert_eq!(imported_media_part.content_type(), "audio/mp3");
+  assert_eq!(imported_media_part.data().bytes(), b"imported media");
+
+  let mut buffer = Cursor::new(Vec::new());
+  target.save(&mut buffer).unwrap();
+  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_header = reopened_main
+    .get_part_by_id(&reopened, "rIdImportedHeader")
+    .and_then(PartRef::downcast::<HeaderPart>)
+    .unwrap();
+  assert!(reopened_header.root_element(&mut reopened).is_ok());
+  assert!(
+    reopened_header
+      .get_part_by_relationship_type(&reopened, ImagePart::RELATIONSHIP_TYPE)
+      .and_then(PartRef::downcast::<ImagePart>)
+      .is_some()
+  );
+  assert_eq!(
+    reopened_header
+      .data_part_reference_relationships(&reopened)
+      .count(),
+    1
+  );
+  assert!(
+    reopened_header
+      .get_external_relationship(&reopened, "rIdSourceExternal")
+      .is_some()
+  );
+  assert!(
+    reopened_header
+      .get_hyperlink_relationship(&reopened, "rIdSourceHyperlink")
+      .is_some()
+  );
+}
+
+#[test]
 fn add_main_document_part_creates_fixed_main_part_path() {
   // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();

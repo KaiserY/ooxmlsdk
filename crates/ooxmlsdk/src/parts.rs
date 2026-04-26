@@ -11564,6 +11564,25 @@ pub trait PartRootCache: crate::sdk::SdkPackage {
   ) -> Option<crate::parts::PartRootElement> {
     self.root_element_slot_mut(part_id)?.take()
   }
+
+  #[inline]
+  fn part_bytes_for_copy(
+    &self,
+    part_id: crate::common::PartId,
+  ) -> Result<Vec<u8>, crate::common::SdkError> {
+    if let Some(root_element) = self.root_element(part_id) {
+      root_element.to_xml_bytes()
+    } else {
+      let part = crate::sdk::SdkPackage::storage(self)
+        .part(part_id)
+        .ok_or_else(|| {
+          crate::common::SdkError::CommonError(format!(
+            "part id {part_id:?} is not present in package storage"
+          ))
+        })?;
+      Ok(part.data().bytes().to_vec())
+    }
+  }
 }
 pub fn save_package<P, W>(package: &P, writer: W) -> Result<(), crate::common::SdkError>
 where

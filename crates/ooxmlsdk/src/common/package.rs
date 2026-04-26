@@ -1100,6 +1100,66 @@ impl SdkPackageStorage {
     Ok(relationship_id)
   }
 
+  pub(crate) fn import_part_tree_from(
+    &mut self,
+    source: &Self,
+    source_part_id: PartId,
+    parent_part_id: Option<PartId>,
+    relationship_id: impl Into<String>,
+    mut part_data: impl FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
+  ) -> Result<(PartId, usize), SdkError> {
+    let relationship_id = relationship_id.into();
+    let source_part = source.part(source_part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "source part id {source_part_id:?} is not present in package storage"
+      ))
+    })?;
+    let relationship_type = source_part.relationship_type().ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "source part id {source_part_id:?} does not have a relationship type"
+      ))
+    })?;
+
+    match parent_part_id {
+      Some(parent_part_id) => {
+        let relationships = self.relationships(parent_part_id).ok_or_else(|| {
+          SdkError::CommonError(format!(
+            "part id {parent_part_id:?} is not present in package storage"
+          ))
+        })?;
+        if relationships.contains_id(&relationship_id) {
+          return Err(SdkError::CommonError(format!(
+            "relationship id {relationship_id} already exists"
+          )));
+        }
+      }
+      None => {
+        if self.package_relationships.contains_id(&relationship_id) {
+          return Err(SdkError::CommonError(format!(
+            "relationship id {relationship_id} already exists"
+          )));
+        }
+      }
+    }
+
+    let mut part_map = HashMap::new();
+    let mut added_count = 0;
+    let imported_part_id = self.import_part_tree_recursive(
+      source,
+      source_part_id,
+      &mut part_map,
+      &mut added_count,
+      &mut part_data,
+    )?;
+    self.add_imported_part_relationship(
+      parent_part_id,
+      relationship_id,
+      relationship_type,
+      imported_part_id,
+    )?;
+    Ok((imported_part_id, added_count))
+  }
+
   #[inline]
   pub fn data_part_reference_relationships_to(
     &self,
@@ -1142,6 +1202,117 @@ impl SdkPackageStorage {
       self.remove_content_type_override(&path);
     }
     deleted_count
+  }
+
+  fn import_part_tree_recursive(
+    &mut self,
+    source: &Self,
+    source_part_id: PartId,
+    part_map: &mut HashMap<PartId, PartId>,
+    added_count: &mut usize,
+    part_data: &mut impl FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
+  ) -> Result<PartId, SdkError> {
+    if let Some(imported_part_id) = part_map.get(&source_part_id).copied() {
+      return Ok(imported_part_id);
+    }
+
+    let source_part = source.part(source_part_id).ok_or_else(|| {
+      SdkError::CommonError(format!(
+        "source part id {source_part_id:?} is not present in package storage"
+      ))
+    })?;
+    let imported_path = self.unique_import_part_path(source_part.path());
+    let imported_part_id = self.push_part(
+      imported_path,
+      source_part.content_type(),
+      source_part.relationship_type(),
+    );
+    self.set_part_data(imported_part_id, part_data(source_part_id, source_part)?)?;
+    *added_count += 1;
+    part_map.insert(source_part_id, imported_part_id);
+
+    for relationship in source_part.relationships().iter() {
+      if let Some(target_part_id) = relationship.target_part_id() {
+        let imported_target_part_id = self.import_part_tree_recursive(
+          source,
+          target_part_id,
+          part_map,
+          added_count,
+          part_data,
+        )?;
+        if relationship.is_reference_relationship() {
+          self.add_data_part_reference_relationship(
+            imported_part_id,
+            relationship.id(),
+            relationship.relationship_type(),
+            imported_target_part_id,
+          )?;
+        } else {
+          self.add_imported_part_relationship(
+            Some(imported_part_id),
+            relationship.id().to_string(),
+            relationship.relationship_type(),
+            imported_target_part_id,
+          )?;
+        }
+      } else if relationship.is_reference_relationship()
+        || relationship.target_kind() == RelationshipTargetKind::External
+      {
+        self
+          .relationships_mut(imported_part_id)
+          .expect("imported part was just created")
+          .add_relationship_info(relationship.clone())?;
+      }
+    }
+
+    Ok(imported_part_id)
+  }
+
+  fn add_imported_part_relationship(
+    &mut self,
+    parent_part_id: Option<PartId>,
+    relationship_id: String,
+    relationship_type: &str,
+    target_part_id: PartId,
+  ) -> Result<(), SdkError> {
+    let target_part_path = self
+      .part(target_part_id)
+      .ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {target_part_id:?} is not present in package storage"
+        ))
+      })?
+      .path()
+      .to_string();
+    let target = if let Some(parent_part_id) = parent_part_id {
+      let parent_part_path = self
+        .part(parent_part_id)
+        .ok_or_else(|| {
+          SdkError::CommonError(format!(
+            "part id {parent_part_id:?} is not present in package storage"
+          ))
+        })?
+        .path()
+        .to_string();
+      relationship_target_from_source(&parent_part_path, &target_part_path)
+    } else {
+      target_part_path
+    };
+    let relationships = match parent_part_id {
+      Some(parent_part_id) => self.relationships_mut(parent_part_id).ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {parent_part_id:?} is not present in package storage"
+        ))
+      })?,
+      None => self.package_relationships_mut(),
+    };
+    relationships.add_internal_part_relationship(
+      relationship_id,
+      relationship_type,
+      target,
+      target_part_id,
+    )?;
+    Ok(())
   }
 
   pub fn add_child_part(
@@ -1398,6 +1569,24 @@ impl SdkPackageStorage {
         self.delete_unreachable_part_tree(child_part_id);
       }
     }
+  }
+
+  fn unique_import_part_path(&self, source_path: &str) -> String {
+    if !self.by_path.contains_key(source_path) {
+      return source_path.to_string();
+    }
+
+    let (base, extension) = match source_path.rsplit_once('.') {
+      Some((base, extension)) => (base, format!(".{extension}")),
+      None => (source_path, String::new()),
+    };
+    for index in 1.. {
+      let candidate = format!("{base}_copy{index}{extension}");
+      if !self.by_path.contains_key(candidate.as_str()) {
+        return candidate;
+      }
+    }
+    unreachable!("unbounded import path search should always find a candidate")
   }
 
   fn next_child_part_path(

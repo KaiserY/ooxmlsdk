@@ -1753,6 +1753,7 @@ mod tests {
       "SdkType" => sdk_type::expand_sdk_type(&input).expect("SdkType expansion"),
       "SdkChoice" => sdk_choice::expand_sdk_choice(&input).expect("SdkChoice expansion"),
       "SdkPart" => sdk_part::expand_sdk_part(&input).expect("SdkPart expansion"),
+      "SdkPackage" => sdk_package::expand_sdk_package(&input).expect("SdkPackage expansion"),
       other => panic!("unexpected kind: {other}"),
     };
     dump_macro_expansion(kind, &input, &tokens);

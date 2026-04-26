@@ -933,6 +933,105 @@ struct PartHandleRootInfo {
   accessor_ident: Ident,
 }
 
+fn part_handle_child_init_tokens(
+  child: &PartHandleChildInfo,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+  let field_ident = &child.field_ident;
+  let part_ty = &child.part_ty;
+  match child.kind {
+    PartChildKind::Repeated => (
+      quote! {
+        let mut #field_ident: Vec<#part_ty> = Vec::new();
+      },
+      quote! {
+        if let Some(child_part_id) = relationship.target_part_id() {
+          let mut child_visited = visited.clone();
+          #field_ident.push(
+            <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships_visited(
+              storage,
+              relationship.id(),
+              child_part_id,
+              &mut child_visited,
+            ),
+          );
+          represented_relationship = true;
+        }
+      },
+    ),
+    PartChildKind::Required | PartChildKind::Optional => (
+      quote! {
+        let mut #field_ident: Option<Box<#part_ty>> = None;
+      },
+      quote! {
+        if #field_ident.is_none() {
+          if let Some(child_part_id) = relationship.target_part_id() {
+            let mut child_visited = visited.clone();
+            #field_ident = Some(Box::new(
+              <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships_visited(
+                storage,
+                relationship.id(),
+                child_part_id,
+                &mut child_visited,
+              ),
+            ));
+            represented_relationship = true;
+          }
+        }
+      },
+    ),
+  }
+}
+
+fn part_handle_relationship_dispatch_tokens(
+  child_infos: &[PartHandleChildInfo],
+) -> proc_macro2::TokenStream {
+  use std::collections::BTreeMap;
+
+  let mut exact_groups: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
+  let mut alias_branches = Vec::new();
+  for child in child_infos {
+    let relationship_type = child.relationship_type.as_str();
+    let (_, load_tokens) = part_handle_child_init_tokens(child);
+    exact_groups
+      .entry(relationship_type)
+      .or_default()
+      .push(load_tokens.clone());
+    if explicit_relationship_type_may_have_alias(relationship_type) {
+      alias_branches.push((
+        quote! {
+          crate::common::relationship_type_matches_alias(
+            relationship_type,
+            #relationship_type,
+          )
+        },
+        load_tokens,
+      ));
+    }
+  }
+
+  let exact_arms = exact_groups.iter().map(|(relationship_type, loads)| {
+    quote! {
+      #relationship_type => {
+        #( #loads )*
+      }
+    }
+  });
+  let alias_fallback = if alias_branches.is_empty() {
+    quote! {}
+  } else {
+    build_conditional_chain(&alias_branches, quote! {})
+  };
+
+  quote! {
+    match relationship_type {
+      #( #exact_arms )*
+      _ => {
+        #alias_fallback
+      }
+    }
+  }
+}
+
 fn is_part_handle_struct(fields: &syn::FieldsNamed) -> bool {
   fields
     .named
@@ -999,46 +1098,10 @@ fn expand_part_handle(
 
   let root_method = part_handle_root_method_tokens(ident, root_info.as_ref());
   let child_methods = part_handle_child_methods_tokens(ident, &child_infos);
-  let child_field_locals = child_infos.iter().map(|child| {
-    let field_ident = &child.field_ident;
-    let part_ty = &child.part_ty;
-    let relationship_type = &child.relationship_type;
-    let make_part = quote! {
-      |relationship: &crate::common::RelationshipInfo| {
-        if crate::common::relationship_type_matches(
-          relationship.relationship_type(),
-          #relationship_type,
-        ) {
-          relationship.target_part_id().map(|part_id| {
-            <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships_visited(
-              storage,
-              relationship.id(),
-              part_id,
-              visited,
-            )
-          })
-        } else {
-          None
-        }
-      }
-    };
-    match child.kind {
-      PartChildKind::Repeated => quote! {
-        let #field_ident = relationships
-          .into_iter()
-          .flat_map(crate::common::RelationshipSet::iter)
-          .filter_map(#make_part)
-          .collect();
-      },
-      PartChildKind::Required | PartChildKind::Optional => quote! {
-        let #field_ident = relationships
-          .into_iter()
-          .flat_map(crate::common::RelationshipSet::iter)
-          .find_map(#make_part)
-          .map(Box::new);
-      },
-    }
-  });
+  let child_field_declarations = child_infos
+    .iter()
+    .map(|child| part_handle_child_init_tokens(child).0);
+  let child_relationship_dispatch = part_handle_relationship_dispatch_tokens(&child_infos);
   let field_inits_with_relationships = fields.named.iter().filter_map(|field| {
     let field_ident = field.ident.as_ref().unwrap();
     if is_relationship_model_field(field_ident) {
@@ -1053,28 +1116,7 @@ fn expand_part_handle(
       Some(quote! { #field_ident: Default::default() })
     }
   });
-  let represented_relationship_id_stmts = child_infos.iter().map(|child| {
-    let field_ident = &child.field_ident;
-    match child.kind {
-      PartChildKind::Repeated => quote! {
-        for part in &#field_ident {
-          if let Some(relationship_id) = crate::sdk::SdkPartHandle::relationship_id(part) {
-            represented_relationship_ids.insert(relationship_id);
-          }
-        }
-      },
-      PartChildKind::Required | PartChildKind::Optional => quote! {
-        if let Some(part) = #field_ident.as_deref() {
-          if let Some(relationship_id) = crate::sdk::SdkPartHandle::relationship_id(part) {
-            represented_relationship_ids.insert(relationship_id);
-          }
-        }
-      },
-    }
-  });
   let relationship_model_field_locals = quote! {
-    let mut represented_relationship_ids = std::collections::HashSet::<&str>::new();
-    #( #represented_relationship_id_stmts )*
     let mut fallback_parts = Vec::new();
     let mut relationship_order: Vec<Box<str>> = Vec::new();
     let mut data_part_reference_relationships = Vec::new();
@@ -1086,6 +1128,9 @@ fn expand_part_handle(
         .map(|relationship| relationship.id().into())
         .collect();
       for relationship in relationships.iter() {
+        let mut represented_relationship = false;
+        let relationship_type = relationship.relationship_type();
+        #child_relationship_dispatch
         if relationship.is_reference_relationship() {
           if relationship.reference_kind().is_some_and(|kind| {
             matches!(
@@ -1100,7 +1145,7 @@ fn expand_part_handle(
             reference_relationships.push(relationship.clone());
           }
         } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart {
-          if !represented_relationship_ids.contains(relationship.id()) {
+          if !represented_relationship {
             if let Some(part) = crate::parts::PartRef::from_relationship_storage(storage, relationship) {
               fallback_parts.push(part);
             }
@@ -1213,8 +1258,7 @@ fn expand_part_handle(
         if !visited.insert(part_id) {
           return Self::from_part_id(part_id);
         }
-        let relationships = storage.relationships(part_id);
-        #( #child_field_locals )*
+        #( #child_field_declarations )*
         #relationship_model_field_locals
         Self {
           #( #field_inits_with_relationships, )*

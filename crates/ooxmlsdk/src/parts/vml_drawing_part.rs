@@ -27,7 +27,5 @@ pub struct VmlDrawingPart {
     Vec<crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
   pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
-  pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
-  pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
 }

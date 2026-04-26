@@ -31,7 +31,7 @@ pub use package::{
   StoredPartData, StoredPartDataKind,
 };
 #[cfg(feature = "parts")]
-pub(crate) use package::{RelationshipInfo, RelationshipSet, RelationshipView};
+pub(crate) use package::{RelationshipInfo, RelationshipSet};
 #[cfg(feature = "parts")]
 pub use part::{
   load_data_part_reference, load_extended_part, load_part_relationships, load_typed_child_part,

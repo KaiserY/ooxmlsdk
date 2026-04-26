@@ -42,11 +42,7 @@ fn explicit_relationship_type_may_have_alias(value: &str) -> bool {
 }
 
 fn is_relationship_model_field(ident: &Ident) -> bool {
-  ident == "fallback_parts"
-    || ident == "relationship_order"
-    || ident == "data_part_reference_relationships"
-    || ident == "reference_relationships"
-    || ident == "raw_relationships"
+  ident == "fallback_parts" || ident == "relationship_order" || ident == "modeled_relationships"
 }
 
 pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
@@ -1137,31 +1133,16 @@ fn expand_part_handle(
   let relationship_model_field_locals = quote! {
     let mut fallback_parts = Vec::new();
     let mut relationship_order: Vec<crate::sdk::RelationshipModelEntry> = Vec::new();
-    let mut data_part_reference_relationships = Vec::new();
-    let mut reference_relationships = Vec::new();
-    let mut raw_relationships = Vec::new();
+    let mut modeled_relationships = Vec::new();
     if let Some(relationships) = storage.relationships(part_id) {
       for relationship in relationships.iter() {
         let mut represented_relationship = false;
         let relationship_type = relationship.relationship_type();
         #child_relationship_dispatch
         if relationship.is_reference_relationship() {
-          if relationship.reference_kind().is_some_and(|kind| {
-            matches!(
-              kind,
-              crate::common::ReferenceRelationshipKind::Audio
-                | crate::common::ReferenceRelationshipKind::Media
-                | crate::common::ReferenceRelationshipKind::Video
-            )
-          }) {
-            let item_index = data_part_reference_relationships.len();
-            data_part_reference_relationships.push(relationship.clone());
-            relationship_order.push(crate::sdk::RelationshipModelEntry::DataPartReference(item_index));
-          } else {
-            let item_index = reference_relationships.len();
-            reference_relationships.push(relationship.clone());
-            relationship_order.push(crate::sdk::RelationshipModelEntry::Reference(item_index));
-          }
+          let item_index = modeled_relationships.len();
+          modeled_relationships.push(relationship.clone());
+          relationship_order.push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
         } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart {
           if !represented_relationship {
             if let Some(part) = crate::parts::PartRef::from_relationship_storage(storage, relationship) {
@@ -1171,9 +1152,9 @@ fn expand_part_handle(
             }
           }
         } else {
-          let item_index = raw_relationships.len();
-          raw_relationships.push(relationship.clone());
-          relationship_order.push(crate::sdk::RelationshipModelEntry::Raw(item_index));
+          let item_index = modeled_relationships.len();
+          modeled_relationships.push(relationship.clone());
+          relationship_order.push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
         }
       }
     }
@@ -1181,9 +1162,7 @@ fn expand_part_handle(
   let relationship_model_field_inits = quote! {
     fallback_parts,
     relationship_order,
-    data_part_reference_relationships,
-    reference_relationships,
-    raw_relationships,
+    modeled_relationships,
   };
   let modeled_child_stmts: Vec<_> = child_infos
     .iter()
@@ -1376,12 +1355,7 @@ fn expand_part_handle(
               part,
             )?;
           }
-          for relationship in self
-            .data_part_reference_relationships
-            .iter()
-            .chain(self.reference_relationships.iter())
-            .chain(self.raw_relationships.iter())
-          {
+          for relationship in &self.modeled_relationships {
             relationships.add_relationship_info(relationship.clone())?;
           }
           return Ok(relationships);
@@ -1405,18 +1379,8 @@ fn expand_part_handle(
                 )?;
               }
             }
-            crate::sdk::RelationshipModelEntry::DataPartReference(item_index) => {
-              if let Some(relationship) = self.data_part_reference_relationships.get(*item_index) {
-                relationships.add_relationship_info(relationship.clone())?;
-              }
-            }
-            crate::sdk::RelationshipModelEntry::Reference(item_index) => {
-              if let Some(relationship) = self.reference_relationships.get(*item_index) {
-                relationships.add_relationship_info(relationship.clone())?;
-              }
-            }
-            crate::sdk::RelationshipModelEntry::Raw(item_index) => {
-              if let Some(relationship) = self.raw_relationships.get(*item_index) {
+            crate::sdk::RelationshipModelEntry::Relationship(item_index) => {
+              if let Some(relationship) = self.modeled_relationships.get(*item_index) {
                 relationships.add_relationship_info(relationship.clone())?;
               }
             }
@@ -1459,26 +1423,6 @@ fn expand_part_handle(
       #[inline]
       pub(crate) const fn part_id(&self) -> crate::common::PartId {
         self.id
-      }
-
-      #[inline]
-      pub(crate) fn relationships<'a, P: crate::sdk::SdkPackage>(
-        &'a self,
-        package: &'a P,
-      ) -> Option<crate::common::RelationshipView> {
-        self.try_relationships(package).ok()
-      }
-
-      #[inline]
-      pub(crate) fn try_relationships<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-      ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {
-        let part = <Self as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-          crate::sdk::SdkPackageInternal::storage(package),
-          self.id,
-        );
-        <Self as crate::sdk::SdkPartHandleInternal>::modeled_relationships(&part, package).map(Into::into)
       }
 
       #[inline]

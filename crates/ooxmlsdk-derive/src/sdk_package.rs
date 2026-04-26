@@ -56,11 +56,7 @@ fn explicit_relationship_type_may_have_alias(value: &str) -> bool {
 }
 
 fn is_relationship_model_field(ident: &Ident) -> bool {
-  ident == "fallback_parts"
-    || ident == "relationship_order"
-    || ident == "data_part_reference_relationships"
-    || ident == "reference_relationships"
-    || ident == "raw_relationships"
+  ident == "fallback_parts" || ident == "relationship_order" || ident == "modeled_relationships"
 }
 
 fn package_child_init_tokens(
@@ -314,7 +310,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           ));
         }
 
-        let relationship_id = self.relationships().next_relationship_id();
+        let relationship_id =
+          crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
         let part = if let Some(content_type) = crate::sdk::default_main_part_content_type::<#part_ty>() {
           crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension::<#part_ty>(
             self,
@@ -411,30 +408,15 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   let relationship_model_field_locals = quote! {
     let mut fallback_parts = Vec::new();
     let mut relationship_order: Vec<crate::sdk::RelationshipModelEntry> = Vec::new();
-    let mut data_part_reference_relationships = Vec::new();
-    let mut reference_relationships = Vec::new();
-    let mut raw_relationships = Vec::new();
+    let mut modeled_relationships = Vec::new();
     for relationship in storage.package_relationships().iter() {
       let mut represented_relationship = false;
       let relationship_type = relationship.relationship_type();
       #relationship_dispatch
       if relationship.is_reference_relationship() {
-        if relationship.reference_kind().is_some_and(|kind| {
-          matches!(
-            kind,
-            crate::common::ReferenceRelationshipKind::Audio
-              | crate::common::ReferenceRelationshipKind::Media
-              | crate::common::ReferenceRelationshipKind::Video
-          )
-        }) {
-          let item_index = data_part_reference_relationships.len();
-          data_part_reference_relationships.push(relationship.clone());
-          relationship_order.push(crate::sdk::RelationshipModelEntry::DataPartReference(item_index));
-        } else {
-          let item_index = reference_relationships.len();
-          reference_relationships.push(relationship.clone());
-          relationship_order.push(crate::sdk::RelationshipModelEntry::Reference(item_index));
-        }
+        let item_index = modeled_relationships.len();
+        modeled_relationships.push(relationship.clone());
+        relationship_order.push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
       } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart {
         if !represented_relationship {
           if let Some(part) = crate::parts::PartRef::from_relationship_storage(&storage, relationship) {
@@ -444,9 +426,9 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           }
         }
       } else {
-        let item_index = raw_relationships.len();
-        raw_relationships.push(relationship.clone());
-        relationship_order.push(crate::sdk::RelationshipModelEntry::Raw(item_index));
+        let item_index = modeled_relationships.len();
+        modeled_relationships.push(relationship.clone());
+        relationship_order.push(crate::sdk::RelationshipModelEntry::Relationship(item_index));
       }
     }
   };
@@ -537,12 +519,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           for part in &self.fallback_parts {
             crate::sdk::add_part_ref_to_relationship_set(&mut relationships, &self.#storage_ident, None, part)?;
           }
-          for relationship in self
-            .data_part_reference_relationships
-            .iter()
-            .chain(self.reference_relationships.iter())
-            .chain(self.raw_relationships.iter())
-          {
+          for relationship in &self.modeled_relationships {
             relationships.add_relationship_info(relationship.clone())?;
           }
           return Ok(relationships);
@@ -566,18 +543,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
                 )?;
               }
             }
-            crate::sdk::RelationshipModelEntry::DataPartReference(item_index) => {
-              if let Some(relationship) = self.data_part_reference_relationships.get(*item_index) {
-                relationships.add_relationship_info(relationship.clone())?;
-              }
-            }
-            crate::sdk::RelationshipModelEntry::Reference(item_index) => {
-              if let Some(relationship) = self.reference_relationships.get(*item_index) {
-                relationships.add_relationship_info(relationship.clone())?;
-              }
-            }
-            crate::sdk::RelationshipModelEntry::Raw(item_index) => {
-              if let Some(relationship) = self.raw_relationships.get(*item_index) {
+            crate::sdk::RelationshipModelEntry::Relationship(item_index) => {
+              if let Some(relationship) = self.modeled_relationships.get(*item_index) {
                 relationships.add_relationship_info(relationship.clone())?;
               }
             }
@@ -591,9 +558,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           #( #child_field_tuple_values, )*
           fallback_parts,
           relationship_order,
-          data_part_reference_relationships,
-          reference_relationships,
-          raw_relationships,
+          modeled_relationships,
         ) = {
           let storage = &self.#storage_ident;
           #( #child_field_locals )*
@@ -602,18 +567,14 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
             #( #child_field_tuple_values, )*
             fallback_parts,
             relationship_order,
-            data_part_reference_relationships,
-            reference_relationships,
-            raw_relationships,
+            modeled_relationships,
           )
         };
 
         #( #child_field_assigns )*
         self.fallback_parts = fallback_parts;
         self.relationship_order = relationship_order;
-        self.data_part_reference_relationships = data_part_reference_relationships;
-        self.reference_relationships = reference_relationships;
-        self.raw_relationships = raw_relationships;
+        self.modeled_relationships = modeled_relationships;
       }
 
       fn collect_modeled_part_relationships(
@@ -659,18 +620,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         path: P,
       ) -> Result<Self, crate::common::SdkError> {
         Self::new_lazy(std::io::BufReader::new(std::fs::File::open(path)?))
-      }
-
-      pub(crate) fn relationships(&self) -> crate::common::RelationshipView {
-        self
-          .try_relationships()
-          .expect("package relationships could not be modeled")
-      }
-
-      pub(crate) fn try_relationships(
-        &self,
-      ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {
-        crate::sdk::SdkPackageInternal::modeled_relationships(self).map(Into::into)
       }
 
       #[inline]
@@ -1102,11 +1051,9 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           #main_part_id_ident: main_part_id,
           #root_elements_init
         #( #child_field_inits )*
-        fallback_parts,
-        relationship_order,
-        data_part_reference_relationships,
-          reference_relationships,
-          raw_relationships,
+          fallback_parts,
+          relationship_order,
+          modeled_relationships,
           #storage_ident: storage,
         })
       }

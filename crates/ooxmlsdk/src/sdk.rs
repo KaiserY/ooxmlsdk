@@ -97,9 +97,7 @@ pub struct PartRoot<T>(std::marker::PhantomData<T>);
 pub enum RelationshipModelEntry {
   Child { field_index: u16, item_index: usize },
   Fallback(usize),
-  DataPartReference(usize),
-  Reference(usize),
-  Raw(usize),
+  Relationship(usize),
 }
 
 #[cfg(feature = "parts")]

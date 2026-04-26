@@ -128,13 +128,7 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   });
   fields.push(quote! {
-    pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
-  });
-  fields.push(quote! {
-    pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
-  });
-  fields.push(quote! {
-    pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+    pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
   });
 
   Ok(fields)
@@ -212,13 +206,7 @@ fn part_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   });
   fields.push(quote! {
-    pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
-  });
-  fields.push(quote! {
-    pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
-  });
-  fields.push(quote! {
-    pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
+    pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
   });
 
   Ok(fields)

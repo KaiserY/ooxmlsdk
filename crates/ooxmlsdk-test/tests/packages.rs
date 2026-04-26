@@ -3175,3 +3175,56 @@ fn package_save_roundtrips_unmodified_storage() {
   let root = main_part.root_element(&mut roundtripped).unwrap();
   assert!(main_document_body_child_count(root) > 0);
 }
+
+#[test]
+fn package_copy_helpers_include_dirty_root_cache() {
+  // Source: upstream package Clone(stream) behavior adapted to Rust copy helpers.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+  let header_part = main_part
+    .add_new_part::<_, HeaderPart>(&mut package, "rIdCopyHeader")
+    .unwrap();
+  header_part
+    .set_root_element(&mut package, Header::default())
+    .unwrap();
+
+  let mut copied_stream = Cursor::new(Vec::new());
+  package.copy_to(&mut copied_stream).unwrap();
+  let copied_bytes = package.to_package_bytes().unwrap();
+  assert!(!copied_bytes.is_empty());
+  assert_eq!(copied_stream.into_inner(), copied_bytes);
+
+  let mut owned_copy = package.to_owned_package().unwrap();
+  let copied_main = owned_copy.main_document_part().unwrap();
+  assert!(
+    copied_main
+      .root_element(&mut owned_copy)
+      .unwrap()
+      .body
+      .is_some()
+  );
+  let copied_header = copied_main
+    .get_part_by_id(&owned_copy, "rIdCopyHeader")
+    .and_then(PartRef::downcast::<HeaderPart>)
+    .unwrap();
+  assert!(copied_header.root_element(&mut owned_copy).is_ok());
+
+  let mut reopened_from_bytes = WordprocessingDocument::new(Cursor::new(copied_bytes)).unwrap();
+  let reopened_main = reopened_from_bytes.main_document_part().unwrap();
+  assert!(
+    reopened_main
+      .root_element(&mut reopened_from_bytes)
+      .unwrap()
+      .body
+      .is_some()
+  );
+  assert!(
+    reopened_main
+      .get_part_by_id(&reopened_from_bytes, "rIdCopyHeader")
+      .and_then(PartRef::downcast::<HeaderPart>)
+      .is_some()
+  );
+}

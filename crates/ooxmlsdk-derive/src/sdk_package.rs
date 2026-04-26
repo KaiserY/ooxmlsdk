@@ -862,6 +862,30 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         crate::parts::save_package(self, writer)
       }
 
+      pub fn copy_to<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: W,
+      ) -> Result<(), crate::common::SdkError> {
+        crate::parts::save_package(self, writer)
+      }
+
+      pub fn to_package_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        self.copy_to(&mut buffer)?;
+        Ok(buffer.into_inner())
+      }
+
+      pub fn to_owned_package(&self) -> Result<Self, crate::common::SdkError> {
+        Self::new(std::io::Cursor::new(self.to_package_bytes()?))
+      }
+
+      pub fn save_as_file<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+      ) -> Result<(), crate::common::SdkError> {
+        self.copy_to(std::io::BufWriter::new(std::fs::File::create(path)?))
+      }
+
       #main_part_method
 
       #package_relationship_methods

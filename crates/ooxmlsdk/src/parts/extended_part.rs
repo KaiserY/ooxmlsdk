@@ -170,7 +170,7 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
   }
 }
 impl ExtendedPart {
-  pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
+  pub(crate) fn modeled_relationships<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
   ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {

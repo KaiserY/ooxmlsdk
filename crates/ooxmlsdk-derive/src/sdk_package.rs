@@ -830,14 +830,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
-      pub fn relationships_by_type(
-        &self,
-        relationship_type: &str,
-      ) -> impl Iterator<Item = &crate::common::RelationshipInfo> {
-        crate::sdk::SdkPackage::relationships_by_type(self, relationship_type)
-      }
-
-      #[inline]
       pub fn add_new_part<T: crate::sdk::SdkPartHandle>(
         &mut self,
         relationship_id: impl Into<String>,
@@ -1099,12 +1091,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
       #package_relationship_methods
 
-      pub fn modeled_relationships(
-        &self,
-      ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
-        crate::sdk::SdkPackage::modeled_relationships(self)
-      }
-
       fn new_inner<R: std::io::Read + std::io::Seek>(
         reader: R,
         open_mode: crate::common::PackageOpenMode,
@@ -1153,7 +1139,7 @@ fn package_relationship_method_tokens(
             &self,
           ) -> impl Iterator<Item = &crate::common::RelationshipInfo> + '_ {
             let _ = self.#field_ident;
-            self.relationships_by_type(#relationship_type)
+            crate::sdk::SdkPackage::relationships_by_type(self, #relationship_type)
           }
 
           #( #attrs )*
@@ -1167,7 +1153,7 @@ fn package_relationship_method_tokens(
             &self,
           ) -> impl Iterator<Item = &crate::common::RelationshipInfo> + '_ {
             let _ = self.#field_ident;
-            self.relationships_by_type(#relationship_type)
+            crate::sdk::SdkPackage::relationships_by_type(self, #relationship_type)
           }
 
           #( #attrs )*
@@ -1187,19 +1173,6 @@ fn package_relationship_method_tokens(
     #[inline]
     pub fn get_all_parts(&self) -> impl Iterator<Item = crate::parts::PartRef> + '_ {
       crate::sdk::SdkPackage::get_all_parts(self)
-    }
-
-    #[inline]
-    pub fn get_part_by_relationship_type(
-      &self,
-      relationship_type: &str,
-    ) -> Option<crate::parts::PartRef> {
-      crate::sdk::SdkPackage::get_part_by_relationship_type(self, relationship_type)
-    }
-
-    #[inline]
-    pub fn is_child_part<T: crate::sdk::SdkPartHandle>(&self, part: &T) -> bool {
-      crate::sdk::SdkPackage::is_child_part(self, part)
     }
 
     #[inline]
@@ -1225,11 +1198,6 @@ fn package_relationship_method_tokens(
       &self,
     ) -> impl Iterator<Item = T> + '_ {
       crate::sdk::SdkPackage::get_parts_of_type(self)
-    }
-
-    #[inline]
-    pub fn get_sub_part_of_type<T: crate::parts::PartRefDowncast>(&self) -> Option<T> {
-      crate::sdk::SdkPackage::get_sub_part_of_type(self)
     }
 
     #[inline]
@@ -1277,20 +1245,6 @@ fn package_relationship_method_tokens(
       I: IntoIterator<Item = T>,
     {
       crate::sdk::SdkPackage::delete_parts(self, parts)
-    }
-
-    #[inline]
-    pub fn delete_parts_of_type<T: crate::parts::PartRefDowncast>(
-      &mut self,
-    ) -> Result<(), crate::common::SdkError> {
-      crate::sdk::SdkPackage::delete_parts_of_type::<T>(self)
-    }
-
-    #[inline]
-    pub fn delete_parts_recursively_of_type<T: crate::parts::PartRefDowncast>(
-      &mut self,
-    ) -> Result<(), crate::common::SdkError> {
-      crate::sdk::SdkPackage::delete_parts_recursively_of_type::<T>(self)
     }
 
     #[inline]

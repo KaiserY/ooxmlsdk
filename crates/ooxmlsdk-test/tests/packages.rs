@@ -155,7 +155,8 @@ fn package_relationships_resolve_with_container_local_part_factory() {
   assert_eq!(package.parts().count(), package.relationships().len());
   assert_eq!(
     package
-      .get_sub_part_of_type::<MainDocumentPart>()
+      .get_parts_of_type::<MainDocumentPart>()
+      .next()
       .unwrap()
       .part_id(),
     main_part.part_id()
@@ -203,11 +204,11 @@ fn package_relationship_helpers_match_openxml_container_api_shape() {
     .get_id_of_part_required(&main_part)
     .unwrap()
     .to_string();
-  assert!(package.is_child_part(&main_part));
+  assert!(package.get_id_of_part(&main_part).is_some());
   assert!(
     package
-      .get_part_by_relationship_type(MainDocumentPart::RELATIONSHIP_TYPE)
-      .and_then(PartRef::downcast::<MainDocumentPart>)
+      .get_parts_of_type::<MainDocumentPart>()
+      .next()
       .is_some()
   );
   assert!(
@@ -253,16 +254,13 @@ fn package_relationship_helpers_match_openxml_container_api_shape() {
 }
 
 #[test]
-fn package_save_writes_package_relationships_from_modeled_parts() {
+fn package_save_writes_package_relationships_from_parts() {
   let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part_id = package.main_document_part().unwrap().part_id();
-  let modeled_relationships = package.modeled_relationships().unwrap();
-  assert_eq!(modeled_relationships.len(), 3);
-  assert_eq!(package.relationships().len(), modeled_relationships.len());
   assert!(
-    modeled_relationships
-      .iter()
-      .any(|relationship| { relationship.target_part_id() == Some(main_part_id) })
+    package
+      .parts()
+      .any(|entry| entry.part.part_id() == main_part_id)
   );
 
   let mut saved = Cursor::new(Vec::new());
@@ -273,57 +271,6 @@ fn package_save_writes_package_relationships_from_modeled_parts() {
   assert_eq!(
     reopened.main_document_part().unwrap().part_id(),
     main_part_id
-  );
-}
-
-#[test]
-fn package_save_writes_part_relationships_from_modeled_parts() {
-  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
-  let main_part = package.main_document_part().unwrap();
-  let header = main_part
-    .add_new_part::<_, HeaderPart>(&mut package, "rIdModeledHeader")
-    .unwrap();
-  header
-    .set_data(
-      &mut package,
-      br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
-        .to_vec(),
-    )
-    .unwrap();
-  let header_relationship_id = main_part
-    .get_id_of_part(&package, &header)
-    .unwrap()
-    .to_string();
-  package
-    .storage_mut()
-    .relationships_mut(main_part.part_id())
-    .unwrap()
-    .remove(&header_relationship_id);
-  assert!(
-    main_part
-      .get_part_by_id(&package, &header_relationship_id)
-      .is_none()
-  );
-  assert!(
-    package
-      .main_document_part()
-      .unwrap()
-      .modeled_relationships(&package)
-      .unwrap()
-      .contains_id(&header_relationship_id)
-  );
-
-  let mut saved = Cursor::new(Vec::new());
-  package.save(&mut saved).unwrap();
-  saved.set_position(0);
-
-  let reopened = WordprocessingDocument::new(saved).unwrap();
-  let reopened_main = reopened.main_document_part().unwrap();
-  assert!(
-    reopened_main
-      .get_part_by_id(&reopened, &header_relationship_id)
-      .and_then(PartRef::downcast::<HeaderPart>)
-      .is_some()
   );
 }
 
@@ -349,7 +296,8 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   );
   assert_eq!(
     main_part
-      .get_sub_part_of_type::<_, StyleDefinitionsPart>(&package)
+      .get_parts_of_type::<_, StyleDefinitionsPart>(&package)
+      .next()
       .unwrap()
       .part_id(),
     styles_part.part_id()
@@ -606,14 +554,14 @@ fn part_get_all_parts_and_parent_parts_follow_reachable_relationship_graph() {
   let image_part = header_part
     .add_image_part(&mut package, "image/png")
     .unwrap();
-  assert!(main_part.is_child_part(&package, &header_part));
-  assert!(main_part.is_child_part(&package, &settings_part));
-  assert!(header_part.is_child_part(&package, &image_part));
-  assert!(!main_part.is_child_part(&package, &image_part));
+  assert!(main_part.get_id_of_part(&package, &header_part).is_some());
+  assert!(main_part.get_id_of_part(&package, &settings_part).is_some());
+  assert!(header_part.get_id_of_part(&package, &image_part).is_some());
+  assert!(main_part.get_id_of_part(&package, &image_part).is_none());
   assert!(
     main_part
-      .get_part_by_relationship_type(&package, HeaderPart::RELATIONSHIP_TYPE)
-      .and_then(PartRef::downcast::<HeaderPart>)
+      .get_parts_of_type::<_, HeaderPart>(&package)
+      .next()
       .is_some()
   );
 
@@ -2715,8 +2663,8 @@ fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
 }
 
 #[test]
-fn delete_parts_of_type_only_removes_direct_children() {
-  // Source: upstream OpenXmlPartContainer.DeletePartsOfType<T>() direct-child semantics.
+fn delete_parts_removes_selected_direct_children() {
+  // Source: aligned with upstream OpenXmlPartContainer.DeleteParts<T>().
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
   let main_part = package.add_main_document_part().unwrap();
   main_part
@@ -2747,8 +2695,11 @@ fn delete_parts_of_type_only_removes_direct_children() {
   let direct_image_path = direct_image.path(&package).unwrap().to_string();
   let nested_image_path = nested_image.path(&package).unwrap().to_string();
 
+  let image_parts: Vec<_> = main_part
+    .get_parts_of_type::<_, ImagePart>(&package)
+    .collect();
   main_part
-    .delete_parts_of_type::<_, ImagePart>(&mut package)
+    .delete_parts::<_, ImagePart, _>(&mut package, image_parts)
     .unwrap();
 
   assert!(
@@ -2770,59 +2721,6 @@ fn delete_parts_of_type_only_removes_direct_children() {
 
   assert!(!package_entry_exists(bytes.clone(), &direct_image_path));
   assert!(package_entry_exists(bytes, &nested_image_path));
-}
-
-#[test]
-fn delete_parts_recursively_of_type_removes_descendant_matches() {
-  // Source: upstream OpenXmlPackage.DeletePartsRecursivelyOfType<T>() traversal semantics.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
-  let main_part = package.add_main_document_part().unwrap();
-  main_part
-    .set_root_element(&mut package, empty_body_document())
-    .unwrap();
-
-  let direct_image = main_part
-    .add_image_part_with_id(&mut package, "image/png", "rIdDirectImage")
-    .unwrap();
-  let extended = main_part
-    .add_extended_part_with_id(
-      &mut package,
-      "http://temp",
-      "text/xml",
-      ".xml",
-      "rIdExtended",
-    )
-    .unwrap();
-  let nested_image = extended
-    .add_image_part_with_id(&mut package, "image/png", "rIdNestedImage")
-    .unwrap();
-  let direct_image_path = direct_image.path(&package).unwrap().to_string();
-  let nested_image_path = nested_image.path(&package).unwrap().to_string();
-
-  package
-    .delete_parts_recursively_of_type::<ImagePart>()
-    .unwrap();
-
-  assert!(
-    main_part
-      .get_part_by_id(&package, "rIdDirectImage")
-      .is_none()
-  );
-  assert!(
-    extended
-      .get_part_by_id(&package, "rIdNestedImage")
-      .is_none()
-  );
-  assert!(package.storage().part(direct_image.part_id()).is_none());
-  assert!(package.storage().part(nested_image.part_id()).is_none());
-  assert!(main_part.get_part_by_id(&package, "rIdExtended").is_some());
-
-  let mut buffer = Cursor::new(Vec::new());
-  package.save(&mut buffer).unwrap();
-  let bytes = buffer.into_inner();
-
-  assert!(!package_entry_exists(bytes.clone(), &direct_image_path));
-  assert!(!package_entry_exists(bytes, &nested_image_path));
 }
 
 #[test]
@@ -3015,7 +2913,11 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
     target_main.get_id_of_part(&target, &imported_header),
     Some("rIdImportedHeader")
   );
-  assert!(target_main.is_child_part(&target, &imported_header));
+  assert!(
+    target_main
+      .get_id_of_part(&target, &imported_header)
+      .is_some()
+  );
   assert!(
     imported_header
       .root_element(&mut target)
@@ -3025,8 +2927,8 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
   );
 
   let imported_image = imported_header
-    .get_part_by_relationship_type(&target, ImagePart::RELATIONSHIP_TYPE)
-    .and_then(PartRef::downcast::<ImagePart>)
+    .get_parts_of_type::<_, ImagePart>(&target)
+    .next()
     .unwrap();
   assert_eq!(imported_image.data(&target).unwrap(), b"imported image");
 
@@ -3061,8 +2963,8 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
   assert!(reopened_header.root_element(&mut reopened).is_ok());
   assert!(
     reopened_header
-      .get_part_by_relationship_type(&reopened, ImagePart::RELATIONSHIP_TYPE)
-      .and_then(PartRef::downcast::<ImagePart>)
+      .get_parts_of_type::<_, ImagePart>(&reopened)
+      .next()
       .is_some()
   );
   assert_eq!(

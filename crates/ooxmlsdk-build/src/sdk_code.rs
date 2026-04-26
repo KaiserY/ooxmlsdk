@@ -382,7 +382,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
       }
 
       impl ExtendedPart {
-        pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
+        pub(crate) fn modeled_relationships<P: crate::sdk::SdkPackage>(
           &self,
           package: &P,
         ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {

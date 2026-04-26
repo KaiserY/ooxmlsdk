@@ -32,7 +32,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
   match kind {
     DocSampleKind::Wordprocessing => {
       let original = WordprocessingDocument::new_from_file(&path).unwrap();
-      assert_modeled_relationships_match_relationship_sets(&original, file_name);
       assert_relationship_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
@@ -44,7 +43,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
     }
     DocSampleKind::Spreadsheet => {
       let original = SpreadsheetDocument::new_from_file(&path).unwrap();
-      assert_modeled_relationships_match_relationship_sets(&original, file_name);
       assert_relationship_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
@@ -56,7 +54,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
     }
     DocSampleKind::Presentation => {
       let original = PresentationDocument::new_from_file(&path).unwrap();
-      assert_modeled_relationships_match_relationship_sets(&original, file_name);
       assert_relationship_child_descriptor_coverage(&original, file_name);
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
@@ -214,39 +211,6 @@ fn assert_presentation_document_round_trip(
       .slide_master_parts(roundtripped)
       .count()
   );
-}
-
-fn assert_modeled_relationships_match_relationship_sets<P: SdkPackage>(
-  package: &P,
-  file_name: &str,
-) {
-  assert_eq!(
-    package.modeled_relationships().unwrap(),
-    package.storage().package_relationships().clone(),
-    "package relationship fields do not model RelationshipSet for {file_name}"
-  );
-
-  for (index, part) in package.storage().parts().iter().enumerate() {
-    if part.is_deleted() {
-      continue;
-    }
-
-    let part_id = PartId::from_index(index);
-    let Some(part_ref) = PartRef::from_part_id(package, part_id) else {
-      continue;
-    };
-    let modeled_relationships = part_ref.modeled_relationships(package).unwrap();
-    let relationships = package
-      .storage()
-      .relationships(part_id)
-      .expect("active part has relationships");
-    assert_eq!(
-      modeled_relationships,
-      relationships.clone(),
-      "part relationship fields do not model RelationshipSet for {file_name}:{}",
-      part.path()
-    );
-  }
 }
 
 fn assert_relationship_sets_round_trip<P: SdkPackage>(

@@ -1684,6 +1684,10 @@ fn child_part_directory_path(source_part_path: &str, path_prefix: &str) -> Strin
   let source_parent_path = super::parent_zip_path(source_part_path);
   let mut path = if path_prefix.is_empty() || path_prefix == "." {
     source_parent_path
+  } else if path_prefix == "../media"
+    && matches!(source_parent_path.as_str(), "word/" | "ppt/" | "xl/")
+  {
+    format!("{source_parent_path}media")
   } else if path_prefix.starts_with('/') {
     path_prefix.to_string()
   } else {

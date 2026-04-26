@@ -19,12 +19,16 @@ use ooxmlsdk::parts::{
   font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
   image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
   main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  ribbon_extensibility_part::RibbonExtensibilityPart, slide_layout_part::SlideLayoutPart,
+  presentation_part::PresentationPart, ribbon_extensibility_part::RibbonExtensibilityPart,
+  slide_layout_part::SlideLayoutPart, slide_part::SlidePart,
   spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
   thumbnail_part::ThumbnailPart, wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
+  Presentation as PmlPresentation, Slide,
+};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, Document, Header,
 };
@@ -417,6 +421,17 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
 }
 
 #[test]
+fn raw_whitespace_part_data_does_not_load_root_element() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: RootElementTest2
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+
+  assert!(main_part.root_element(&mut package).is_err());
+  main_part.set_data(&mut package, b" \n".to_vec()).unwrap();
+  assert!(main_part.root_element(&mut package).is_err());
+}
+
+#[test]
 fn part_relationship_ids_can_change_for_child_parts() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: ChangePartIdTest
   let mut package =
@@ -488,6 +503,29 @@ fn part_relationship_ids_can_change_for_child_parts() {
       .get_part_by_id(&reopened, &comments_original_id)
       .and_then(PartRef::downcast::<ImagePart>)
       .is_some()
+  );
+}
+
+#[test]
+fn delete_invalid_child_part_id_is_safe() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: DeleteInvalidPartIdSafely
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  let relationship_count = main_part.relationships(&package).unwrap().len();
+
+  assert!(
+    main_part
+      .try_get_part_by_id(&package, "invalidId")
+      .is_none()
+  );
+  assert!(
+    !main_part
+      .delete_part_by_id(&mut package, "invalidId")
+      .unwrap()
+  );
+  assert_eq!(
+    main_part.relationships(&package).unwrap().len(),
+    relationship_count
   );
 }
 
@@ -1521,6 +1559,30 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
 
   assert_eq!(reopened_header.path(&reopened), Some("word/header1.xml"));
   assert!(reopened_header.root_element(&mut reopened).is_ok());
+}
+
+#[test]
+fn add_new_parts_use_unique_upstream_style_part_names() {
+  // Source: test/DocumentFormat.OpenXml.Packaging.Tests/PartUriHelperTests
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let header1 = main_part
+    .add_new_part_auto_id::<_, HeaderPart>(&mut package)
+    .unwrap();
+  let header2 = main_part
+    .add_new_part_auto_id::<_, HeaderPart>(&mut package)
+    .unwrap();
+  assert_eq!(header1.path(&package), Some("word/header1.xml"));
+  assert_eq!(header2.path(&package), Some("word/header2.xml"));
+
+  let image1 = main_part.add_image_part(&mut package, "image/png").unwrap();
+  let image2 = main_part.add_image_part(&mut package, "image/png").unwrap();
+  assert_eq!(image1.path(&package), Some("word/media/image1.bin"));
+  assert_eq!(image2.path(&package), Some("word/media/image2.bin"));
 }
 
 #[test]
@@ -2991,6 +3053,59 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
 }
 
 #[test]
+fn add_part_from_package_imports_real_hyperlink_relationships() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: HyperlinkRelationshipTest2
+  let source = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
+  let source_main = source.main_document_part().unwrap();
+  let source_part_count = source_main.get_all_parts(&source).count();
+  let source_hyperlinks: Vec<_> = source_main
+    .hyperlink_relationships(&source)
+    .map(|relationship| {
+      (
+        relationship.id().to_string(),
+        relationship.target().to_string(),
+        relationship.target_mode(),
+      )
+    })
+    .collect();
+  let source_external_count = source_main.external_relationships(&source).count();
+
+  let mut target = WordprocessingDocument::new(empty_package()).unwrap();
+  let imported_main = target
+    .add_part_from_package_with_id(&source, &source_main, "rIdImportedMain")
+    .unwrap();
+
+  assert_eq!(
+    imported_main.get_all_parts(&target).count(),
+    source_part_count
+  );
+  let imported_hyperlinks: Vec<_> = imported_main
+    .hyperlink_relationships(&target)
+    .map(|relationship| {
+      (
+        relationship.id().to_string(),
+        relationship.target().to_string(),
+        relationship.target_mode(),
+      )
+    })
+    .collect();
+  assert_eq!(imported_hyperlinks, source_hyperlinks);
+  assert_eq!(
+    imported_main.external_relationships(&target).count(),
+    source_external_count
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  target.save(&mut buffer).unwrap();
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  assert_eq!(
+    reopened_main.hyperlink_relationships(&reopened).count(),
+    source_hyperlinks.len()
+  );
+}
+
+#[test]
 fn add_main_document_part_creates_fixed_main_part_path() {
   // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
@@ -3258,5 +3373,46 @@ fn package_copy_helpers_include_dirty_root_cache() {
       .get_part_by_id(&reopened_from_bytes, "rIdCopyHeader")
       .and_then(PartRef::downcast::<HeaderPart>)
       .is_some()
+  );
+}
+
+#[test]
+fn package_copy_retains_part_names_when_adding_more_parts() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs :: CloneRetainsPartNames
+  let mut presentation = PresentationDocument::new(empty_package()).unwrap();
+  let presentation_part = presentation
+    .add_new_part::<PresentationPart>("rIdPresentation")
+    .unwrap();
+  presentation_part
+    .set_root_element(&mut presentation, PmlPresentation::default())
+    .unwrap();
+  let slide1 = presentation_part
+    .add_new_part_auto_id::<_, SlidePart>(&mut presentation)
+    .unwrap();
+  slide1
+    .set_root_element(&mut presentation, Slide::default())
+    .unwrap();
+  assert_eq!(slide1.path(&presentation), Some("ppt/slides/slide1.xml"));
+
+  let mut duplicate = presentation.to_owned_package().unwrap();
+  let duplicate_presentation_part = duplicate.presentation_part().unwrap();
+  let slide2 = duplicate_presentation_part
+    .add_new_part_auto_id::<_, SlidePart>(&mut duplicate)
+    .unwrap();
+  slide2
+    .set_root_element(&mut duplicate, Slide::default())
+    .unwrap();
+  assert_eq!(slide2.path(&duplicate), Some("ppt/slides/slide2.xml"));
+
+  let slide_paths: Vec<_> = duplicate_presentation_part
+    .slide_parts(&duplicate)
+    .map(|slide| slide.path(&duplicate).unwrap().to_string())
+    .collect();
+  assert_eq!(
+    slide_paths,
+    vec![
+      "ppt/slides/slide1.xml".to_string(),
+      "ppt/slides/slide2.xml".to_string()
+    ]
   );
 }

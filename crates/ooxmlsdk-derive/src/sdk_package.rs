@@ -677,6 +677,44 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn add_new_part_with_content_type_and_extension<T: crate::sdk::SdkPartHandle>(
+        &mut self,
+        relationship_id: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        extension: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension(
+          self,
+          relationship_id,
+          content_type,
+          extension,
+          crate::common::NewPartTargetMode::Indexed,
+        )
+      }
+
+      #[inline]
+      pub fn add_new_part_with_content_type_and_extension_auto_id<T: crate::sdk::SdkPartHandle>(
+        &mut self,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        extension: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        Self: crate::parts::PartRootCache,
+      {
+        let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
+        crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension(
+          self,
+          relationship_id,
+          content_type,
+          extension,
+          crate::common::NewPartTargetMode::Indexed,
+        )
+      }
+
+      #[inline]
       pub fn add_core_file_properties_part(
         &mut self,
       ) -> Result<crate::parts::core_file_properties_part::CoreFilePropertiesPart, crate::common::SdkError>

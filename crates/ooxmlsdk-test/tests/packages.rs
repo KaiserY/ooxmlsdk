@@ -1904,6 +1904,87 @@ fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
 }
 
 #[test]
+fn generic_add_new_part_with_content_type_and_extension_saves_custom_extension() {
+  // Source: upstream AddNewPart<T>(contentType, id) plus PartTypeInfo extension semantics.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkGenericCustomXml";
+  let custom_xml = b"<ink xmlns=\"http://www.w3.org/2003/InkML\"/>".to_vec();
+
+  let part = main_part
+    .add_new_part_with_content_type_and_extension::<_, CustomXmlPart>(
+      &mut package,
+      relationship_id,
+      "application/inkml+xml",
+      ".inkml",
+    )
+    .unwrap();
+  part.set_data(&mut package, custom_xml.clone()).unwrap();
+  let path = part.path(&package).unwrap().to_string();
+
+  assert_eq!(
+    main_part.get_id_of_part(&package, &part),
+    Some(relationship_id)
+  );
+  assert_eq!(part.content_type(&package), Some("application/inkml+xml"));
+  assert!(path.starts_with("customXml/item"));
+  assert!(path.ends_with(".inkml"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_part = reopened_main
+    .get_part_by_id(&reopened, relationship_id)
+    .and_then(PartRef::downcast::<CustomXmlPart>)
+    .unwrap();
+
+  assert_eq!(
+    reopened_part.content_type(&reopened),
+    Some("application/inkml+xml")
+  );
+  assert_eq!(reopened_part.data(&reopened), Some(custom_xml.as_slice()));
+  assert_eq!(reopened_part.path(&reopened), Some(path.as_str()));
+}
+
+#[test]
+fn package_add_new_part_with_content_type_and_extension_auto_id_saves_custom_extension() {
+  // Source: package-level AddNewPart<T>() creation semantics with Rust extension override.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let relationship_count = package.relationships().len();
+  let png = b"package thumbnail png".to_vec();
+
+  let part = package
+    .add_new_part_with_content_type_and_extension_auto_id::<ThumbnailPart>("image/png", ".png")
+    .unwrap();
+  part.set_data(&mut package, png.clone()).unwrap();
+  let relationship_id = package.get_id_of_part(&part).unwrap().to_string();
+  let path = part.path(&package).unwrap().to_string();
+
+  assert!(relationship_id.starts_with("rId"));
+  assert_eq!(package.relationships().len(), relationship_count + 1);
+  assert_eq!(part.content_type(&package), Some("image/png"));
+  assert!(path.starts_with("docProps/thumbnail"));
+  assert!(path.ends_with(".png"));
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_part = reopened
+    .get_part_by_id(relationship_id.as_str())
+    .and_then(PartRef::downcast::<ThumbnailPart>)
+    .unwrap();
+
+  assert_eq!(reopened_part.content_type(&reopened), Some("image/png"));
+  assert_eq!(reopened_part.data(&reopened), Some(png.as_slice()));
+  assert_eq!(reopened_part.path(&reopened), Some(path.as_str()));
+}
+
+#[test]
 fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
   // Source: upstream OpenXmlSupportedRelationshipExtensions typed PartTypeInfo overloads.
   let mut package =

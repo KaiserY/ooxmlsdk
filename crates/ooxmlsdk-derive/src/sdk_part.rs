@@ -1552,6 +1552,44 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_new_part_with_content_type_and_extension<P, T>(
+        &self,
+        package: &mut P,
+        relationship_id: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        extension: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_new_part_with_content_type_and_extension(self,
+          package,
+          relationship_id,
+          content_type,
+          extension,
+        )
+      }
+
+      #[inline]
+      pub fn add_new_part_with_content_type_and_extension_auto_id<P, T>(
+        &self,
+        package: &mut P,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        extension: impl Into<std::borrow::Cow<'static, str>>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        T: crate::sdk::SdkPartHandle,
+      {
+        <Self as crate::sdk::SdkPartHandle>::add_new_part_with_content_type_and_extension_auto_id(self,
+          package,
+          content_type,
+          extension,
+        )
+      }
+
+      #[inline]
       pub fn add_extended_part<P>(
         &self,
         package: &mut P,

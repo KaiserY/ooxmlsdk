@@ -1251,12 +1251,12 @@ fn expand_part_handle(
     match child.kind {
       PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
         for part in &self.#field_ident {
-          crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)?;
+          crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, package, relationships)?;
         }
       },
       PartChildKind::Required | PartChildKind::Optional => quote! {
         if let Some(part) = self.#field_ident.as_deref() {
-          crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)?;
+          crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, package, relationships)?;
         }
       },
     }
@@ -1358,7 +1358,9 @@ fn expand_part_handle(
       fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
       }
+    }
 
+    impl crate::sdk::SdkPartHandleInternal for #ident {
       fn modeled_relationships<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,
@@ -1442,7 +1444,7 @@ fn expand_part_handle(
         }
         relationships.insert(
           self.id,
-          <Self as crate::sdk::SdkPartHandle>::modeled_relationships(self, package)?,
+          <Self as crate::sdk::SdkPartHandleInternal>::modeled_relationships(self, package)?,
         );
         #( #collect_relationship_child_stmts )*
         for part in &self.fallback_parts {
@@ -1476,7 +1478,7 @@ fn expand_part_handle(
           crate::sdk::SdkPackageInternal::storage(package),
           self.id,
         );
-        <Self as crate::sdk::SdkPartHandle>::modeled_relationships(&part, package).map(Into::into)
+        <Self as crate::sdk::SdkPartHandleInternal>::modeled_relationships(&part, package).map(Into::into)
       }
 
       #[inline]
@@ -2491,7 +2493,7 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
           let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
+          <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
             .filter_map(#map_relationship)
@@ -2515,7 +2517,7 @@ fn part_handle_child_methods_tokens(
           package: &P,
         ) -> Option<#part_ty> {
           let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
+          <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
             .find_map(#map_relationship)
@@ -2558,7 +2560,7 @@ fn part_handle_child_methods_tokens(
         &'a self,
         package: &'a P,
       ) -> impl Iterator<Item = crate::parts::IdPartPair<'a>> + 'a {
-        <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
+        <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)
           .into_iter()
           .flat_map(|relationships| relationships.iter())
           .filter_map(|relationship| {
@@ -2590,7 +2592,7 @@ fn part_handle_child_methods_tokens(
         relationship_id: &str,
       ) -> Option<crate::parts::PartRef> {
         let relationship =
-          <Self as crate::sdk::SdkPartHandle>::relationships(self, package)?.get(relationship_id)?;
+          <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)?.get(relationship_id)?;
         Self::part_ref_from_relationship(package, relationship)
       }
 
@@ -2629,7 +2631,7 @@ fn part_handle_child_methods_tokens(
         part: &T,
       ) -> Option<&'a str> {
         let target_part_id = part.part_id();
-        <Self as crate::sdk::SdkPartHandle>::relationships(self, package)?.iter().find_map(|relationship| {
+        <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)?.iter().find_map(|relationship| {
           (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
         })
       }

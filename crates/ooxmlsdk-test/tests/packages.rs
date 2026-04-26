@@ -89,6 +89,17 @@ fn media_data_part_by_id<P: SdkPackage>(package: &P, part_id: PartId) -> MediaDa
     .unwrap()
 }
 
+fn part_relationship_count<P, T>(package: &P, part: &T) -> usize
+where
+  P: SdkPackage,
+  T: SdkPartHandle,
+{
+  part.parts(package).count()
+    + part.external_relationships(package).count()
+    + part.hyperlink_relationships(package).count()
+    + part.data_part_reference_relationships(package).count()
+}
+
 #[test]
 fn part_child_descriptors_are_generated_from_static_field_metadata() {
   let slide_master_descriptor = PresentationPart::child_descriptors()
@@ -290,7 +301,7 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   let main_part = package.main_document_part().unwrap();
   let styles_part = main_part.style_definitions_part(&package).unwrap();
 
-  assert!(main_part.relationships(&package).is_some());
+  assert!(main_part.path(&package).is_some());
   assert_eq!(
     main_part.get_id_of_part(&package, &styles_part),
     main_part
@@ -334,16 +345,16 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
 fn part_relationship_set_classifies_children_and_references() {
   let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationships = main_part.relationships(&package).unwrap();
 
-  assert_eq!(relationships.part_relationships().count(), 13);
+  assert_eq!(main_part.parts(&package).count(), 13);
   assert_eq!(main_part.external_relationships(&package).count(), 0);
   assert_eq!(main_part.hyperlink_relationships(&package).count(), 71);
   assert_eq!(
-    relationships
-      .iter()
-      .filter(|rel| rel.is_reference_relationship())
-      .count(),
+    main_part.external_relationships(&package).count()
+      + main_part.hyperlink_relationships(&package).count()
+      + main_part
+        .data_part_reference_relationships(&package)
+        .count(),
     71
   );
   let internal_hyperlink = main_part
@@ -436,7 +447,7 @@ fn part_relationship_ids_can_change_for_child_parts() {
     .get_id_of_part(&package, &image_part)
     .unwrap()
     .to_string();
-  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let relationship_count = part_relationship_count(&package, &main_part);
 
   assert_eq!(
     main_part
@@ -450,7 +461,7 @@ fn part_relationship_ids_can_change_for_child_parts() {
 
   let refreshed_main = package.main_document_part().unwrap();
   assert_eq!(
-    refreshed_main.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &refreshed_main),
     relationship_count
   );
   assert!(
@@ -500,7 +511,7 @@ fn delete_invalid_child_part_id_is_safe() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: DeleteInvalidPartIdSafely
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
   let main_part = package.add_main_document_part().unwrap();
-  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let relationship_count = part_relationship_count(&package, &main_part);
 
   assert!(
     main_part
@@ -513,7 +524,7 @@ fn delete_invalid_child_part_id_is_safe() {
       .unwrap()
   );
   assert_eq!(
-    main_part.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &main_part),
     relationship_count
   );
 }
@@ -1105,27 +1116,33 @@ fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test()
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: HyperlinkRelationshipTest
   let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationships = main_part.relationships(&package).unwrap();
 
   let hyperlink_relationships: Vec<_> = main_part.hyperlink_relationships(&package).collect();
 
   assert_eq!(hyperlink_relationships.len(), 71);
-  assert_eq!(relationships.hyperlink_relationships().count(), 71);
   assert!(
     main_part
       .external_relationships(&package)
       .all(|relationship| relationship.relationship_type()
         != ooxmlsdk::common::RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE)
   );
-  assert!(relationships.contains_id("rId15"));
+  assert!(
+    main_part
+      .get_hyperlink_relationship(&package, "rId15")
+      .is_some()
+  );
 
-  let rid15 = relationships.get("rId15").unwrap();
+  let rid15 = main_part
+    .get_hyperlink_relationship(&package, "rId15")
+    .unwrap();
   assert_eq!(rid15.target(), "#_THIS_WEEK_IN");
   assert!(matches!(rid15.target_mode(), TargetMode::Internal));
   assert_eq!(rid15.target_kind(), RelationshipTargetKind::Missing);
   assert!(rid15.target_part_id().is_none());
 
-  let rid18 = relationships.get("rId18").unwrap();
+  let rid18 = main_part
+    .get_hyperlink_relationship(&package, "rId18")
+    .unwrap();
   assert_eq!(rid18.target(), "http://www.iaswresearch.org/");
   assert!(matches!(rid18.target_mode(), TargetMode::External));
   assert_eq!(rid18.target_kind(), RelationshipTargetKind::External);
@@ -1258,10 +1275,9 @@ fn part_hyperlink_relationship_mutation_is_saved() {
   let target = "https://example.com/ooxmlsdk";
 
   assert!(
-    !main_part
-      .relationships(&package)
-      .unwrap()
-      .contains_id(relationship_id)
+    main_part
+      .get_hyperlink_relationship(&package, relationship_id)
+      .is_none()
   );
 
   let relationship = main_part
@@ -1286,9 +1302,7 @@ fn part_hyperlink_relationship_mutation_is_saved() {
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_relationship = reopened_main
-    .relationships(&reopened)
-    .unwrap()
-    .get(relationship_id)
+    .get_hyperlink_relationship(&reopened, relationship_id)
     .unwrap();
 
   assert_eq!(reopened_relationship.target(), target);
@@ -1398,16 +1412,13 @@ fn part_external_relationship_ids_can_change_and_remove() {
     .unwrap();
   assert!(
     main_part
-      .relationships(&package)
-      .unwrap()
-      .get(relationship_id)
+      .get_reference_relationship(&package, relationship_id)
       .is_none()
   );
   assert!(
     main_part
-      .relationships(&package)
-      .unwrap()
-      .contains_id(changed_relationship_id)
+      .get_reference_relationship(&package, changed_relationship_id)
+      .is_some()
   );
 
   let removed = main_part
@@ -1426,10 +1437,9 @@ fn part_external_relationship_ids_can_change_and_remove() {
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
   assert!(
-    !reopened_main
-      .relationships(&reopened)
-      .unwrap()
-      .contains_id(changed_relationship_id)
+    reopened_main
+      .get_reference_relationship(&reopened, changed_relationship_id)
+      .is_none()
   );
 }
 
@@ -1506,17 +1516,14 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
   // Source: upstream AddNewPart<HeaderPart> coverage adapted to package-level save/reopen.
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationship_id = main_part
-    .relationships(&package)
-    .unwrap()
-    .next_relationship_id();
+  let relationship_id = "rIdSdkHeader";
 
   let header_part = main_part
-    .add_new_part::<_, HeaderPart>(&mut package, relationship_id.as_str())
+    .add_new_part::<_, HeaderPart>(&mut package, relationship_id)
     .unwrap();
   assert_eq!(
     main_part.get_id_of_part(&package, &header_part),
-    Some(relationship_id.as_str())
+    Some(relationship_id)
   );
   assert_eq!(
     header_part.content_type(&package),
@@ -1540,7 +1547,7 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_header = reopened_main
     .header_parts(&reopened)
-    .find(|part| reopened_main.get_id_of_part(&reopened, part) == Some(relationship_id.as_str()))
+    .find(|part| reopened_main.get_id_of_part(&reopened, part) == Some(relationship_id))
     .unwrap();
 
   assert_eq!(reopened_header.path(&reopened), Some("word/header1.xml"));
@@ -1576,7 +1583,7 @@ fn add_new_part_auto_id_skips_existing_relationship_ids() {
   // Source: upstream AddNewPart<T>() auto relationship-id behavior adapted for Rust handles.
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let relationship_count = part_relationship_count(&package, &main_part);
 
   let header_part = main_part
     .add_new_part_auto_id::<_, HeaderPart>(&mut package)
@@ -1587,7 +1594,7 @@ fn add_new_part_auto_id_skips_existing_relationship_ids() {
     .to_string();
   assert!(relationship_id.starts_with("rId"));
   assert_eq!(
-    main_part.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &main_part),
     relationship_count + 1
   );
 
@@ -1597,7 +1604,7 @@ fn add_new_part_auto_id_skips_existing_relationship_ids() {
       .is_err()
   );
   assert_eq!(
-    main_part.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &main_part),
     relationship_count + 1
   );
 }
@@ -1770,7 +1777,7 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
   let mut package =
     WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let relationship_count = part_relationship_count(&package, &main_part);
 
   let image_part = main_part
     .add_image_part(&mut package, "image/jpeg")
@@ -1785,7 +1792,7 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
 
   assert!(relationship_id.starts_with("rId"));
   assert_eq!(
-    main_part.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &main_part),
     relationship_count + 1
   );
   assert_eq!(image_part.content_type(&package), Some("image/jpeg"));
@@ -1850,7 +1857,7 @@ fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
   let mut package =
     WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let relationship_count = part_relationship_count(&package, &main_part);
 
   let alt_chunk = main_part
     .add_alternative_format_import_part_by_type(
@@ -1871,7 +1878,7 @@ fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
 
   assert!(relationship_id.starts_with("rId"));
   assert_eq!(
-    main_part.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &main_part),
     relationship_count + 1
   );
   assert_eq!(
@@ -1905,7 +1912,7 @@ fn add_custom_xml_part_by_type_feeds_data_and_saves() {
   let mut package =
     WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let relationship_count = main_part.relationships(&package).unwrap().len();
+  let relationship_count = part_relationship_count(&package, &main_part);
   let xml = b"<properties><property name=\"sdk\">custom xml</property></properties>".to_vec();
 
   let custom_xml = main_part
@@ -1921,7 +1928,7 @@ fn add_custom_xml_part_by_type_feeds_data_and_saves() {
 
   assert!(relationship_id.starts_with("rId"));
   assert_eq!(
-    main_part.relationships(&package).unwrap().len(),
+    part_relationship_count(&package, &main_part),
     relationship_count + 1
   );
   assert_eq!(custom_xml.content_type(&package), Some("application/xml"));
@@ -3172,7 +3179,7 @@ fn spreadsheet_child_accessors_resolve_repeated_parts() {
   let package = SpreadsheetDocument::new_from_file(doc_sample("basicspreadsheet.xlsx")).unwrap();
   let workbook_part = package.workbook_part().unwrap();
 
-  assert!(workbook_part.relationships(&package).is_some());
+  assert!(workbook_part.path(&package).is_some());
   assert!(workbook_part.theme_part(&package).is_some());
   assert!(workbook_part.worksheet_parts(&package).count() >= 1);
 }
@@ -3211,7 +3218,7 @@ fn presentation_child_accessors_resolve_repeated_parts() {
   let package = PresentationDocument::new_from_file(doc_sample("mcppt.pptx")).unwrap();
   let presentation_part = package.presentation_part().unwrap();
 
-  assert!(presentation_part.relationships(&package).is_some());
+  assert!(presentation_part.path(&package).is_some());
   assert!(presentation_part.slide_parts(&package).count() >= 1);
   assert!(presentation_part.slide_master_parts(&package).count() >= 1);
 }

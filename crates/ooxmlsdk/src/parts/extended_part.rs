@@ -145,6 +145,8 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
   fn set_relationship_id(&mut self, relationship_id: String) {
     self.relationship_id = Some(relationship_id);
   }
+}
+impl crate::sdk::SdkPartHandleInternal for ExtendedPart {
   fn collect_modeled_part_relationships<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -153,7 +155,7 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
       crate::common::RelationshipSet,
     >,
   ) -> Result<(), crate::common::SdkError> {
-    let Some(part) = package.storage().part(self.id) else {
+    let Some(part) = crate::sdk::SdkPackageInternal::storage(package).part(self.id) else {
       return Ok(());
     };
     if part.is_deleted() {
@@ -162,24 +164,26 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
     if relationships.contains_key(&self.id) {
       return Ok(());
     }
-    relationships.insert(self.id, self.modeled_relationships(package)?);
+    relationships.insert(
+      self.id,
+      <Self as crate::sdk::SdkPartHandleInternal>::modeled_relationships(self, package)?,
+    );
     for part in &self.fallback_parts {
       part.collect_modeled_part_relationships(package, relationships)?;
     }
     Ok(())
   }
-}
-impl ExtendedPart {
-  pub(crate) fn modeled_relationships<P: crate::sdk::SdkPackage>(
+  fn modeled_relationships<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
   ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
+    let storage = crate::sdk::SdkPackageInternal::storage(package);
     let mut relationships = crate::common::RelationshipSet::default();
     if self.relationship_order.is_empty() {
       for part in &self.fallback_parts {
         crate::sdk::add_part_ref_to_relationship_set(
           &mut relationships,
-          package.storage(),
+          storage,
           Some(self.id),
           part,
         )?;
@@ -201,7 +205,7 @@ impl ExtendedPart {
           if let Some(part) = self.fallback_parts.get(*item_index) {
             crate::sdk::add_part_ref_to_relationship_set(
               &mut relationships,
-              package.storage(),
+              storage,
               Some(self.id),
               part,
             )?;

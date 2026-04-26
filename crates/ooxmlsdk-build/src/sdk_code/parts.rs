@@ -341,7 +341,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     part_ref_collect_relationships_arms.push(quote! {
       #( #part_attrs )*
       PartRef::#struct_ident(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, package, relationships)
       }
     });
     part_ref_downcast_impls.push(quote! {
@@ -492,7 +492,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         match self {
           #( #part_ref_collect_relationships_arms, )*
           PartRef::ExtendedPart(part) => {
-            crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+            crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, package, relationships)
           }
         }
       }

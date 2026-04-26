@@ -503,12 +503,12 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     match child.kind {
       PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
         for part in &self.#field_ident {
-          crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, self, relationships)?;
+          crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, self, relationships)?;
         }
       },
       PartChildKind::Required | PartChildKind::Optional => quote! {
         if let Some(part) = self.#field_ident.as_deref() {
-          crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, self, relationships)?;
+          crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(part, self, relationships)?;
         }
       },
     }

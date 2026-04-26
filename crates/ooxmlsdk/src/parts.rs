@@ -2461,418 +2461,922 @@ impl PartRef {
   ) -> Result<(), crate::common::SdkError> {
     match self {
       PartRef::AlternativeFormatImportPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CalculationChainPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CellMetadataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::ChartColorStylePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ChartDrawingPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ChartPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::ChartStylePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ChartsheetPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CommentAuthorsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ConnectionsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::ControlPropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CoreFilePropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::CustomDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::CustomDataPropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CustomFilePropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CustomPropertyPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CustomXmlMappingsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CustomXmlPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CustomXmlPropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::CustomizationPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DiagramColorsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DiagramDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DiagramLayoutDefinitionPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::DiagramPersistLayoutPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DiagramStylePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DialogsheetPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DigitalSignatureOriginPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DocumentSettingsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::DocumentTasksPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::DrawingsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::EmbeddedControlPersistenceBinaryDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::EmbeddedControlPersistencePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::EmbeddedObjectPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::EmbeddedPackagePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::EndnotesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ExcelAttachedToolbarsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::ExtendedChartPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ExtendedFilePropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ExternalWorkbookPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::FeaturePropertyBagsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::FontPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::FontTablePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::FooterPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::FootnotesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::GlossaryDocumentPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::HandoutMasterPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::HeaderPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ImagePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::InternationalMacroSheetPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::LabelInfoPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::LegacyDiagramTextInfoPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::LegacyDiagramTextPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::MacroSheetPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::MailMergeRecipientDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::MainDocumentPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::Model3DReferenceRelationshipPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::NamedSheetViewsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::NotesMasterPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::NotesSlidePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::NumberingDefinitionsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::PivotTableCacheDefinitionPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::PivotTableCacheRecordsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::PivotTablePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::PowerPointAuthorsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::PowerPointCommentPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::PresentationPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::PresentationPropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::QueryTablePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::QuickAccessToolbarCustomizationsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdArrayPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdRichValuePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdRichValueStructurePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdRichValueTypesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdRichValueWebImagePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdSupportingPropertyBagPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RdSupportingPropertyBagStructurePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RibbonAndBackstageCustomizationsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::RibbonExtensibilityPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::RichStylesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SharedStringTablePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SingleCellTablePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::SlicerCachePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::SlicersPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SlideCommentsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SlideLayoutPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SlideMasterPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SlidePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SlideSyncDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::SpreadsheetPrinterSettingsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::StyleDefinitionsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::StylesWithEffectsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::TableDefinitionPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::TableStylesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ThemeOverridePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ThemePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ThumbnailPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::TimeLineCachePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::TimeLinePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::UserDefinedTagsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::VbaDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::VbaProjectPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ViewPropertiesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::VmlDrawingPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::VolatileDependenciesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WebExTaskpanesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WebExtensionPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WebSettingsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WordAttachedToolbarsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordCommentsExtensiblePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordprocessingCommentsExPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordprocessingCommentsIdsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WordprocessingCommentsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WordprocessingPeoplePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WordprocessingPrinterSettingsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorkbookPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WorkbookPersonPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorkbookRevisionHeaderPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorkbookRevisionLogPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorkbookStylesPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorkbookUserDataPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorksheetCommentsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorksheetPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::WorksheetSortMapPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       #[cfg(feature = "microsoft365")]
       PartRef::WorksheetThreadedCommentsPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::XmlSignaturePart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
       PartRef::ExtendedPart(part) => {
-        crate::sdk::SdkPartHandle::collect_modeled_part_relationships(part, package, relationships)
+        crate::sdk::SdkPartHandleInternal::collect_modeled_part_relationships(
+          part,
+          package,
+          relationships,
+        )
       }
     }
   }

@@ -25,6 +25,3 @@ pub struct DiagramColorsPart {
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl DiagramColorsPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
-}

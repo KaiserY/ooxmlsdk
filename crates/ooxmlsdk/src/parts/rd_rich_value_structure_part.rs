@@ -24,6 +24,3 @@ pub struct RdRichValueStructurePart {
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl RdRichValueStructurePart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
-}

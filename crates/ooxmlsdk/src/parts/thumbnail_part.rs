@@ -20,6 +20,3 @@ pub struct ThumbnailPart {
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl ThumbnailPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
-}

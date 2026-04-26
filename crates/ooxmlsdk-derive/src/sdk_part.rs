@@ -1158,10 +1158,17 @@ fn expand_part_handle(
       },
     }
   });
-  Ok(quote! {
-    impl crate::sdk::SdkPartHandle for #ident {
+  let child_descriptors_assoc = if child_infos.is_empty() {
+    quote! {}
+  } else {
+    quote! {
       const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
         Self::GENERATED_CHILD_DESCRIPTORS;
+    }
+  };
+  Ok(quote! {
+    impl crate::sdk::SdkPartHandle for #ident {
+      #child_descriptors_assoc
 
       const DESCRIPTOR: crate::sdk::PartDescriptor = crate::sdk::PartDescriptor::new(
         self::RELATIONSHIP_TYPE,

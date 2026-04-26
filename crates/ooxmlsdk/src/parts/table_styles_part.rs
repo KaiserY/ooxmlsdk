@@ -25,6 +25,3 @@ pub struct TableStylesPart {
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl TableStylesPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
-}

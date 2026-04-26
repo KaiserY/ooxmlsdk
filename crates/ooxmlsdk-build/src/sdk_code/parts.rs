@@ -66,6 +66,17 @@ fn gen_package_module(
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = package_marker_fields(part)?;
   let child_descriptors = generated_child_descriptors(part)?;
+  let child_descriptors_impl = if child_descriptors.is_empty() {
+    quote! {}
+  } else {
+    quote! {
+      impl #struct_name_ident {
+        pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
+          #( #child_descriptors, )*
+        ];
+      }
+    }
+  };
   let package_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
     pub struct #struct_name_ident {
@@ -83,12 +94,7 @@ fn gen_package_module(
     #target_name_stmt
     #extension_stmt
     #package_struct
-
-    impl #struct_name_ident {
-      pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-        #( #child_descriptors, )*
-      ];
-    }
+    #child_descriptors_impl
   })
 }
 
@@ -156,6 +162,17 @@ fn gen_part_handle_module(
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = part_marker_fields(part)?;
   let child_descriptors = generated_child_descriptors(part)?;
+  let child_descriptors_impl = if child_descriptors.is_empty() {
+    quote! {}
+  } else {
+    quote! {
+      impl #struct_name_ident {
+        pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
+          #( #child_descriptors, )*
+        ];
+      }
+    }
+  };
   let part_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
     pub struct #struct_name_ident {
@@ -172,12 +189,7 @@ fn gen_part_handle_module(
     #target_name_stmt
     #extension_stmt
     #part_struct
-
-    impl #struct_name_ident {
-      pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-        #( #child_descriptors, )*
-      ];
-    }
+    #child_descriptors_impl
   })
 }
 

@@ -25,6 +25,3 @@ pub struct QueryTablePart {
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl QueryTablePart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
-}

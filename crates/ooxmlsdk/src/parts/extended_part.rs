@@ -14,12 +14,7 @@ pub struct ExtendedPart {
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl ExtendedPart {
-  pub const GENERATED_CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[];
-}
 impl crate::sdk::SdkPartHandle for ExtendedPart {
-  const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
-    Self::GENERATED_CHILD_DESCRIPTORS;
   const DESCRIPTOR: crate::sdk::PartDescriptor =
     crate::sdk::PartDescriptor::new("", "", "", "extendedPart", "");
   #[inline]

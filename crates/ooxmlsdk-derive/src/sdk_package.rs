@@ -339,10 +339,17 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       },
     }
   });
-  Ok(quote! {
-    impl crate::sdk::SdkPackage for #ident {
+  let child_descriptors_assoc = if child_infos.is_empty() {
+    quote! {}
+  } else {
+    quote! {
       const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] =
         Self::GENERATED_CHILD_DESCRIPTORS;
+    }
+  };
+  Ok(quote! {
+    impl crate::sdk::SdkPackage for #ident {
+      #child_descriptors_assoc
 
       #[inline]
       fn storage(&self) -> &crate::common::SdkPackageStorage {

@@ -223,6 +223,59 @@ where
 }
 
 #[cfg(feature = "parts")]
+fn collect_all_parts_from_relationships<P: SdkPackage + Sized>(
+  package: &P,
+  relationships: &crate::common::RelationshipSet,
+) -> Vec<crate::parts::PartRef> {
+  let mut parts = Vec::new();
+  let mut visited = std::collections::HashSet::new();
+  let mut queue = std::collections::VecDeque::new();
+
+  for relationship in relationships.part_relationships() {
+    if is_data_part_reference_relationship(relationship) {
+      continue;
+    }
+    if let Some(part_id) = relationship.target_part_id()
+      && visited.insert(part_id)
+    {
+      queue.push_back(part_id);
+    }
+  }
+
+  while let Some(part_id) = queue.pop_front() {
+    if let Some(part) = crate::parts::PartRef::from_part_id(package, part_id) {
+      parts.push(part);
+    }
+
+    if let Some(relationships) = package.storage().relationships(part_id) {
+      for relationship in relationships.part_relationships() {
+        if is_data_part_reference_relationship(relationship) {
+          continue;
+        }
+        if let Some(child_part_id) = relationship.target_part_id()
+          && visited.insert(child_part_id)
+        {
+          queue.push_back(child_part_id);
+        }
+      }
+    }
+  }
+
+  parts
+}
+
+#[cfg(feature = "parts")]
+#[inline]
+fn is_data_part_reference_relationship(relationship: &crate::common::RelationshipInfo) -> bool {
+  matches!(
+    relationship.relationship_type(),
+    crate::common::RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+      | crate::common::RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+      | crate::common::RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+  )
+}
+
+#[cfg(feature = "parts")]
 impl PartDescriptor {
   pub const fn new(
     relationship_type: &'static str,
@@ -933,6 +986,14 @@ pub trait SdkPackage {
       let part = crate::parts::PartRef::from_part_id(self, part_id)?;
       Some(crate::parts::IdPartPair::new(relationship.id(), part))
     })
+  }
+
+  #[inline]
+  fn get_all_parts(&self) -> impl Iterator<Item = crate::parts::PartRef> + '_
+  where
+    Self: Sized,
+  {
+    collect_all_parts_from_relationships(self, self.relationships()).into_iter()
   }
 
   #[inline]
@@ -2996,6 +3057,39 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
         let part = crate::parts::PartRef::from_part_id(package, part_id)?;
         Some(crate::parts::IdPartPair::new(relationship.id(), part))
       })
+  }
+
+  #[inline]
+  fn get_all_parts<'a, P: SdkPackage + Sized>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
+    let Some(relationships) = self.relationships(package) else {
+      return Vec::new().into_iter();
+    };
+    collect_all_parts_from_relationships(package, relationships).into_iter()
+  }
+
+  #[inline]
+  fn get_parent_parts<'a, P: SdkPackage + Sized>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
+    let target_part_id = self.part_id();
+    package
+      .get_all_parts()
+      .filter(move |part| {
+        package
+          .storage()
+          .relationships(part.part_id())
+          .is_some_and(|relationships| {
+            relationships
+              .part_relationships()
+              .any(|relationship| relationship.target_part_id() == Some(target_part_id))
+          })
+      })
+      .collect::<Vec<_>>()
+      .into_iter()
   }
 
   #[inline]

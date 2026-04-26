@@ -1,5 +1,6 @@
 #![cfg(feature = "parts")]
 
+use std::collections::HashSet;
 use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{
@@ -490,7 +491,7 @@ fn package_storage_parts_match_openxml_package_get_all_parts_tests() {
   //   OpenXmlPackageGetAllPartsTestPowerPoint
   let word = WordprocessingDocument::new_from_file(doc_sample("complex0.docx")).unwrap();
   assert_eq!(word.storage().parts().len(), 31);
-  assert_eq!(word.storage().parts().len(), 31);
+  assert_eq!(word.get_all_parts().count(), 31);
 
   let presentation =
     PresentationDocument::new_from_file(doc_sample("o09_Performance_typical.pptx")).unwrap();
@@ -511,7 +512,45 @@ fn package_storage_parts_match_openxml_package_get_all_parts_tests() {
     .count();
 
   assert_eq!(presentation.storage().parts().len() - data_parts, 65);
+  assert_eq!(presentation.get_all_parts().count(), 65);
   assert_eq!(data_parts, 1);
+}
+
+#[test]
+fn part_get_all_parts_and_parent_parts_follow_reachable_relationship_graph() {
+  // Source: aligned with OpenXmlPackageExtensions.GetAllParts and OpenXmlPart.GetParentParts.
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let header_part = main_part
+    .add_new_part_auto_id::<_, HeaderPart>(&mut package)
+    .unwrap();
+  let settings_part = main_part
+    .add_new_part_auto_id::<_, DocumentSettingsPart>(&mut package)
+    .unwrap();
+  let image_part = header_part
+    .add_image_part(&mut package, "image/png")
+    .unwrap();
+
+  let main_descendants: HashSet<_> = main_part
+    .get_all_parts(&package)
+    .map(|part| part.part_id())
+    .collect();
+  assert!(main_descendants.contains(&header_part.part_id()));
+  assert!(main_descendants.contains(&settings_part.part_id()));
+  assert!(main_descendants.contains(&image_part.part_id()));
+  assert!(!main_descendants.contains(&main_part.part_id()));
+
+  let image_parents: Vec<_> = image_part
+    .get_parent_parts(&package)
+    .map(|part| part.part_id())
+    .collect();
+  assert_eq!(image_parents, vec![header_part.part_id()]);
+
+  let header_parents: Vec<_> = header_part
+    .get_parent_parts(&package)
+    .map(|part| part.part_id())
+    .collect();
+  assert_eq!(header_parents, vec![main_part.part_id()]);
 }
 
 #[test]
@@ -1058,9 +1097,12 @@ fn root_cache_reports_and_unloads_lazy_roots() {
   let part_id = main_part.part_id();
 
   assert!(!package.is_root_element_loaded(part_id));
+  assert!(!main_part.is_root_element_loaded(&package));
   assert!(main_part.root_element(&mut package).is_ok());
+  assert!(main_part.is_root_element_loaded(&package));
   assert!(package.is_root_element_loaded(part_id));
-  assert!(package.unload_root_element(part_id).is_some());
+  assert!(main_part.unload_root_element(&mut package).is_some());
+  assert!(!main_part.is_root_element_loaded(&package));
   assert!(!package.is_root_element_loaded(part_id));
 }
 

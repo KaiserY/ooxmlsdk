@@ -909,6 +909,11 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
+    pub fn get_all_parts(&self) -> impl Iterator<Item = crate::parts::PartRef> + '_ {
+      crate::sdk::SdkPackage::get_all_parts(self)
+    }
+
+    #[inline]
     pub fn get_part_by_id(&self, relationship_id: &str) -> Option<crate::parts::PartRef> {
       crate::sdk::SdkPackage::get_part_by_id(self, relationship_id)
     }

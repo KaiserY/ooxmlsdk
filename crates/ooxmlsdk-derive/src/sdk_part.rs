@@ -2128,6 +2128,19 @@ fn part_handle_root_method_tokens(
 
   quote! {
     impl #part_ident {
+      #[inline]
+      pub fn is_root_element_loaded<P: crate::parts::PartRootCache>(&self, package: &P) -> bool {
+        package.is_root_element_loaded(self.id)
+      }
+
+      #[inline]
+      pub fn unload_root_element<P: crate::parts::PartRootCache>(
+        &self,
+        package: &mut P,
+      ) -> Option<crate::parts::PartRootElement> {
+        package.unload_root_element(self.id)
+      }
+
       pub fn root_element<'a, P: crate::parts::PartRootCache>(
         &self,
         package: &'a mut P,
@@ -2358,6 +2371,22 @@ fn part_handle_child_methods_tokens(
             let part = Self::part_ref_from_relationship(package, relationship)?;
             Some(crate::parts::IdPartPair::new(relationship.id(), part))
           })
+      }
+
+      #[inline]
+      pub fn get_all_parts<'a, P: crate::sdk::SdkPackage>(
+        &'a self,
+        package: &'a P,
+      ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
+        <Self as crate::sdk::SdkPartHandle>::get_all_parts(self, package)
+      }
+
+      #[inline]
+      pub fn get_parent_parts<'a, P: crate::sdk::SdkPackage>(
+        &'a self,
+        package: &'a P,
+      ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
+        <Self as crate::sdk::SdkPartHandle>::get_parent_parts(self, package)
       }
 
       #[inline]

@@ -18,9 +18,9 @@ use ooxmlsdk::parts::{
   font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
   image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
   main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  ribbon_extensibility_part::RibbonExtensibilityPart, spreadsheet_document::SpreadsheetDocument,
-  style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
-  wordprocessing_comments_part::WordprocessingCommentsPart,
+  ribbon_extensibility_part::RibbonExtensibilityPart, slide_layout_part::SlideLayoutPart,
+  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
+  thumbnail_part::ThumbnailPart, wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
@@ -285,6 +285,8 @@ fn part_relationship_set_classifies_children_and_references() {
   let relationships = main_part.relationships(&package).unwrap();
 
   assert_eq!(relationships.part_relationships().count(), 13);
+  assert_eq!(main_part.external_relationships(&package).count(), 0);
+  assert_eq!(main_part.hyperlink_relationships(&package).count(), 71);
   assert_eq!(
     relationships
       .iter()
@@ -292,8 +294,31 @@ fn part_relationship_set_classifies_children_and_references() {
       .count(),
     71
   );
+  let internal_hyperlink = main_part
+    .get_reference_relationship(&package, "rId15")
+    .unwrap();
+  assert_eq!(internal_hyperlink.id(), "rId15");
+  assert_eq!(internal_hyperlink.target(), "#_THIS_WEEK_IN");
   assert!(matches!(
-    relationships.get("rId18").unwrap().reference_kind(),
+    internal_hyperlink.target_mode(),
+    TargetMode::Internal
+  ));
+  assert_eq!(
+    internal_hyperlink.reference_kind(),
+    Some(ReferenceRelationshipKind::Hyperlink)
+  );
+
+  let external_hyperlink = main_part
+    .get_reference_relationship(&package, "rId18")
+    .unwrap();
+  assert_eq!(external_hyperlink.id(), "rId18");
+  assert_eq!(external_hyperlink.target(), "http://www.iaswresearch.org/");
+  assert!(matches!(
+    external_hyperlink.target_mode(),
+    TargetMode::External
+  ));
+  assert!(matches!(
+    external_hyperlink.reference_kind(),
     Some(ReferenceRelationshipKind::Hyperlink)
   ));
 }
@@ -329,6 +354,78 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
       .get_parts_of_type::<_, ImagePart>(&package)
       .count(),
     13
+  );
+}
+
+#[test]
+fn part_relationship_ids_can_change_for_child_parts() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: ChangePartIdTest
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("complex0.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let comments_part = main_part.wordprocessing_comments_part(&package).unwrap();
+  let image_part = main_part.image_parts(&package).next().unwrap();
+  let comments_original_id = main_part
+    .get_id_of_part(&package, &comments_part)
+    .unwrap()
+    .to_string();
+  let image_original_id = main_part
+    .get_id_of_part(&package, &image_part)
+    .unwrap()
+    .to_string();
+  let relationship_count = main_part.relationships(&package).unwrap().len();
+
+  main_part
+    .change_relationship_id(&mut package, &comments_original_id, "rIdSdkComments")
+    .unwrap();
+  main_part
+    .change_relationship_id(&mut package, &image_original_id, &comments_original_id)
+    .unwrap();
+
+  let refreshed_main = package.main_document_part().unwrap();
+  assert_eq!(
+    refreshed_main.relationships(&package).unwrap().len(),
+    relationship_count
+  );
+  assert!(
+    refreshed_main
+      .get_part_by_id(&package, &image_original_id)
+      .is_none()
+  );
+  assert_eq!(
+    refreshed_main.get_id_of_part(&package, &comments_part),
+    Some("rIdSdkComments")
+  );
+  assert_eq!(
+    refreshed_main
+      .get_part_by_id(&package, &comments_original_id)
+      .and_then(PartRef::downcast::<ImagePart>)
+      .map(|part| part.part_id()),
+    Some(image_part.part_id())
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_comments = reopened_main
+    .wordprocessing_comments_part(&reopened)
+    .unwrap();
+  assert_eq!(
+    reopened_main.get_id_of_part(&reopened, &reopened_comments),
+    Some("rIdSdkComments")
+  );
+  assert!(
+    reopened_main
+      .get_part_by_id(&reopened, &image_original_id)
+      .is_none()
+  );
+  assert!(
+    reopened_main
+      .get_part_by_id(&reopened, &comments_original_id)
+      .and_then(PartRef::downcast::<ImagePart>)
+      .is_some()
   );
 }
 
@@ -2375,6 +2472,75 @@ fn add_part_and_create_relationship_to_part_share_existing_parts() {
     deleted_buffer.into_inner(),
     image_path.as_str()
   ));
+}
+
+#[test]
+fn create_relationship_to_part_reuses_existing_parts_from_package() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs :: CreateRelationshipToPartTest
+  let mut package = PresentationDocument::new_from_file_lazy(doc_sample("autosave.pptx")).unwrap();
+  let presentation_part = package.presentation_part().unwrap();
+  let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
+  assert!(slides.len() >= 2);
+  let slide1 = slides[0].clone();
+  let slide2 = slides[1].clone();
+  let slide_layout1 = slide1
+    .get_part_by_id(&package, "rId1")
+    .and_then(PartRef::downcast::<SlideLayoutPart>)
+    .unwrap();
+  let slide_layout2 = slide2
+    .get_part_by_id(&package, "rId1")
+    .and_then(PartRef::downcast::<SlideLayoutPart>)
+    .unwrap();
+
+  assert!(
+    slide1
+      .delete_part(&mut package, slide_layout1.clone())
+      .unwrap()
+  );
+  assert!(slide1.get_part_by_id(&package, "rId1").is_none());
+  let slide1_relationship_id = slide1
+    .create_relationship_to_part(&mut package, slide_layout2.clone())
+    .unwrap();
+  assert_eq!(
+    slide1
+      .get_part_by_id(&package, &slide1_relationship_id)
+      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .map(|part| part.part_id()),
+    Some(slide_layout2.part_id())
+  );
+
+  assert!(slide2.delete_part(&mut package, slide_layout2).unwrap());
+  assert!(slide2.get_part_by_id(&package, "rId1").is_none());
+  let slide2_relationship_id = slide2
+    .create_relationship_to_part_with_id(&mut package, slide_layout1.clone(), "rId1001")
+    .unwrap();
+  assert_eq!(slide2_relationship_id, "rId1001");
+  assert_eq!(
+    slide2
+      .get_part_by_id(&package, "rId1001")
+      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .map(|part| part.part_id()),
+    Some(slide_layout1.part_id())
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = PresentationDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_presentation_part = reopened.presentation_part().unwrap();
+  let reopened_slides: Vec<_> = reopened_presentation_part.slide_parts(&reopened).collect();
+  assert!(
+    reopened_slides[0]
+      .get_part_by_id(&reopened, &slide1_relationship_id)
+      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .is_some()
+  );
+  assert!(
+    reopened_slides[1]
+      .get_part_by_id(&reopened, "rId1001")
+      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .is_some()
+  );
 }
 
 #[test]

@@ -3076,6 +3076,36 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
   }
 
   #[inline]
+  fn data_to_vec<P: SdkPackage>(&self, package: &P) -> Option<Vec<u8>> {
+    self.data(package).map(<[u8]>::to_vec)
+  }
+
+  #[inline]
+  fn data_as_str<'a, P: SdkPackage>(
+    &self,
+    package: &'a P,
+  ) -> Result<Option<&'a str>, crate::common::SdkError> {
+    self
+      .data(package)
+      .map(std::str::from_utf8)
+      .transpose()
+      .map_err(|error| crate::common::SdkError::CommonError(error.to_string()))
+  }
+
+  #[inline]
+  fn write_data_to<P: SdkPackage, W: std::io::Write>(
+    &self,
+    package: &P,
+    writer: &mut W,
+  ) -> Result<bool, crate::common::SdkError> {
+    let Some(data) = self.data(package) else {
+      return Ok(false);
+    };
+    writer.write_all(data)?;
+    Ok(true)
+  }
+
+  #[inline]
   fn set_data<P: SdkPackage>(
     &self,
     package: &mut P,

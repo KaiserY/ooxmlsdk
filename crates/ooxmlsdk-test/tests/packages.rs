@@ -1649,6 +1649,38 @@ fn set_data_replaces_existing_part_bytes() {
 }
 
 #[test]
+fn part_data_helpers_read_text_and_write_bytes() {
+  // Source: upstream GetStream(FileMode.Open) read semantics adapted to Rust helpers.
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let xml = "<properties><property name=\"sdk\">text</property></properties>";
+  let custom_xml = main_part
+    .add_custom_xml_part_by_type(&mut package, CustomXmlPartType::CustomXml)
+    .unwrap();
+  custom_xml
+    .set_data(&mut package, xml.as_bytes().to_vec())
+    .unwrap();
+
+  assert_eq!(custom_xml.data_as_str(&package).unwrap(), Some(xml));
+  assert_eq!(
+    custom_xml.data_to_vec(&package).unwrap(),
+    xml.as_bytes().to_vec()
+  );
+
+  let mut copied = Vec::new();
+  assert!(custom_xml.write_data_to(&package, &mut copied).unwrap());
+  assert_eq!(copied, xml.as_bytes());
+
+  let image_part = main_part.add_image_part(&mut package, "image/png").unwrap();
+  let image_bytes = b"\x89PNG\r\n\x1a\nsdk-data-helper".to_vec();
+  image_part
+    .feed_data(&mut package, &mut Cursor::new(image_bytes.clone()))
+    .unwrap();
+  assert_eq!(image_part.data_to_vec(&package), Some(image_bytes));
+}
+
+#[test]
 fn add_image_part_with_id_feeds_data_and_saves() {
   // Source: upstream MainDocumentPart.AddImagePart(mime, id).FeedData(...) coverage.
   let mut package =

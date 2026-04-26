@@ -1362,6 +1362,28 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn data_to_vec<P: crate::sdk::SdkPackage>(&self, package: &P) -> Option<Vec<u8>> {
+        <Self as crate::sdk::SdkPartHandle>::data_to_vec(self, package)
+      }
+
+      #[inline]
+      pub fn data_as_str<'a, P: crate::sdk::SdkPackage>(
+        &self,
+        package: &'a P,
+      ) -> Result<Option<&'a str>, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::data_as_str(self, package)
+      }
+
+      #[inline]
+      pub fn write_data_to<P: crate::sdk::SdkPackage, W: std::io::Write>(
+        &self,
+        package: &P,
+        writer: &mut W,
+      ) -> Result<bool, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::write_data_to(self, package, writer)
+      }
+
+      #[inline]
       pub fn set_data<P: crate::sdk::SdkPackage>(
         &self,
         package: &mut P,

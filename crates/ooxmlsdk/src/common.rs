@@ -259,6 +259,18 @@ pub fn part_descriptor_matches(
   if !relationship_type_matches(actual_relationship_type, descriptor_relationship_type) {
     return false;
   }
+  if descriptor_content_type.is_empty()
+    && relationship_type_matches(
+      actual_relationship_type,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+    )
+  {
+    return package_main_part_path_matches(
+      actual_path,
+      descriptor_path_prefix,
+      descriptor_target_name,
+    );
+  }
   if descriptor_content_type.is_empty() || actual_content_type == descriptor_content_type {
     return true;
   }
@@ -599,5 +611,27 @@ mod tests {
     })
     .expect("parse u8");
     assert_eq!(byte, u8::MAX);
+  }
+
+  #[test]
+  fn variable_content_main_part_descriptors_match_by_target_path() {
+    assert!(part_descriptor_matches(
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "xl/workbook.xml",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "",
+      "xl",
+      "workbook",
+    ));
+    assert!(!part_descriptor_matches(
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "xl/workbook.xml",
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "",
+      "word",
+      "document",
+    ));
   }
 }

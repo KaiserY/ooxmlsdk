@@ -430,7 +430,6 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
 fn write_namespaces(_sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Path) -> Result<()> {
   let namespaces_path = out_dir_path.join("namespaces.rs");
   write_generated_module(&namespaces_path, quote! {})?;
-
   Ok(())
 }
 

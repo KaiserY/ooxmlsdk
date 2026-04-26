@@ -65,6 +65,7 @@ pub enum PartChildCardinality {
   Optional,
   Required,
   Repeated,
+  RequiredRepeated,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -177,23 +178,7 @@ pub fn build_part_codegen_ir(part: &Part, all_parts: &[Part]) -> PartModuleDecl 
 }
 
 fn part_content_type(part: &Part) -> String {
-  if !part.content_type.is_empty() {
-    return part.content_type.clone();
-  }
-
-  match part.name.as_str() {
-    "MainDocumentPart" => {
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".to_string()
-    }
-    "WorkbookPart" => {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".to_string()
-    }
-    "PresentationPart" => {
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
-        .to_string()
-    }
-    _ => String::new(),
-  }
+  part.content_type.clone()
 }
 
 fn package_main_child(part: &Part) -> Option<&PartChild> {
@@ -255,7 +240,9 @@ fn child_relationship_type(child: &PartChild, all_parts: &[Part]) -> String {
 }
 
 fn child_cardinality(child: &PartChild) -> PartChildCardinality {
-  if child.max_occurs_great_than_one {
+  if child.min_occurs_is_non_zero && child.max_occurs_great_than_one {
+    PartChildCardinality::RequiredRepeated
+  } else if child.max_occurs_great_than_one {
     PartChildCardinality::Repeated
   } else if child.min_occurs_is_non_zero {
     PartChildCardinality::Required
@@ -376,6 +363,43 @@ mod tests {
         relationship_type,
         cardinality: PartChildCardinality::Optional,
       } if relationship_type == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
+    ));
+  }
+
+  #[test]
+  fn main_parts_keep_variable_content_type_and_required_repeated_constraints() {
+    let part = Part {
+      name: "PresentationPart".to_string(),
+      module_name: "presentation_part".to_string(),
+      relationship_type:
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          .to_string(),
+      target: "presentation".to_string(),
+      content_type: String::new(),
+      content_kind: PartContentKind::Xml,
+      root_class_name: "Presentation".to_string(),
+      schema_module: "schemas_openxmlformats_org_presentationml_2006_main".to_string(),
+      children: vec![PartChild {
+        min_occurs_is_non_zero: true,
+        max_occurs_great_than_one: true,
+        api_name: "SlideMasterParts".to_string(),
+        name: "SlideMasterPart".to_string(),
+        relationship_type:
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster"
+            .to_string(),
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+
+    let ir = build_part_codegen_ir(&part, &[]);
+    assert_eq!(ir.content_type, "");
+    assert!(matches!(
+      ir.fields.last().unwrap().kind,
+      PartFieldKind::ChildPart {
+        cardinality: PartChildCardinality::RequiredRepeated,
+        ..
+      }
     ));
   }
 }

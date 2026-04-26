@@ -7,8 +7,7 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 pub const PATH_PREFIX: &str = "xl";
-pub const CONTENT_TYPE: &str =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "workbook";
 pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]

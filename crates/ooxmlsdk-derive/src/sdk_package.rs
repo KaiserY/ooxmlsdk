@@ -141,11 +141,21 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         }
 
         let relationship_id = self.relationships().next_relationship_id();
-        let part = crate::sdk::SdkPackage::add_new_part_with_target_mode::<#part_ty>(
-          self,
-          relationship_id.clone(),
-          crate::common::NewPartTargetMode::Fixed,
-        )?;
+        let part = if let Some(content_type) = crate::sdk::default_main_part_content_type::<#part_ty>() {
+          crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension::<#part_ty>(
+            self,
+            relationship_id.clone(),
+            content_type,
+            <#part_ty as crate::sdk::SdkPartHandle>::EXTENSION,
+            crate::common::NewPartTargetMode::Fixed,
+          )?
+        } else {
+          crate::sdk::SdkPackage::add_new_part_with_target_mode::<#part_ty>(
+            self,
+            relationship_id.clone(),
+            crate::common::NewPartTargetMode::Fixed,
+          )?
+        };
         self.#main_part_id_ident = Some(part.part_id());
         self.#field_ident = Some(Box::new(
           <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id(

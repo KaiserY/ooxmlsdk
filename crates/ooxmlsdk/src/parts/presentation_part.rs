@@ -7,8 +7,7 @@
 pub const RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 pub const PATH_PREFIX: &str = "ppt";
-pub const CONTENT_TYPE: &str =
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "presentation";
 pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
@@ -151,7 +150,7 @@ impl PresentationPart {
       "slide_master_parts",
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
       "crate::parts::slide_master_part::SlideMasterPart",
-      crate::sdk::PartChildCardinality::Repeated,
+      crate::sdk::PartChildCardinality::RequiredRepeated,
     ),
     crate::sdk::PartChildDescriptor::new(
       "user_defined_tags_part",

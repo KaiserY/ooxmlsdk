@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::collections::BTreeMap;
 use syn::{Ident, ItemMod, ItemStruct, Stmt, Type, parse_str, parse2};
 
 use crate::Result;
@@ -252,7 +253,9 @@ fn part_child_field_type(cardinality: PartChildCardinality, part_ty: &Type) -> T
     PartChildCardinality::Optional | PartChildCardinality::Required => {
       quote! { Option<Box<#part_ty>> }
     }
-    PartChildCardinality::Repeated => quote! { Vec<#part_ty> },
+    PartChildCardinality::Repeated | PartChildCardinality::RequiredRepeated => {
+      quote! { Vec<#part_ty> }
+    }
   }
 }
 
@@ -294,6 +297,9 @@ fn part_child_cardinality_value(cardinality: PartChildCardinality) -> TokenStrea
     PartChildCardinality::Optional => quote! { crate::sdk::PartChildCardinality::Optional },
     PartChildCardinality::Required => quote! { crate::sdk::PartChildCardinality::Required },
     PartChildCardinality::Repeated => quote! { crate::sdk::PartChildCardinality::Repeated },
+    PartChildCardinality::RequiredRepeated => {
+      quote! { crate::sdk::PartChildCardinality::RequiredRepeated }
+    }
   }
 }
 
@@ -308,6 +314,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut part_ref_downcast_arms: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
   let mut part_ref_from_relationship_branches: Vec<TokenStream> = vec![];
+  let mut part_ref_from_part_id_groups: BTreeMap<String, Vec<TokenStream>> = BTreeMap::new();
+  let mut part_ref_from_relationship_groups: BTreeMap<String, Vec<TokenStream>> = BTreeMap::new();
   let mut root_variants: Vec<TokenStream> = vec![];
   let mut root_part_id_arms: Vec<TokenStream> = vec![];
   let mut root_accessor_methods: Vec<TokenStream> = vec![];
@@ -363,7 +371,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         #( #part_attrs )*
         PartRootElement::#struct_ident(root) => Ok(root.to_xml_bytes()?),
       });
-      let content_type_str = part.content_type.as_str();
+      let content_type_str = root_part_content_type(part);
       root_from_part_id_branches.push(quote! {
         #( #part_attrs )*
         if !matches!(#content_type_str, "" | "application/xml" | "text/xml")
@@ -418,6 +426,36 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     let content_type_str = part.content_type.as_str();
     let path_prefix_str = part.path_prefix.as_str();
     let target_name_str = part.target_name.as_str();
+    let exact_match_condition = part_exact_match_condition_tokens(part, quote! { part });
+    part_ref_from_part_id_groups
+      .entry(part.relationship_type.clone())
+      .or_default()
+      .push(quote! {
+        #( #part_attrs )*
+        if #exact_match_condition {
+          return Some(PartRef::#struct_ident(
+            <#part_ty as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+              package.storage(),
+              part_id,
+            ),
+          ));
+        }
+      });
+    part_ref_from_relationship_groups
+      .entry(part.relationship_type.clone())
+      .or_default()
+      .push(quote! {
+        #( #part_attrs )*
+        if #exact_match_condition {
+          return Some(PartRef::#struct_ident(
+            <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
+              storage,
+              relationship.id(),
+              part_id,
+            ),
+          ));
+        }
+      });
     part_ref_from_relationship_type_branches.push(quote! {
       #( #part_attrs )*
       if crate::common::part_descriptor_matches(
@@ -458,6 +496,11 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       }
     });
   }
+
+  let part_ref_from_part_id_match_arms =
+    part_ref_relationship_type_match_arms(&part_ref_from_part_id_groups);
+  let part_ref_from_relationship_match_arms =
+    part_ref_relationship_type_match_arms(&part_ref_from_relationship_groups);
 
   Ok(quote! {
     #( #mod_list )*
@@ -544,7 +587,12 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             ),
           ));
         };
-        #( #part_ref_from_relationship_type_branches )*
+        match relationship_type {
+          #( #part_ref_from_part_id_match_arms )*
+          _ => {
+            #( #part_ref_from_relationship_type_branches )*
+          }
+        }
         Some(PartRef::ExtendedPart(
           <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
             package.storage(),
@@ -575,7 +623,12 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             ),
           ));
         };
-        #( #part_ref_from_relationship_branches )*
+        match relationship_type {
+          #( #part_ref_from_relationship_match_arms )*
+          _ => {
+            #( #part_ref_from_relationship_branches )*
+          }
+        }
         Some(PartRef::ExtendedPart(
           <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
             storage,
@@ -674,6 +727,25 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         part_id: crate::common::PartId,
       ) -> Option<crate::parts::PartRootElement> {
         self.root_element_slot_mut(part_id)?.take()
+      }
+
+      #[inline]
+      fn part_bytes_for_copy(
+        &self,
+        part_id: crate::common::PartId,
+      ) -> Result<Vec<u8>, crate::common::SdkError> {
+        if let Some(root_element) = self.root_element(part_id) {
+          root_element.to_xml_bytes()
+        } else {
+          let part = crate::sdk::SdkPackage::storage(self)
+            .part(part_id)
+            .ok_or_else(|| {
+              crate::common::SdkError::CommonError(format!(
+                "part id {part_id:?} is not present in package storage"
+              ))
+            })?;
+          Ok(part.data().bytes().to_vec())
+        }
       }
     }
 
@@ -791,6 +863,75 @@ fn part_root_element_info(part: &PartModuleDecl) -> Option<(String, String)> {
     .iter()
     .find(|field| matches!(field.kind, PartFieldKind::RootElement))
     .map(|field| (field.rust_type.clone(), format!("as_{}", part.module_name)))
+}
+
+fn root_part_content_type(part: &PartModuleDecl) -> &str {
+  if !part.content_type.is_empty() {
+    return part.content_type.as_str();
+  }
+
+  match part.struct_name.as_str() {
+    "MainDocumentPart" => {
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    }
+    "WorkbookPart" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    "PresentationPart" => {
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+    }
+    _ => "",
+  }
+}
+
+fn part_ref_relationship_type_match_arms(
+  groups: &BTreeMap<String, Vec<TokenStream>>,
+) -> Vec<TokenStream> {
+  groups
+    .iter()
+    .map(|(relationship_type, branches)| {
+      let relationship_type = relationship_type.as_str();
+      quote! {
+        #relationship_type => {
+          #( #branches )*
+        }
+      }
+    })
+    .collect()
+}
+
+fn part_exact_match_condition_tokens(part: &PartModuleDecl, part_expr: TokenStream) -> TokenStream {
+  let content_type = part.content_type.as_str();
+  if content_type.is_empty() {
+    if part.relationship_type
+      == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    {
+      let expected_path = fixed_xml_part_path(part);
+      return quote! { #part_expr.path() == #expected_path };
+    }
+    return quote! { true };
+  }
+
+  if part.relationship_type
+    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+  {
+    let expected_path = fixed_xml_part_path(part);
+    return quote! {
+      #part_expr.content_type() == #content_type || #part_expr.path() == #expected_path
+    };
+  }
+
+  quote! { #part_expr.content_type() == #content_type }
+}
+
+fn fixed_xml_part_path(part: &PartModuleDecl) -> String {
+  if part.path_prefix.is_empty() || part.path_prefix == "." {
+    format!("{}.xml", part.target_name)
+  } else {
+    format!(
+      "{}/{}.xml",
+      part.path_prefix.trim_matches('/'),
+      part.target_name
+    )
+  }
 }
 
 #[cfg(test)]

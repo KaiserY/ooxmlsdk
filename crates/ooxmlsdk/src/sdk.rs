@@ -23,6 +23,7 @@ pub enum PartChildCardinality {
   Optional,
   Required,
   Repeated,
+  RequiredRepeated,
 }
 
 #[cfg(feature = "parts")]
@@ -308,6 +309,53 @@ impl PartChildDescriptor {
       child_part_type,
       cardinality,
     }
+  }
+
+  #[inline]
+  pub const fn min_occurs_is_non_zero(&self) -> bool {
+    matches!(
+      self.cardinality,
+      PartChildCardinality::Required | PartChildCardinality::RequiredRepeated
+    )
+  }
+
+  #[inline]
+  pub const fn max_occurs_great_than_one(&self) -> bool {
+    matches!(
+      self.cardinality,
+      PartChildCardinality::Repeated | PartChildCardinality::RequiredRepeated
+    )
+  }
+}
+
+#[cfg(feature = "parts")]
+pub fn default_main_part_content_type<T: SdkPartHandle>() -> Option<&'static str> {
+  match (T::RELATIONSHIP_TYPE, T::TARGET_NAME) {
+    (
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "document",
+    ) => Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"),
+    (
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "workbook",
+    ) => Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"),
+    (
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      "presentation",
+    ) => Some("application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"),
+    _ => None,
+  }
+}
+
+#[cfg(feature = "parts")]
+#[inline]
+fn default_new_package_part_content_type<T: SdkPartHandle>() -> std::borrow::Cow<'static, str> {
+  if T::CONTENT_TYPE.is_empty() {
+    default_main_part_content_type::<T>()
+      .map(std::borrow::Cow::Borrowed)
+      .unwrap_or_else(|| std::borrow::Cow::Borrowed(T::CONTENT_TYPE))
+  } else {
+    std::borrow::Cow::Borrowed(T::CONTENT_TYPE)
   }
 }
 
@@ -1381,7 +1429,7 @@ pub trait SdkPackage {
       relationship_id.clone(),
       crate::common::NewPartDescriptor {
         relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
-        content_type: std::borrow::Cow::Borrowed(T::CONTENT_TYPE),
+        content_type: default_new_package_part_content_type::<T>(),
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
         extension: std::borrow::Cow::Borrowed(T::EXTENSION),

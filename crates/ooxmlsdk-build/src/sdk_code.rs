@@ -17,7 +17,7 @@ use crate::sdk_code::schemas::{
   CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
 };
 use crate::sdk_code::versioning::version_cfg_attrs;
-use crate::sdk_data::sdk_data_model::{Namespace as SdkDataNamespace, Schema as SdkDataSchema};
+use crate::sdk_data::sdk_data_model::Schema as SdkDataSchema;
 
 pub mod codegen_ir;
 pub mod codegen_ir_builder;
@@ -52,12 +52,10 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let loaded_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
   let loaded_parts = read_parts(&sdk_data_parts_dir_path)?;
-  let sdk_data_namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
 
   write_schemas(&loaded_schemas, out_dir_path)?;
   write_parts(&loaded_parts, out_dir_path)?;
-  write_namespaces(&sdk_data_namespaces, out_dir_path)?;
 
   Ok(())
 }
@@ -148,19 +146,6 @@ fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<LoadedPart>> {
   Ok(loaded_parts)
 }
 
-fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
-  let file = File::open(path)?;
-  let reader = BufReader::new(file);
-  let mut namespaces: Vec<SdkDataNamespace> = serde_json::from_reader(reader)?;
-  namespaces.sort_by(|left, right| {
-    left
-      .prefix
-      .cmp(&right.prefix)
-      .then(left.uri.cmp(&right.uri))
-  });
-  Ok(namespaces)
-}
-
 fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result<()> {
   let out_schemas_dir_path = out_dir_path.join("schemas");
   fs::create_dir_all(&out_schemas_dir_path)?;
@@ -232,7 +217,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
         pub(crate) relationship_id: Option<String>,
         pub(crate) id: crate::common::PartId,
         pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-        pub(crate) relationship_order: Vec<Box<str>>,
+        pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
         pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
         pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
         pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
@@ -298,12 +283,8 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
             return Self::from_part_id(part_id);
           }
           let mut part = Self::from_part_id(part_id);
-            if let Some(relationships) = storage.relationships(part_id) {
-              part.relationship_order = relationships
-                .iter()
-                .map(|relationship| relationship.id().into())
-                .collect();
-              for relationship in relationships.iter() {
+          if let Some(relationships) = storage.relationships(part_id) {
+            for relationship in relationships.iter() {
               if relationship.is_reference_relationship() {
                 if relationship.reference_kind().is_some_and(|kind| {
                   matches!(
@@ -313,16 +294,32 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
                       | crate::common::ReferenceRelationshipKind::Video
                   )
                 }) {
+                  let item_index = part.data_part_reference_relationships.len();
                   part.data_part_reference_relationships.push(relationship.clone());
+                  part.relationship_order.push(
+                    crate::sdk::RelationshipModelEntry::DataPartReference(item_index),
+                  );
                 } else {
+                  let item_index = part.reference_relationships.len();
                   part.reference_relationships.push(relationship.clone());
+                  part.relationship_order.push(
+                    crate::sdk::RelationshipModelEntry::Reference(item_index),
+                  );
                 }
               } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart {
                 if let Some(child) = crate::parts::PartRef::from_relationship_storage(storage, relationship) {
+                  let item_index = part.fallback_parts.len();
                   part.fallback_parts.push(child);
+                  part.relationship_order.push(
+                    crate::sdk::RelationshipModelEntry::Fallback(item_index),
+                  );
                 }
               } else {
+                let item_index = part.raw_relationships.len();
                 part.raw_relationships.push(relationship.clone());
+                part.relationship_order.push(
+                  crate::sdk::RelationshipModelEntry::Raw(item_index),
+                );
               }
             }
           }
@@ -390,14 +387,15 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
           package: &P,
         ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
           let mut relationships = crate::common::RelationshipSet::default();
-          for part in &self.fallback_parts {
-            crate::sdk::add_part_ref_to_relationship_set(
-              &mut relationships,
-              package.storage(),
-              Some(self.id),
-              part,
-            )?;
-          }
+          if self.relationship_order.is_empty() {
+            for part in &self.fallback_parts {
+              crate::sdk::add_part_ref_to_relationship_set(
+                &mut relationships,
+                package.storage(),
+                Some(self.id),
+                part,
+              )?;
+            }
             for relationship in self
               .data_part_reference_relationships
               .iter()
@@ -406,9 +404,41 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
             {
               relationships.add_relationship_info(relationship.clone())?;
             }
-            relationships.reorder_by_ids(&self.relationship_order);
-            Ok(relationships)
+            return Ok(relationships);
           }
+
+          for entry in &self.relationship_order {
+            match entry {
+              crate::sdk::RelationshipModelEntry::Child { .. } => {}
+              crate::sdk::RelationshipModelEntry::Fallback(item_index) => {
+                if let Some(part) = self.fallback_parts.get(*item_index) {
+                  crate::sdk::add_part_ref_to_relationship_set(
+                    &mut relationships,
+                    package.storage(),
+                    Some(self.id),
+                    part,
+                  )?;
+                }
+              }
+              crate::sdk::RelationshipModelEntry::DataPartReference(item_index) => {
+                if let Some(relationship) = self.data_part_reference_relationships.get(*item_index) {
+                  relationships.add_relationship_info(relationship.clone())?;
+                }
+              }
+              crate::sdk::RelationshipModelEntry::Reference(item_index) => {
+                if let Some(relationship) = self.reference_relationships.get(*item_index) {
+                  relationships.add_relationship_info(relationship.clone())?;
+                }
+              }
+              crate::sdk::RelationshipModelEntry::Raw(item_index) => {
+                if let Some(relationship) = self.raw_relationships.get(*item_index) {
+                  relationships.add_relationship_info(relationship.clone())?;
+                }
+              }
+            }
+          }
+          Ok(relationships)
+        }
 
       }
     },
@@ -424,12 +454,6 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
     )?,
   )?;
 
-  Ok(())
-}
-
-fn write_namespaces(_sdk_data_namespaces: &[SdkDataNamespace], out_dir_path: &Path) -> Result<()> {
-  let namespaces_path = out_dir_path.join("namespaces.rs");
-  write_generated_module(&namespaces_path, quote! {})?;
   Ok(())
 }
 

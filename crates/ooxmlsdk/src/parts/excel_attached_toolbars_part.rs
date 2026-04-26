@@ -15,7 +15,7 @@ pub struct ExcelAttachedToolbarsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,

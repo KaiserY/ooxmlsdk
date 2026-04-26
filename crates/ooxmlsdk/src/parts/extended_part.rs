@@ -9,7 +9,7 @@ pub struct ExtendedPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,
@@ -70,10 +70,6 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
     }
     let mut part = Self::from_part_id(part_id);
     if let Some(relationships) = storage.relationships(part_id) {
-      part.relationship_order = relationships
-        .iter()
-        .map(|relationship| relationship.id().into())
-        .collect();
       for relationship in relationships.iter() {
         if relationship.is_reference_relationship() {
           if relationship.reference_kind().is_some_and(|kind| {
@@ -84,21 +80,39 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
                 | crate::common::ReferenceRelationshipKind::Video
             )
           }) {
+            let item_index = part.data_part_reference_relationships.len();
             part
               .data_part_reference_relationships
               .push(relationship.clone());
+            part
+              .relationship_order
+              .push(crate::sdk::RelationshipModelEntry::DataPartReference(
+                item_index,
+              ));
           } else {
+            let item_index = part.reference_relationships.len();
             part.reference_relationships.push(relationship.clone());
+            part
+              .relationship_order
+              .push(crate::sdk::RelationshipModelEntry::Reference(item_index));
           }
         } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart
         {
           if let Some(child) =
             crate::parts::PartRef::from_relationship_storage(storage, relationship)
           {
+            let item_index = part.fallback_parts.len();
             part.fallback_parts.push(child);
+            part
+              .relationship_order
+              .push(crate::sdk::RelationshipModelEntry::Fallback(item_index));
           }
         } else {
+          let item_index = part.raw_relationships.len();
           part.raw_relationships.push(relationship.clone());
+          part
+            .relationship_order
+            .push(crate::sdk::RelationshipModelEntry::Raw(item_index));
         }
       }
     }
@@ -161,23 +175,55 @@ impl ExtendedPart {
     package: &P,
   ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
     let mut relationships = crate::common::RelationshipSet::default();
-    for part in &self.fallback_parts {
-      crate::sdk::add_part_ref_to_relationship_set(
-        &mut relationships,
-        package.storage(),
-        Some(self.id),
-        part,
-      )?;
+    if self.relationship_order.is_empty() {
+      for part in &self.fallback_parts {
+        crate::sdk::add_part_ref_to_relationship_set(
+          &mut relationships,
+          package.storage(),
+          Some(self.id),
+          part,
+        )?;
+      }
+      for relationship in self
+        .data_part_reference_relationships
+        .iter()
+        .chain(self.reference_relationships.iter())
+        .chain(self.raw_relationships.iter())
+      {
+        relationships.add_relationship_info(relationship.clone())?;
+      }
+      return Ok(relationships);
     }
-    for relationship in self
-      .data_part_reference_relationships
-      .iter()
-      .chain(self.reference_relationships.iter())
-      .chain(self.raw_relationships.iter())
-    {
-      relationships.add_relationship_info(relationship.clone())?;
+    for entry in &self.relationship_order {
+      match entry {
+        crate::sdk::RelationshipModelEntry::Child { .. } => {}
+        crate::sdk::RelationshipModelEntry::Fallback(item_index) => {
+          if let Some(part) = self.fallback_parts.get(*item_index) {
+            crate::sdk::add_part_ref_to_relationship_set(
+              &mut relationships,
+              package.storage(),
+              Some(self.id),
+              part,
+            )?;
+          }
+        }
+        crate::sdk::RelationshipModelEntry::DataPartReference(item_index) => {
+          if let Some(relationship) = self.data_part_reference_relationships.get(*item_index) {
+            relationships.add_relationship_info(relationship.clone())?;
+          }
+        }
+        crate::sdk::RelationshipModelEntry::Reference(item_index) => {
+          if let Some(relationship) = self.reference_relationships.get(*item_index) {
+            relationships.add_relationship_info(relationship.clone())?;
+          }
+        }
+        crate::sdk::RelationshipModelEntry::Raw(item_index) => {
+          if let Some(relationship) = self.raw_relationships.get(*item_index) {
+            relationships.add_relationship_info(relationship.clone())?;
+          }
+        }
+      }
     }
-    relationships.reorder_by_ids(&self.relationship_order);
     Ok(relationships)
   }
 }

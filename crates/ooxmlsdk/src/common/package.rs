@@ -261,6 +261,128 @@ pub struct RelationshipSet {
   by_id: HashMap<Box<str>, usize>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RelationshipView {
+  relationships: Vec<RelationshipInfo>,
+  by_id: HashMap<Box<str>, usize>,
+}
+
+impl RelationshipView {
+  #[inline]
+  pub fn is_empty(&self) -> bool {
+    self.relationships.is_empty()
+  }
+
+  #[inline]
+  pub fn len(&self) -> usize {
+    self.relationships.len()
+  }
+
+  #[inline]
+  pub fn iter(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter()
+  }
+
+  #[inline]
+  pub fn get(&self, relationship_id: &str) -> Option<RelationshipInfo> {
+    self
+      .by_id
+      .get(relationship_id)
+      .and_then(|index| self.relationships.get(*index))
+      .cloned()
+  }
+
+  #[inline]
+  pub fn contains_id(&self, relationship_id: &str) -> bool {
+    self.by_id.contains_key(relationship_id)
+  }
+
+  #[inline]
+  pub fn next_relationship_id(&self) -> String {
+    next_relationship_id(self.relationships.iter())
+  }
+
+  #[inline]
+  pub fn by_relationship_type(
+    &self,
+    relationship_type: &str,
+  ) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter().filter(move |relationship| {
+      super::relationship_type_matches(relationship.relationship_type(), relationship_type)
+    })
+  }
+
+  #[inline]
+  pub fn part_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self
+      .relationships
+      .iter()
+      .filter(|relationship| relationship.target_kind() == RelationshipTargetKind::InternalPart)
+  }
+
+  #[inline]
+  pub fn external_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter().filter(|relationship| {
+      relationship.target_kind() == RelationshipTargetKind::External
+        && !super::relationship_type_matches(
+          relationship.relationship_type(),
+          RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE,
+        )
+    })
+  }
+
+  #[inline]
+  pub fn hyperlink_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.by_relationship_type(RelationshipSet::HYPERLINK_RELATIONSHIP_TYPE)
+  }
+
+  #[inline]
+  pub fn data_part_reference_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+    self.relationships.iter().filter(|relationship| {
+      super::relationship_type_matches(
+        relationship.relationship_type(),
+        RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE,
+      ) || super::relationship_type_matches(
+        relationship.relationship_type(),
+        RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE,
+      ) || super::relationship_type_matches(
+        relationship.relationship_type(),
+        RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE,
+      )
+    })
+  }
+}
+
+impl From<RelationshipSet> for RelationshipView {
+  #[inline]
+  fn from(value: RelationshipSet) -> Self {
+    Self {
+      relationships: value.relationships,
+      by_id: value.by_id,
+    }
+  }
+}
+
+impl<'a> IntoIterator for &'a RelationshipView {
+  type Item = &'a RelationshipInfo;
+  type IntoIter = std::slice::Iter<'a, RelationshipInfo>;
+
+  #[inline]
+  fn into_iter(self) -> Self::IntoIter {
+    self.relationships.iter()
+  }
+}
+
+fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a RelationshipInfo>) -> String {
+  let next = relationships
+    .filter_map(|relationship| relationship.id().strip_prefix("rId"))
+    .filter_map(|suffix| suffix.parse::<u32>().ok())
+    .max()
+    .unwrap_or_default()
+    + 1;
+  format!("rId{next}")
+}
+
 impl RelationshipSet {
   pub const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
@@ -300,15 +422,7 @@ impl RelationshipSet {
   }
 
   pub fn next_relationship_id(&self) -> String {
-    let next = self
-      .relationships
-      .iter()
-      .filter_map(|relationship| relationship.id().strip_prefix("rId"))
-      .filter_map(|suffix| suffix.parse::<u32>().ok())
-      .max()
-      .unwrap_or_default()
-      + 1;
-    format!("rId{next}")
+    next_relationship_id(self.relationships.iter())
   }
 
   pub fn add_external_relationship(
@@ -535,32 +649,6 @@ impl RelationshipSet {
         Self::VIDEO_REFERENCE_RELATIONSHIP_TYPE,
       )
     })
-  }
-
-  pub fn reorder_by_ids(&mut self, relationship_ids: &[Box<str>]) {
-    if self.relationships.len() <= 1 || relationship_ids.is_empty() {
-      return;
-    }
-
-    let mut ordered = Vec::with_capacity(self.relationships.len());
-    let mut used = vec![false; self.relationships.len()];
-    for relationship_id in relationship_ids {
-      if let Some(index) = self.by_id.get(relationship_id.as_ref()).copied()
-        && !used[index]
-      {
-        used[index] = true;
-        ordered.push(self.relationships[index].clone());
-      }
-    }
-
-    for (index, relationship) in self.relationships.iter().enumerate() {
-      if !used[index] {
-        ordered.push(relationship.clone());
-      }
-    }
-
-    self.relationships = ordered;
-    self.rebuild_index();
   }
 
   #[inline]

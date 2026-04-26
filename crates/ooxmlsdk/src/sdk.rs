@@ -93,6 +93,16 @@ impl<T, C> PartialEq for PartChild<T, C> {
 pub struct PartRoot<T>(std::marker::PhantomData<T>);
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RelationshipModelEntry {
+  Child { field_index: u16, item_index: usize },
+  Fallback(usize),
+  DataPartReference(usize),
+  Reference(usize),
+  Raw(usize),
+}
+
+#[cfg(feature = "parts")]
 impl<T> PartRoot<T> {
   #[inline]
   pub const fn new() -> Self {

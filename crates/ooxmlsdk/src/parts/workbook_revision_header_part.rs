@@ -25,7 +25,7 @@ pub struct WorkbookRevisionHeaderPart {
   pub(crate) workbook_revision_log_parts:
     Vec<crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,

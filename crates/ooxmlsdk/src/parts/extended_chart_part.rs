@@ -47,7 +47,7 @@ pub struct ExtendedChartPart {
   pub(crate) chart_color_style_parts:
     Vec<crate::parts::chart_color_style_part::ChartColorStylePart>,
   pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<Box<str>>,
+  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) reference_relationships: Vec<crate::common::RelationshipInfo>,
   pub(crate) raw_relationships: Vec<crate::common::RelationshipInfo>,

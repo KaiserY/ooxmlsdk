@@ -215,19 +215,11 @@ fn package_relationship_helpers_match_openxml_container_api_shape() {
 
 #[test]
 fn package_save_writes_package_relationships_from_modeled_parts() {
-  let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
+  let package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part_id = package.main_document_part().unwrap().part_id();
-  let relationship_ids: Vec<_> = package
-    .relationships()
-    .iter()
-    .map(|relationship| relationship.id().to_string())
-    .collect();
-  for relationship_id in relationship_ids {
-    package.relationships_mut().remove(&relationship_id);
-  }
-  assert!(package.relationships().is_empty());
   let modeled_relationships = package.modeled_relationships().unwrap();
   assert_eq!(modeled_relationships.len(), 3);
+  assert_eq!(package.relationships().len(), modeled_relationships.len());
   assert!(
     modeled_relationships
       .iter()

@@ -137,7 +137,7 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
   });
   fields.push(quote! {
-    pub(crate) relationship_order: Vec<Box<str>>,
+    pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   });
   fields.push(quote! {
     pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,
@@ -233,7 +233,7 @@ fn part_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
     pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
   });
   fields.push(quote! {
-    pub(crate) relationship_order: Vec<Box<str>>,
+    pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   });
   fields.push(quote! {
     pub(crate) data_part_reference_relationships: Vec<crate::common::RelationshipInfo>,

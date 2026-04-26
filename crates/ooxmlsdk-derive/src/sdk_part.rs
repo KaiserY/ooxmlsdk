@@ -935,9 +935,11 @@ struct PartHandleRootInfo {
 
 fn part_handle_child_init_tokens(
   child: &PartHandleChildInfo,
+  field_index: usize,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
   let field_ident = &child.field_ident;
   let part_ty = &child.part_ty;
+  let field_index = field_index as u16;
   match child.kind {
     PartChildKind::Repeated => (
       quote! {
@@ -945,15 +947,23 @@ fn part_handle_child_init_tokens(
       },
       quote! {
         if let Some(child_part_id) = relationship.target_part_id() {
-          let mut child_visited = visited.clone();
+          let child_was_visited = visited.contains(&child_part_id);
+          let item_index = #field_ident.len();
           #field_ident.push(
             <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships_visited(
               storage,
               relationship.id(),
               child_part_id,
-              &mut child_visited,
+              visited,
             ),
           );
+          if !child_was_visited {
+            visited.remove(&child_part_id);
+          }
+          relationship_order.push(crate::sdk::RelationshipModelEntry::Child {
+            field_index: #field_index,
+            item_index,
+          });
           represented_relationship = true;
         }
       },
@@ -965,15 +975,22 @@ fn part_handle_child_init_tokens(
       quote! {
         if #field_ident.is_none() {
           if let Some(child_part_id) = relationship.target_part_id() {
-            let mut child_visited = visited.clone();
+            let child_was_visited = visited.contains(&child_part_id);
             #field_ident = Some(Box::new(
               <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships_visited(
                 storage,
                 relationship.id(),
                 child_part_id,
-                &mut child_visited,
+                visited,
               ),
             ));
+            if !child_was_visited {
+              visited.remove(&child_part_id);
+            }
+            relationship_order.push(crate::sdk::RelationshipModelEntry::Child {
+              field_index: #field_index,
+              item_index: 0,
+            });
             represented_relationship = true;
           }
         }
@@ -989,9 +1006,9 @@ fn part_handle_relationship_dispatch_tokens(
 
   let mut exact_groups: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
   let mut alias_branches = Vec::new();
-  for child in child_infos {
+  for (field_index, child) in child_infos.iter().enumerate() {
     let relationship_type = child.relationship_type.as_str();
-    let (_, load_tokens) = part_handle_child_init_tokens(child);
+    let (_, load_tokens) = part_handle_child_init_tokens(child, field_index);
     exact_groups
       .entry(relationship_type)
       .or_default()
@@ -1100,7 +1117,8 @@ fn expand_part_handle(
   let child_methods = part_handle_child_methods_tokens(ident, &child_infos);
   let child_field_declarations = child_infos
     .iter()
-    .map(|child| part_handle_child_init_tokens(child).0);
+    .enumerate()
+    .map(|(field_index, child)| part_handle_child_init_tokens(child, field_index).0);
   let child_relationship_dispatch = part_handle_relationship_dispatch_tokens(&child_infos);
   let field_inits_with_relationships = fields.named.iter().filter_map(|field| {
     let field_ident = field.ident.as_ref().unwrap();
@@ -1118,15 +1136,11 @@ fn expand_part_handle(
   });
   let relationship_model_field_locals = quote! {
     let mut fallback_parts = Vec::new();
-    let mut relationship_order: Vec<Box<str>> = Vec::new();
+    let mut relationship_order: Vec<crate::sdk::RelationshipModelEntry> = Vec::new();
     let mut data_part_reference_relationships = Vec::new();
     let mut reference_relationships = Vec::new();
     let mut raw_relationships = Vec::new();
     if let Some(relationships) = storage.relationships(part_id) {
-      relationship_order = relationships
-        .iter()
-        .map(|relationship| relationship.id().into())
-        .collect();
       for relationship in relationships.iter() {
         let mut represented_relationship = false;
         let relationship_type = relationship.relationship_type();
@@ -1140,18 +1154,26 @@ fn expand_part_handle(
                 | crate::common::ReferenceRelationshipKind::Video
             )
           }) {
+            let item_index = data_part_reference_relationships.len();
             data_part_reference_relationships.push(relationship.clone());
+            relationship_order.push(crate::sdk::RelationshipModelEntry::DataPartReference(item_index));
           } else {
+            let item_index = reference_relationships.len();
             reference_relationships.push(relationship.clone());
+            relationship_order.push(crate::sdk::RelationshipModelEntry::Reference(item_index));
           }
         } else if relationship.target_kind() == crate::common::RelationshipTargetKind::InternalPart {
           if !represented_relationship {
             if let Some(part) = crate::parts::PartRef::from_relationship_storage(storage, relationship) {
+              let item_index = fallback_parts.len();
               fallback_parts.push(part);
+              relationship_order.push(crate::sdk::RelationshipModelEntry::Fallback(item_index));
             }
           }
         } else {
+          let item_index = raw_relationships.len();
           raw_relationships.push(relationship.clone());
+          relationship_order.push(crate::sdk::RelationshipModelEntry::Raw(item_index));
         }
       }
     }
@@ -1163,31 +1185,67 @@ fn expand_part_handle(
     reference_relationships,
     raw_relationships,
   };
-  let modeled_child_stmts = child_infos.iter().map(|child| {
+  let modeled_child_stmts: Vec<_> = child_infos
+    .iter()
+    .map(|child| {
+      let field_ident = &child.field_ident;
+      match child.kind {
+        PartChildKind::Repeated => quote! {
+          for part in &self.#field_ident {
+            crate::sdk::add_part_handle_to_relationship_set(
+              &mut relationships,
+              package.storage(),
+              Some(self.id),
+              part,
+            )?;
+          }
+        },
+        PartChildKind::Required | PartChildKind::Optional => quote! {
+          if let Some(part) = self.#field_ident.as_deref() {
+            crate::sdk::add_part_handle_to_relationship_set(
+              &mut relationships,
+              package.storage(),
+              Some(self.id),
+              part,
+            )?;
+          }
+        },
+      }
+    })
+    .collect();
+  let ordered_child_arms = child_infos.iter().enumerate().map(|(field_index, child)| {
+    let field_index = field_index as u16;
     let field_ident = &child.field_ident;
     match child.kind {
       PartChildKind::Repeated => quote! {
-        for part in &self.#field_ident {
-          crate::sdk::add_part_handle_to_relationship_set(
-            &mut relationships,
-            package.storage(),
-            Some(self.id),
-            part,
-          )?;
+        #field_index => {
+          if let Some(part) = self.#field_ident.get(*item_index) {
+            crate::sdk::add_part_handle_to_relationship_set(
+              &mut relationships,
+              package.storage(),
+              Some(self.id),
+              part,
+            )?;
+          }
         }
       },
       PartChildKind::Required | PartChildKind::Optional => quote! {
-        if let Some(part) = self.#field_ident.as_deref() {
-          crate::sdk::add_part_handle_to_relationship_set(
-            &mut relationships,
-            package.storage(),
-            Some(self.id),
-            part,
-          )?;
+        #field_index => {
+          if *item_index == 0 {
+            if let Some(part) = self.#field_ident.as_deref() {
+              crate::sdk::add_part_handle_to_relationship_set(
+                &mut relationships,
+                package.storage(),
+                Some(self.id),
+                part,
+              )?;
+            }
+          }
         }
       },
     }
   });
+  let unordered_child_stmts = modeled_child_stmts.iter();
   let collect_relationship_child_stmts = child_infos.iter().map(|child| {
     let field_ident = &child.field_ident;
     match child.kind {
@@ -1313,24 +1371,62 @@ fn expand_part_handle(
         package: &P,
       ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
         let mut relationships = crate::common::RelationshipSet::default();
-        #( #modeled_child_stmts )*
-        for part in &self.fallback_parts {
-          crate::sdk::add_part_ref_to_relationship_set(
-            &mut relationships,
-            package.storage(),
-            Some(self.id),
-            part,
-          )?;
+        if self.relationship_order.is_empty() {
+          #( #unordered_child_stmts )*
+          for part in &self.fallback_parts {
+            crate::sdk::add_part_ref_to_relationship_set(
+              &mut relationships,
+              package.storage(),
+              Some(self.id),
+              part,
+            )?;
+          }
+          for relationship in self
+            .data_part_reference_relationships
+            .iter()
+            .chain(self.reference_relationships.iter())
+            .chain(self.raw_relationships.iter())
+          {
+            relationships.add_relationship_info(relationship.clone())?;
+          }
+          return Ok(relationships);
         }
-        for relationship in self
-          .data_part_reference_relationships
-          .iter()
-          .chain(self.reference_relationships.iter())
-          .chain(self.raw_relationships.iter())
-        {
-          relationships.add_relationship_info(relationship.clone())?;
+
+        for entry in &self.relationship_order {
+          match entry {
+            crate::sdk::RelationshipModelEntry::Child { field_index, item_index } => {
+              match field_index {
+                #( #ordered_child_arms, )*
+                _ => {}
+              }
+            }
+            crate::sdk::RelationshipModelEntry::Fallback(item_index) => {
+              if let Some(part) = self.fallback_parts.get(*item_index) {
+                crate::sdk::add_part_ref_to_relationship_set(
+                  &mut relationships,
+                  package.storage(),
+                  Some(self.id),
+                  part,
+                )?;
+              }
+            }
+            crate::sdk::RelationshipModelEntry::DataPartReference(item_index) => {
+              if let Some(relationship) = self.data_part_reference_relationships.get(*item_index) {
+                relationships.add_relationship_info(relationship.clone())?;
+              }
+            }
+            crate::sdk::RelationshipModelEntry::Reference(item_index) => {
+              if let Some(relationship) = self.reference_relationships.get(*item_index) {
+                relationships.add_relationship_info(relationship.clone())?;
+              }
+            }
+            crate::sdk::RelationshipModelEntry::Raw(item_index) => {
+              if let Some(relationship) = self.raw_relationships.get(*item_index) {
+                relationships.add_relationship_info(relationship.clone())?;
+              }
+            }
+          }
         }
-        relationships.reorder_by_ids(&self.relationship_order);
         Ok(relationships)
       }
 
@@ -1371,8 +1467,21 @@ fn expand_part_handle(
       pub fn relationships<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
-      ) -> Option<&'a crate::common::RelationshipSet> {
-        <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
+      ) -> Option<crate::common::RelationshipView> {
+        self.try_relationships(package).ok()
+      }
+
+      #[inline]
+      pub fn try_relationships<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+      ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {
+        <Self as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
+          package.storage(),
+          self.id,
+        )
+        .modeled_relationships(package)
+        .map(Into::into)
       }
 
       pub fn modeled_relationships<P: crate::sdk::SdkPackage>(
@@ -2402,8 +2511,7 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
           let _ = &self.#method_ident;
-          self
-            .relationships(package)
+          <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
             .filter_map(#map_relationship)
@@ -2423,8 +2531,7 @@ fn part_handle_child_methods_tokens(
           package: &P,
         ) -> Option<#part_ty> {
           let _ = &self.#method_ident;
-          self
-            .relationships(package)
+          <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
             .find_map(#map_relationship)
@@ -2467,8 +2574,7 @@ fn part_handle_child_methods_tokens(
         &'a self,
         package: &'a P,
       ) -> impl Iterator<Item = crate::parts::IdPartPair<'a>> + 'a {
-        self
-          .relationships(package)
+        <Self as crate::sdk::SdkPartHandle>::relationships(self, package)
           .into_iter()
           .flat_map(|relationships| relationships.iter())
           .filter_map(|relationship| {
@@ -2521,7 +2627,8 @@ fn part_handle_child_methods_tokens(
         package: &P,
         relationship_id: &str,
       ) -> Option<crate::parts::PartRef> {
-        let relationship = self.relationships(package)?.get(relationship_id)?;
+        let relationship =
+          <Self as crate::sdk::SdkPartHandle>::relationships(self, package)?.get(relationship_id)?;
         Self::part_ref_from_relationship(package, relationship)
       }
 
@@ -2583,7 +2690,7 @@ fn part_handle_child_methods_tokens(
         part: &T,
       ) -> Option<&'a str> {
         let target_part_id = part.part_id();
-        self.relationships(package)?.iter().find_map(|relationship| {
+        <Self as crate::sdk::SdkPartHandle>::relationships(self, package)?.iter().find_map(|relationship| {
           (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
         })
       }

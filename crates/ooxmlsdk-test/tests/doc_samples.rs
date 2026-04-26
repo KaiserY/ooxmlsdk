@@ -147,12 +147,10 @@ fn assert_wordprocessing_document_round_trip(
     roundtripped.relationships().len()
   );
   assert_eq!(
-    original_main
-      .relationships(original)
-      .map(ooxmlsdk::common::RelationshipSet::len),
+    original_main.relationships(original).map(|rels| rels.len()),
     roundtripped_main
       .relationships(roundtripped)
-      .map(ooxmlsdk::common::RelationshipSet::len)
+      .map(|rels| rels.len())
   );
 }
 
@@ -173,10 +171,10 @@ fn assert_spreadsheet_document_round_trip(
   assert_eq!(
     original_workbook
       .relationships(original)
-      .map(ooxmlsdk::common::RelationshipSet::len),
+      .map(|rels| rels.len()),
     roundtripped_workbook
       .relationships(roundtripped)
-      .map(ooxmlsdk::common::RelationshipSet::len)
+      .map(|rels| rels.len())
   );
   assert_eq!(
     original_workbook.worksheet_parts(original).count(),
@@ -201,10 +199,10 @@ fn assert_presentation_document_round_trip(
   assert_eq!(
     original_presentation
       .relationships(original)
-      .map(ooxmlsdk::common::RelationshipSet::len),
+      .map(|rels| rels.len()),
     roundtripped_presentation
       .relationships(roundtripped)
-      .map(ooxmlsdk::common::RelationshipSet::len)
+      .map(|rels| rels.len())
   );
   assert_eq!(
     original_presentation.slide_parts(original).count(),

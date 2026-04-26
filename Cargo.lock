@@ -379,6 +379,7 @@ dependencies = [
  "criterion",
  "ooxmlsdk",
  "quick-xml",
+ "serde_json",
  "zip",
 ]
 

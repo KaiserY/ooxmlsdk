@@ -216,6 +216,7 @@ pub struct WebExtensionBindingList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Blip/we:snapshot")]
 pub struct Snapshot {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Embedded Picture Reference
   ///
   /// Available in Office2007 and above.

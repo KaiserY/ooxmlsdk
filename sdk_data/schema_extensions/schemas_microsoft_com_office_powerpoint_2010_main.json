@@ -9,6 +9,10 @@
       "HasXmlnsFields": true
     },
     {
+      "ClassName": "Media",
+      "HasXmlnsFields": true
+    },
+    {
       "ClassName": "CreationId",
       "HasXmlnsFields": true
     },

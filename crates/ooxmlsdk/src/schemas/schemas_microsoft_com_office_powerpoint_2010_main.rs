@@ -118,6 +118,7 @@ pub struct ExtensionListModify {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p14:CT_Media/p14:media")]
 pub struct Media {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Embedded Picture Reference
   ///
   /// Available in Office2007 and above.

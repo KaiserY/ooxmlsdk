@@ -379,9 +379,11 @@ fn find_merge_target_legacy<'a>(
 
 fn find_insert_before_index(target: &[SchemaTypeChild], insert_before: &str) -> Option<usize> {
   target.iter().position(|child| {
-    child.name == insert_before
+    child.particle_id == insert_before
+      || child.name == insert_before
       || child.name.ends_with(&format!("/{insert_before}"))
       || child.property_name == insert_before
+      || (insert_before == "unknown_xml" && child.kind == SchemaTypeChildKind::Any)
       || (child.kind == SchemaTypeChildKind::Choice
         && choice_child_contains_qname(child, insert_before))
   })

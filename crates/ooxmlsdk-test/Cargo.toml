@@ -14,6 +14,9 @@ validators = ["ooxmlsdk/validators"]
 [dependencies]
 ooxmlsdk = { workspace = true, default-features = false }
 
+[build-dependencies]
+serde_json = { workspace = true }
+
 [dev-dependencies]
 criterion = { workspace = true }
 quick-xml = { workspace = true }

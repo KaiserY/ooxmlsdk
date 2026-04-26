@@ -981,8 +981,20 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  #[cfg(feature = "microsoft365")]
+  /// _
+  #[sdk(child(qname = "p14:CT_Media/p14:media"))]
+  pub media: Option<
+    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::Media>,
+  >,
+  #[cfg(feature = "microsoft365")]
+  /// _
+  #[sdk(child(qname = "p14:CT_RandomId/p14:creationId"))]
+  pub creation_id:
+    Option<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::CreationId>,
+  /// _
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub unknown_xml: String,
 }
 /// Browse Slide Show Mode.
 ///

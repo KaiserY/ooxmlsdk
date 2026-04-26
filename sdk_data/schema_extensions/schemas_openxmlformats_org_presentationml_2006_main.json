@@ -17,6 +17,25 @@
           "InsertBefore": "p:CT_SlideTransition/p:transition"
         }
       ]
+    },
+    {
+      "ClassName": "Extension",
+      "Children": [
+        {
+          "Name": "p14:CT_Media/p14:media",
+          "PropertyName": "media",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "unknown_xml"
+        },
+        {
+          "Name": "p14:CT_RandomId/p14:creationId",
+          "PropertyName": "creation_id",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "unknown_xml"
+        }
+      ]
     }
   ]
 }

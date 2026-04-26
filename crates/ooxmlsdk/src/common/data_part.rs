@@ -102,6 +102,14 @@ impl MediaDataPart {
   }
 
   #[inline]
+  pub fn is_orphan<P: crate::sdk::SdkPackage>(&self, package: &P) -> bool {
+    self
+      .data_part_reference_relationships(package)
+      .next()
+      .is_none()
+  }
+
+  #[inline]
   pub fn set_data<P: crate::sdk::SdkPackage>(
     &self,
     package: &mut P,

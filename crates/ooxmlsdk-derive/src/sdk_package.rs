@@ -616,6 +616,11 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       #[inline]
+      pub fn delete_unused_media_data_parts(&mut self) -> usize {
+        crate::sdk::SdkPackage::delete_unused_media_data_parts(self)
+      }
+
+      #[inline]
       pub fn relationships_by_type(
         &self,
         relationship_type: &str,
@@ -911,6 +916,19 @@ fn package_relationship_method_tokens(
     #[inline]
     pub fn get_all_parts(&self) -> impl Iterator<Item = crate::parts::PartRef> + '_ {
       crate::sdk::SdkPackage::get_all_parts(self)
+    }
+
+    #[inline]
+    pub fn get_part_by_relationship_type(
+      &self,
+      relationship_type: &str,
+    ) -> Option<crate::parts::PartRef> {
+      crate::sdk::SdkPackage::get_part_by_relationship_type(self, relationship_type)
+    }
+
+    #[inline]
+    pub fn is_child_part<T: crate::sdk::SdkPartHandle>(&self, part: &T) -> bool {
+      crate::sdk::SdkPackage::is_child_part(self, part)
     }
 
     #[inline]

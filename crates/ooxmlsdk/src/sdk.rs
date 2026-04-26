@@ -969,6 +969,11 @@ pub trait SdkPackage {
   }
 
   #[inline]
+  fn delete_unused_media_data_parts(&mut self) -> usize {
+    self.storage_mut().delete_unused_media_data_parts()
+  }
+
+  #[inline]
   fn relationships_by_type(
     &self,
     relationship_type: &str,
@@ -994,6 +999,28 @@ pub trait SdkPackage {
     Self: Sized,
   {
     collect_all_parts_from_relationships(self, self.relationships()).into_iter()
+  }
+
+  #[inline]
+  fn get_part_by_relationship_type(&self, relationship_type: &str) -> Option<crate::parts::PartRef>
+  where
+    Self: Sized,
+  {
+    self
+      .relationships_by_type(relationship_type)
+      .find_map(|relationship| {
+        let part_id = relationship.target_part_id()?;
+        crate::parts::PartRef::from_part_id(self, part_id)
+      })
+  }
+
+  #[inline]
+  fn is_child_part<T: SdkPartHandle>(&self, part: &T) -> bool {
+    let target_part_id = part.part_id();
+    self
+      .relationships()
+      .part_relationships()
+      .any(|relationship| relationship.target_part_id() == Some(target_part_id))
   }
 
   #[inline]
@@ -3090,6 +3117,31 @@ pub trait SdkPartHandle: Clone + Sized + 'static {
       })
       .collect::<Vec<_>>()
       .into_iter()
+  }
+
+  #[inline]
+  fn get_part_by_relationship_type<P: SdkPackage + Sized>(
+    &self,
+    package: &P,
+    relationship_type: &str,
+  ) -> Option<crate::parts::PartRef> {
+    self
+      .relationships(package)?
+      .by_relationship_type(relationship_type)
+      .find_map(|relationship| {
+        let part_id = relationship.target_part_id()?;
+        crate::parts::PartRef::from_part_id(package, part_id)
+      })
+  }
+
+  #[inline]
+  fn is_child_part<P: SdkPackage, T: SdkPartHandle>(&self, package: &P, part: &T) -> bool {
+    let target_part_id = part.part_id();
+    self
+      .relationships(package)
+      .into_iter()
+      .flat_map(crate::common::RelationshipSet::part_relationships)
+      .any(|relationship| relationship.target_part_id() == Some(target_part_id))
   }
 
   #[inline]

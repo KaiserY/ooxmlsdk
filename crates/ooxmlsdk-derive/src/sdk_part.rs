@@ -2390,6 +2390,28 @@ fn part_handle_child_methods_tokens(
       }
 
       #[inline]
+      pub fn get_part_by_relationship_type<P: crate::sdk::SdkPackage>(
+        &self,
+        package: &P,
+        relationship_type: &str,
+      ) -> Option<crate::parts::PartRef> {
+        <Self as crate::sdk::SdkPartHandle>::get_part_by_relationship_type(
+          self,
+          package,
+          relationship_type,
+        )
+      }
+
+      #[inline]
+      pub fn is_child_part<P: crate::sdk::SdkPackage, T: crate::sdk::SdkPartHandle>(
+        &self,
+        package: &P,
+        part: &T,
+      ) -> bool {
+        <Self as crate::sdk::SdkPartHandle>::is_child_part(self, package, part)
+      }
+
+      #[inline]
       pub fn get_part_by_id<P: crate::sdk::SdkPackage>(
         &self,
         package: &P,

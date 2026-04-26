@@ -160,6 +160,13 @@ fn package_relationship_helpers_match_openxml_container_api_shape() {
     .get_id_of_part_required(&main_part)
     .unwrap()
     .to_string();
+  assert!(package.is_child_part(&main_part));
+  assert!(
+    package
+      .get_part_by_relationship_type(MainDocumentPart::RELATIONSHIP_TYPE)
+      .and_then(PartRef::downcast::<MainDocumentPart>)
+      .is_some()
+  );
   assert!(
     package
       .get_part_by_id_required(&main_part_id)
@@ -530,6 +537,16 @@ fn part_get_all_parts_and_parent_parts_follow_reachable_relationship_graph() {
   let image_part = header_part
     .add_image_part(&mut package, "image/png")
     .unwrap();
+  assert!(main_part.is_child_part(&package, &header_part));
+  assert!(main_part.is_child_part(&package, &settings_part));
+  assert!(header_part.is_child_part(&package, &image_part));
+  assert!(!main_part.is_child_part(&package, &image_part));
+  assert!(
+    main_part
+      .get_part_by_relationship_type(&package, HeaderPart::RELATIONSHIP_TYPE)
+      .and_then(PartRef::downcast::<HeaderPart>)
+      .is_some()
+  );
 
   let main_descendants: HashSet<_> = main_part
     .get_all_parts(&package)
@@ -757,12 +774,16 @@ fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
 
   let remaining_media_data_parts: Vec<_> = reopened.media_data_parts().collect();
   assert_eq!(remaining_media_data_parts.len(), 1);
+  assert!(remaining_media_data_parts[0].is_orphan(&reopened));
   assert_eq!(
     remaining_media_data_parts[0]
       .data_part_reference_relationships(&reopened)
       .count(),
     0
   );
+  assert_eq!(reopened.delete_unused_media_data_parts(), 1);
+  assert_eq!(reopened.media_data_parts().count(), 0);
+  assert_eq!(reopened.delete_unused_media_data_parts(), 0);
 }
 
 #[test]

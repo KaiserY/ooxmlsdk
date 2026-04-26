@@ -1117,6 +1117,33 @@ impl SdkPackageStorage {
       .filter(move |relationship| relationship.target_part_id() == Some(target_part_id))
   }
 
+  pub fn delete_unused_media_data_parts(&mut self) -> usize {
+    let unused_part_ids: Vec<_> = self
+      .media_data_parts()
+      .filter_map(|(part_id, _)| {
+        self
+          .data_part_reference_relationships_to(part_id)
+          .next()
+          .is_none()
+          .then_some(part_id)
+      })
+      .collect();
+
+    let deleted_count = unused_part_ids.len();
+    for part_id in unused_part_ids {
+      let Some(part) = self.part(part_id) else {
+        continue;
+      };
+      let path = part.path().to_string();
+      if let Some(part) = self.parts.get_mut(part_id.index()) {
+        part.deleted = true;
+      }
+      self.by_path.remove(path.as_str());
+      self.remove_content_type_override(&path);
+    }
+    deleted_count
+  }
+
   pub fn add_child_part(
     &mut self,
     source_part_id: PartId,

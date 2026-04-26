@@ -1194,7 +1194,7 @@ fn expand_part_handle(
           for part in &self.#field_ident {
             crate::sdk::add_part_handle_to_relationship_set(
               &mut relationships,
-              package.storage(),
+              crate::sdk::SdkPackageInternal::storage(package),
               Some(self.id),
               part,
             )?;
@@ -1204,7 +1204,7 @@ fn expand_part_handle(
           if let Some(part) = self.#field_ident.as_deref() {
             crate::sdk::add_part_handle_to_relationship_set(
               &mut relationships,
-              package.storage(),
+              crate::sdk::SdkPackageInternal::storage(package),
               Some(self.id),
               part,
             )?;
@@ -1222,7 +1222,7 @@ fn expand_part_handle(
           if let Some(part) = self.#field_ident.get(*item_index) {
             crate::sdk::add_part_handle_to_relationship_set(
               &mut relationships,
-              package.storage(),
+              crate::sdk::SdkPackageInternal::storage(package),
               Some(self.id),
               part,
             )?;
@@ -1235,7 +1235,7 @@ fn expand_part_handle(
             if let Some(part) = self.#field_ident.as_deref() {
               crate::sdk::add_part_handle_to_relationship_set(
                 &mut relationships,
-                package.storage(),
+                crate::sdk::SdkPackageInternal::storage(package),
                 Some(self.id),
                 part,
               )?;
@@ -1369,7 +1369,7 @@ fn expand_part_handle(
           for part in &self.fallback_parts {
             crate::sdk::add_part_ref_to_relationship_set(
               &mut relationships,
-              package.storage(),
+              crate::sdk::SdkPackageInternal::storage(package),
               Some(self.id),
               part,
             )?;
@@ -1397,7 +1397,7 @@ fn expand_part_handle(
               if let Some(part) = self.fallback_parts.get(*item_index) {
                 crate::sdk::add_part_ref_to_relationship_set(
                   &mut relationships,
-                  package.storage(),
+                  crate::sdk::SdkPackageInternal::storage(package),
                   Some(self.id),
                   part,
                 )?;
@@ -1431,7 +1431,7 @@ fn expand_part_handle(
           crate::common::RelationshipSet,
         >,
       ) -> Result<(), crate::common::SdkError> {
-        let Some(part) = package.storage().part(self.id) else {
+        let Some(part) = crate::sdk::SdkPackageInternal::storage(package).part(self.id) else {
           return Ok(());
         };
         if part.is_deleted() {
@@ -1473,7 +1473,7 @@ fn expand_part_handle(
         package: &P,
       ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {
         let part = <Self as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-          package.storage(),
+          crate::sdk::SdkPackageInternal::storage(package),
           self.id,
         );
         <Self as crate::sdk::SdkPartHandle>::modeled_relationships(&part, package).map(Into::into)
@@ -2340,7 +2340,7 @@ fn part_handle_root_method_tokens(
           .is_none()
         {
           let root_element = {
-            let part = package.storage().part(self.id).ok_or_else(|| {
+            let part = crate::sdk::SdkPackageInternal::storage(package).part(self.id).ok_or_else(|| {
               crate::common::SdkError::CommonError(format!(
                 "part id {:?} is not present in package storage",
                 self.id,
@@ -2378,7 +2378,7 @@ fn part_handle_root_method_tokens(
           .is_none()
         {
           let root_element = {
-            let part = package.storage().part(self.id).ok_or_else(|| {
+            let part = crate::sdk::SdkPackageInternal::storage(package).part(self.id).ok_or_else(|| {
               crate::common::SdkError::CommonError(format!(
                 "part id {:?} is not present in package storage",
                 self.id,
@@ -2437,7 +2437,7 @@ fn part_handle_child_methods_tokens(
       if crate::common::relationship_type_matches(relationship_type, #relationship_type) {
         return Some(crate::parts::PartRef::#variant_ident(
           <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
-            package.storage(),
+            crate::sdk::SdkPackageInternal::storage(package),
             relationship.id(),
             part_id,
           ),
@@ -2461,7 +2461,7 @@ fn part_handle_child_methods_tokens(
             .target_part_id()
             .map(|part_id| {
               <#part_ty as crate::sdk::SdkPartHandle>::from_relationship_id_with_relationships(
-                package.storage(),
+                crate::sdk::SdkPackageInternal::storage(package),
                 relationship.id(),
                 part_id,
               )
@@ -2532,7 +2532,7 @@ fn part_handle_child_methods_tokens(
       ) -> Option<crate::parts::PartRef> {
         let part_id = relationship.target_part_id()?;
         Some(crate::parts::PartRef::ExtendedPart(
-          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(package.storage(), part_id),
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(crate::sdk::SdkPackageInternal::storage(package), part_id),
         ))
       }
     }
@@ -2546,7 +2546,7 @@ fn part_handle_child_methods_tokens(
         let relationship_type = relationship.relationship_type();
         #( #child_branches )*
         Some(crate::parts::PartRef::ExtendedPart(
-          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(package.storage(), part_id),
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(crate::sdk::SdkPackageInternal::storage(package), part_id),
         ))
       }
     }

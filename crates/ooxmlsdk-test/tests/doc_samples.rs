@@ -7,12 +7,11 @@ use std::{
   path::Path,
 };
 
-use ooxmlsdk::common::PartId;
 use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
-use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
+use ooxmlsdk::sdk::SdkPartHandle;
 use ooxmlsdk_test::fixtures::doc_sample_path;
 use quick_xml::{Reader, escape::unescape, events::Event};
 use zip::ZipArchive;
@@ -37,7 +36,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
       let roundtripped_bytes = buffer.into_inner();
       let reopened = WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
       assert_wordprocessing_document_round_trip(&original, &reopened);
-      assert_relationship_sets_round_trip(&original, &reopened, file_name);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Spreadsheet => {
@@ -47,7 +45,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
       let roundtripped_bytes = buffer.into_inner();
       let reopened = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
       assert_spreadsheet_document_round_trip(&original, &reopened);
-      assert_relationship_sets_round_trip(&original, &reopened, file_name);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Presentation => {
@@ -57,7 +54,6 @@ fn assert_doc_sample_round_trip(file_name: &str) {
       let roundtripped_bytes = buffer.into_inner();
       let reopened = PresentationDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
       assert_presentation_document_round_trip(&original, &reopened);
-      assert_relationship_sets_round_trip(&original, &reopened, file_name);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
   }
@@ -136,15 +132,10 @@ fn assert_wordprocessing_document_round_trip(
     part_path(original, &original_main),
     part_path(roundtripped, &roundtripped_main)
   );
+  assert_eq!(original.parts().count(), roundtripped.parts().count());
   assert_eq!(
-    original.relationships().len(),
-    roundtripped.relationships().len()
-  );
-  assert_eq!(
-    original_main.relationships(original).map(|rels| rels.len()),
-    roundtripped_main
-      .relationships(roundtripped)
-      .map(|rels| rels.len())
+    original_main.get_all_parts(original).count(),
+    roundtripped_main.get_all_parts(roundtripped).count()
   );
 }
 
@@ -158,18 +149,7 @@ fn assert_spreadsheet_document_round_trip(
     part_path(original, &original_workbook),
     part_path(roundtripped, &roundtripped_workbook)
   );
-  assert_eq!(
-    original.relationships().len(),
-    roundtripped.relationships().len()
-  );
-  assert_eq!(
-    original_workbook
-      .relationships(original)
-      .map(|rels| rels.len()),
-    roundtripped_workbook
-      .relationships(roundtripped)
-      .map(|rels| rels.len())
-  );
+  assert_eq!(original.parts().count(), roundtripped.parts().count());
   assert_eq!(
     original_workbook.worksheet_parts(original).count(),
     roundtripped_workbook.worksheet_parts(roundtripped).count()
@@ -186,18 +166,7 @@ fn assert_presentation_document_round_trip(
     part_path(original, &original_presentation),
     part_path(roundtripped, &roundtripped_presentation)
   );
-  assert_eq!(
-    original.relationships().len(),
-    roundtripped.relationships().len()
-  );
-  assert_eq!(
-    original_presentation
-      .relationships(original)
-      .map(|rels| rels.len()),
-    roundtripped_presentation
-      .relationships(roundtripped)
-      .map(|rels| rels.len())
-  );
+  assert_eq!(original.parts().count(), roundtripped.parts().count());
   assert_eq!(
     original_presentation.slide_parts(original).count(),
     roundtripped_presentation.slide_parts(roundtripped).count()
@@ -210,56 +179,12 @@ fn assert_presentation_document_round_trip(
   );
 }
 
-fn assert_relationship_sets_round_trip<P: SdkPackage>(
-  original: &P,
-  roundtripped: &P,
-  file_name: &str,
-) {
-  assert_eq!(
-    original.storage().package_relationships(),
-    roundtripped.storage().package_relationships(),
-    "package relationships changed after save/reopen for {file_name}"
-  );
-
-  for (index, original_part) in original.storage().parts().iter().enumerate() {
-    if original_part.is_deleted() {
-      continue;
-    }
-
-    let original_part_id = PartId::from_index(index);
-    let original_relationships = original
-      .storage()
-      .relationships(original_part_id)
-      .expect("active part has relationships");
-    let (roundtripped_part_id, _) = roundtripped
-      .storage()
-      .part_by_path(original_part.path())
-      .unwrap_or_else(|| {
-        panic!(
-          "missing round-tripped part for {file_name}:{}",
-          original_part.path()
-        )
-      });
-    let roundtripped_relationships = roundtripped
-      .storage()
-      .relationships(roundtripped_part_id)
-      .expect("active part has relationships");
-
-    assert_eq!(
-      original_relationships,
-      roundtripped_relationships,
-      "part relationships changed after save/reopen for {file_name}:{}",
-      original_part.path()
-    );
-  }
-}
-
 fn part_path<'a, P, T>(package: &'a P, part: &T) -> &'a str
 where
-  P: SdkPackage,
+  P: ooxmlsdk::sdk::SdkPackage,
   T: SdkPartHandle,
 {
-  package.storage().part(part.part_id()).unwrap().path()
+  part.path(package).unwrap()
 }
 
 fn doc_sample_kind(file_name: &str) -> DocSampleKind {

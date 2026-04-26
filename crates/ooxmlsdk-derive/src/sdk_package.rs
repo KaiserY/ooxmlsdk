@@ -515,7 +515,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   });
   let child_descriptors_assoc = package_child_descriptors_tokens(&child_infos);
   Ok(quote! {
-    impl crate::sdk::SdkPackage for #ident {
+    impl crate::sdk::SdkPackageInternal for #ident {
       #child_descriptors_assoc
 
       #[inline]
@@ -526,11 +526,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       #[inline]
       fn storage_mut(&mut self) -> &mut crate::common::SdkPackageStorage {
         &mut self.#storage_ident
-      }
-
-      #[inline]
-      fn main_part_id(&self) -> Option<crate::common::PartId> {
-        self.#main_part_id_ident
       }
 
       fn modeled_relationships(
@@ -637,6 +632,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
     }
 
+    impl crate::sdk::SdkPackage for #ident {}
+
     impl #ident {
       #main_part_relationship_type
 
@@ -673,7 +670,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub(crate) fn try_relationships(
         &self,
       ) -> Result<crate::common::RelationshipView, crate::common::SdkError> {
-        crate::sdk::SdkPackage::modeled_relationships(self).map(Into::into)
+        crate::sdk::SdkPackageInternal::modeled_relationships(self).map(Into::into)
       }
 
       #[inline]
@@ -905,7 +902,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       where
         Self: crate::parts::PartRootCache,
       {
-        let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
+        let relationship_id = crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
         crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension(
           self,
           relationship_id,

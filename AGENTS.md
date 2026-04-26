@@ -33,9 +33,10 @@ The runtime crate currently exports `common`, `deserializers`, `namespaces`, `pa
 - `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: run lints for the Office2007-oriented `parts` surface without `microsoft365`.
 - `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: lint the validator-focused integration lane.
 
-Run commands from the repository root. For normal validation, use this order and keep `cargo fmt --all` last:
+Run commands from the repository root. For normal validation, use this order. When generation is part of the workflow, run `cargo fmt --all` immediately after `test_gen` before reviewing diffs or drawing conclusions; generated files may otherwise appear to have large formatting-only churn because generation and repository rustfmt settings can differ. Keep a final `cargo fmt --all` at the end as well:
 
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+- `cargo fmt --all`
 - `cargo test --workspace`
 - `cargo test --workspace --no-default-features`
 - `cargo test --workspace --no-default-features --features parts`
@@ -45,6 +46,8 @@ Run commands from the repository root. For normal validation, use this order and
 - `cargo fmt --all`
 
 For fast iteration on runtime or doc-sample work, treat `cargo test -p ooxmlsdk-test` as the primary gate first. Defer workspace-wide, `strict`, and clippy runs unless the change touches generator code, shared runtime code, or feature-gated behavior.
+
+After running `test_gen`, do not revert generated files just because the diff is large before formatting. First run `cargo fmt --all`, then inspect the formatted diff. If unrelated generated areas still changed after formatting, understand why before deciding whether to narrow the change; do not blindly reverse generated output.
 
 When changing validator IR, validator runtime helpers, or validator-facing derive output, also run the validator-specific lane:
 
@@ -62,6 +65,8 @@ Follow standard Rust formatting and keep the workspace `rustfmt`-clean. Use snak
 
 Prefer keeping hand-written logic in `crates/ooxmlsdk-build`. Avoid editing generated files in `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, or `crates/ooxmlsdk/src/schemas.rs` unless you are also updating the generator or the source metadata and intentionally regenerating the output. Keep runtime-only helpers in `crates/ooxmlsdk/src/common.rs` small and generic.
 
+For the `parts` API, keep the public surface aligned with upstream Open XML SDK container concepts and preserve established constructors/save entry points such as `new`, `new_lazy`, `new_from_file`, and `save`. Do not expose implementation structures such as raw `RelationshipSet`, package storage, relationship model rebuilding, or generated factory helpers just to satisfy tests. Prefer crate-internal traits/helpers such as internal package or part plumbing for storage/model access, with public inherent methods wrapping only upstream-style operations.
+
 The fixtures in `crates/ooxmlsdk-test/src/fixtures.rs` are intentionally tied back to upstream .NET Open XML SDK tests. When adding coverage, prefer representative sample XML with a traceable origin instead of ad hoc snippets.
 
 ## Testing Guidelines
@@ -70,6 +75,7 @@ The generator entry point is `test_gen` in `crates/ooxmlsdk-build/src/lib.rs`. R
 When validating generator changes, feature-gated code, or generated schema output, use this sequence:
 
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+- `cargo fmt --all`
 - `cargo test --workspace`
 - `cargo test --workspace --no-default-features`
 - `cargo test --workspace --no-default-features --features parts`
@@ -81,6 +87,8 @@ When validating generator changes, feature-gated code, or generated schema outpu
 Runtime behavior is currently covered by focused round-trip tests in `crates/ooxmlsdk-test/tests/wordprocessing.rs` and `crates/ooxmlsdk-test/tests/presentation.rs`. Add new tests close to the behavior they protect and keep assertions stable: verify both parsed fields and serialized XML where possible.
 
 Additional integration coverage also lives in `crates/ooxmlsdk-test/tests/spreadsheet.rs`, `crates/ooxmlsdk-test/tests/properties.rs`, and `crates/ooxmlsdk-test/tests/packages.rs`. Add new tests close to the behavior they protect.
+
+Package/parts tests should assert behavior through public, upstream-aligned APIs such as `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, relationship-specific helpers, part path/content/data helpers, and saved package contents. Do not add tests that require exposing raw `storage()`, raw package or part `relationships()`, or `RelationshipSet` internals unless the API is intentionally public and matched to upstream.
 
 Validator-focused integration coverage lives in `crates/ooxmlsdk-test/tests/validators.rs` and `crates/ooxmlsdk-test/tests/file_validators.rs`. Keep these tests behind `validators` and prefer traceable upstream Open XML SDK fixtures and assertions. For package-level validator migrations where upstream reports multiple errors, it is acceptable to assert the first Rust-side validation error when the implementation intentionally stops at first failure.
 

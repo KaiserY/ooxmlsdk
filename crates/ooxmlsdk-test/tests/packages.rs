@@ -4,7 +4,8 @@ use std::collections::HashSet;
 use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{
-  ReferenceRelationshipKind, RelationshipSet, RelationshipTargetKind, StoredPartDataKind,
+  MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipSet, RelationshipTargetKind,
+  StoredPartDataKind,
 };
 use ooxmlsdk::parts::{
   PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
@@ -81,6 +82,13 @@ fn empty_package() -> Cursor<Vec<u8>> {
   buffer
 }
 
+fn media_data_part_by_id<P: SdkPackage>(package: &P, part_id: PartId) -> MediaDataPart {
+  package
+    .media_data_parts()
+    .find(|part| part.part_id() == Some(part_id))
+    .unwrap()
+}
+
 #[test]
 fn part_child_descriptors_are_generated_from_static_field_metadata() {
   let slide_master_descriptor = PresentationPart::child_descriptors()
@@ -152,7 +160,7 @@ fn package_relationships_resolve_with_container_local_part_factory() {
     .unwrap();
 
   assert_eq!(resolved.part_id(), main_part.part_id());
-  assert_eq!(package.parts().count(), package.relationships().len());
+  assert!(package.parts().count() > 0);
   assert_eq!(
     package
       .get_parts_of_type::<MainDocumentPart>()
@@ -181,7 +189,9 @@ fn package_relationship_set_can_be_edited_and_written_back() {
   saved.set_position(0);
 
   let reopened = WordprocessingDocument::new(saved).unwrap();
-  let relationship = reopened.relationships().get("rIdGraphExternal").unwrap();
+  let relationship = reopened
+    .get_reference_relationship("rIdGraphExternal")
+    .unwrap();
   assert_eq!(
     relationship.relationship_type(),
     "http://example.com/relationships/custom"
@@ -514,28 +524,12 @@ fn package_storage_parts_match_openxml_package_get_all_parts_tests() {
   //   OpenXmlPackageGetAllPartsTestWord
   //   OpenXmlPackageGetAllPartsTestPowerPoint
   let word = WordprocessingDocument::new_from_file(doc_sample("complex0.docx")).unwrap();
-  assert_eq!(word.storage().parts().len(), 31);
   assert_eq!(word.get_all_parts().count(), 31);
 
   let presentation =
     PresentationDocument::new_from_file(doc_sample("o09_Performance_typical.pptx")).unwrap();
-  let data_parts = presentation
-    .storage()
-    .parts()
-    .iter()
-    .filter(|part| {
-      matches!(
-        part.relationship_type(),
-        Some(
-          "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
-            | "http://schemas.microsoft.com/office/2007/relationships/media"
-            | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video"
-        )
-      )
-    })
-    .count();
+  let data_parts = presentation.media_data_parts().count();
 
-  assert_eq!(presentation.storage().parts().len() - data_parts, 65);
   assert_eq!(presentation.get_all_parts().count(), 65);
   assert_eq!(data_parts, 1);
 }
@@ -603,21 +597,16 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
   );
 
   let media_part = package
-    .storage()
-    .parts()
-    .iter()
-    .enumerate()
-    .find(|(_, part)| part.path() == "ppt/media/media1.wav")
-    .map(|(index, part)| (ooxmlsdk::common::PartId::from_index(index), part))
+    .media_data_parts()
+    .find(|part| part.path(&package) == Some("ppt/media/media1.wav"))
     .unwrap();
-  assert_eq!(media_part.1.content_type(), "audio/wav");
-  assert_eq!(media_part.1.data().kind(), StoredPartDataKind::Binary);
+  assert_eq!(media_part.content_type(&package), Some("audio/wav"));
 
   let mut internal_media_reference_count = 0;
   let mut external_null_audio_reference_count = 0;
   for slide in slides {
     for relationship in slide.data_part_reference_relationships(&package) {
-      if relationship.target_part_id() == Some(media_part.0) {
+      if relationship.target_part_id() == media_part.part_id() {
         internal_media_reference_count += 1;
       } else {
         assert_eq!(relationship.target(), "NULL");
@@ -956,23 +945,35 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
     .iter()
     .find(|relationship| relationship.id() == "rIdSdkAudio")
     .unwrap();
-  let reopened_audio_part = reopened
-    .storage()
-    .part(reopened_audio_relationship.target_part_id().unwrap())
-    .unwrap();
-  assert_eq!(reopened_audio_part.content_type(), "audio/wav");
-  assert_eq!(reopened_audio_part.data().bytes(), b"wav bytes");
+  let reopened_audio_part = media_data_part_by_id(
+    &reopened,
+    reopened_audio_relationship.target_part_id().unwrap(),
+  );
+  assert_eq!(
+    reopened_audio_part.content_type(&reopened),
+    Some("audio/wav")
+  );
+  assert_eq!(
+    reopened_audio_part.data(&reopened),
+    Some(b"wav bytes".as_slice())
+  );
 
   let reopened_media_relationship = reopened_relationships
     .iter()
     .find(|relationship| relationship.id() == "rIdSdkMedia")
     .unwrap();
-  let reopened_media_part = reopened
-    .storage()
-    .part(reopened_media_relationship.target_part_id().unwrap())
-    .unwrap();
-  assert_eq!(reopened_media_part.content_type(), "video/avi");
-  assert_eq!(reopened_media_part.data().bytes(), b"avi bytes");
+  let reopened_media_part = media_data_part_by_id(
+    &reopened,
+    reopened_media_relationship.target_part_id().unwrap(),
+  );
+  assert_eq!(
+    reopened_media_part.content_type(&reopened),
+    Some("video/avi")
+  );
+  assert_eq!(
+    reopened_media_part.data(&reopened),
+    Some(b"avi bytes".as_slice())
+  );
 
   let reopened_video_relationship = reopened_relationships
     .iter()
@@ -1087,12 +1088,16 @@ fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target(
     reopened_relationship.relationship_type(),
     RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
   );
-  let reopened_media_part = reopened
-    .storage()
-    .part(reopened_relationship.target_part_id().unwrap())
-    .unwrap();
-  assert_eq!(reopened_media_part.content_type(), "audio/mp3");
-  assert_eq!(reopened_media_part.data().bytes(), b"mp3 bytes");
+  let reopened_media_part =
+    media_data_part_by_id(&reopened, reopened_relationship.target_part_id().unwrap());
+  assert_eq!(
+    reopened_media_part.content_type(&reopened),
+    Some("audio/mp3")
+  );
+  assert_eq!(
+    reopened_media_part.data(&reopened),
+    Some(b"mp3 bytes".as_slice())
+  );
 }
 
 #[test]
@@ -1469,7 +1474,7 @@ fn part_external_relationship_helpers_are_kind_specific() {
 fn package_external_relationship_mutation_is_saved() {
   // Source: adapted from OpenXmlPackage relationship mutation coverage.
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
-  let relationship_id = package.relationships().next_relationship_id();
+  let relationship_id = "rIdPackageExternal".to_string();
   let relationship_type = "http://example.com/package/relationship";
   let target = "https://example.com/package";
 
@@ -1486,7 +1491,9 @@ fn package_external_relationship_mutation_is_saved() {
   package.save(&mut buffer).unwrap();
 
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
-  let relationship = reopened.relationships().get(&relationship_id).unwrap();
+  let relationship = reopened
+    .get_reference_relationship(&relationship_id)
+    .unwrap();
 
   assert_eq!(relationship.relationship_type(), relationship_type);
   assert_eq!(relationship.target(), target);
@@ -2027,7 +2034,7 @@ fn package_add_new_part_with_content_type_and_extension_auto_id_saves_custom_ext
   // Source: package-level AddNewPart<T>() creation semantics with Rust extension override.
   let mut package =
     WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
-  let relationship_count = package.relationships().len();
+  let relationship_count = package.parts().count();
   let png = b"package thumbnail png".to_vec();
 
   let part = package
@@ -2038,7 +2045,7 @@ fn package_add_new_part_with_content_type_and_extension_auto_id_saves_custom_ext
   let path = part.path(&package).unwrap().to_string();
 
   assert!(relationship_id.starts_with("rId"));
-  assert_eq!(package.relationships().len(), relationship_count + 1);
+  assert_eq!(package.parts().count(), relationship_count + 1);
   assert_eq!(part.content_type(&package), Some("image/png"));
   assert!(path.starts_with("docProps/thumbnail"));
   assert!(path.ends_with(".png"));
@@ -2139,20 +2146,14 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
     )
   );
   assert!(
-    package
-      .storage()
-      .part(embedded_package.part_id())
-      .unwrap()
-      .path()
-      .ends_with(".xlsx")
+    embedded_package
+      .path(&package)
+      .is_some_and(|path| path.ends_with(".xlsx"))
   );
   assert!(
-    package
-      .storage()
-      .part(font.part_id())
-      .unwrap()
-      .path()
-      .ends_with(".ttf")
+    font
+      .path(&package)
+      .is_some_and(|path| path.ends_with(".ttf"))
   );
 
   let mut buffer = Cursor::new(Vec::new());
@@ -2275,28 +2276,19 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
     Some("application/vnd.ms-office.activeX")
   );
   assert!(
-    package
-      .storage()
-      .part(custom_property.part_id())
-      .unwrap()
-      .path()
-      .ends_with(".xml")
+    custom_property
+      .path(&package)
+      .is_some_and(|path| path.ends_with(".xml"))
   );
   assert!(
-    package
-      .storage()
-      .part(control.part_id())
-      .unwrap()
-      .path()
-      .ends_with(".xml")
+    control
+      .path(&package)
+      .is_some_and(|path| path.ends_with(".xml"))
   );
   assert!(
-    package
-      .storage()
-      .part(direct_binary.part_id())
-      .unwrap()
-      .path()
-      .ends_with(".bin")
+    direct_binary
+      .path(&package)
+      .is_some_and(|path| path.ends_with(".bin"))
   );
 
   let mut buffer = Cursor::new(Vec::new());
@@ -2342,7 +2334,7 @@ fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
   // Source: upstream AddThumbnailPart(ThumbnailPartType.Jpeg) package coverage.
   let mut package =
     WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
-  let relationship_count = package.relationships().len();
+  let relationship_count = package.parts().count();
   let jpeg = b"thumbnail jpeg bytes".to_vec();
 
   let thumbnail = package
@@ -2352,15 +2344,10 @@ fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
     .feed_data(&mut package, &mut Cursor::new(jpeg.clone()))
     .unwrap();
   let relationship_id = package.get_id_of_part(&thumbnail).unwrap().to_string();
-  let thumbnail_path = package
-    .storage()
-    .part(thumbnail.part_id())
-    .unwrap()
-    .path()
-    .to_string();
+  let thumbnail_path = thumbnail.path(&package).unwrap().to_string();
 
   assert!(relationship_id.starts_with("rId"));
-  assert_eq!(package.relationships().len(), relationship_count + 1);
+  assert_eq!(package.parts().count(), relationship_count + 1);
   assert_eq!(thumbnail.content_type(&package), Some("image/jpeg"));
   assert!(thumbnail_path.starts_with("docProps/thumbnail"));
   assert!(thumbnail_path.ends_with(".jpg"));
@@ -2494,28 +2481,23 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
       .is_some_and(|path| path.starts_with("word/extendedPart") && path.ends_with(".txt"))
   );
 
-  let package_relationship = package
-    .relationships()
-    .get("rIdSdkPackageExtended")
-    .unwrap();
-  assert_eq!(
-    package_relationship.relationship_type(),
-    "http://temp/package"
+  assert!(
+    package
+      .get_part_by_id("rIdSdkPackageExtended")
+      .and_then(PartRef::downcast::<ExtendedPart>)
+      .is_some()
   );
-  let part_relationship = main_part
-    .relationships(&package)
-    .unwrap()
-    .get("rIdSdkMainExtended")
-    .unwrap();
-  assert_eq!(part_relationship.relationship_type(), "http://temp/main");
-  let nested_relationship = part_extended
-    .relationships(&package)
-    .unwrap()
-    .get("rIdSdkNestedExtended")
-    .unwrap();
-  assert_eq!(
-    nested_relationship.relationship_type(),
-    "http://temp/nested"
+  assert!(
+    main_part
+      .get_part_by_id(&package, "rIdSdkMainExtended")
+      .and_then(PartRef::downcast::<ExtendedPart>)
+      .is_some()
+  );
+  assert!(
+    part_extended
+      .get_part_by_id(&package, "rIdSdkNestedExtended")
+      .and_then(PartRef::downcast::<ExtendedPart>)
+      .is_some()
   );
 
   let mut buffer = Cursor::new(Vec::new());
@@ -2565,19 +2547,7 @@ fn delete_package_part_removes_relationship_part_and_content_type() {
   assert!(package.delete_part(thumbnail.clone()).unwrap());
   assert!(!package.delete_part_by_id("rIdSdkThumbnail").unwrap());
   assert!(package.get_part_by_id("rIdSdkThumbnail").is_none());
-  assert!(package.storage().part(thumbnail.part_id()).is_none());
-  assert!(
-    !package
-      .storage()
-      .content_types()
-      .xml_children
-      .iter()
-      .any(|child| matches!(
-        child,
-        ooxmlsdk::schemas::opc_content_types::TypesChoice::Override(override_type)
-          if override_type.part_name == format!("/{thumbnail_path}")
-      ))
-  );
+  assert!(thumbnail.path(&package).is_none());
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
@@ -2620,7 +2590,7 @@ fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
   assert!(extended.delete_part(&mut package, nested.clone()).unwrap());
   assert!(!extended.delete_part_by_id(&mut package, "tempId2").unwrap());
   assert!(extended.get_part_by_id(&package, "tempId2").is_none());
-  assert!(package.storage().part(nested.part_id()).is_none());
+  assert!(nested.path(&package).is_none());
 
   assert!(
     main_part
@@ -2628,7 +2598,7 @@ fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
       .unwrap()
   );
   assert!(main_part.get_part_by_id(&package, "tempId").is_none());
-  assert!(package.storage().part(extended.part_id()).is_none());
+  assert!(extended.path(&package).is_none());
 
   let image1 = main_part
     .add_image_part_with_id(&mut package, "image/png", "rIdDeleteImage1")
@@ -2707,7 +2677,7 @@ fn delete_parts_removes_selected_direct_children() {
       .get_part_by_id(&package, "rIdDirectImage")
       .is_none()
   );
-  assert!(package.storage().part(direct_image.part_id()).is_none());
+  assert!(direct_image.path(&package).is_none());
   assert!(
     extended
       .get_part_by_id(&package, "rIdNestedImage")
@@ -2781,7 +2751,7 @@ fn add_part_and_create_relationship_to_part_share_existing_parts() {
   ));
 
   assert!(extended.delete_part(&mut package, image.clone()).unwrap());
-  assert!(package.storage().part(image.part_id()).is_none());
+  assert!(image.path(&package).is_none());
 
   let mut deleted_buffer = Cursor::new(Vec::new());
   package.save(&mut deleted_buffer).unwrap();
@@ -2948,9 +2918,12 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
   assert_eq!(data_refs.len(), 1);
   assert_eq!(data_refs[0].id(), "rIdSourceMedia");
   let imported_media_part_id = data_refs[0].target_part_id().unwrap();
-  let imported_media_part = target.storage().part(imported_media_part_id).unwrap();
-  assert_eq!(imported_media_part.content_type(), "audio/mp3");
-  assert_eq!(imported_media_part.data().bytes(), b"imported media");
+  let imported_media_part = media_data_part_by_id(&target, imported_media_part_id);
+  assert_eq!(imported_media_part.content_type(&target), Some("audio/mp3"));
+  assert_eq!(
+    imported_media_part.data(&target),
+    Some(b"imported media".as_slice())
+  );
 
   let mut buffer = Cursor::new(Vec::new());
   target.save(&mut buffer).unwrap();

@@ -2883,12 +2883,12 @@ impl PartRef {
     package: &P,
     part_id: crate::common::PartId,
   ) -> Option<Self> {
-    let part = package.storage().part(part_id)?;
+    let part = crate::sdk::SdkPackageInternal::storage(package).part(part_id)?;
     let Some(relationship_type) = part.relationship_type() else {
       return Some(
                 PartRef::ExtendedPart(
                     <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                        package.storage(),
+                        crate::sdk::SdkPackageInternal::storage(package),
                         part_id,
                     ),
                 ),
@@ -2900,7 +2900,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedControlPersistenceBinaryDataPart(
                             <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2912,7 +2912,7 @@ impl PartRef {
           return Some(
                         PartRef::ExcelAttachedToolbarsPart(
                             <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2922,7 +2922,7 @@ impl PartRef {
           return Some(
                         PartRef::WordAttachedToolbarsPart(
                             <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2934,7 +2934,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomizationPart(
                             <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2946,7 +2946,7 @@ impl PartRef {
           return Some(
                         PartRef::LegacyDiagramTextPart(
                             <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2958,7 +2958,7 @@ impl PartRef {
           return Some(
                         PartRef::LegacyDiagramTextInfoPart(
                             <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2970,7 +2970,7 @@ impl PartRef {
           return Some(
                         PartRef::RibbonExtensibilityPart(
                             <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2982,7 +2982,7 @@ impl PartRef {
           return Some(
                         PartRef::QuickAccessToolbarCustomizationsPart(
                             <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -2994,7 +2994,7 @@ impl PartRef {
           return Some(
                         PartRef::VbaProjectPart(
                             <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3006,7 +3006,7 @@ impl PartRef {
           return Some(
                         PartRef::VbaDataPart(
                             <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3018,7 +3018,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetSortMapPart(
                             <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3030,7 +3030,7 @@ impl PartRef {
           return Some(
                         PartRef::InternationalMacroSheetPart(
                             <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3042,7 +3042,7 @@ impl PartRef {
           return Some(
                         PartRef::MacroSheetPart(
                             <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3055,7 +3055,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomDataPart(
                             <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3068,7 +3068,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomDataPropertiesPart(
                             <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3081,7 +3081,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramPersistLayoutPart(
                             <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3094,7 +3094,7 @@ impl PartRef {
           return Some(
                         PartRef::SlicersPart(
                             <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3107,7 +3107,7 @@ impl PartRef {
           return Some(
                         PartRef::SlicerCachePart(
                             <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3120,7 +3120,7 @@ impl PartRef {
           return Some(
                         PartRef::StylesWithEffectsPart(
                             <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3133,7 +3133,7 @@ impl PartRef {
           return Some(
                         PartRef::RibbonAndBackstageCustomizationsPart(
                             <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3146,7 +3146,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartColorStylePart(
                             <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3159,7 +3159,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartStylePart(
                             <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3174,7 +3174,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingCommentsExPart(
                             <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3189,7 +3189,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingPeoplePart(
                             <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3202,7 +3202,7 @@ impl PartRef {
           return Some(
                         PartRef::TimeLinePart(
                             <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3215,7 +3215,7 @@ impl PartRef {
           return Some(
                         PartRef::TimeLineCachePart(
                             <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3228,7 +3228,7 @@ impl PartRef {
           return Some(
                         PartRef::WebExtensionPart(
                             <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3241,7 +3241,7 @@ impl PartRef {
           return Some(
                         PartRef::WebExTaskpanesPart(
                             <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3254,7 +3254,7 @@ impl PartRef {
           return Some(
                         PartRef::ExtendedChartPart(
                             <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3269,7 +3269,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingCommentsIdsPart(
                             <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3282,7 +3282,7 @@ impl PartRef {
           return Some(
                         PartRef::Model3DReferenceRelationshipPart(
                             <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3295,7 +3295,7 @@ impl PartRef {
           return Some(
                         PartRef::RdArrayPart(
                             <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3308,7 +3308,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValuePart(
                             <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3321,7 +3321,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValueStructurePart(
                             <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3334,7 +3334,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValueTypesPart(
                             <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3347,7 +3347,7 @@ impl PartRef {
           return Some(
                         PartRef::RdSupportingPropertyBagPart(
                             <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3361,7 +3361,7 @@ impl PartRef {
           return Some(
                         PartRef::RdSupportingPropertyBagStructurePart(
                             <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3374,7 +3374,7 @@ impl PartRef {
           return Some(
                         PartRef::RichStylesPart(
                             <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3387,7 +3387,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookPersonPart(
                             <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3400,7 +3400,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetThreadedCommentsPart(
                             <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3415,7 +3415,7 @@ impl PartRef {
           return Some(
                         PartRef::WordCommentsExtensiblePart(
                             <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3428,7 +3428,7 @@ impl PartRef {
           return Some(
                         PartRef::PowerPointAuthorsPart(
                             <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3441,7 +3441,7 @@ impl PartRef {
           return Some(
                         PartRef::PowerPointCommentPart(
                             <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3454,7 +3454,7 @@ impl PartRef {
           return Some(
                         PartRef::NamedSheetViewsPart(
                             <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3467,7 +3467,7 @@ impl PartRef {
           return Some(
                         PartRef::DocumentTasksPart(
                             <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3480,7 +3480,7 @@ impl PartRef {
           return Some(
                         PartRef::LabelInfoPart(
                             <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3493,7 +3493,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValueWebImagePart(
                             <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3506,7 +3506,7 @@ impl PartRef {
           return Some(
                         PartRef::FeaturePropertyBagsPart(
                             <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3518,7 +3518,7 @@ impl PartRef {
           return Some(
                         PartRef::AlternativeFormatImportPart(
                             <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3532,7 +3532,7 @@ impl PartRef {
           return Some(
                         PartRef::CalculationChainPart(
                             <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3546,7 +3546,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartPart(
                             <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3560,7 +3560,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartDrawingPart(
                             <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3574,7 +3574,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartsheetPart(
                             <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3588,7 +3588,7 @@ impl PartRef {
           return Some(
                         PartRef::CommentAuthorsPart(
                             <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3602,7 +3602,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideCommentsPart(
                             <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3614,7 +3614,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingCommentsPart(
                             <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3626,7 +3626,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetCommentsPart(
                             <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3640,7 +3640,7 @@ impl PartRef {
           return Some(
                         PartRef::ConnectionsPart(
                             <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3652,7 +3652,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedControlPersistencePart(
                             <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3665,7 +3665,7 @@ impl PartRef {
           return Some(
                         PartRef::ControlPropertiesPart(
                             <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3679,7 +3679,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomFilePropertiesPart(
                             <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3691,7 +3691,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomPropertyPart(
                             <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3703,7 +3703,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomXmlPart(
                             <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3717,7 +3717,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomXmlPropertiesPart(
                             <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3731,7 +3731,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramColorsPart(
                             <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3745,7 +3745,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramDataPart(
                             <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3759,7 +3759,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramLayoutDefinitionPart(
                             <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3773,7 +3773,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramStylePart(
                             <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3787,7 +3787,7 @@ impl PartRef {
           return Some(
                         PartRef::DialogsheetPart(
                             <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3799,7 +3799,7 @@ impl PartRef {
           return Some(
                         PartRef::DrawingsPart(
                             <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3813,7 +3813,7 @@ impl PartRef {
           return Some(
                         PartRef::EndnotesPart(
                             <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3827,7 +3827,7 @@ impl PartRef {
           return Some(
                         PartRef::ExtendedFilePropertiesPart(
                             <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3841,7 +3841,7 @@ impl PartRef {
           return Some(
                         PartRef::ExternalWorkbookPart(
                             <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3853,7 +3853,7 @@ impl PartRef {
           return Some(
                         PartRef::FontPart(
                             <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3867,7 +3867,7 @@ impl PartRef {
           return Some(
                         PartRef::FontTablePart(
                             <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3881,7 +3881,7 @@ impl PartRef {
           return Some(
                         PartRef::FooterPart(
                             <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3895,7 +3895,7 @@ impl PartRef {
           return Some(
                         PartRef::FootnotesPart(
                             <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3909,7 +3909,7 @@ impl PartRef {
           return Some(
                         PartRef::GlossaryDocumentPart(
                             <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3923,7 +3923,7 @@ impl PartRef {
           return Some(
                         PartRef::HandoutMasterPart(
                             <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3937,7 +3937,7 @@ impl PartRef {
           return Some(
                         PartRef::HeaderPart(
                             <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3949,7 +3949,7 @@ impl PartRef {
           return Some(
                         PartRef::ImagePart(
                             <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3963,7 +3963,7 @@ impl PartRef {
           return Some(
                         PartRef::NotesMasterPart(
                             <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3977,7 +3977,7 @@ impl PartRef {
           return Some(
                         PartRef::NotesSlidePart(
                             <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -3991,7 +3991,7 @@ impl PartRef {
           return Some(
                         PartRef::NumberingDefinitionsPart(
                             <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4003,7 +4003,7 @@ impl PartRef {
           return Some(
                         PartRef::MainDocumentPart(
                             <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4013,7 +4013,7 @@ impl PartRef {
           return Some(
                         PartRef::PresentationPart(
                             <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4023,7 +4023,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookPart(
                             <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4035,7 +4035,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedObjectPart(
                             <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4047,7 +4047,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedPackagePart(
                             <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4061,7 +4061,7 @@ impl PartRef {
           return Some(
                         PartRef::PivotTableCacheDefinitionPart(
                             <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4075,7 +4075,7 @@ impl PartRef {
           return Some(
                         PartRef::PivotTableCacheRecordsPart(
                             <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4089,7 +4089,7 @@ impl PartRef {
           return Some(
                         PartRef::PivotTablePart(
                             <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4103,7 +4103,7 @@ impl PartRef {
           return Some(
                         PartRef::PresentationPropertiesPart(
                             <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4117,7 +4117,7 @@ impl PartRef {
           return Some(
                         PartRef::SpreadsheetPrinterSettingsPart(
                             <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4129,7 +4129,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingPrinterSettingsPart(
                             <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4143,7 +4143,7 @@ impl PartRef {
           return Some(
                         PartRef::QueryTablePart(
                             <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4155,7 +4155,7 @@ impl PartRef {
           return Some(
                         PartRef::MailMergeRecipientDataPart(
                             <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4169,7 +4169,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookRevisionHeaderPart(
                             <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4183,7 +4183,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookRevisionLogPart(
                             <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4197,7 +4197,7 @@ impl PartRef {
           return Some(
                         PartRef::DocumentSettingsPart(
                             <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4211,7 +4211,7 @@ impl PartRef {
           return Some(
                         PartRef::SharedStringTablePart(
                             <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4225,7 +4225,7 @@ impl PartRef {
           return Some(
                         PartRef::CellMetadataPart(
                             <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4239,7 +4239,7 @@ impl PartRef {
           return Some(
                         PartRef::SlidePart(
                             <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4253,7 +4253,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideLayoutPart(
                             <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4267,7 +4267,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideMasterPart(
                             <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4281,7 +4281,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideSyncDataPart(
                             <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4295,7 +4295,7 @@ impl PartRef {
           return Some(
                         PartRef::StyleDefinitionsPart(
                             <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4307,7 +4307,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookStylesPart(
                             <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4321,7 +4321,7 @@ impl PartRef {
           return Some(
                         PartRef::TableDefinitionPart(
                             <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4335,7 +4335,7 @@ impl PartRef {
           return Some(
                         PartRef::SingleCellTablePart(
                             <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4349,7 +4349,7 @@ impl PartRef {
           return Some(
                         PartRef::TableStylesPart(
                             <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4363,7 +4363,7 @@ impl PartRef {
           return Some(
                         PartRef::UserDefinedTagsPart(
                             <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4375,7 +4375,7 @@ impl PartRef {
           return Some(
                         PartRef::ThemePart(
                             <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4388,7 +4388,7 @@ impl PartRef {
           return Some(
                         PartRef::ThemeOverridePart(
                             <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4402,7 +4402,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookUserDataPart(
                             <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4416,7 +4416,7 @@ impl PartRef {
           return Some(
                         PartRef::ViewPropertiesPart(
                             <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4428,7 +4428,7 @@ impl PartRef {
           return Some(
                         PartRef::VmlDrawingPart(
                             <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4442,7 +4442,7 @@ impl PartRef {
           return Some(
                         PartRef::VolatileDependenciesPart(
                             <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4456,7 +4456,7 @@ impl PartRef {
           return Some(
                         PartRef::WebSettingsPart(
                             <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4470,7 +4470,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetPart(
                             <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4482,7 +4482,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomXmlMappingsPart(
                             <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4495,7 +4495,7 @@ impl PartRef {
           return Some(
                         PartRef::DigitalSignatureOriginPart(
                             <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4509,7 +4509,7 @@ impl PartRef {
           return Some(
                         PartRef::XmlSignaturePart(
                             <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4521,7 +4521,7 @@ impl PartRef {
           return Some(
                         PartRef::CoreFilePropertiesPart(
                             <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4533,7 +4533,7 @@ impl PartRef {
           return Some(
                         PartRef::ThumbnailPart(
                             <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4553,7 +4553,7 @@ impl PartRef {
           return Some(
                         PartRef::AlternativeFormatImportPart(
                             <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4571,7 +4571,7 @@ impl PartRef {
           return Some(
                         PartRef::CalculationChainPart(
                             <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4589,7 +4589,7 @@ impl PartRef {
           return Some(
                         PartRef::CellMetadataPart(
                             <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4608,7 +4608,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartColorStylePart(
                             <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4626,7 +4626,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartDrawingPart(
                             <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4644,7 +4644,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartPart(
                             <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4663,7 +4663,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartStylePart(
                             <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4681,7 +4681,7 @@ impl PartRef {
           return Some(
                         PartRef::ChartsheetPart(
                             <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4699,7 +4699,7 @@ impl PartRef {
           return Some(
                         PartRef::CommentAuthorsPart(
                             <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4717,7 +4717,7 @@ impl PartRef {
           return Some(
                         PartRef::ConnectionsPart(
                             <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4736,7 +4736,7 @@ impl PartRef {
           return Some(
                         PartRef::ControlPropertiesPart(
                             <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4754,7 +4754,7 @@ impl PartRef {
           return Some(
                         PartRef::CoreFilePropertiesPart(
                             <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4773,7 +4773,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomDataPart(
                             <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4792,7 +4792,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomDataPropertiesPart(
                             <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4810,7 +4810,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomFilePropertiesPart(
                             <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4828,7 +4828,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomPropertyPart(
                             <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4846,7 +4846,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomXmlMappingsPart(
                             <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4864,7 +4864,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomXmlPart(
                             <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4882,7 +4882,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomXmlPropertiesPart(
                             <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4900,7 +4900,7 @@ impl PartRef {
           return Some(
                         PartRef::CustomizationPart(
                             <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4918,7 +4918,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramColorsPart(
                             <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4936,7 +4936,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramDataPart(
                             <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4954,7 +4954,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramLayoutDefinitionPart(
                             <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4973,7 +4973,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramPersistLayoutPart(
                             <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -4991,7 +4991,7 @@ impl PartRef {
           return Some(
                         PartRef::DiagramStylePart(
                             <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5009,7 +5009,7 @@ impl PartRef {
           return Some(
                         PartRef::DialogsheetPart(
                             <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5027,7 +5027,7 @@ impl PartRef {
           return Some(
                         PartRef::DigitalSignatureOriginPart(
                             <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5045,7 +5045,7 @@ impl PartRef {
           return Some(
                         PartRef::DocumentSettingsPart(
                             <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5064,7 +5064,7 @@ impl PartRef {
           return Some(
                         PartRef::DocumentTasksPart(
                             <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5082,7 +5082,7 @@ impl PartRef {
           return Some(
                         PartRef::DrawingsPart(
                             <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5100,7 +5100,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedControlPersistenceBinaryDataPart(
                             <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5118,7 +5118,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedControlPersistencePart(
                             <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5136,7 +5136,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedObjectPart(
                             <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5154,7 +5154,7 @@ impl PartRef {
           return Some(
                         PartRef::EmbeddedPackagePart(
                             <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5172,7 +5172,7 @@ impl PartRef {
           return Some(
                         PartRef::EndnotesPart(
                             <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5190,7 +5190,7 @@ impl PartRef {
           return Some(
                         PartRef::ExcelAttachedToolbarsPart(
                             <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5209,7 +5209,7 @@ impl PartRef {
           return Some(
                         PartRef::ExtendedChartPart(
                             <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5227,7 +5227,7 @@ impl PartRef {
           return Some(
                         PartRef::ExtendedFilePropertiesPart(
                             <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5245,7 +5245,7 @@ impl PartRef {
           return Some(
                         PartRef::ExternalWorkbookPart(
                             <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5264,7 +5264,7 @@ impl PartRef {
           return Some(
                         PartRef::FeaturePropertyBagsPart(
                             <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5282,7 +5282,7 @@ impl PartRef {
           return Some(
                         PartRef::FontPart(
                             <crate::parts::font_part::FontPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5300,7 +5300,7 @@ impl PartRef {
           return Some(
                         PartRef::FontTablePart(
                             <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5318,7 +5318,7 @@ impl PartRef {
           return Some(
                         PartRef::FooterPart(
                             <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5336,7 +5336,7 @@ impl PartRef {
           return Some(
                         PartRef::FootnotesPart(
                             <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5354,7 +5354,7 @@ impl PartRef {
           return Some(
                         PartRef::GlossaryDocumentPart(
                             <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5372,7 +5372,7 @@ impl PartRef {
           return Some(
                         PartRef::HandoutMasterPart(
                             <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5390,7 +5390,7 @@ impl PartRef {
           return Some(
                         PartRef::HeaderPart(
                             <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5408,7 +5408,7 @@ impl PartRef {
           return Some(
                         PartRef::ImagePart(
                             <crate::parts::image_part::ImagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5426,7 +5426,7 @@ impl PartRef {
           return Some(
                         PartRef::InternationalMacroSheetPart(
                             <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5445,7 +5445,7 @@ impl PartRef {
           return Some(
                         PartRef::LabelInfoPart(
                             <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5463,7 +5463,7 @@ impl PartRef {
           return Some(
                         PartRef::LegacyDiagramTextInfoPart(
                             <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5481,7 +5481,7 @@ impl PartRef {
           return Some(
                         PartRef::LegacyDiagramTextPart(
                             <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5499,7 +5499,7 @@ impl PartRef {
           return Some(
                         PartRef::MacroSheetPart(
                             <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5517,7 +5517,7 @@ impl PartRef {
           return Some(
                         PartRef::MailMergeRecipientDataPart(
                             <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5535,7 +5535,7 @@ impl PartRef {
           return Some(
                         PartRef::MainDocumentPart(
                             <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5554,7 +5554,7 @@ impl PartRef {
           return Some(
                         PartRef::Model3DReferenceRelationshipPart(
                             <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5573,7 +5573,7 @@ impl PartRef {
           return Some(
                         PartRef::NamedSheetViewsPart(
                             <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5591,7 +5591,7 @@ impl PartRef {
           return Some(
                         PartRef::NotesMasterPart(
                             <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5609,7 +5609,7 @@ impl PartRef {
           return Some(
                         PartRef::NotesSlidePart(
                             <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5627,7 +5627,7 @@ impl PartRef {
           return Some(
                         PartRef::NumberingDefinitionsPart(
                             <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5645,7 +5645,7 @@ impl PartRef {
           return Some(
                         PartRef::PivotTableCacheDefinitionPart(
                             <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5663,7 +5663,7 @@ impl PartRef {
           return Some(
                         PartRef::PivotTableCacheRecordsPart(
                             <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5681,7 +5681,7 @@ impl PartRef {
           return Some(
                         PartRef::PivotTablePart(
                             <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5700,7 +5700,7 @@ impl PartRef {
           return Some(
                         PartRef::PowerPointAuthorsPart(
                             <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5719,7 +5719,7 @@ impl PartRef {
           return Some(
                         PartRef::PowerPointCommentPart(
                             <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5737,7 +5737,7 @@ impl PartRef {
           return Some(
                         PartRef::PresentationPart(
                             <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5755,7 +5755,7 @@ impl PartRef {
           return Some(
                         PartRef::PresentationPropertiesPart(
                             <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5773,7 +5773,7 @@ impl PartRef {
           return Some(
                         PartRef::QueryTablePart(
                             <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5791,7 +5791,7 @@ impl PartRef {
           return Some(
                         PartRef::QuickAccessToolbarCustomizationsPart(
                             <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5810,7 +5810,7 @@ impl PartRef {
           return Some(
                         PartRef::RdArrayPart(
                             <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5829,7 +5829,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValuePart(
                             <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5848,7 +5848,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValueStructurePart(
                             <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5867,7 +5867,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValueTypesPart(
                             <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5886,7 +5886,7 @@ impl PartRef {
           return Some(
                         PartRef::RdRichValueWebImagePart(
                             <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5905,7 +5905,7 @@ impl PartRef {
           return Some(
                         PartRef::RdSupportingPropertyBagPart(
                             <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5924,7 +5924,7 @@ impl PartRef {
           return Some(
                         PartRef::RdSupportingPropertyBagStructurePart(
                             <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5943,7 +5943,7 @@ impl PartRef {
           return Some(
                         PartRef::RibbonAndBackstageCustomizationsPart(
                             <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5961,7 +5961,7 @@ impl PartRef {
           return Some(
                         PartRef::RibbonExtensibilityPart(
                             <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5980,7 +5980,7 @@ impl PartRef {
           return Some(
                         PartRef::RichStylesPart(
                             <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -5998,7 +5998,7 @@ impl PartRef {
           return Some(
                         PartRef::SharedStringTablePart(
                             <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6016,7 +6016,7 @@ impl PartRef {
           return Some(
                         PartRef::SingleCellTablePart(
                             <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6035,7 +6035,7 @@ impl PartRef {
           return Some(
                         PartRef::SlicerCachePart(
                             <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6054,7 +6054,7 @@ impl PartRef {
           return Some(
                         PartRef::SlicersPart(
                             <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6072,7 +6072,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideCommentsPart(
                             <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6090,7 +6090,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideLayoutPart(
                             <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6108,7 +6108,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideMasterPart(
                             <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6126,7 +6126,7 @@ impl PartRef {
           return Some(
                         PartRef::SlidePart(
                             <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6144,7 +6144,7 @@ impl PartRef {
           return Some(
                         PartRef::SlideSyncDataPart(
                             <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6162,7 +6162,7 @@ impl PartRef {
           return Some(
                         PartRef::SpreadsheetPrinterSettingsPart(
                             <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6180,7 +6180,7 @@ impl PartRef {
           return Some(
                         PartRef::StyleDefinitionsPart(
                             <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6199,7 +6199,7 @@ impl PartRef {
           return Some(
                         PartRef::StylesWithEffectsPart(
                             <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6217,7 +6217,7 @@ impl PartRef {
           return Some(
                         PartRef::TableDefinitionPart(
                             <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6235,7 +6235,7 @@ impl PartRef {
           return Some(
                         PartRef::TableStylesPart(
                             <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6253,7 +6253,7 @@ impl PartRef {
           return Some(
                         PartRef::ThemeOverridePart(
                             <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6271,7 +6271,7 @@ impl PartRef {
           return Some(
                         PartRef::ThemePart(
                             <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6289,7 +6289,7 @@ impl PartRef {
           return Some(
                         PartRef::ThumbnailPart(
                             <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6308,7 +6308,7 @@ impl PartRef {
           return Some(
                         PartRef::TimeLineCachePart(
                             <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6327,7 +6327,7 @@ impl PartRef {
           return Some(
                         PartRef::TimeLinePart(
                             <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6345,7 +6345,7 @@ impl PartRef {
           return Some(
                         PartRef::UserDefinedTagsPart(
                             <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6363,7 +6363,7 @@ impl PartRef {
           return Some(
                         PartRef::VbaDataPart(
                             <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6381,7 +6381,7 @@ impl PartRef {
           return Some(
                         PartRef::VbaProjectPart(
                             <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6399,7 +6399,7 @@ impl PartRef {
           return Some(
                         PartRef::ViewPropertiesPart(
                             <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6417,7 +6417,7 @@ impl PartRef {
           return Some(
                         PartRef::VmlDrawingPart(
                             <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6435,7 +6435,7 @@ impl PartRef {
           return Some(
                         PartRef::VolatileDependenciesPart(
                             <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6454,7 +6454,7 @@ impl PartRef {
           return Some(
                         PartRef::WebExTaskpanesPart(
                             <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6473,7 +6473,7 @@ impl PartRef {
           return Some(
                         PartRef::WebExtensionPart(
                             <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6491,7 +6491,7 @@ impl PartRef {
           return Some(
                         PartRef::WebSettingsPart(
                             <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6509,7 +6509,7 @@ impl PartRef {
           return Some(
                         PartRef::WordAttachedToolbarsPart(
                             <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6528,7 +6528,7 @@ impl PartRef {
           return Some(
                         PartRef::WordCommentsExtensiblePart(
                             <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6547,7 +6547,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingCommentsExPart(
                             <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6566,7 +6566,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingCommentsIdsPart(
                             <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6584,7 +6584,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingCommentsPart(
                             <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6603,7 +6603,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingPeoplePart(
                             <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6621,7 +6621,7 @@ impl PartRef {
           return Some(
                         PartRef::WordprocessingPrinterSettingsPart(
                             <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6639,7 +6639,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookPart(
                             <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6658,7 +6658,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookPersonPart(
                             <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6676,7 +6676,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookRevisionHeaderPart(
                             <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6694,7 +6694,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookRevisionLogPart(
                             <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6712,7 +6712,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookStylesPart(
                             <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6730,7 +6730,7 @@ impl PartRef {
           return Some(
                         PartRef::WorkbookUserDataPart(
                             <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6748,7 +6748,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetCommentsPart(
                             <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6766,7 +6766,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetPart(
                             <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6784,7 +6784,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetSortMapPart(
                             <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6803,7 +6803,7 @@ impl PartRef {
           return Some(
                         PartRef::WorksheetThreadedCommentsPart(
                             <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6821,7 +6821,7 @@ impl PartRef {
           return Some(
                         PartRef::XmlSignaturePart(
                             <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                                package.storage(),
+                                crate::sdk::SdkPackageInternal::storage(package),
                                 part_id,
                             ),
                         ),
@@ -6832,7 +6832,7 @@ impl PartRef {
     Some(
             PartRef::ExtendedPart(
                 <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartHandle>::from_part_id_with_relationships(
-                    package.storage(),
+                    crate::sdk::SdkPackageInternal::storage(package),
                     part_id,
                 ),
             ),
@@ -15059,7 +15059,7 @@ pub trait PartRootCache: crate::sdk::SdkPackage {
     if let Some(root_element) = self.root_element(part_id) {
       root_element.to_xml_bytes()
     } else {
-      let part = crate::sdk::SdkPackage::storage(self)
+      let part = crate::sdk::SdkPackageInternal::storage(self)
         .part(part_id)
         .ok_or_else(|| {
           crate::common::SdkError::CommonError(format!(
@@ -15081,15 +15081,15 @@ where
     .compression_method(zip::CompressionMethod::Deflated)
     .unix_permissions(0o755);
   let mut entry_set = std::collections::HashSet::<String>::new();
-  let storage = crate::sdk::SdkPackage::storage(package);
+  let storage = crate::sdk::SdkPackageInternal::storage(package);
   let mut modeled_part_relationships = std::collections::HashMap::new();
-  crate::sdk::SdkPackage::collect_modeled_part_relationships(
+  crate::sdk::SdkPackageInternal::collect_modeled_part_relationships(
     package,
     &mut modeled_part_relationships,
   )?;
   zip.start_file("[Content_Types].xml", options)?;
   zip.write_all(&storage.content_types().to_xml_bytes()?)?;
-  let package_relationships = crate::sdk::SdkPackage::modeled_relationships(package)?;
+  let package_relationships = crate::sdk::SdkPackageInternal::modeled_relationships(package)?;
   if !package_relationships.is_empty() {
     if entry_set.insert("_rels".to_string()) {
       zip.add_directory("_rels", options)?;

@@ -759,12 +759,12 @@ impl StoredPart {
   }
 
   #[inline]
-  pub fn relationships(&self) -> &RelationshipSet {
+  pub(crate) fn relationships(&self) -> &RelationshipSet {
     &self.relationships
   }
 
   #[inline]
-  pub fn relationships_mut(&mut self) -> &mut RelationshipSet {
+  pub(crate) fn relationships_mut(&mut self) -> &mut RelationshipSet {
     &mut self.relationships
   }
 
@@ -871,12 +871,12 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn package_relationships(&self) -> &RelationshipSet {
+  pub(crate) fn package_relationships(&self) -> &RelationshipSet {
     &self.package_relationships
   }
 
   #[inline]
-  pub fn package_relationships_mut(&mut self) -> &mut RelationshipSet {
+  pub(crate) fn package_relationships_mut(&mut self) -> &mut RelationshipSet {
     &mut self.package_relationships
   }
 
@@ -923,12 +923,12 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn relationships(&self, part_id: PartId) -> Option<&RelationshipSet> {
+  pub(crate) fn relationships(&self, part_id: PartId) -> Option<&RelationshipSet> {
     self.part(part_id).map(StoredPart::relationships)
   }
 
   #[inline]
-  pub fn relationships_mut(&mut self, part_id: PartId) -> Option<&mut RelationshipSet> {
+  pub(crate) fn relationships_mut(&mut self, part_id: PartId) -> Option<&mut RelationshipSet> {
     self.part_mut(part_id).map(StoredPart::relationships_mut)
   }
 

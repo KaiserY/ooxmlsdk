@@ -121,6 +121,36 @@ fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
 }
 
 #[test]
+fn wordprocessing_part_unload_root_element_matches_openxml_part_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs
+  //   UnloadRootElementTest
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  assert!(!main_part.is_root_element_loaded(&package));
+  assert!(main_part.unload_root_element(&mut package).is_none());
+
+  let original_child_count = {
+    let root = main_part.root_element(&mut package).unwrap();
+    main_document_body_child_count(root)
+  };
+  assert!(original_child_count > 0);
+  assert!(main_part.is_root_element_loaded(&package));
+
+  let unloaded_root = main_part.unload_root_element(&mut package).unwrap();
+  assert_eq!(unloaded_root.part_type_name(), "MainDocumentPart");
+  assert!(!main_part.is_root_element_loaded(&package));
+
+  let reloaded_child_count = {
+    let root = main_part.root_element(&mut package).unwrap();
+    main_document_body_child_count(root)
+  };
+  assert_eq!(reloaded_child_count, original_child_count);
+  assert!(main_part.is_root_element_loaded(&package));
+}
+
+#[test]
 fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs
   //   OpenMcPackage

@@ -32,11 +32,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 ## Summary
 
 - `blocked_by_api`: 75
-- `covered`: 34
+- `covered`: 35
 - `covered_by_doc_samples`: 38
 - `missing`: 85
 - `not_applicable`: 121
-- `partial`: 633
+- `partial`: 632
 
 ## Tests
 
@@ -905,7 +905,7 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs:200` `ChangePartIdTest` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs:244` `AddPartTest` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs:288` `DeleteInvalidPartIdSafely` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs:303` `UnloadRootElementTest` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs:303` `UnloadRootElementTest` | Fact | `covered` | `package_parts` | Covered by `packages.rs::wordprocessing_part_unload_root_element_matches_openxml_part_test` through public lazy root load/unload APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs:326` `SavingPartDoesNotUnloadRoot` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs:21` `DomReaderBasicTest` | Fact | `blocked_by_api` | `reader_writer` | Requires public streaming reader/writer API, or explicit decision to cover via parse/write only |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlReaderTest.cs:74` `DomReaderRootCaseTest` | Fact | `blocked_by_api` | `reader_writer` | Requires public streaming reader/writer API, or explicit decision to cover via parse/write only |

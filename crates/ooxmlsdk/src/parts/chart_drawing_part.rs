@@ -11,26 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml";
 pub const TARGET_NAME: &str = "drawing";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
-  crate::sdk::PartChildDescriptor::new(
-    "chart_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-    "crate::parts::chart_part::ChartPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "extended_chart_part",
-    "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    "crate::parts::extended_chart_part::ExtendedChartPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "image_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    "crate::parts::image_part::ImagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartDrawingPart {
   pub(crate) relationship_id: Option<String>,

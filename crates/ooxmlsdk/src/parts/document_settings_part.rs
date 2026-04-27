@@ -11,20 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml";
 pub const TARGET_NAME: &str = "settings";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
-  crate::sdk::PartChildDescriptor::new(
-    "mail_merge_recipient_data_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
-    "crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "image_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    "crate::parts::image_part::ImagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DocumentSettingsPart {
   pub(crate) relationship_id: Option<String>,

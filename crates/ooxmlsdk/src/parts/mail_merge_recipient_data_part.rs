@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "recipients";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct MailMergeRecipientDataPart {
   pub(crate) relationship_id: Option<String>,

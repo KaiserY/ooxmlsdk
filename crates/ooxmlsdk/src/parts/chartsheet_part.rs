@@ -11,32 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 pub const TARGET_NAME: &str = "sheet";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
-  crate::sdk::PartChildDescriptor::new(
-    "spreadsheet_printer_settings_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    "crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "drawings_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    "crate::parts::drawings_part::DrawingsPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "vml_drawing_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    "crate::parts::vml_drawing_part::VmlDrawingPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "image_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    "crate::parts::image_part::ImagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartsheetPart {
   pub(crate) relationship_id: Option<String>,

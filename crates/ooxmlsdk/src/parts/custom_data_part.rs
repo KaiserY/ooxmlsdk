@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "customData";
 pub const CONTENT_TYPE: &str = "application/binary";
 pub const TARGET_NAME: &str = "customData";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomDataPart {
   pub(crate) relationship_id: Option<String>,

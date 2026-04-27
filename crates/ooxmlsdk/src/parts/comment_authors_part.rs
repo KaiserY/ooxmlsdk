@@ -11,7 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml";
 pub const TARGET_NAME: &str = "commentAuthors";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CommentAuthorsPart {
   pub(crate) relationship_id: Option<String>,

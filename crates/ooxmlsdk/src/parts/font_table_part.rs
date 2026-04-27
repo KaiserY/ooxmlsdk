@@ -11,13 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml";
 pub const TARGET_NAME: &str = "fontTable";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "font_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-    "crate::parts::font_part::FontPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct FontTablePart {
   pub(crate) relationship_id: Option<String>,

@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "richData";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.rdsupportingpropertybag+xml";
 pub const TARGET_NAME: &str = "rdsupportingpropertybag";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdSupportingPropertyBagPart {
   pub(crate) relationship_id: Option<String>,

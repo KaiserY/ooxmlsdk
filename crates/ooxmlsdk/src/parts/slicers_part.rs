@@ -9,7 +9,6 @@ pub const PATH_PREFIX: &str = "../slicers";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.slicer+xml";
 pub const TARGET_NAME: &str = "slicer";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SlicersPart {
   pub(crate) relationship_id: Option<String>,

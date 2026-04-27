@@ -5,11 +5,7 @@ use quick_xml::events::attributes::Attribute;
 pub mod data_part;
 mod error;
 #[cfg(feature = "parts")]
-pub mod extended_part;
-#[cfg(feature = "parts")]
 mod package;
-#[cfg(feature = "parts")]
-mod part;
 mod xml;
 
 #[cfg(feature = "parts")]
@@ -21,8 +17,6 @@ pub use error::{
   validation_error,
 };
 #[cfg(feature = "parts")]
-pub use extended_part::ExtendedPart;
-#[cfg(feature = "parts")]
 pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub(crate) use package::{
@@ -33,12 +27,6 @@ pub(crate) use package::{
 pub use package::{
   PackageOpenMode, PartId, ReferenceRelationshipKind, Relationship, RelationshipRef,
   RelationshipTargetKind,
-};
-#[cfg(feature = "parts")]
-pub use part::{
-  load_data_part_reference, load_extended_part, load_part_relationships, load_typed_child_part,
-  resolve_relationship_part_path, save_data_part_reference, save_part_relationships,
-  save_typed_child_part,
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
@@ -251,7 +239,7 @@ pub fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
 }
 
 #[inline]
-pub fn part_descriptor_matches(
+pub(crate) fn part_descriptor_matches(
   actual_relationship_type: &str,
   actual_content_type: &str,
   actual_path: &str,

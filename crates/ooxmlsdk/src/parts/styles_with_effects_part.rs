@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-word.stylesWithEffects+xml";
 pub const TARGET_NAME: &str = "stylesWithEffects";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct StylesWithEffectsPart {
   pub(crate) relationship_id: Option<String>,

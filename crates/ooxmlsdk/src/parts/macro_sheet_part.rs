@@ -10,56 +10,6 @@ pub const PATH_PREFIX: &str = "macrosheets";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.macrosheet+xml";
 pub const TARGET_NAME: &str = "sheet";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
-  crate::sdk::PartChildDescriptor::new(
-    "spreadsheet_printer_settings_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    "crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "drawings_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    "crate::parts::drawings_part::DrawingsPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "vml_drawing_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    "crate::parts::vml_drawing_part::VmlDrawingPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "worksheet_comments_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
-    "crate::parts::worksheet_comments_part::WorksheetCommentsPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "custom_property_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty",
-    "crate::parts::custom_property_part::CustomPropertyPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "embedded_object_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    "crate::parts::embedded_object_part::EmbeddedObjectPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "embedded_package_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-    "crate::parts::embedded_package_part::EmbeddedPackagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "image_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    "crate::parts::image_part::ImagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct MacroSheetPart {
   pub(crate) relationship_id: Option<String>,

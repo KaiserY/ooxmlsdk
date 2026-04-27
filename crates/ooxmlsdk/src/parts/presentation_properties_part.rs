@@ -11,7 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml";
 pub const TARGET_NAME: &str = "presProps";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PresentationPropertiesPart {
   pub(crate) relationship_id: Option<String>,

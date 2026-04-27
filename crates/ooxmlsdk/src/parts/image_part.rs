@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "../media";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "image";
 pub const EXTENSION: &str = ".bin";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ImagePart {
   pub(crate) relationship_id: Option<String>,

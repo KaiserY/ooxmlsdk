@@ -757,21 +757,6 @@ fn infer_part_field_kind_and_inner_type(field: &syn::Field) -> Option<(PartChild
   None
 }
 
-fn part_child_cardinality_tokens(kind: PartChildKind) -> proc_macro2::TokenStream {
-  match kind {
-    PartChildKind::Optional => quote! { crate::sdk::PartChildCardinality::Optional },
-    PartChildKind::Required => quote! { crate::sdk::PartChildCardinality::Required },
-    PartChildKind::Repeated => quote! { crate::sdk::PartChildCardinality::Repeated },
-    PartChildKind::RequiredRepeated => {
-      quote! { crate::sdk::PartChildCardinality::RequiredRepeated }
-    }
-  }
-}
-
-fn part_child_type_name(ty: &Type) -> String {
-  quote!(#ty).to_string().replace(" :: ", "::")
-}
-
 fn is_string_type(ty: &Type) -> bool {
   is_terminal_type(ty, "String")
 }

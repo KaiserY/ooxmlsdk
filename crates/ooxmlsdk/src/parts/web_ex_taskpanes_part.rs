@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = "../webextensions";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.webextensiontaskpanes+xml";
 pub const TARGET_NAME: &str = "taskpanes";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "web_extension_parts",
-    "http://schemas.microsoft.com/office/2011/relationships/webextension",
-    "crate::parts::web_extension_part::WebExtensionPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebExTaskpanesPart {
   pub(crate) relationship_id: Option<String>,

@@ -11,13 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml";
 pub const TARGET_NAME: &str = "revisionHeaders";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "workbook_revision_log_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
-    "crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorkbookRevisionHeaderPart {
   pub(crate) relationship_id: Option<String>,

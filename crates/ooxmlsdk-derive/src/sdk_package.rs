@@ -165,33 +165,6 @@ fn package_relationship_dispatch_tokens(
   }
 }
 
-fn package_child_descriptors_tokens(child_infos: &[PackageChildInfo]) -> proc_macro2::TokenStream {
-  if child_infos.is_empty() {
-    return quote! {};
-  }
-
-  let descriptors = child_infos.iter().map(|child| {
-    let field_name = child.field_ident.to_string();
-    let relationship_type = child.relationship_type.as_str();
-    let child_part_type = part_child_type_name(&child.part_ty);
-    let cardinality = part_child_cardinality_tokens(child.kind);
-    quote! {
-      crate::sdk::PartChildDescriptor::new(
-        #field_name,
-        #relationship_type,
-        #child_part_type,
-        #cardinality,
-      )
-    }
-  });
-
-  quote! {
-    const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = &[
-      #( #descriptors, )*
-    ];
-  }
-}
-
 pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let Data::Struct(data_struct) = &input.data else {
@@ -430,11 +403,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
     }
   };
-  let child_descriptors_assoc = package_child_descriptors_tokens(&child_infos);
   Ok(quote! {
     impl crate::sdk::SdkPackageInternal for #ident {
-      #child_descriptors_assoc
-
       #[inline]
       fn storage(&self) -> &crate::common::SdkPackageStorage {
         &self.#storage_ident

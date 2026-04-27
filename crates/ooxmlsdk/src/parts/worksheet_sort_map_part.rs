@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.wsSortMap+xml";
 pub const TARGET_NAME: &str = "wsSortMap";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorksheetSortMapPart {
   pub(crate) relationship_id: Option<String>,

@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = "customUI";
 pub const CONTENT_TYPE: &str = "application/xml";
 pub const TARGET_NAME: &str = "customUI";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "image_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    "crate::parts::image_part::ImagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RibbonAndBackstageCustomizationsPart {
   pub(crate) relationship_id: Option<String>,

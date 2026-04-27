@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = "../customXml";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "item";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "custom_xml_properties_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
-    "crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart",
-    crate::sdk::PartChildCardinality::Optional,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomXmlPart {
   pub(crate) relationship_id: Option<String>,

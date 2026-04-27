@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "docMetadata";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.classificationlabels+xml";
 pub const TARGET_NAME: &str = "LabelInfo";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct LabelInfoPart {
   pub(crate) relationship_id: Option<String>,

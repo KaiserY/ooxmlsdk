@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "richData";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.rdrichvalue+xml";
 pub const TARGET_NAME: &str = "rdrichvalue";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdRichValuePart {
   pub(crate) relationship_id: Option<String>,

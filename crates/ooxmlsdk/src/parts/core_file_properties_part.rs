@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "docProps";
 pub const CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.core-properties+xml";
 pub const TARGET_NAME: &str = "core";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CoreFilePropertiesPart {
   pub(crate) relationship_id: Option<String>,

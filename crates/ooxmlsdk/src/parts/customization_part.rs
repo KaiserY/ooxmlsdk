@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-word.keyMapCustomizations+xml";
 pub const TARGET_NAME: &str = "customizations";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "word_attached_toolbars_part",
-    "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
-    "crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart",
-    crate::sdk::PartChildCardinality::Optional,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomizationPart {
   pub(crate) relationship_id: Option<String>,

@@ -1,32 +1,4 @@
 #[cfg(feature = "parts")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PartDescriptor {
-  pub relationship_type: &'static str,
-  pub path_prefix: &'static str,
-  pub content_type: &'static str,
-  pub target_name: &'static str,
-  pub extension: &'static str,
-}
-
-#[cfg(feature = "parts")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PartChildDescriptor {
-  pub field_name: &'static str,
-  pub relationship_type: &'static str,
-  pub child_part_type: &'static str,
-  pub cardinality: PartChildCardinality,
-}
-
-#[cfg(feature = "parts")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PartChildCardinality {
-  Optional,
-  Required,
-  Repeated,
-  RequiredRepeated,
-}
-
-#[cfg(feature = "parts")]
 pub enum OptionalPartKind {}
 
 #[cfg(feature = "parts")]
@@ -237,59 +209,6 @@ fn is_data_part_reference_relationship(relationship: &crate::common::Relationshi
   )
 }
 
-#[cfg(feature = "parts")]
-impl PartDescriptor {
-  pub const fn new(
-    relationship_type: &'static str,
-    path_prefix: &'static str,
-    content_type: &'static str,
-    target_name: &'static str,
-    extension: &'static str,
-  ) -> Self {
-    Self {
-      relationship_type,
-      path_prefix,
-      content_type,
-      target_name,
-      extension,
-    }
-  }
-}
-
-#[cfg(feature = "parts")]
-impl PartChildDescriptor {
-  pub const fn new(
-    field_name: &'static str,
-    relationship_type: &'static str,
-    child_part_type: &'static str,
-    cardinality: PartChildCardinality,
-  ) -> Self {
-    Self {
-      field_name,
-      relationship_type,
-      child_part_type,
-      cardinality,
-    }
-  }
-
-  #[inline]
-  pub const fn min_occurs_is_non_zero(&self) -> bool {
-    matches!(
-      self.cardinality,
-      PartChildCardinality::Required | PartChildCardinality::RequiredRepeated
-    )
-  }
-
-  #[inline]
-  pub const fn max_occurs_great_than_one(&self) -> bool {
-    matches!(
-      self.cardinality,
-      PartChildCardinality::Repeated | PartChildCardinality::RequiredRepeated
-    )
-  }
-}
-
-#[cfg(feature = "parts")]
 pub fn default_main_part_content_type<T: SdkPart>() -> Option<&'static str> {
   match (T::RELATIONSHIP_TYPE, T::TARGET_NAME) {
     (
@@ -737,8 +656,6 @@ impl MediaDataPartType {
 
 #[cfg(feature = "parts")]
 pub(crate) trait SdkPackageInternal {
-  const CHILD_DESCRIPTORS: &'static [PartChildDescriptor] = &[];
-
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 
   fn storage_mut(&mut self) -> &mut crate::common::SdkPackageStorage;
@@ -808,14 +725,6 @@ pub(crate) trait SdkPackageInternal {
 #[cfg(feature = "parts")]
 #[allow(private_bounds)]
 pub trait SdkPackage: SdkPackageInternal {
-  #[inline(always)]
-  fn child_descriptors() -> &'static [PartChildDescriptor]
-  where
-    Self: Sized,
-  {
-    <Self as SdkPackageInternal>::CHILD_DESCRIPTORS
-  }
-
   #[inline]
   fn add_external_relationship(
     &mut self,
@@ -1539,13 +1448,11 @@ pub trait SdkPackage: SdkPackageInternal {
 #[cfg(feature = "parts")]
 #[allow(private_bounds)]
 pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
-  const CHILD_DESCRIPTORS: &'static [PartChildDescriptor] = &[];
-  const DESCRIPTOR: PartDescriptor;
-  const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
-  const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
-  const CONTENT_TYPE: &'static str = Self::DESCRIPTOR.content_type;
-  const TARGET_NAME: &'static str = Self::DESCRIPTOR.target_name;
-  const EXTENSION: &'static str = Self::DESCRIPTOR.extension;
+  const RELATIONSHIP_TYPE: &'static str;
+  const PATH_PREFIX: &'static str;
+  const CONTENT_TYPE: &'static str;
+  const TARGET_NAME: &'static str;
+  const EXTENSION: &'static str;
 
   fn from_part_id(part_id: crate::common::PartId) -> Self;
 
@@ -1559,11 +1466,6 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   fn part_id(&self) -> crate::common::PartId;
 
   fn relationship_id(&self) -> Option<&str>;
-
-  #[inline(always)]
-  fn child_descriptors() -> &'static [PartChildDescriptor] {
-    Self::CHILD_DESCRIPTORS
-  }
 
   #[inline(always)]
   fn relationship_type() -> &'static str {
@@ -3369,43 +3271,6 @@ pub(crate) trait SdkPartInternal: Clone + Sized + 'static {
     Self: SdkPart,
   {
     crate::sdk::SdkPackageInternal::storage_mut(package).relationships_mut(self.part_id())
-  }
-}
-
-#[cfg(feature = "parts")]
-pub trait SdkPartTree: Sized {
-  const DESCRIPTOR: PartDescriptor;
-  const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
-  const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
-  const CONTENT_TYPE: &'static str = Self::DESCRIPTOR.content_type;
-  const TARGET_NAME: &'static str = Self::DESCRIPTOR.target_name;
-  const EXTENSION: &'static str = Self::DESCRIPTOR.extension;
-
-  fn new_from_archive<R: std::io::Read + std::io::Seek>(
-    parent_path: &str,
-    path: &str,
-    r_id: &str,
-    part_index: Option<usize>,
-    archive: &mut zip::ZipArchive<R>,
-    visited: &mut std::collections::HashSet<usize>,
-  ) -> Result<Self, crate::common::SdkError>;
-
-  fn save_zip<W: std::io::Write + std::io::Seek>(
-    &self,
-    parent_path: &str,
-    zip: &mut zip::ZipWriter<W>,
-    entry_set: &mut std::collections::HashSet<String>,
-    visited: &mut std::collections::HashSet<String>,
-  ) -> Result<(), crate::common::SdkError>;
-
-  #[inline(always)]
-  fn relationship_type() -> &'static str {
-    Self::RELATIONSHIP_TYPE
-  }
-
-  #[inline(always)]
-  fn path_prefix() -> &'static str {
-    Self::PATH_PREFIX
   }
 }
 

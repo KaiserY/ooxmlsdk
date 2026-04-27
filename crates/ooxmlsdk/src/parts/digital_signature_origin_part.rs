@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = "_xmlsignatures";
 pub const CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.digital-signature-origin";
 pub const TARGET_NAME: &str = "origin";
 pub const EXTENSION: &str = ".sigs";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "xml_signature_parts",
-    "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
-    "crate::parts::xml_signature_part::XmlSignaturePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DigitalSignatureOriginPart {
   pub(crate) relationship_id: Option<String>,

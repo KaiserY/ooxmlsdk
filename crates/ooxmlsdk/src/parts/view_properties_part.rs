@@ -11,13 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml";
 pub const TARGET_NAME: &str = "viewProps";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "slide_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-    "crate::parts::slide_part::SlidePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ViewPropertiesPart {
   pub(crate) relationship_id: Option<String>,

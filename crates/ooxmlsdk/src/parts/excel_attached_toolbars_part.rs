@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.attachedToolbars";
 pub const TARGET_NAME: &str = "attachedToolbars";
 pub const EXTENSION: &str = ".bin";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ExcelAttachedToolbarsPart {
   pub(crate) relationship_id: Option<String>,

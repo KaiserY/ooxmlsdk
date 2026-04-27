@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "ActiveXControl";
 pub const EXTENSION: &str = ".bin";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct EmbeddedControlPersistenceBinaryDataPart {
   pub(crate) relationship_id: Option<String>,

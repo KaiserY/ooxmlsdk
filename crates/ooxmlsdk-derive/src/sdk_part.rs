@@ -172,7 +172,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     });
     field_declarations.push(quote! {
       let (rels_path, relationships) =
-        crate::common::load_part_relationships(#path_ident, #archive_ident)?;
+        crate::common::part::load_part_relationships(#path_ident, #archive_ident)?;
     });
     self_field_values.push(quote! { rels_path });
     self_field_values.push(quote! { relationships });
@@ -230,7 +230,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Vec<#child_type> = vec![];
         });
         let load_child_tokens = quote! {
-          if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+          if let Some(loaded_child) = crate::common::part::load_typed_child_part::<_, #child_type>(
             &child_parent_path,
             relationship,
             #archive_ident,
@@ -249,7 +249,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
         child_save_stmts.push(quote! {
           for #child_item_ident in &self.#child_field_ident {
-            crate::common::save_typed_child_part(
+            crate::common::part::save_typed_child_part(
               #child_item_ident,
               &child_parent_path,
               zip,
@@ -278,7 +278,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
         let load_child_tokens = quote! {
-          if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+          if let Some(loaded_child) = crate::common::part::load_typed_child_part::<_, #child_type>(
             &child_parent_path,
             relationship,
             #archive_ident,
@@ -303,7 +303,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             ))?;
         });
         child_save_stmts.push(quote! {
-          crate::common::save_typed_child_part(
+          crate::common::part::save_typed_child_part(
             self.#child_field_ident.as_ref(),
             &child_parent_path,
             zip,
@@ -327,7 +327,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #child_field_ident: Option<std::boxed::Box<#child_type>> = None;
         });
         let load_child_tokens = quote! {
-          if let Some(loaded_child) = crate::common::load_typed_child_part::<_, #child_type>(
+          if let Some(loaded_child) = crate::common::part::load_typed_child_part::<_, #child_type>(
             &child_parent_path,
             relationship,
             #archive_ident,
@@ -346,7 +346,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
         child_save_stmts.push(quote! {
           if let Some(#child_item_ident) = &self.#child_field_ident {
-            crate::common::save_typed_child_part(
+            crate::common::part::save_typed_child_part(
               #child_item_ident.as_ref(),
               &child_parent_path,
               zip,
@@ -409,7 +409,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #data_ref_field_ident: Vec<#data_ref_type> = vec![];
         });
         let load_data_ref_tokens = quote! {
-          if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+          if let Some(loaded_data_ref) = crate::common::part::load_data_part_reference::<_, #data_ref_type>(
             &child_parent_path,
             relationship,
             #archive_ident,
@@ -427,7 +427,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
         child_save_stmts.push(quote! {
           for #data_ref_item_ident in &self.#data_ref_field_ident {
-            crate::common::save_data_part_reference(
+            crate::common::part::save_data_part_reference(
               #data_ref_item_ident,
               &child_parent_path,
               zip,
@@ -447,7 +447,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #data_ref_field_ident: Option<std::boxed::Box<#data_ref_type>> = None;
         });
         let load_data_ref_tokens = quote! {
-          if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+          if let Some(loaded_data_ref) = crate::common::part::load_data_part_reference::<_, #data_ref_type>(
             &child_parent_path,
             relationship,
             #archive_ident,
@@ -471,7 +471,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             ))?;
         });
         child_save_stmts.push(quote! {
-          crate::common::save_data_part_reference(
+          crate::common::part::save_data_part_reference(
             self.#data_ref_field_ident.as_ref(),
             &child_parent_path,
             zip,
@@ -488,7 +488,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           let mut #data_ref_field_ident: Option<std::boxed::Box<#data_ref_type>> = None;
         });
         let load_data_ref_tokens = quote! {
-          if let Some(loaded_data_ref) = crate::common::load_data_part_reference::<_, #data_ref_type>(
+          if let Some(loaded_data_ref) = crate::common::part::load_data_part_reference::<_, #data_ref_type>(
             &child_parent_path,
             relationship,
             #archive_ident,
@@ -506,7 +506,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         }
         child_save_stmts.push(quote! {
           if let Some(#data_ref_item_ident) = &self.#data_ref_field_ident {
-            crate::common::save_data_part_reference(
+            crate::common::part::save_data_part_reference(
               #data_ref_item_ident.as_ref(),
               &child_parent_path,
               zip,
@@ -526,7 +526,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
 
   let extended_fallback_tokens = if has_extended_parts {
     quote! {
-      if let Some(loaded_extended_part) = crate::common::load_extended_part(
+      if let Some(loaded_extended_part) = crate::common::part::load_extended_part(
         &child_parent_path,
         relationship,
         #archive_ident,
@@ -684,7 +684,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
   let relationships_write_tokens = if needs_relationships {
     quote! {
       if let Some(relationships) = &self.relationships {
-        crate::common::save_part_relationships(
+        crate::common::part::save_part_relationships(
           &self.inner_path,
           &self.rels_path,
           relationships,
@@ -899,15 +899,6 @@ struct PartHandleRootInfo {
   accessor_ident: Ident,
 }
 
-fn part_handle_child_descriptors_tokens(
-  child_infos: &[PartHandleChildInfo],
-) -> proc_macro2::TokenStream {
-  let _ = child_infos;
-  quote! {
-    const CHILD_DESCRIPTORS: &'static [crate::sdk::PartChildDescriptor] = self::CHILD_DESCRIPTORS;
-  }
-}
-
 fn is_part_handle_struct(fields: &syn::FieldsNamed) -> bool {
   fields
     .named
@@ -973,18 +964,13 @@ fn expand_part_handle(
 
   let root_method = part_handle_root_method_tokens(ident, root_info.as_ref());
   let child_methods = part_handle_child_methods_tokens(ident, &child_infos);
-  let child_descriptors_assoc = part_handle_child_descriptors_tokens(&child_infos);
   Ok(quote! {
     impl crate::sdk::SdkPart for #ident {
-      #child_descriptors_assoc
-
-      const DESCRIPTOR: crate::sdk::PartDescriptor = crate::sdk::PartDescriptor::new(
-        self::RELATIONSHIP_TYPE,
-        self::PATH_PREFIX,
-        self::CONTENT_TYPE,
-        self::TARGET_NAME,
-        self::EXTENSION,
-      );
+      const RELATIONSHIP_TYPE: &'static str = self::RELATIONSHIP_TYPE;
+      const PATH_PREFIX: &'static str = self::PATH_PREFIX;
+      const CONTENT_TYPE: &'static str = self::CONTENT_TYPE;
+      const TARGET_NAME: &'static str = self::TARGET_NAME;
+      const EXTENSION: &'static str = self::EXTENSION;
 
       #[inline]
       fn from_part_id(part_id: crate::common::PartId) -> Self {

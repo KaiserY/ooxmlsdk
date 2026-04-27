@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "slicerCaches";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.slicerCache+xml";
 pub const TARGET_NAME: &str = "slicerCache";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct SlicerCachePart {
   pub(crate) relationship_id: Option<String>,

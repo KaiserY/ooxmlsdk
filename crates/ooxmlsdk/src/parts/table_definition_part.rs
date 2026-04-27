@@ -11,13 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
 pub const TARGET_NAME: &str = "table";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "query_table_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
-    "crate::parts::query_table_part::QueryTablePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct TableDefinitionPart {
   pub(crate) relationship_id: Option<String>,

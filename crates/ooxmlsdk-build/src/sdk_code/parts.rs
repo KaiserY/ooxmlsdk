@@ -143,7 +143,6 @@ fn gen_part_handle_module(
   extension_stmt: Stmt,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
-  let child_descriptors = part_child_descriptors(part)?;
   let part_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
     pub struct #struct_name_ident {
@@ -159,42 +158,8 @@ fn gen_part_handle_module(
     #content_type_stmt
     #target_name_stmt
     #extension_stmt
-    #child_descriptors
     #part_struct
     #typed_impl
-  })
-}
-
-fn part_child_descriptors(part: &PartModuleDecl) -> Result<TokenStream> {
-  let mut descriptors = Vec::new();
-  for field in &part.fields {
-    let PartFieldKind::ChildPart {
-      relationship_type,
-      cardinality,
-    } = &field.kind
-    else {
-      continue;
-    };
-    if relationship_type.is_empty() {
-      continue;
-    }
-    let field_name = field.rust_name.as_str();
-    let child_part_type = part_child_type_name(&field.rust_type);
-    let cardinality = part_child_cardinality_tokens(*cardinality);
-    descriptors.push(quote! {
-      crate::sdk::PartChildDescriptor::new(
-        #field_name,
-        #relationship_type,
-        #child_part_type,
-        #cardinality,
-      )
-    });
-  }
-
-  Ok(quote! {
-    pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
-      #( #descriptors, )*
-    ];
   })
 }
 
@@ -299,21 +264,6 @@ fn part_child_kind_value(cardinality: PartChildCardinality) -> &'static str {
     PartChildCardinality::Repeated => "repeated",
     PartChildCardinality::RequiredRepeated => "required_repeated",
   }
-}
-
-fn part_child_cardinality_tokens(cardinality: PartChildCardinality) -> TokenStream {
-  match cardinality {
-    PartChildCardinality::Optional => quote! { crate::sdk::PartChildCardinality::Optional },
-    PartChildCardinality::Required => quote! { crate::sdk::PartChildCardinality::Required },
-    PartChildCardinality::Repeated => quote! { crate::sdk::PartChildCardinality::Repeated },
-    PartChildCardinality::RequiredRepeated => {
-      quote! { crate::sdk::PartChildCardinality::RequiredRepeated }
-    }
-  }
-}
-
-fn part_child_type_name(rust_type: &str) -> String {
-  rust_type.to_string()
 }
 
 pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {

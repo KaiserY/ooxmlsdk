@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.vbaProject";
 pub const TARGET_NAME: &str = "vbaProject";
 pub const EXTENSION: &str = ".bin";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "vba_data_part",
-    "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
-    "crate::parts::vba_data_part::VbaDataPart",
-    crate::sdk::PartChildCardinality::Optional,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct VbaProjectPart {
   pub(crate) relationship_id: Option<String>,

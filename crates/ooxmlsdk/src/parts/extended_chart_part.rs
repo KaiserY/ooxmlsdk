@@ -10,44 +10,6 @@ pub const PATH_PREFIX: &str = "extendedCharts";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.chartex+xml";
 pub const TARGET_NAME: &str = "chart";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
-  crate::sdk::PartChildDescriptor::new(
-    "chart_drawing_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
-    "crate::parts::chart_drawing_part::ChartDrawingPart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "embedded_package_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-    "crate::parts::embedded_package_part::EmbeddedPackagePart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "image_parts",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    "crate::parts::image_part::ImagePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "theme_override_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
-    "crate::parts::theme_override_part::ThemeOverridePart",
-    crate::sdk::PartChildCardinality::Optional,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "chart_style_parts",
-    "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
-    "crate::parts::chart_style_part::ChartStylePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-  crate::sdk::PartChildDescriptor::new(
-    "chart_color_style_parts",
-    "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
-    "crate::parts::chart_color_style_part::ChartColorStylePart",
-    crate::sdk::PartChildCardinality::Repeated,
-  ),
-];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ExtendedChartPart {
   pub(crate) relationship_id: Option<String>,

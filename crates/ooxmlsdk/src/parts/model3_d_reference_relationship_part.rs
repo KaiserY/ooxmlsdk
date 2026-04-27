@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "../media";
 pub const CONTENT_TYPE: &str = "model/gltf-binary";
 pub const TARGET_NAME: &str = "model3d";
 pub const EXTENSION: &str = ".glb";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct Model3DReferenceRelationshipPart {
   pub(crate) relationship_id: Option<String>,

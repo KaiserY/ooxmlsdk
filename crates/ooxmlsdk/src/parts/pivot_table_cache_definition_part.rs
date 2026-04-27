@@ -11,13 +11,6 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml";
 pub const TARGET_NAME: &str = "pivotCacheDefinition";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "pivot_table_cache_records_part",
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords",
-    "crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart",
-    crate::sdk::PartChildCardinality::Optional,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PivotTableCacheDefinitionPart {
   pub(crate) relationship_id: Option<String>,

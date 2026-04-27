@@ -10,13 +10,6 @@ pub const PATH_PREFIX: &str = "customData";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.customDataProperties+xml";
 pub const TARGET_NAME: &str = "customDataProps";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
-  &[crate::sdk::PartChildDescriptor::new(
-    "custom_data_part",
-    "http://schemas.microsoft.com/office/2007/relationships/customData",
-    "crate::parts::custom_data_part::CustomDataPart",
-    crate::sdk::PartChildCardinality::Optional,
-  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomDataPropertiesPart {
   pub(crate) relationship_id: Option<String>,

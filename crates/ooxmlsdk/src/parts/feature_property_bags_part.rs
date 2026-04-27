@@ -10,7 +10,6 @@ pub const PATH_PREFIX: &str = "featurePropertyBag";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.featurepropertybag+xml";
 pub const TARGET_NAME: &str = "featurePropertyBag";
 pub const EXTENSION: &str = "";
-pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct FeaturePropertyBagsPart {
   pub(crate) relationship_id: Option<String>,

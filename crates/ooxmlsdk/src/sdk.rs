@@ -209,6 +209,7 @@ fn is_data_part_reference_relationship(relationship: &crate::common::Relationshi
   )
 }
 
+#[cfg(feature = "parts")]
 pub fn default_main_part_content_type<T: SdkPart>() -> Option<&'static str> {
   match (T::RELATIONSHIP_TYPE, T::TARGET_NAME) {
     (

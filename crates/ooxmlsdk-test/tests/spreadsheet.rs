@@ -1,12 +1,31 @@
 #[cfg(feature = "microsoft365")]
+use std::io::{Cursor, Read};
+
+#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::{
   ArrayFeatureProperty, ArrayFeaturePropertyChoice, BoolFeatureProperty, IntFeatureProperty,
 };
+#[cfg(feature = "microsoft365")]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart::{
+  ChartSpace, ChartSpaceExtensionChoice,
+};
+#[cfg(feature = "microsoft365")]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::WorkbookExtensionChoice;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
 use ooxmlsdk::simple_type::{ListValue, StringValue};
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
+
+#[cfg(feature = "microsoft365")]
+fn doc_sample_part(file_name: &str, part_name: &str) -> String {
+  let bytes = std::fs::read(fixtures::doc_sample_path(file_name)).unwrap();
+  let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+  let mut part = archive.by_name(part_name).unwrap();
+  let mut xml = String::new();
+  part.read_to_string(&mut xml).unwrap();
+  xml
+}
 
 fn assert_cell_value_xml(serialized: &str, expected_value: &str) {
   assert_eq!(
@@ -77,6 +96,55 @@ fn workbook_round_trip_from_complex01_part_test() {
   assert!(trim_xml_declaration(&serialized).contains("calcId=\"152511\""));
   assert_eq!(reparsed.mc_ignorable.as_deref(), Some("x15"));
   assert_eq!(reparsed.sheets.x_sheet.len(), 2);
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs
+  //   LoadExt
+  let workbook_xml = doc_sample_part("excel14.xlsx", "xl/workbook.xml");
+
+  let (parsed, serialized, _) = assert_stable_roundtrip::<Workbook>(&workbook_xml);
+
+  let extension = parsed
+    .x_ext_lst
+    .as_ref()
+    .and_then(|extension_list| extension_list.x_ext.first())
+    .expect("expected workbook extension");
+  let Some(WorkbookExtensionChoice::X14WorkbookPr(workbook_properties)) = &extension.xml_children
+  else {
+    panic!("expected x14:workbookPr");
+  };
+  assert_eq!(workbook_properties.discard_image_edit_data, Some(true));
+  assert!(serialized.contains("<x14:workbookPr"));
+  assert!(serialized.contains(r#"discardImageEditData="1""#));
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn chart_extension_loads_pivot_options_from_m4_conformance_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs
+  //   LoadExt2
+  let chart_xml = doc_sample_part("extlst.xlsx", "xl/charts/chart1.xml");
+
+  let (parsed, serialized, _) = assert_stable_roundtrip::<ChartSpace>(&chart_xml);
+
+  let extension = parsed
+    .c_ext_lst
+    .as_ref()
+    .and_then(|extension_list| extension_list.c_ext.first())
+    .expect("expected chart-space extension");
+  let Some(ChartSpaceExtensionChoice::C14PivotOptions(pivot_options)) = &extension.xml_children
+  else {
+    panic!("expected c14:pivotOptions");
+  };
+  assert!(pivot_options.drop_zone_filter.is_some());
+  assert!(pivot_options.drop_zone_categories.is_some());
+  assert!(pivot_options.drop_zone_data.is_some());
+  assert!(pivot_options.drop_zone_series.is_some());
+  assert!(pivot_options.drop_zones_visible.is_some());
+  assert!(serialized.contains("<c14:pivotOptions"));
 }
 
 #[test]
@@ -153,6 +221,49 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
   assert!(serialized.contains("<x:t"));
   assert!(serialized.contains(">Test</x:t>"));
   assert_eq!(shared_string_items(&reparsed).len(), 1);
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn shared_string_table_process_content_preserves_extension_attributes_from_mc_support_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadProcessContent
+  let shared_strings_xml = doc_sample_part("MCExecl.xlsx", "xl/sharedStrings.xml");
+
+  let (parsed, serialized, _) = assert_stable_roundtrip::<SharedStringTable>(&shared_strings_xml);
+
+  let item = parsed.x_si.first().expect("expected shared string item");
+  assert_eq!(item.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(item.w14_attr.as_deref(), Some("value"));
+  let placeholder = item
+    .w14_placeholder
+    .as_ref()
+    .expect("expected w14 placeholder");
+  assert_eq!(
+    placeholder.mc_process_content.as_deref(),
+    Some("w14:placeholder")
+  );
+  assert_eq!(
+    placeholder.mc_preserve_attributes.as_deref(),
+    Some("w14:a w14:b")
+  );
+  let text = placeholder
+    .text
+    .as_ref()
+    .expect("expected placeholder text");
+  assert_eq!(text.w14_a.as_deref(), Some("a"));
+  assert_eq!(text.w14_b.as_deref(), Some("b"));
+  assert_eq!(text.w14_c.as_deref(), Some("c"));
+  assert_eq!(text.xml_content.as_deref(), Some("ddd"));
+  assert!(item.w14_no.is_some());
+  assert!(item.text.is_some());
+  assert!(item.x_phonetic_pr.is_some());
+
+  assert!(serialized.contains(r#"mc:ProcessContent="w14:placeholder""#));
+  assert!(serialized.contains(r#"mc:PreserveAttributes="w14:a w14:b""#));
+  assert!(serialized.contains(r#"w14:a="a""#));
+  assert!(serialized.contains(r#"w14:b="b""#));
+  assert!(serialized.contains(r#"w14:c="c""#));
 }
 
 #[test]

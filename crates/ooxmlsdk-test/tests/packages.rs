@@ -16,11 +16,13 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
+#[cfg(feature = "microsoft365")]
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::SeriesLayout;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
   Presentation as PmlPresentation, Slide,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, Document, Header,
+  Body, BodyChoice, Document, Header, SdtPropertiesChoice,
 };
 use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
@@ -116,6 +118,110 @@ fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
   let lazy_main = lazy.main_document_part().unwrap();
   let lazy_root = lazy_main.root_element(&mut lazy).unwrap();
   assert!(main_document_body_child_count(lazy_root) > 0);
+}
+
+#[test]
+fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
+  // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs
+  //   OpenMcPackage
+  for file_name in ["mcdoc.docx", "mcinleaf.docx"] {
+    let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample(file_name)).unwrap();
+    let main_part = package.main_document_part().unwrap();
+    assert!(main_part.root_element(&mut package).is_ok());
+
+    let mut saved = Cursor::new(Vec::new());
+    package.save(&mut saved).unwrap();
+    saved.set_position(0);
+
+    let mut reopened = WordprocessingDocument::new_lazy(saved).unwrap();
+    let reopened_main = reopened.main_document_part().unwrap();
+    assert!(reopened_main.root_element(&mut reopened).is_ok());
+  }
+}
+
+#[test]
+fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   ParticalProperty
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("simpleSdt.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element_mut(&mut package).unwrap();
+  let sdt = root
+    .body
+    .as_mut()
+    .and_then(|body| body.body_choice.first_mut())
+    .and_then(|choice| match choice {
+      BodyChoice::WSdt(sdt) => Some(sdt.as_mut()),
+      _ => None,
+    })
+    .unwrap();
+  let alias = sdt
+    .sdt_properties
+    .as_mut()
+    .and_then(|properties| properties.xml_children.first_mut())
+    .and_then(|choice| match choice {
+      SdtPropertiesChoice::WAlias(alias) => Some(alias.as_mut()),
+      _ => None,
+    })
+    .unwrap();
+
+  assert_eq!(alias.val.as_str(), "SDT1");
+  alias.val = "newsdt".to_string();
+
+  let mut saved = Cursor::new(Vec::new());
+  package.save(&mut saved).unwrap();
+  saved.set_position(0);
+
+  let mut reopened = WordprocessingDocument::new_lazy(saved).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
+  let reopened_alias = reopened_root
+    .body
+    .as_ref()
+    .and_then(|body| body.body_choice.first())
+    .and_then(|choice| match choice {
+      BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
+      _ => None,
+    })
+    .and_then(|sdt| sdt.sdt_properties.as_ref())
+    .and_then(|properties| properties.xml_children.first())
+    .and_then(|choice| match choice {
+      SdtPropertiesChoice::WAlias(alias) => Some(alias.as_ref()),
+      _ => None,
+    })
+    .unwrap();
+
+  assert_eq!(reopened_alias.val.as_str(), "newsdt");
+}
+
+#[test]
+fn wordprocessing_font_table_touch_preserves_w14_namespace_from_mc_support_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   WriteExtraAttr
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("HelloO14.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let font_table_part = main_part.font_table_part(&package).unwrap();
+  let fonts = font_table_part.root_element(&mut package).unwrap();
+  assert_eq!(fonts.mc_ignorable.as_deref(), Some("w14"));
+
+  let mut saved = Cursor::new(Vec::new());
+  package.save(&mut saved).unwrap();
+  saved.set_position(0);
+
+  let reopened = WordprocessingDocument::new_lazy(saved).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_font_table_part = reopened_main.font_table_part(&reopened).unwrap();
+  let font_table_xml = reopened_font_table_part
+    .data_as_str(&reopened)
+    .unwrap()
+    .unwrap();
+
+  assert!(
+    font_table_xml.contains(r#"xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml""#)
+  );
+  assert!(font_table_xml.contains(r#"mc:Ignorable="w14""#));
 }
 
 #[test]
@@ -3076,6 +3182,28 @@ fn spreadsheet_child_accessors_resolve_repeated_parts() {
 }
 
 #[test]
+fn spreadsheet_vml_drawing_part_is_raw_package_part_from_low_level_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs
+  //   TestRootElementOfVmlDrawingPartIsLoadedAsUnknown
+  let package = SpreadsheetDocument::new_from_file(doc_sample("vmldrawingroot.xlsx")).unwrap();
+  let workbook_part = package.workbook_part().unwrap();
+  let vml_part = workbook_part
+    .worksheet_parts(&package)
+    .find_map(|worksheet| worksheet.vml_drawing_parts(&package).next())
+    .unwrap();
+
+  assert_eq!(
+    vml_part.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.vmlDrawing")
+  );
+  assert_eq!(vml_part.path(&package), Some("xl/drawings/vmlDrawing1.vml"));
+  let data = vml_part.data_as_str(&package).unwrap().unwrap();
+  assert!(data.contains("<xml"));
+  assert!(data.contains("<v:shapetype"));
+  assert!(data.contains("<v:shape"));
+}
+
+#[test]
 fn spreadsheet_sheet_relationship_ids_match_workbook_part_relationships() {
   // Source: test/DocumentFormat.OpenXml.Tests/XlsxTests01.cs :: X002_XlsxCreation / X003_XlsxCreation_Stream
   let mut package =
@@ -3134,6 +3262,37 @@ fn model3d_reference_relationship_parts_use_powerpoint_content_type() {
       Some("model/gltf-binary")
     );
   }
+}
+
+#[cfg(feature = "microsoft365")]
+#[test]
+fn wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/TestOffice2016.cs
+  //   OF16_006_AccessChartPart_IntentionalUnknownElement
+  let mut package =
+    WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-09-UnknownElement.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let chart_part = main_part.extended_chart_parts(&package).next().unwrap();
+
+  assert_eq!(
+    chart_part.content_type(&package),
+    Some("application/vnd.ms-office.chartex+xml")
+  );
+  assert_eq!(chart_part.path(&package), Some("word/charts/chartEx1.xml"));
+  assert!(chart_part.embedded_package_part(&package).is_some());
+
+  let chart_space = chart_part.root_element(&mut package).unwrap();
+  assert!(chart_space.chart_data_intentionally_changed.is_some());
+  assert_eq!(
+    chart_space
+      .chart
+      .plot_area
+      .plot_area_region
+      .cx_series
+      .first()
+      .map(|series| series.layout_id),
+    Some(SeriesLayout::Waterfall)
+  );
 }
 
 #[test]

@@ -191,11 +191,13 @@ where
 }
 
 #[inline(always)]
+#[cfg_attr(not(feature = "parts"), allow(dead_code))]
 pub(crate) fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
   actual == canonical || relationship_type_matches_alias(actual, canonical)
 }
 
 #[inline(always)]
+#[cfg_attr(not(feature = "parts"), allow(dead_code))]
 pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
   if let Some(suffix) =
     canonical.strip_prefix("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
@@ -223,6 +225,7 @@ pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> 
 }
 
 #[inline]
+#[cfg_attr(not(feature = "parts"), allow(dead_code))]
 pub(crate) fn part_descriptor_matches(
   actual_relationship_type: &str,
   actual_content_type: &str,
@@ -258,6 +261,7 @@ pub(crate) fn part_descriptor_matches(
 }
 
 #[inline]
+#[cfg_attr(not(feature = "parts"), allow(dead_code))]
 fn package_main_part_path_matches(
   actual_path: &str,
   descriptor_path_prefix: &str,

@@ -208,6 +208,17 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
   }
 }
 
+fn body_choice_alternate_content(
+  choice: &BodyChoice,
+) -> Option<
+  &ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+> {
+  match choice {
+    BodyChoice::McAlternateContent(alternate_content) => Some(alternate_content.as_ref()),
+    _ => None,
+  }
+}
+
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
   matches!(choice, BodyChoice::WBookmarkStart(_))
 }
@@ -666,6 +677,115 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
   assert!(serialized.contains(r#"mc:MustUnderstand="w14""#));
   assert!(serialized.contains(r#"mc:ProcessContent="w14:unknown""#));
   assert!(serialized.contains(r#"<w14:unknown attr="1">choice</w14:unknown>"#));
+}
+
+#[test]
+fn body_alternate_content_without_selected_content_round_trips() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   NoChoice_NoFallback_FullMode
+  //   OneChoice_NoFallback_FullMode
+  //   MultipleChoice_NoMatches_NoFallback_FullMode
+  //   MustUnderstand_Unselected_FullMode
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   Bug718314
+  //   Bug718316
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w13="http://example.com/w13" xmlns:w15="http://example.com/w15"><w:body><mc:AlternateContent/><mc:AlternateContent><mc:Choice Requires="w13"/></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="w13"><w:p><w:r><w:t>choice1</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w15" mc:MustUnderstand="w15"><w:p><w:r><w:t>choice2</w:t></w:r></w:p></mc:Choice></mc:AlternateContent><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#;
+
+  let (document, serialized, reparsed) = assert_stable_roundtrip::<Document>(xml);
+
+  let body = first_body(&document);
+  assert_eq!(
+    body
+      .body_choice
+      .iter()
+      .filter_map(body_choice_alternate_content)
+      .count(),
+    3
+  );
+
+  let mut alternate_content = body
+    .body_choice
+    .iter()
+    .filter_map(body_choice_alternate_content);
+  assert_eq!(
+    alternate_content
+      .next()
+      .unwrap()
+      .alternate_content_choice
+      .len(),
+    0
+  );
+  let choice_only = alternate_content.next().unwrap();
+  assert_eq!(choice_only.alternate_content_choice.len(), 1);
+  let AlternateContentChoice::McChoice(choice) = &choice_only.alternate_content_choice[0] else {
+    panic!("expected mc:Choice");
+  };
+  assert_eq!(choice.requires.as_deref(), Some("w13"));
+  assert!(choice.xml_children.is_empty());
+  let multi_choice = alternate_content.next().unwrap();
+  assert_eq!(multi_choice.alternate_content_choice.len(), 2);
+  let AlternateContentChoice::McChoice(second_choice) = &multi_choice.alternate_content_choice[1]
+  else {
+    panic!("expected second mc:Choice");
+  };
+  assert_eq!(second_choice.requires.as_deref(), Some("w15"));
+  assert_eq!(second_choice.mc_must_understand.as_deref(), Some("w15"));
+
+  assert!(serialized.contains("<mc:AlternateContent"));
+  assert!(serialized.contains(r#"<mc:Choice Requires="w13""#));
+  assert!(serialized.contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
+  assert_eq!(
+    first_body(&reparsed)
+      .body_choice
+      .iter()
+      .filter_map(body_choice_alternate_content)
+      .count(),
+    3
+  );
+}
+
+#[test]
+fn body_alternate_content_fallback_preserves_multiple_known_children() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   MultipleChoice_NoMatches_OneFallback_FullMode
+  //   MultipleChoice_OneFallback_FullMode
+  //   MultipleChoice_LeadingFallback_FullMode
+  //   OneChoice_MultipleFallback_FullMode
+  //   MultipleChoice_OneFallback_Ignorable_FullMode
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadACB
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w13="http://example.com/w13" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:body><mc:AlternateContent mc:Ignorable="w14"><mc:Choice Requires="w13"><w:p><w:r><w:t>choice1</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w14"><w:p><w:r><w:t>choice2</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback1</w:t></w:r></w:p><w:p><w:r><w:t>fallback2</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+
+  let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
+
+  let alternate_content = first_body(&document)
+    .body_choice
+    .iter()
+    .find_map(body_choice_alternate_content)
+    .expect("expected body alternate content");
+  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(alternate_content.alternate_content_choice.len(), 3);
+  let fallback = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      AlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Fallback");
+  assert_eq!(
+    fallback.xml_children,
+    vec![
+      r#"<w:p><w:r><w:t>fallback1</w:t></w:r></w:p>"#.to_string(),
+      r#"<w:p><w:r><w:t>fallback2</w:t></w:r></w:p>"#.to_string(),
+    ]
+  );
+
+  assert!(serialized.contains(r#"<mc:Choice Requires="w13">"#));
+  assert!(serialized.contains(r#"<mc:Choice Requires="w14">"#));
+  assert!(serialized.contains(r#"mc:Ignorable="w14""#));
+  assert!(serialized.contains(r#"<w:t>fallback1</w:t>"#));
+  assert!(serialized.contains(r#"<w:t>fallback2</w:t>"#));
 }
 
 #[test]

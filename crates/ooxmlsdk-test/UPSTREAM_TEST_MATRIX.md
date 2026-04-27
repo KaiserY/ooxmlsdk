@@ -32,11 +32,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 ## Summary
 
 - `blocked_by_api`: 77
-- `covered`: 15
+- `covered`: 32
 - `covered_by_doc_samples`: 38
-- `missing`: 105
+- `missing`: 85
 - `not_applicable`: 121
-- `partial`: 630
+- `partial`: 633
 
 ## Tests
 
@@ -229,7 +229,7 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:136` `DefaultWithFilePath` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:148` `OpenPackageWord` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:165` `AutoSaveStream` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:195` `OpenMcPackage` | Theory | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:195` `OpenMcPackage` | Theory | `partial` | `mce_unknown` | `packages.rs::wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests` covers public package open/save/reopen for MCE documents; OpenSettings MC modes require API |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:209` `PartsShouldBeEncodedWithUTF8WithoutBOM` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.FlatOpcTests.cs:17` `CanCreateFlatOpcDocuments1` | Fact | `blocked_by_api` | `flat_opc` | Requires Flat OPC public API |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.FlatOpcTests.cs:32` `CanCreateFlatOpcDocuments2` | Fact | `blocked_by_api` | `flat_opc` | Requires Flat OPC public API |
@@ -330,7 +330,7 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/DocumentTraverseTest.cs:317` `TraverseSpreadSheetDocument` | Theory | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/DocumentTraverseTest.cs:356` `TraversePPTDocument` | Theory | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs:26` `TestAutosaveAfterSettingNullRootElement` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs:47` `TestRootElementOfVmlDrawingPartIsLoadedAsUnknown` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs:47` `TestRootElementOfVmlDrawingPartIsLoadedAsUnknown` | Fact | `covered` | `mce_unknown` | `packages.rs::spreadsheet_vml_drawing_part_is_raw_package_part_from_low_level_test` verifies VML drawing parts remain raw readable package parts |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs:66` `TestAssertInInnerTextForPlusSymbol` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs:148` `TestAssertInInnerTextOfDoubleValue` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/GenerateList4LowLevelTest.cs:161` `ExceptionForDuplicatedNsDeclarionWhenClosePackage` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
@@ -396,31 +396,31 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2445` `MustUnderstand_NonIgnored_UnknownElement_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::document_round_trip_preserves_mce_attributes_and_alternate_content` preserves public `mc:MustUnderstand` data |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2494` `MustUnderstand_NonIgnored_UnknownElement_O12Mode` | Fact | `blocked_by_api` | `open_settings` | Requires MarkupCompatibilityProcessSettings/ProcessAllParts-style public API and namespace-understand errors |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2543` `Validate_MustUnderstand_NonIgnored_UnknownElement` | Fact | `blocked_by_api` | `validator` | Requires upstream-style markup compatibility validator processing |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2582` `NoChoice_NoFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2582` `NoChoice_NoFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_without_selected_content_round_trips` preserves empty body-level `mc:AlternateContent` |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2621` `NoChoice_NoFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2659` `Validate_NoChoice_NoFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2683` `OneChoice_NoFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2683` `OneChoice_NoFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_without_selected_content_round_trips` preserves choice-only body-level `mc:AlternateContent` |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2722` `OneChoice_NoFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2760` `Validate_OneChoice_NoFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2784` `MultipleChoice_NoMatches_NoFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2784` `MultipleChoice_NoMatches_NoFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_without_selected_content_round_trips` preserves multiple choice-only alternate content |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2822` `MultipleChoice_NoMatches_NoFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2860` `Validate_MultipleChoice_NoMatches_NoFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2884` `MultipleChoice_NoMatches_OneFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2884` `MultipleChoice_NoMatches_OneFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` preserves multiple choices plus fallback |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2922` `MultipleChoice_NoMatches_OneFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2960` `Validate_MultipleChoice_NoMatches_OneFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2984` `MultipleChoice_OneFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:2984` `MultipleChoice_OneFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` preserves multiple choices plus fallback |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3022` `MultipleChoice_OneFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3060` `Validate_MultipleChoice_OneFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3084` `MultipleChoice_LeadingFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3084` `MultipleChoice_LeadingFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` preserves fallback content with sibling choices |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3122` `MultipleChoice_LeadingFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3161` `Validate_MultipleChoice_LeadingFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3181` `OneChoice_MultipleFallback_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3181` `OneChoice_MultipleFallback_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` preserves multiple fallback child elements |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3213` `OneChoice_MultipleFallback_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3251` `Validate_OneChoice_MultipleFallback` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3268` `MustUnderstand_Unselected_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3268` `MustUnderstand_Unselected_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_without_selected_content_round_trips` preserves unselected choice `mc:MustUnderstand` metadata |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3316` `MustUnderstand_Unselected_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3366` `Validate_MustUnderstand_Unselected` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3406` `MultipleChoice_OneFallback_Ignorable_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3406` `MultipleChoice_OneFallback_Ignorable_FullMode` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` preserves ignorable alternate content with choices and fallback |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3454` `MultipleChoice_OneFallback_Ignorable_O12Mode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3502` `Validate_MultipleChoice_OneFallback_Ignorable` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs:3534` `MultipleChoice_OneFallback_UnPrefixedMCAttributes_FullMode` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
@@ -723,7 +723,7 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs:249` `CellBooleanConstructorTest` | Theory | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs:263` `CellBooleanTestNegative` | Theory | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/TestOffice2016.cs:18` `OF16_007_SymEx` | Theory | `covered_by_doc_samples` | `assets` | Large generated package samples or asset regressions are represented through doc_samples/fixtures where applicable |
-| `DocumentFormat.OpenXml.Tests/TestOffice2016.cs:33` `OF16_006_AccessChartPart_IntentionalUnknownElement` | Theory | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/TestOffice2016.cs:33` `OF16_006_AccessChartPart_IntentionalUnknownElement` | Theory | `covered` | `mce_unknown` | `packages.rs::wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element_test` verifies extended chart root loading for the unknown-element sample |
 | `DocumentFormat.OpenXml.Tests/TestOffice2016.cs:61` `OF16_005_AccessChartPart` | Theory | `covered_by_doc_samples` | `assets` | Large generated package samples or asset regressions are represented through doc_samples/fixtures where applicable |
 | `DocumentFormat.OpenXml.Tests/TestOffice2016.cs:85` `OF16_004_ValidatePptx_2013` | Theory | `covered_by_doc_samples` | `assets` | Large generated package samples or asset regressions are represented through doc_samples/fixtures where applicable |
 | `DocumentFormat.OpenXml.Tests/TestOffice2016.cs:107` `OF16_003_ValidateDocx_2013` | Theory | `covered_by_doc_samples` | `assets` | Large generated package samples or asset regressions are represented through doc_samples/fixtures where applicable |
@@ -809,20 +809,20 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ofapiTest/ListValueTest.cs:19` `ListValueSanityTest` | Fact | `partial` | `simple_types` | Basic lexical round-trip covered; edge/comparable cases may need targeted additions |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:19` `O14OnlyElesInO12` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:32` `O14ElesInO14` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:45` `LoadExt` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:56` `LoadExt2` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:45` `LoadExt` | Fact | `covered` | `mce_unknown` | `spreadsheet.rs::workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_test` verifies x14 workbook extension typing |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:56` `LoadExt2` | Fact | `covered` | `mce_unknown` | `spreadsheet.rs::chart_extension_loads_pivot_options_from_m4_conformance_test` verifies c14 pivot options extension typing |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:22` `LoadAttributeTest` | Fact | `covered` | `mce_unknown` | Covered by wordprocessing MCE attribute round-trip test |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:82` `LoadIgnorable` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:108` `LoadPreserveAttr` | Fact | `covered` | `mce_unknown` | Covered by wordprocessing MCE preserve attribute round-trip test |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:147` `LoadProcessContent` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:178` `LoadACB` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:147` `LoadProcessContent` | Fact | `covered` | `mce_unknown` | `spreadsheet.rs::shared_string_table_process_content_preserves_extension_attributes_from_mc_support_test` preserves ProcessContent and extension attributes |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:178` `LoadACB` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` covers body-level alternate content block load/save |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:204` `LoadACB2` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:247` `MCSave` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:317` `MCMustUnderstand` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:360` `ParticalProperty` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:401` `WriteExtraAttr` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:438` `Bug718314` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:466` `Bug718316` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:360` `ParticalProperty` | Fact | `covered` | `mce_unknown` | `packages.rs::wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test` verifies SDT alias mutation persists through save/reopen |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:401` `WriteExtraAttr` | Fact | `covered` | `mce_unknown` | `packages.rs::wordprocessing_font_table_touch_preserves_w14_namespace_from_mc_support_test` verifies touched font table roots preserve the w14 namespace declaration |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:438` `Bug718314` | Fact | `partial` | `mce_unknown` | Empty body-level alternate content now round-trips; upstream ProcessAllParts removal semantics require OpenSettings-style API |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:466` `Bug718316` | Fact | `partial` | `mce_unknown` | Choice-only body-level alternate content now round-trips; upstream ProcessAllParts removal semantics require OpenSettings-style API |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/McValidationTest.cs:21` `AcbSyntaxValidationTest` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/McValidationTest.cs:125` `CompatibilityRuleAttributesValidationTest` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/McValidationTest.cs:221` `GetChildMcTest` | Fact | `missing` | `mce_unknown` | Needs targeted MCE/unknown element public behavior tests |

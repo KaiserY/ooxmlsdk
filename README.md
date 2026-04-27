@@ -53,14 +53,14 @@ Most users should keep the default features enabled:
 
 ```toml
 [dependencies]
-ooxmlsdk = "0.5.0"
+ooxmlsdk = "0.5.1"
 ```
 
 If you want the narrower Office 2007-oriented package surface, disable default features and enable only `parts`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.5.0", default-features = false, features = ["parts"] }
+ooxmlsdk = { version = "0.5.1", default-features = false, features = ["parts"] }
 ```
 
 Read, inspect, and save a package:
@@ -98,7 +98,7 @@ The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx`
 - save packages with `save`
 - inspect package and part relationships with `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, and relationship-specific helpers
 - access well-known child parts through typed methods such as `main_document_part`, `workbook_part`, `presentation_part`, `worksheet_parts`, `font_table_part`, and chart-related part accessors
-- read or replace part payloads through public data helpers and root-element helpers
+- read, replace, or unload parsed part payloads through public data helpers and root-element helpers
 
 Raw package storage, raw relationship sets, generated factory internals, and unchecked dynamic part plumbing are not part of the public API. Prefer the package and part methods above when writing code that should survive generator updates.
 

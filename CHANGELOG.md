@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.5.1
+
+### Package API
+
+- Kept the public `parts` API aligned with upstream Open XML SDK while reducing generated enum boilerplate in the package implementation.
+- Added upstream-derived coverage for `OpenXmlPart.UnloadRootElement()` through the public lazy root load/unload APIs.
+
+### Maintenance
+
+- Regenerated the checked-in `parts` output after consolidating repeated generated `PartRef` and `PartRootElement` dispatch code.
+- Updated the upstream test coverage matrix to mark `UnloadRootElementTest` as covered.
+
 ## 0.5.0
 
 ### Breaking Changes

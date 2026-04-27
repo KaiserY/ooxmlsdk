@@ -992,9 +992,7 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
-    pub fn get_parts_of_type<T: crate::parts::PartRefDowncast>(
-      &self,
-    ) -> impl Iterator<Item = T> + '_ {
+    pub fn get_parts_of_type<T: crate::sdk::SdkPart>(&self) -> impl Iterator<Item = T> + '_ {
       crate::sdk::SdkPackage::get_parts_of_type(self)
     }
 

@@ -8,23 +8,13 @@ use ooxmlsdk::common::{
   StoredPartDataKind,
 };
 use ooxmlsdk::parts::{
-  PartRef, PartRootCache, alternative_format_import_part::AlternativeFormatImportPart,
-  core_file_properties_part::CoreFilePropertiesPart,
-  custom_file_properties_part::CustomFilePropertiesPart, custom_property_part::CustomPropertyPart,
-  custom_xml_part::CustomXmlPart, digital_signature_origin_part::DigitalSignatureOriginPart,
-  document_settings_part::DocumentSettingsPart,
-  embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
-  embedded_control_persistence_part::EmbeddedControlPersistencePart,
-  embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
-  extended_file_properties_part::ExtendedFilePropertiesPart, extended_part::ExtendedPart,
-  font_part::FontPart, font_table_part::FontTablePart, header_part::HeaderPart,
-  image_part::ImagePart, mail_merge_recipient_data_part::MailMergeRecipientDataPart,
-  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
-  presentation_part::PresentationPart, ribbon_extensibility_part::RibbonExtensibilityPart,
-  slide_layout_part::SlideLayoutPart, slide_part::SlidePart,
+  PartRef, PartRootCache, custom_xml_part::CustomXmlPart,
+  document_settings_part::DocumentSettingsPart, font_table_part::FontTablePart,
+  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
+  presentation_document::PresentationDocument, presentation_part::PresentationPart,
+  ribbon_extensibility_part::RibbonExtensibilityPart, slide_part::SlidePart,
   spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
-  thumbnail_part::ThumbnailPart, wordprocessing_comments_part::WordprocessingCommentsPart,
-  wordprocessing_document::WordprocessingDocument,
+  thumbnail_part::ThumbnailPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
@@ -40,6 +30,15 @@ use ooxmlsdk::sdk::{
   MediaDataPartType, PartChildCardinality, SdkPackage, SdkPartHandle, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
+
+macro_rules! part_ref_variant {
+  ($part_ref:expr, $variant:ident) => {
+    match $part_ref {
+      PartRef::$variant(part) => Some(part),
+      _ => None,
+    }
+  };
+}
 
 fn doc_sample(file_name: &str) -> std::path::PathBuf {
   let path = fixtures::doc_sample_path(file_name);
@@ -167,7 +166,7 @@ fn package_relationships_resolve_with_container_local_part_factory() {
 
   let resolved = package
     .try_get_part_by_id(main_part_id)
-    .and_then(PartRef::downcast::<MainDocumentPart>)
+    .and_then(|part| part_ref_variant!(part, MainDocumentPart))
     .unwrap();
 
   assert_eq!(resolved.part_id(), main_part.part_id());
@@ -232,13 +231,10 @@ fn package_relationship_helpers_match_openxml_container_api_shape() {
       .next()
       .is_some()
   );
-  assert!(
-    package
-      .get_part_by_id_required(&main_part_id)
-      .unwrap()
-      .downcast::<MainDocumentPart>()
-      .is_some()
-  );
+  assert!(matches!(
+    package.get_part_by_id_required(&main_part_id).unwrap(),
+    PartRef::MainDocumentPart(_)
+  ));
   assert!(package.get_part_by_id_required("rIdMissing").is_err());
 
   let relationship = package
@@ -330,7 +326,7 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   assert_eq!(
     main_part
       .parts(&package)
-      .filter(|pair| pair.part.clone().downcast::<MainDocumentPart>().is_some())
+      .filter(|pair| part_ref_variant!(pair.part.clone(), MainDocumentPart).is_some())
       .count(),
     0
   );
@@ -403,7 +399,7 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
   assert_eq!(
     main_part
       .get_part_by_id(&package, "rId7")
-      .and_then(PartRef::downcast::<WordprocessingCommentsPart>)
+      .and_then(|part| part_ref_variant!(part, WordprocessingCommentsPart))
       .map(|part| part.part_id()),
     Some(comments_part.part_id())
   );
@@ -471,7 +467,7 @@ fn part_relationship_ids_can_change_for_child_parts() {
   assert_eq!(
     refreshed_main
       .get_part_by_id(&package, &comments_original_id)
-      .and_then(PartRef::downcast::<ImagePart>)
+      .and_then(|part| part_ref_variant!(part, ImagePart))
       .map(|part| part.part_id()),
     Some(image_part.part_id())
   );
@@ -496,7 +492,7 @@ fn part_relationship_ids_can_change_for_child_parts() {
   assert!(
     reopened_main
       .get_part_by_id(&reopened, &comments_original_id)
-      .and_then(PartRef::downcast::<ImagePart>)
+      .and_then(|part| part_ref_variant!(part, ImagePart))
       .is_some()
   );
 }
@@ -1622,7 +1618,7 @@ fn package_add_new_part_creates_package_relationship() {
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_part = reopened
     .get_part_by_id(relationship_id)
-    .and_then(PartRef::downcast::<RibbonExtensibilityPart>)
+    .and_then(|part| part_ref_variant!(part, RibbonExtensibilityPart))
     .unwrap();
   assert_eq!(
     reopened_part.path(&reopened),
@@ -1656,7 +1652,7 @@ fn image_part_feed_data_is_saved() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_image = reopened_main
     .get_part_by_id(&reopened, relationship_id)
-    .and_then(PartRef::downcast::<ImagePart>)
+    .and_then(|part| part_ref_variant!(part, ImagePart))
     .unwrap();
 
   assert_eq!(reopened_image.content_type(&reopened), Some("image/png"));
@@ -1688,7 +1684,7 @@ fn set_data_replaces_existing_part_bytes() {
   let relationship_id = main_part.get_id_of_part(&package, &image_part).unwrap();
   let reopened_image = reopened_main
     .get_part_by_id(&reopened, relationship_id)
-    .and_then(PartRef::downcast::<ImagePart>)
+    .and_then(|part| part_ref_variant!(part, ImagePart))
     .unwrap();
 
   assert_eq!(
@@ -1758,7 +1754,7 @@ fn add_image_part_with_id_feeds_data_and_saves() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_image = reopened_main
     .get_part_by_id(&reopened, relationship_id)
-    .and_then(PartRef::downcast::<ImagePart>)
+    .and_then(|part| part_ref_variant!(part, ImagePart))
     .unwrap();
 
   assert_eq!(reopened_image.content_type(&reopened), Some("image/png"));
@@ -1798,7 +1794,7 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_image = reopened_main
     .get_part_by_id(&reopened, relationship_id.as_str())
-    .and_then(PartRef::downcast::<ImagePart>)
+    .and_then(|part| part_ref_variant!(part, ImagePart))
     .unwrap();
 
   assert_eq!(reopened_image.content_type(&reopened), Some("image/jpeg"));
@@ -1838,7 +1834,7 @@ fn add_alternative_format_import_part_with_id_feeds_data_and_saves() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_chunk = reopened_main
     .get_part_by_id(&reopened, relationship_id)
-    .and_then(PartRef::downcast::<AlternativeFormatImportPart>)
+    .and_then(|part| part_ref_variant!(part, AlternativeFormatImportPart))
     .unwrap();
 
   assert_eq!(reopened_chunk.content_type(&reopened), Some("text/html"));
@@ -1887,7 +1883,7 @@ fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_chunk = reopened_main
     .get_part_by_id(&reopened, relationship_id.as_str())
-    .and_then(PartRef::downcast::<AlternativeFormatImportPart>)
+    .and_then(|part| part_ref_variant!(part, AlternativeFormatImportPart))
     .unwrap();
 
   assert_eq!(
@@ -1934,7 +1930,7 @@ fn add_custom_xml_part_by_type_feeds_data_and_saves() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_custom_xml = reopened_main
     .get_part_by_id(&reopened, relationship_id.as_str())
-    .and_then(PartRef::downcast::<CustomXmlPart>)
+    .and_then(|part| part_ref_variant!(part, CustomXmlPart))
     .unwrap();
 
   assert_eq!(
@@ -1974,7 +1970,7 @@ fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_custom_xml = reopened_main
     .get_part_by_id(&reopened, relationship_id)
-    .and_then(PartRef::downcast::<CustomXmlPart>)
+    .and_then(|part| part_ref_variant!(part, CustomXmlPart))
     .unwrap();
 
   assert_eq!(
@@ -2019,7 +2015,7 @@ fn generic_add_new_part_with_content_type_and_extension_saves_custom_extension()
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_part = reopened_main
     .get_part_by_id(&reopened, relationship_id)
-    .and_then(PartRef::downcast::<CustomXmlPart>)
+    .and_then(|part| part_ref_variant!(part, CustomXmlPart))
     .unwrap();
 
   assert_eq!(
@@ -2057,7 +2053,7 @@ fn package_add_new_part_with_content_type_and_extension_auto_id_saves_custom_ext
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_part = reopened
     .get_part_by_id(relationship_id.as_str())
-    .and_then(PartRef::downcast::<ThumbnailPart>)
+    .and_then(|part| part_ref_variant!(part, ThumbnailPart))
     .unwrap();
 
   assert_eq!(reopened_part.content_type(&reopened), Some("image/png"));
@@ -2165,27 +2161,27 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
 
   let reopened_embedded_object = reopened_main
     .get_part_by_id(&reopened, embedded_object_id.as_str())
-    .and_then(PartRef::downcast::<EmbeddedObjectPart>)
+    .and_then(|part| part_ref_variant!(part, EmbeddedObjectPart))
     .unwrap();
   let reopened_embedded_package = reopened_main
     .get_part_by_id(&reopened, embedded_package_id.as_str())
-    .and_then(PartRef::downcast::<EmbeddedPackagePart>)
+    .and_then(|part| part_ref_variant!(part, EmbeddedPackagePart))
     .unwrap();
   let reopened_font_table = reopened_main
     .get_part_by_id(&reopened, font_table_id.as_str())
-    .and_then(PartRef::downcast::<FontTablePart>)
+    .and_then(|part| part_ref_variant!(part, FontTablePart))
     .unwrap();
   let reopened_font = reopened_font_table
     .get_part_by_id(&reopened, font_id.as_str())
-    .and_then(PartRef::downcast::<FontPart>)
+    .and_then(|part| part_ref_variant!(part, FontPart))
     .unwrap();
   let reopened_settings = reopened_main
     .get_part_by_id(&reopened, settings_id.as_str())
-    .and_then(PartRef::downcast::<DocumentSettingsPart>)
+    .and_then(|part| part_ref_variant!(part, DocumentSettingsPart))
     .unwrap();
   let reopened_recipients = reopened_settings
     .get_part_by_id(&reopened, recipients_id.as_str())
-    .and_then(PartRef::downcast::<MailMergeRecipientDataPart>)
+    .and_then(|part| part_ref_variant!(part, MailMergeRecipientDataPart))
     .unwrap();
 
   assert_eq!(
@@ -2300,19 +2296,19 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
   let reopened_worksheet = reopened_workbook.worksheet_parts(&reopened).next().unwrap();
   let reopened_custom_property = reopened_worksheet
     .get_part_by_id(&reopened, custom_property_id.as_str())
-    .and_then(PartRef::downcast::<CustomPropertyPart>)
+    .and_then(|part| part_ref_variant!(part, CustomPropertyPart))
     .unwrap();
   let reopened_control = reopened_worksheet
     .get_part_by_id(&reopened, control_id.as_str())
-    .and_then(PartRef::downcast::<EmbeddedControlPersistencePart>)
+    .and_then(|part| part_ref_variant!(part, EmbeddedControlPersistencePart))
     .unwrap();
   let reopened_direct_binary = reopened_worksheet
     .get_part_by_id(&reopened, direct_binary_id.as_str())
-    .and_then(PartRef::downcast::<EmbeddedControlPersistenceBinaryDataPart>)
+    .and_then(|part| part_ref_variant!(part, EmbeddedControlPersistenceBinaryDataPart))
     .unwrap();
   let reopened_child_binary = reopened_control
     .get_part_by_id(&reopened, child_binary_id.as_str())
-    .and_then(PartRef::downcast::<EmbeddedControlPersistenceBinaryDataPart>)
+    .and_then(|part| part_ref_variant!(part, EmbeddedControlPersistenceBinaryDataPart))
     .unwrap();
 
   assert_eq!(
@@ -2359,7 +2355,7 @@ fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_thumbnail = reopened
     .get_part_by_id(relationship_id.as_str())
-    .and_then(PartRef::downcast::<ThumbnailPart>)
+    .and_then(|part| part_ref_variant!(part, ThumbnailPart))
     .unwrap();
 
   assert_eq!(
@@ -2391,7 +2387,7 @@ fn add_thumbnail_part_with_id_uses_content_type_and_relationship_id() {
   let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_thumbnail = reopened
     .get_part_by_id(relationship_id)
-    .and_then(PartRef::downcast::<ThumbnailPart>)
+    .and_then(|part| part_ref_variant!(part, ThumbnailPart))
     .unwrap();
 
   assert_eq!(
@@ -2485,19 +2481,19 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
   assert!(
     package
       .get_part_by_id("rIdSdkPackageExtended")
-      .and_then(PartRef::downcast::<ExtendedPart>)
+      .and_then(|part| part_ref_variant!(part, ExtendedPart))
       .is_some()
   );
   assert!(
     main_part
       .get_part_by_id(&package, "rIdSdkMainExtended")
-      .and_then(PartRef::downcast::<ExtendedPart>)
+      .and_then(|part| part_ref_variant!(part, ExtendedPart))
       .is_some()
   );
   assert!(
     part_extended
       .get_part_by_id(&package, "rIdSdkNestedExtended")
-      .and_then(PartRef::downcast::<ExtendedPart>)
+      .and_then(|part| part_ref_variant!(part, ExtendedPart))
       .is_some()
   );
 
@@ -2507,16 +2503,16 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
   let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_package_extended = reopened
     .get_part_by_id("rIdSdkPackageExtended")
-    .and_then(PartRef::downcast::<ExtendedPart>)
+    .and_then(|part| part_ref_variant!(part, ExtendedPart))
     .unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_part_extended = reopened_main
     .get_part_by_id(&reopened, "rIdSdkMainExtended")
-    .and_then(PartRef::downcast::<ExtendedPart>)
+    .and_then(|part| part_ref_variant!(part, ExtendedPart))
     .unwrap();
   let reopened_nested_extended = reopened_part_extended
     .get_part_by_id(&reopened, "rIdSdkNestedExtended")
-    .and_then(PartRef::downcast::<ExtendedPart>)
+    .and_then(|part| part_ref_variant!(part, ExtendedPart))
     .unwrap();
 
   assert_eq!(
@@ -2682,7 +2678,7 @@ fn delete_parts_removes_selected_direct_children() {
   assert!(
     extended
       .get_part_by_id(&package, "rIdNestedImage")
-      .and_then(PartRef::downcast::<ImagePart>)
+      .and_then(|part| part_ref_variant!(part, ImagePart))
       .is_some()
   );
 
@@ -2773,11 +2769,11 @@ fn create_relationship_to_part_reuses_existing_parts_from_package() {
   let slide2 = slides[1].clone();
   let slide_layout1 = slide1
     .get_part_by_id(&package, "rId1")
-    .and_then(PartRef::downcast::<SlideLayoutPart>)
+    .and_then(|part| part_ref_variant!(part, SlideLayoutPart))
     .unwrap();
   let slide_layout2 = slide2
     .get_part_by_id(&package, "rId1")
-    .and_then(PartRef::downcast::<SlideLayoutPart>)
+    .and_then(|part| part_ref_variant!(part, SlideLayoutPart))
     .unwrap();
 
   assert!(
@@ -2792,7 +2788,7 @@ fn create_relationship_to_part_reuses_existing_parts_from_package() {
   assert_eq!(
     slide1
       .get_part_by_id(&package, &slide1_relationship_id)
-      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .and_then(|part| part_ref_variant!(part, SlideLayoutPart))
       .map(|part| part.part_id()),
     Some(slide_layout2.part_id())
   );
@@ -2806,7 +2802,7 @@ fn create_relationship_to_part_reuses_existing_parts_from_package() {
   assert_eq!(
     slide2
       .get_part_by_id(&package, "rId1001")
-      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .and_then(|part| part_ref_variant!(part, SlideLayoutPart))
       .map(|part| part.part_id()),
     Some(slide_layout1.part_id())
   );
@@ -2820,13 +2816,13 @@ fn create_relationship_to_part_reuses_existing_parts_from_package() {
   assert!(
     reopened_slides[0]
       .get_part_by_id(&reopened, &slide1_relationship_id)
-      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .and_then(|part| part_ref_variant!(part, SlideLayoutPart))
       .is_some()
   );
   assert!(
     reopened_slides[1]
       .get_part_by_id(&reopened, "rId1001")
-      .and_then(PartRef::downcast::<SlideLayoutPart>)
+      .and_then(|part| part_ref_variant!(part, SlideLayoutPart))
       .is_some()
   );
 }
@@ -2932,7 +2928,7 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_header = reopened_main
     .get_part_by_id(&reopened, "rIdImportedHeader")
-    .and_then(PartRef::downcast::<HeaderPart>)
+    .and_then(|part| part_ref_variant!(part, HeaderPart))
     .unwrap();
   assert!(reopened_header.root_element(&mut reopened).is_ok());
   assert!(
@@ -3121,19 +3117,19 @@ fn add_file_properties_and_signature_origin_parts_create_fixed_package_relations
   let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
   let reopened_core = reopened
     .get_part_by_id(core_id.as_str())
-    .and_then(PartRef::downcast::<CoreFilePropertiesPart>)
+    .and_then(|part| part_ref_variant!(part, CoreFilePropertiesPart))
     .unwrap();
   let reopened_extended = reopened
     .get_part_by_id(extended_id.as_str())
-    .and_then(PartRef::downcast::<ExtendedFilePropertiesPart>)
+    .and_then(|part| part_ref_variant!(part, ExtendedFilePropertiesPart))
     .unwrap();
   let reopened_custom = reopened
     .get_part_by_id(custom_id.as_str())
-    .and_then(PartRef::downcast::<CustomFilePropertiesPart>)
+    .and_then(|part| part_ref_variant!(part, CustomFilePropertiesPart))
     .unwrap();
   let reopened_signature_origin = reopened
     .get_part_by_id(signature_origin_id.as_str())
-    .and_then(PartRef::downcast::<DigitalSignatureOriginPart>)
+    .and_then(|part| part_ref_variant!(part, DigitalSignatureOriginPart))
     .unwrap();
 
   assert_eq!(reopened_core.path(&reopened), Some("docProps/core.xml"));
@@ -3262,7 +3258,7 @@ fn package_copy_helpers_include_dirty_root_cache() {
   );
   let copied_header = copied_main
     .get_part_by_id(&owned_copy, "rIdCopyHeader")
-    .and_then(PartRef::downcast::<HeaderPart>)
+    .and_then(|part| part_ref_variant!(part, HeaderPart))
     .unwrap();
   assert!(copied_header.root_element(&mut owned_copy).is_ok());
 
@@ -3278,7 +3274,7 @@ fn package_copy_helpers_include_dirty_root_cache() {
   assert!(
     reopened_main
       .get_part_by_id(&reopened_from_bytes, "rIdCopyHeader")
-      .and_then(PartRef::downcast::<HeaderPart>)
+      .and_then(|part| part_ref_variant!(part, HeaderPart))
       .is_some()
   );
 }

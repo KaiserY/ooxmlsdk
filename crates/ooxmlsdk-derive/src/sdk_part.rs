@@ -2095,11 +2095,11 @@ fn part_handle_child_methods_tokens(
         self.get_part_by_id(package, relationship_id)
       }
 
-      pub fn get_parts_of_type<'a, P: crate::sdk::SdkPackage, T: crate::parts::PartRefDowncast>(
+      pub fn get_parts_of_type<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(
         &'a self,
         package: &'a P,
       ) -> impl Iterator<Item = T> + 'a {
-        self.parts(package).filter_map(|entry| entry.part.downcast::<T>())
+        <Self as crate::sdk::SdkPart>::get_parts_of_type::<P, T>(self, package)
       }
 
       pub fn get_id_of_part<'a, P: crate::sdk::SdkPackage, T: crate::sdk::SdkPart>(

@@ -242,35 +242,29 @@ fn assert_part_subgraph_equal<P, T>(
   );
 }
 
-fn package_direct_part_signature<P: SdkPackage>(package: &P) -> Vec<(String, String, String)> {
+fn package_direct_part_signature<P: SdkPackage>(package: &P) -> Vec<(String, String)> {
   direct_part_signature(package, package.parts().collect())
 }
 
 fn direct_part_signature<P: SdkPackage>(
   _package: &P,
   parts: Vec<ooxmlsdk::parts::IdPartPair<'_>>,
-) -> Vec<(String, String, String)> {
+) -> Vec<(String, String)> {
   parts
     .into_iter()
     .map(|pair| {
       (
         pair.relationship_id.to_string(),
-        pair.part.relationship_id().unwrap_or_default().to_string(),
         format!("{:?}", pair.part.part_id()),
       )
     })
     .collect()
 }
 
-fn all_part_signature(parts: Vec<PartRef>) -> Vec<(String, String)> {
+fn all_part_signature(parts: Vec<PartRef>) -> Vec<String> {
   parts
     .into_iter()
-    .map(|part| {
-      (
-        part.relationship_id().unwrap_or_default().to_string(),
-        format!("{:?}", part.part_id()),
-      )
-    })
+    .map(|part| format!("{:?}", part.part_id()))
     .collect()
 }
 

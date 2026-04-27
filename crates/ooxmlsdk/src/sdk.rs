@@ -187,6 +187,46 @@ fn collect_all_parts_from_relationships<P: SdkPackage + Sized>(
 }
 
 #[cfg(feature = "parts")]
+fn relationship_target_as_part<T: SdkPart>(
+  storage: &crate::common::SdkPackageStorage,
+  relationship: &crate::common::RelationshipInfo,
+) -> Option<T> {
+  let part_id = relationship.target_part_id()?;
+  let part = storage.part(part_id)?;
+
+  if std::any::TypeId::of::<T>()
+    == std::any::TypeId::of::<crate::parts::extended_part::ExtendedPart>()
+  {
+    if let Some(crate::parts::PartRef::ExtendedPart(part)) =
+      crate::parts::PartRef::from_relationship_storage(storage, relationship)
+    {
+      let part: Box<dyn std::any::Any> = Box::new(part);
+      return part.downcast::<T>().ok().map(|part| *part);
+    }
+    return None;
+  }
+
+  let relationship_type = part.relationship_type()?;
+  if crate::common::part_descriptor_matches(
+    relationship_type,
+    part.content_type(),
+    part.path(),
+    T::RELATIONSHIP_TYPE,
+    T::CONTENT_TYPE,
+    T::PATH_PREFIX,
+    T::TARGET_NAME,
+  ) {
+    Some(T::from_relationship_id_with_relationships(
+      storage,
+      relationship.id(),
+      part_id,
+    ))
+  } else {
+    None
+  }
+}
+
+#[cfg(feature = "parts")]
 #[inline]
 fn is_data_part_reference_relationship(relationship: &crate::common::RelationshipInfo) -> bool {
   matches!(
@@ -976,11 +1016,14 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn get_parts_of_type<T: crate::parts::PartRefDowncast>(&self) -> impl Iterator<Item = T> + '_
+  fn get_parts_of_type<T: SdkPart>(&self) -> impl Iterator<Item = T> + '_
   where
     Self: Sized,
   {
-    self.parts().filter_map(|entry| entry.part.downcast::<T>())
+    let storage = crate::sdk::SdkPackageInternal::storage(self);
+    crate::sdk::SdkPackageInternal::relationships(self)
+      .part_relationships()
+      .filter_map(move |relationship| relationship_target_as_part::<T>(storage, relationship))
   }
 
   #[inline]
@@ -3059,13 +3102,16 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn get_parts_of_type<'a, P: SdkPackage + Sized, T: crate::parts::PartRefDowncast>(
+  fn get_parts_of_type<'a, P: SdkPackage + Sized, T: SdkPart>(
     &'a self,
     package: &'a P,
   ) -> impl Iterator<Item = T> + 'a {
+    let storage = crate::sdk::SdkPackageInternal::storage(package);
     self
-      .parts(package)
-      .filter_map(|entry| entry.part.downcast::<T>())
+      .relationships(package)
+      .into_iter()
+      .flat_map(|relationships| relationships.part_relationships())
+      .filter_map(move |relationship| relationship_target_as_part::<T>(storage, relationship))
   }
 
   #[inline]

@@ -7006,6 +7006,10 @@ pub struct NumberingProperties {
   ///Numbering Definition Instance Reference
   #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:numId"))]
   pub numbering_id: Option<NumberingId>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Previous Paragraph Numbering Properties
   #[sdk(child(qname = "w:CT_TrackChangeNumbering/w:numberingChange"))]
   pub numbering_change: Option<NumberingChange>,
@@ -11481,10 +11485,6 @@ pub struct Run {
   ///Run Properties.
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "w:CT_Br/w:br",
     qname = "w:CT_Text/w:t",
@@ -11518,6 +11518,7 @@ pub struct Run {
     qname = "w:CT_Drawing/w:drawing",
     qname = "w:CT_PTab/w:ptab",
     qname = "w:CT_Empty/w:lastRenderedPageBreak",
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     text
   ))]
   #[cfg_attr(
@@ -14116,6 +14117,10 @@ pub struct TableCellBorders {
   ///Table Cell Left Border
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_Border/w:start"))]
@@ -14477,6 +14482,10 @@ pub struct TableCellMargin {
   ///Table Cell Left Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
   pub left_margin: Option<LeftMargin>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
@@ -14802,6 +14811,10 @@ pub struct TableBorders {
   ///Table Left Border
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_Border/w:start"))]
@@ -14853,6 +14866,10 @@ pub struct TableCellMarginDefault {
   ///Table Cell Left Margin Default
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
@@ -14995,6 +15012,10 @@ pub struct FootnoteProperties {
   ///Footnote Placement
   #[sdk(child(qname = "w:CT_FtnPos/w:pos"))]
   pub footnote_position: Option<FootnotePosition>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Footnote Numbering Format
   #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -15016,6 +15037,10 @@ pub struct EndnoteProperties {
   ///Endnote Placement
   #[sdk(child(qname = "w:CT_EdnPos/w:pos"))]
   pub endnote_position: Option<EndnotePosition>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Endnote Numbering Format
   #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -15528,6 +15553,10 @@ pub struct Comments {
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
   #[sdk(child(qname = "w:CT_Comment/w:comment"))]
   pub w_comment: Vec<Comment>,
 }
@@ -15736,6 +15765,10 @@ pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Write Protection
   #[sdk(child(qname = "w:CT_WriteProtection/w:writeProtection"))]
   pub write_protection: Option<WriteProtection>,
@@ -16128,10 +16161,6 @@ pub struct Fonts {
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
   #[sdk(child(qname = "w:CT_Font/w:font"))]
   pub w_font: Vec<Font>,
 }
@@ -16255,6 +16284,10 @@ pub struct PreviousTablePropertyExceptions {
   ///Table Cell Margin Exceptions
   #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Table Style Conditional Formatting Settings Exception
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
@@ -16384,6 +16417,10 @@ pub struct PreviousTableProperties {
   ///Defines the TableLook Class.
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_String/w:tblCaption"))]
@@ -17377,6 +17414,10 @@ pub struct ParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_OnOff/w:oMath"))]
   pub office_math: Option<OfficeMath>,
   /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
   #[sdk(child(qname = "w:CT_ParaRPrChange/w:rPrChange"))]
   pub w_r_pr_change: Option<std::boxed::Box<ParagraphMarkRunPropertiesChange>>,
 }
@@ -17487,6 +17528,10 @@ pub struct SectionProperties {
   #[sdk(child(qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
   pub footnote_columns:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::FootnoteColumns>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
   #[sdk(child(qname = "w:CT_SectPrChange/w:sectPrChange"))]
   pub w_sect_pr_change: Option<std::boxed::Box<SectionPropertiesChange>>,
@@ -20510,6 +20555,10 @@ pub struct Level {
   ///Starting Value
   #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:start"))]
   pub start_numbering_value: Option<StartNumberingValue>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Numbering Format
   #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -22240,10 +22289,6 @@ pub struct DocPartBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:body")]
 pub struct Body {
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
@@ -22295,10 +22340,6 @@ pub struct Body {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/")]
 pub struct BodyType {
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
@@ -25797,6 +25838,12 @@ pub enum RunChoice {
   WPtab(std::boxed::Box<PositionalTab>),
   #[sdk(child(qname = "w:CT_Empty/w:lastRenderedPageBreak"))]
   WLastRenderedPageBreak(std::boxed::Box<LastRenderedPageBreak>),
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(text)]
   Text(crate::simple_type::StringValue),
   #[cfg(feature = "microsoft365")]

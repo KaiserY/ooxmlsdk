@@ -412,10 +412,6 @@ pub struct Anchor {
   ///Simple Positioning Coordinates
   #[sdk(child(qname = "a:CT_Point2D/wp:simplePos"))]
   pub simple_position: std::boxed::Box<SimplePosition>,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Horizontal Positioning
   #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
   pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
@@ -446,6 +442,10 @@ pub struct Anchor {
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub a_graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]

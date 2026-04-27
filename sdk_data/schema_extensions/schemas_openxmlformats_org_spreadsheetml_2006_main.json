@@ -199,9 +199,6 @@
           "Optional": true,
           "InsertBefore": "x:CT_BookViews/x:bookViews"
         }
-      ],
-      "McAlternateContentInsertBefore": [
-        "x15ac:CT_AbsolutePath/x15ac:absPath"
       ]
     }
   ]

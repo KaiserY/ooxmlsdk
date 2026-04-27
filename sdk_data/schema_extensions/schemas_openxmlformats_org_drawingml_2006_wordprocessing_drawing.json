@@ -10,14 +10,6 @@
         {
           "Name": "wp:CT_PosV/wp:positionV",
           "Optional": true
-        },
-        {
-          "Name": "mc:CT_AlternateContent/mc:AlternateContent",
-          "PropertyName": "mc_alternate_content",
-          "Kind": "Child",
-          "Optional": true,
-          "Repeated": true,
-          "InsertBefore": "wp:CT_PosH/wp:positionH"
         }
       ]
     }

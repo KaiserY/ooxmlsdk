@@ -6925,6 +6925,10 @@ pub struct DisplayBlanksAs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]

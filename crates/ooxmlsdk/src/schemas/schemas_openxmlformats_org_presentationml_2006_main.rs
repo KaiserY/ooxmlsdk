@@ -1477,6 +1477,10 @@ pub struct Presentation {
   #[sdk(child(qname = "a:CT_TextListStyle/p:defaultTextStyle"))]
   pub default_text_style: Option<std::boxed::Box<DefaultTextStyle>>,
   /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
   #[sdk(child(qname = "p:CT_ModifyVerifier/p:modifyVerifier"))]
   pub modification_verifier: Option<ModificationVerifier>,
   /// _
@@ -1626,6 +1630,10 @@ pub struct SlideLayout {
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// _
@@ -1665,6 +1673,10 @@ pub struct SlideMaster {
   /// _
   #[sdk(child(qname = "p:CT_SlideLayoutIdList/p:sldLayoutIdLst"))]
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -2227,6 +2239,10 @@ pub struct TimeListConditionalType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeParallel/p:par")]
 pub struct ParallelTimeNode {
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Parallel TimeNode
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
@@ -2262,6 +2278,10 @@ pub struct SequenceTimeNode {
   #[sdk(attr(qname = ":nextAc"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub next_action: Option<NextActionValues>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
@@ -2280,6 +2300,10 @@ pub struct SequenceTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeExclusive/p:excl")]
 pub struct ExclusiveTimeNode {
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
@@ -3301,6 +3325,10 @@ pub struct CommonBehavior {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#override: Option<BehaviorOverrideValues>,
   /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   ///Target Element
@@ -3416,6 +3444,10 @@ pub struct CommonMediaNode {
   /// Represents the following attribute in the schema: :showWhenStopped
   #[sdk(attr(qname = ":showWhenStopped"))]
   pub show_when_stopped: Option<crate::simple_type::BooleanValue>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Common Time Node Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
@@ -6220,10 +6252,6 @@ pub struct ShapeTree {
   ///Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "p:CT_Shape/p:sp",

@@ -11,12 +11,6 @@
     {
       "ClassName": "RadarSerExtension",
       "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "ChartSpace",
-      "McAlternateContentInsertBefore": [
-        "c:CT_Style/c:style"
-      ]
     }
   ]
 }

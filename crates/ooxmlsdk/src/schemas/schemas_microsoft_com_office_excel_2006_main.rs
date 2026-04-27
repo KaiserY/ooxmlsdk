@@ -31,6 +31,10 @@ pub struct Macrosheet {
   pub sheet_views: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetViews>,
   >,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   ///Sheet Format Properties
   #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<

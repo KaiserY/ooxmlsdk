@@ -168,7 +168,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           mark_sequence_collection_children_repeated(ty, &mut children);
           mark_mixed_sequence_direct_children_optional(&mut children);
           if has_mce_alternate_content {
-            insert_mce_alternate_content_for_mixed_version_choices(ty, &mut children);
+            insert_mce_alternate_content_for_mixed_version_content(ty, &type_map, &mut children);
           }
           assign_particle_ids(&mut children);
 
@@ -1053,18 +1053,22 @@ fn mark_mixed_sequence_direct_children_optional(children: &mut [SchemaTypeChild]
   }
 }
 
-fn insert_mce_alternate_content_for_mixed_version_choices(
+fn insert_mce_alternate_content_for_mixed_version_content(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
   children: &mut Vec<SchemaTypeChild>,
 ) {
   if !is_office2007_or_default(schema_type.version.as_deref()) {
     return;
   }
 
-  insert_mce_alternate_content_in_children(children);
+  insert_mce_alternate_content_in_children(children, type_map);
 }
 
-fn insert_mce_alternate_content_in_children(children: &mut Vec<SchemaTypeChild>) {
+fn insert_mce_alternate_content_in_children(
+  children: &mut Vec<SchemaTypeChild>,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) {
   let children = if children.len() == 1 && children[0].kind == SchemaTypeChildKind::Sequence {
     &mut children[0].children
   } else {
@@ -1073,9 +1077,17 @@ fn insert_mce_alternate_content_in_children(children: &mut Vec<SchemaTypeChild>)
 
   let mut index = 0;
   while index < children.len() {
-    if is_mixed_version_choice(&children[index], "") {
+    if should_insert_mce_alternate_content_before_child(children, index, type_map) {
       if children[index].repeated {
-        insert_mce_alternate_content_choice_variant(&mut children[index]);
+        if children[index].kind == SchemaTypeChildKind::Choice {
+          insert_mce_alternate_content_choice_variant(&mut children[index]);
+        } else if index > 0 && is_mce_alternate_content_child(&children[index - 1]) {
+        } else {
+          let mut mce_child = mce_alternate_content_child(true);
+          mce_child.repeated = true;
+          children.insert(index, mce_child);
+          index += 1;
+        }
         index += 1;
       } else if index > 0 && is_mce_alternate_content_child(&children[index - 1]) {
         index += 1;
@@ -1087,6 +1099,50 @@ fn insert_mce_alternate_content_in_children(children: &mut Vec<SchemaTypeChild>)
       index += 1;
     }
   }
+}
+
+fn should_insert_mce_alternate_content_before_child(
+  children: &[SchemaTypeChild],
+  index: usize,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> bool {
+  let child = &children[index];
+  is_mixed_version_choice(child, "")
+    || child_has_later_initial_version(child)
+    || (child_type_has_later_version_attributes(child, type_map)
+      && !next_child_has_later_initial_version(children, index))
+}
+
+fn child_has_later_initial_version(child: &SchemaTypeChild) -> bool {
+  !is_office2007_or_default(Some(child.initial_version.as_str()))
+}
+
+fn next_child_has_later_initial_version(children: &[SchemaTypeChild], index: usize) -> bool {
+  children
+    .get(index + 1)
+    .is_some_and(child_has_later_initial_version)
+}
+
+fn child_type_has_later_version_attributes(
+  child: &SchemaTypeChild,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> bool {
+  if !matches!(
+    child.kind,
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+  ) {
+    return false;
+  }
+
+  let Some(schema_type) = type_map.get(child.name.as_str()) else {
+    return false;
+  };
+
+  is_office2007_or_default(schema_type.version.as_deref())
+    && schema_type
+      .attributes
+      .iter()
+      .any(|attribute| !is_office2007_or_default(Some(attribute.version.as_str())))
 }
 
 fn insert_mce_alternate_content_choice_variant(choice: &mut SchemaTypeChild) {

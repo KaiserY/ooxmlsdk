@@ -21,6 +21,10 @@ pub struct Picture {
   ///Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/pic:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "a:CT_ShapeStyle/pic14:style"))]

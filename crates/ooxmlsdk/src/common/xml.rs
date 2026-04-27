@@ -253,21 +253,6 @@ pub(crate) fn decode_attr_value(
 }
 
 #[inline]
-pub(crate) fn parse_bool_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  if let Some(value) = attr_raw_value(attr) {
-    parse_bool_bytes_inner(value, ty, field)
-  } else {
-    let value = decode_attr_value(attr, decoder)?;
-    parse_bool_str(value.as_ref(), ty, field)
-  }
-}
-
-#[inline]
 pub(crate) fn parse_boolean_value_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -293,7 +278,11 @@ pub(crate) fn parse_on_off_attr(
     parse_on_off_bytes(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
-    parse_on_off_str(value.as_ref(), ty, field)
+    match value.as_bytes() {
+      b"true" | b"1" | b"on" => Ok(true),
+      b"false" | b"0" | b"off" => Ok(false),
+      _ => Err(invalid_field_value(ty, field, &value)),
+    }
   }
 }
 
@@ -323,7 +312,11 @@ pub(crate) fn parse_true_false_attr(
     parse_true_false_bytes(value, ty, field)
   } else {
     let value = decode_attr_value(attr, decoder)?;
-    parse_true_false_str(value.as_ref(), ty, field)
+    match value.as_bytes() {
+      b"true" | b"t" => Ok(true),
+      b"false" | b"f" => Ok(false),
+      _ => Err(invalid_field_value(ty, field, &value)),
+    }
   }
 }
 
@@ -497,32 +490,6 @@ pub(crate) fn parse_boolean_value_str(
 }
 
 #[inline(always)]
-pub(crate) fn parse_bool_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  match value.as_bytes() {
-    b"true" | b"1" | b"True" | b"TRUE" | b"t" | b"Yes" | b"YES" | b"yes" | b"y" => Ok(true),
-    b"false" | b"0" | b"False" | b"FALSE" | b"f" | b"No" | b"NO" | b"no" | b"n" | b"" => Ok(false),
-    _ => Err(invalid_field_value(ty, field, value)),
-  }
-}
-
-#[inline(always)]
-pub(crate) fn parse_on_off_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  match value.as_bytes() {
-    b"true" | b"1" | b"on" => Ok(true),
-    b"false" | b"0" | b"off" => Ok(false),
-    _ => Err(invalid_field_value(ty, field, value)),
-  }
-}
-
-#[inline(always)]
 pub(crate) fn parse_true_false_blank_str(
   value: &str,
   ty: &'static str,
@@ -532,37 +499,6 @@ pub(crate) fn parse_true_false_blank_str(
     b"true" | b"t" => Ok(true),
     b"false" | b"f" | b"" => Ok(false),
     _ => Err(invalid_field_value(ty, field, value)),
-  }
-}
-
-#[inline(always)]
-pub(crate) fn parse_true_false_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  match value.as_bytes() {
-    b"true" | b"t" => Ok(true),
-    b"false" | b"f" => Ok(false),
-    _ => Err(invalid_field_value(ty, field, value)),
-  }
-}
-
-#[inline(always)]
-pub(crate) fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
-  parse_bool_bytes_inner(b, "bool", "value")
-}
-
-#[inline(always)]
-fn parse_bool_bytes_inner(
-  value: &[u8],
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  match value {
-    b"true" | b"1" | b"True" | b"TRUE" | b"t" | b"Yes" | b"YES" | b"yes" | b"y" => Ok(true),
-    b"false" | b"0" | b"False" | b"FALSE" | b"f" | b"No" | b"NO" | b"no" | b"n" | b"" => Ok(false),
-    _ => Err(invalid_field_value_bytes(ty, field, value)),
   }
 }
 

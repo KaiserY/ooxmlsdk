@@ -13,7 +13,7 @@ use super::{
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum PackageOpenMode {
+pub(crate) enum PackageOpenMode {
   #[default]
   Eager,
   Lazy,
@@ -45,12 +45,12 @@ impl PackageId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NewPartDescriptor {
-  pub relationship_type: Cow<'static, str>,
-  pub content_type: Cow<'static, str>,
-  pub path_prefix: &'static str,
-  pub target_name: &'static str,
-  pub extension: Cow<'static, str>,
+pub(crate) struct NewPartDescriptor {
+  pub(crate) relationship_type: Cow<'static, str>,
+  pub(crate) content_type: Cow<'static, str>,
+  pub(crate) path_prefix: &'static str,
+  pub(crate) target_name: &'static str,
+  pub(crate) extension: Cow<'static, str>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -61,20 +61,20 @@ pub enum NewPartTargetMode {
 }
 
 #[derive(Clone, Debug)]
-pub enum StoredPartData {
+pub(crate) enum StoredPartData {
   Raw { bytes: Vec<u8> },
 }
 
 impl StoredPartData {
   #[inline]
-  pub fn bytes(&self) -> &[u8] {
+  pub(crate) fn bytes(&self) -> &[u8] {
     match self {
       Self::Raw { bytes, .. } => bytes,
     }
   }
 
   #[inline]
-  pub fn bytes_mut(&mut self) -> &mut Vec<u8> {
+  pub(crate) fn bytes_mut(&mut self) -> &mut Vec<u8> {
     match self {
       Self::Raw { bytes, .. } => bytes,
     }
@@ -393,27 +393,27 @@ fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a Relationship
 }
 
 impl RelationshipSet {
-  pub const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
+  pub(crate) const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
-  pub const AUDIO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+  pub(crate) const AUDIO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
-  pub const MEDIA_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+  pub(crate) const MEDIA_REFERENCE_RELATIONSHIP_TYPE: &'static str =
     "http://schemas.microsoft.com/office/2007/relationships/media";
-  pub const VIDEO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
+  pub(crate) const VIDEO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
 
   #[inline]
-  pub fn is_empty(&self) -> bool {
+  pub(crate) fn is_empty(&self) -> bool {
     self.relationships.is_empty()
   }
 
   #[inline]
-  pub fn iter(&self) -> impl Iterator<Item = &RelationshipInfo> {
+  pub(crate) fn iter(&self) -> impl Iterator<Item = &RelationshipInfo> {
     self.relationships.iter()
   }
 
   #[inline]
-  pub fn get(&self, relationship_id: &str) -> Option<&RelationshipInfo> {
+  pub(crate) fn get(&self, relationship_id: &str) -> Option<&RelationshipInfo> {
     self
       .by_id
       .get(relationship_id)
@@ -421,15 +421,15 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub fn contains_id(&self, relationship_id: &str) -> bool {
+  pub(crate) fn contains_id(&self, relationship_id: &str) -> bool {
     self.by_id.contains_key(relationship_id)
   }
 
-  pub fn next_relationship_id(&self) -> String {
+  pub(crate) fn next_relationship_id(&self) -> String {
     next_relationship_id(self.relationships.iter())
   }
 
-  pub fn add_external_relationship(
+  pub(crate) fn add_external_relationship(
     &mut self,
     relationship_id: impl Into<String>,
     relationship_type: impl Into<String>,
@@ -443,7 +443,7 @@ impl RelationshipSet {
     ))
   }
 
-  pub fn add_hyperlink_relationship(
+  pub(crate) fn add_hyperlink_relationship(
     &mut self,
     relationship_id: impl Into<String>,
     target: impl Into<String>,
@@ -451,7 +451,7 @@ impl RelationshipSet {
     self.add_hyperlink_relationship_with_mode(relationship_id, target, TargetMode::External)
   }
 
-  pub fn add_hyperlink_relationship_with_mode(
+  pub(crate) fn add_hyperlink_relationship_with_mode(
     &mut self,
     relationship_id: impl Into<String>,
     target: impl Into<String>,
@@ -469,7 +469,7 @@ impl RelationshipSet {
     ))
   }
 
-  pub fn add_internal_part_relationship(
+  pub(crate) fn add_internal_part_relationship(
     &mut self,
     relationship_id: impl Into<String>,
     relationship_type: impl Into<String>,
@@ -484,21 +484,21 @@ impl RelationshipSet {
     ))
   }
 
-  pub fn add_relationship_info(
+  pub(crate) fn add_relationship_info(
     &mut self,
     relationship: RelationshipInfo,
   ) -> Result<&RelationshipInfo, SdkError> {
     self.push_relationship(relationship)
   }
 
-  pub fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
+  pub(crate) fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
     let index = *self.by_id.get(relationship_id)?;
     let removed = self.relationships.remove(index);
     self.rebuild_index();
     Some(removed)
   }
 
-  pub fn remove_reference_relationship(
+  pub(crate) fn remove_reference_relationship(
     &mut self,
     relationship_id: &str,
   ) -> Result<RelationshipInfo, SdkError> {
@@ -519,7 +519,10 @@ impl RelationshipSet {
     )
   }
 
-  pub fn get_external_relationship(&self, relationship_id: &str) -> Option<&RelationshipInfo> {
+  pub(crate) fn get_external_relationship(
+    &self,
+    relationship_id: &str,
+  ) -> Option<&RelationshipInfo> {
     self.get(relationship_id).filter(|relationship| {
       matches!(
         relationship.reference_kind(),
@@ -528,7 +531,7 @@ impl RelationshipSet {
     })
   }
 
-  pub fn remove_external_relationship(
+  pub(crate) fn remove_external_relationship(
     &mut self,
     relationship_id: &str,
   ) -> Result<RelationshipInfo, SdkError> {
@@ -552,7 +555,10 @@ impl RelationshipSet {
     )
   }
 
-  pub fn get_hyperlink_relationship(&self, relationship_id: &str) -> Option<&RelationshipInfo> {
+  pub(crate) fn get_hyperlink_relationship(
+    &self,
+    relationship_id: &str,
+  ) -> Option<&RelationshipInfo> {
     self.get(relationship_id).filter(|relationship| {
       matches!(
         relationship.reference_kind(),
@@ -561,7 +567,7 @@ impl RelationshipSet {
     })
   }
 
-  pub fn change_relationship_id(
+  pub(crate) fn change_relationship_id(
     &mut self,
     relationship_id: &str,
     new_relationship_id: impl Into<String>,
@@ -588,7 +594,7 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub fn by_relationship_type(
+  pub(crate) fn by_relationship_type(
     &self,
     relationship_type: &str,
   ) -> impl Iterator<Item = &RelationshipInfo> {
@@ -598,7 +604,7 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub fn part_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+  pub(crate) fn part_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
     self
       .relationships
       .iter()
@@ -606,7 +612,7 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub fn external_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+  pub(crate) fn external_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
     self.relationships.iter().filter(|relationship| {
       relationship.target_kind() == RelationshipTargetKind::External
         && !super::relationship_type_matches(
@@ -617,12 +623,14 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub fn hyperlink_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+  pub(crate) fn hyperlink_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
     self.by_relationship_type(Self::HYPERLINK_RELATIONSHIP_TYPE)
   }
 
   #[inline]
-  pub fn data_part_reference_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
+  pub(crate) fn data_part_reference_relationships(
+    &self,
+  ) -> impl Iterator<Item = &RelationshipInfo> {
     self.relationships.iter().filter(|relationship| {
       super::relationship_type_matches(
         relationship.relationship_type(),
@@ -638,7 +646,10 @@ impl RelationshipSet {
   }
 
   #[inline]
-  pub fn first_target_part_by_relationship_type(&self, relationship_type: &str) -> Option<PartId> {
+  pub(crate) fn first_target_part_by_relationship_type(
+    &self,
+    relationship_type: &str,
+  ) -> Option<PartId> {
     self.relationships.iter().find_map(|relationship| {
       super::relationship_type_matches(relationship.relationship_type(), relationship_type)
         .then(|| relationship.target_part_id())
@@ -714,7 +725,7 @@ impl RelationshipSet {
 }
 
 #[derive(Clone, Debug)]
-pub struct StoredPart {
+pub(crate) struct StoredPart {
   path: Box<str>,
   content_type: Box<str>,
   relationship_type: Option<Box<str>>,
@@ -725,22 +736,22 @@ pub struct StoredPart {
 
 impl StoredPart {
   #[inline]
-  pub fn is_deleted(&self) -> bool {
+  pub(crate) fn is_deleted(&self) -> bool {
     self.deleted
   }
 
   #[inline]
-  pub fn path(&self) -> &str {
+  pub(crate) fn path(&self) -> &str {
     &self.path
   }
 
   #[inline]
-  pub fn content_type(&self) -> &str {
+  pub(crate) fn content_type(&self) -> &str {
     &self.content_type
   }
 
   #[inline]
-  pub fn relationship_type(&self) -> Option<&str> {
+  pub(crate) fn relationship_type(&self) -> Option<&str> {
     self.relationship_type.as_deref()
   }
 
@@ -755,18 +766,18 @@ impl StoredPart {
   }
 
   #[inline]
-  pub fn data(&self) -> &StoredPartData {
+  pub(crate) fn data(&self) -> &StoredPartData {
     &self.data
   }
 
   #[inline]
-  pub fn data_mut(&mut self) -> &mut StoredPartData {
+  pub(crate) fn data_mut(&mut self) -> &mut StoredPartData {
     &mut self.data
   }
 }
 
 #[derive(Debug)]
-pub struct SdkPackageStorage {
+pub(crate) struct SdkPackageStorage {
   id: PackageId,
   content_types: Types,
   package_relationships: RelationshipSet,
@@ -789,7 +800,10 @@ impl Clone for SdkPackageStorage {
 }
 
 impl SdkPackageStorage {
-  pub fn open<R: Read + Seek>(reader: R, open_mode: PackageOpenMode) -> Result<Self, SdkError> {
+  pub(crate) fn open<R: Read + Seek>(
+    reader: R,
+    open_mode: PackageOpenMode,
+  ) -> Result<Self, SdkError> {
     let mut archive = zip::ZipArchive::new(reader)?;
     let content_types = read_content_types(&mut archive)?;
     let mut raw_parts = read_raw_parts(&mut archive, &content_types)?;
@@ -851,7 +865,7 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn content_types(&self) -> &Types {
+  pub(crate) fn content_types(&self) -> &Types {
     &self.content_types
   }
 
@@ -866,12 +880,12 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn parts(&self) -> &[StoredPart] {
+  pub(crate) fn parts(&self) -> &[StoredPart] {
     &self.parts
   }
 
   #[inline]
-  pub fn part(&self, part_id: PartId) -> Option<&StoredPart> {
+  pub(crate) fn part(&self, part_id: PartId) -> Option<&StoredPart> {
     self
       .parts
       .get(part_id.index())
@@ -879,7 +893,7 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn part_mut(&mut self, part_id: PartId) -> Option<&mut StoredPart> {
+  pub(crate) fn part_mut(&mut self, part_id: PartId) -> Option<&mut StoredPart> {
     self
       .parts
       .get_mut(part_id.index())
@@ -887,7 +901,7 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn media_data_parts(&self) -> impl Iterator<Item = (PartId, &StoredPart)> {
+  pub(crate) fn media_data_parts(&self) -> impl Iterator<Item = (PartId, &StoredPart)> {
     self
       .parts
       .iter()
@@ -907,14 +921,18 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn target_part_id(&self, source_part_id: PartId, relationship_id: &str) -> Option<PartId> {
+  pub(crate) fn target_part_id(
+    &self,
+    source_part_id: PartId,
+    relationship_id: &str,
+  ) -> Option<PartId> {
     self
       .relationships(source_part_id)?
       .get(relationship_id)?
       .target_part_id()
   }
 
-  pub fn delete_package_part(&mut self, relationship_id: &str) -> Result<bool, SdkError> {
+  pub(crate) fn delete_package_part(&mut self, relationship_id: &str) -> Result<bool, SdkError> {
     let Some(target_part_id) = self
       .package_relationships
       .get(relationship_id)
@@ -930,7 +948,7 @@ impl SdkPackageStorage {
     Ok(true)
   }
 
-  pub fn delete_child_part(
+  pub(crate) fn delete_child_part(
     &mut self,
     source_part_id: PartId,
     relationship_id: &str,
@@ -951,7 +969,7 @@ impl SdkPackageStorage {
     Ok(true)
   }
 
-  pub fn add_package_relationship_to_part(
+  pub(crate) fn add_package_relationship_to_part(
     &mut self,
     relationship_id: impl Into<String>,
     target_part_id: PartId,
@@ -994,7 +1012,7 @@ impl SdkPackageStorage {
     Ok(relationship_id)
   }
 
-  pub fn add_child_relationship_to_part(
+  pub(crate) fn add_child_relationship_to_part(
     &mut self,
     source_part_id: PartId,
     relationship_id: impl Into<String>,
@@ -1050,7 +1068,7 @@ impl SdkPackageStorage {
     Ok(relationship_id)
   }
 
-  pub fn create_media_data_part(
+  pub(crate) fn create_media_data_part(
     &mut self,
     content_type: impl Into<String>,
     extension: impl AsRef<str>,
@@ -1067,7 +1085,7 @@ impl SdkPackageStorage {
     Ok(part_id)
   }
 
-  pub fn add_data_part_reference_relationship(
+  pub(crate) fn add_data_part_reference_relationship(
     &mut self,
     source_part_id: PartId,
     relationship_id: impl Into<String>,
@@ -1182,7 +1200,7 @@ impl SdkPackageStorage {
       .filter(move |relationship| relationship.target_part_id() == Some(target_part_id))
   }
 
-  pub fn delete_unused_media_data_parts(&mut self) -> usize {
+  pub(crate) fn delete_unused_media_data_parts(&mut self) -> usize {
     let unused_part_ids: Vec<_> = self
       .media_data_parts()
       .filter_map(|(part_id, _)| {
@@ -1320,7 +1338,7 @@ impl SdkPackageStorage {
     Ok(())
   }
 
-  pub fn add_child_part(
+  pub(crate) fn add_child_part(
     &mut self,
     source_part_id: PartId,
     relationship_id: impl Into<String>,
@@ -1385,7 +1403,7 @@ impl SdkPackageStorage {
     Ok(part_id)
   }
 
-  pub fn add_package_part(
+  pub(crate) fn add_package_part(
     &mut self,
     relationship_id: impl Into<String>,
     descriptor: NewPartDescriptor,
@@ -1449,7 +1467,7 @@ impl SdkPackageStorage {
     part_id
   }
 
-  pub fn set_part_data(
+  pub(crate) fn set_part_data(
     &mut self,
     part_id: PartId,
     data: impl Into<Vec<u8>>,
@@ -1463,7 +1481,7 @@ impl SdkPackageStorage {
     Ok(())
   }
 
-  pub fn feed_part_data<R: Read>(
+  pub(crate) fn feed_part_data<R: Read>(
     &mut self,
     part_id: PartId,
     reader: &mut R,

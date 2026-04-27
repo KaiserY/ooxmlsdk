@@ -20,13 +20,12 @@ pub use error::{
 pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub(crate) use package::{
-  NewPartDescriptor, NewPartTargetMode, RelationshipInfo, RelationshipSet, SdkPackageStorage,
-  StoredPart,
+  NewPartDescriptor, NewPartTargetMode, PackageOpenMode, RelationshipInfo, RelationshipSet,
+  SdkPackageStorage, StoredPart,
 };
 #[cfg(feature = "parts")]
 pub use package::{
-  PackageOpenMode, PartId, ReferenceRelationshipKind, Relationship, RelationshipRef,
-  RelationshipTargetKind,
+  PartId, ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
@@ -75,17 +74,7 @@ pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) ->
 }
 
 #[inline(always)]
-pub fn parse_bool_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_bool_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub fn parse_attr_value<T>(
+pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -98,7 +87,7 @@ where
 }
 
 #[inline(always)]
-pub fn parse_u8_attr(
+pub(crate) fn parse_u8_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -108,7 +97,7 @@ pub fn parse_u8_attr(
 }
 
 #[inline(always)]
-pub fn parse_i8_attr(
+pub(crate) fn parse_i8_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -118,7 +107,7 @@ pub fn parse_i8_attr(
 }
 
 #[inline(always)]
-pub fn parse_u16_attr(
+pub(crate) fn parse_u16_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -128,7 +117,7 @@ pub fn parse_u16_attr(
 }
 
 #[inline(always)]
-pub fn parse_i16_attr(
+pub(crate) fn parse_i16_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -138,7 +127,7 @@ pub fn parse_i16_attr(
 }
 
 #[inline(always)]
-pub fn parse_u32_attr(
+pub(crate) fn parse_u32_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -148,7 +137,7 @@ pub fn parse_u32_attr(
 }
 
 #[inline(always)]
-pub fn parse_i32_attr(
+pub(crate) fn parse_i32_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -158,7 +147,7 @@ pub fn parse_i32_attr(
 }
 
 #[inline(always)]
-pub fn parse_u64_attr(
+pub(crate) fn parse_u64_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -168,7 +157,7 @@ pub fn parse_u64_attr(
 }
 
 #[inline(always)]
-pub fn parse_i64_attr(
+pub(crate) fn parse_i64_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -178,7 +167,7 @@ pub fn parse_i64_attr(
 }
 
 #[inline(always)]
-pub fn parse_enum_attr<T>(
+pub(crate) fn parse_enum_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -190,7 +179,11 @@ where
 }
 
 #[inline(always)]
-pub fn parse_value<T>(value: &str, ty: &'static str, field: &'static str) -> Result<T, SdkError>
+pub(crate) fn parse_value<T>(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<T, SdkError>
 where
   T: std::str::FromStr,
 {
@@ -198,21 +191,12 @@ where
 }
 
 #[inline(always)]
-pub fn parse_bool_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_bool_str(value, ty, field)
-}
-
-#[inline(always)]
-pub fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
+pub(crate) fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
   actual == canonical || relationship_type_matches_alias(actual, canonical)
 }
 
 #[inline(always)]
-pub fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
+pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
   if let Some(suffix) =
     canonical.strip_prefix("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
   {
@@ -299,12 +283,7 @@ fn package_main_part_path_matches(
 }
 
 #[inline(always)]
-pub fn parse_bool_bytes(b: &[u8]) -> Result<bool, SdkError> {
-  xml::parse_bool_bytes(b)
-}
-
-#[inline(always)]
-pub fn parse_boolean_value_attr(
+pub(crate) fn parse_boolean_value_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -314,7 +293,7 @@ pub fn parse_boolean_value_attr(
 }
 
 #[inline(always)]
-pub fn parse_on_off_attr(
+pub(crate) fn parse_on_off_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -324,7 +303,7 @@ pub fn parse_on_off_attr(
 }
 
 #[inline(always)]
-pub fn parse_true_false_blank_attr(
+pub(crate) fn parse_true_false_blank_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -334,7 +313,7 @@ pub fn parse_true_false_blank_attr(
 }
 
 #[inline(always)]
-pub fn parse_true_false_attr(
+pub(crate) fn parse_true_false_attr(
   attr: &Attribute<'_>,
   decoder: Decoder,
   ty: &'static str,
@@ -344,7 +323,7 @@ pub fn parse_true_false_attr(
 }
 
 #[inline(always)]
-pub fn parse_boolean_value_str(
+pub(crate) fn parse_boolean_value_str(
   value: &str,
   ty: &'static str,
   field: &'static str,
@@ -353,30 +332,12 @@ pub fn parse_boolean_value_str(
 }
 
 #[inline(always)]
-pub fn parse_on_off_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_on_off_str(value, ty, field)
-}
-
-#[inline(always)]
-pub fn parse_true_false_blank_str(
+pub(crate) fn parse_true_false_blank_str(
   value: &str,
   ty: &'static str,
   field: &'static str,
 ) -> Result<bool, SdkError> {
   xml::parse_true_false_blank_str(value, ty, field)
-}
-
-#[inline(always)]
-pub fn parse_true_false_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_true_false_str(value, ty, field)
 }
 
 #[inline(always)]

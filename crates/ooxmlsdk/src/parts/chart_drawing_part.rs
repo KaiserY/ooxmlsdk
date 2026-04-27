@@ -43,16 +43,6 @@ impl ChartDrawingPart {
     as_chart_drawing_part,
     as_chart_drawing_part_mut
   );
-  pub fn chart_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-    )
-  }
   pub fn chart_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -67,17 +57,6 @@ impl ChartDrawingPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn extended_chart_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn extended_chart_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -89,16 +68,6 @@ impl ChartDrawingPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    )
-  }
-  pub fn image_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
     )
   }
   pub fn image_parts<'a, P: crate::sdk::SdkPackage>(

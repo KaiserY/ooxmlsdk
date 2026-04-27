@@ -228,16 +228,6 @@ impl WorkbookPart {
     as_workbook_part,
     as_workbook_part_mut
   );
-  pub fn custom_xml_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-    )
-  }
   pub fn custom_xml_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -249,16 +239,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-    )
-  }
-  pub fn calculation_chain_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
     )
   }
   pub fn calculation_chain_part<P: crate::sdk::SdkPackage>(
@@ -274,16 +254,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
     )
   }
-  pub fn cell_metadata_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
-    )
-  }
   pub fn cell_metadata_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -295,16 +265,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
-    )
-  }
-  pub fn connections_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
     )
   }
   pub fn connections_part<P: crate::sdk::SdkPackage>(
@@ -320,16 +280,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
     )
   }
-  pub fn custom_xml_mappings_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps",
-    )
-  }
   pub fn custom_xml_mappings_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -341,16 +291,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps",
-    )
-  }
-  pub fn shared_string_table_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
     )
   }
   pub fn shared_string_table_part<P: crate::sdk::SdkPackage>(
@@ -366,16 +306,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
     )
   }
-  pub fn workbook_revision_header_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders",
-    )
-  }
   pub fn workbook_revision_header_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -387,16 +317,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders",
-    )
-  }
-  pub fn workbook_user_data_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames",
     )
   }
   pub fn workbook_user_data_part<P: crate::sdk::SdkPackage>(
@@ -412,16 +332,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames",
     )
   }
-  pub fn workbook_styles_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
-    )
-  }
   pub fn workbook_styles_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -433,16 +343,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
-    )
-  }
-  pub fn theme_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
     )
   }
   pub fn theme_part<P: crate::sdk::SdkPackage>(
@@ -458,16 +358,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
     )
   }
-  pub fn thumbnail_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
-    )
-  }
   pub fn thumbnail_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -479,16 +369,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
-    )
-  }
-  pub fn volatile_dependencies_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies",
     )
   }
   pub fn volatile_dependencies_part<P: crate::sdk::SdkPackage>(
@@ -504,16 +384,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies",
     )
   }
-  pub fn chartsheet_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
-    )
-  }
   pub fn chartsheet_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -525,16 +395,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
-    )
-  }
-  pub fn dialogsheet_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
     )
   }
   pub fn dialogsheet_parts<'a, P: crate::sdk::SdkPackage>(
@@ -550,16 +410,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
     )
   }
-  pub fn external_workbook_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
-    )
-  }
   pub fn external_workbook_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -571,16 +421,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
-    )
-  }
-  pub fn pivot_table_cache_definition_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
     )
   }
   pub fn pivot_table_cache_definition_parts<'a, P: crate::sdk::SdkPackage>(
@@ -598,16 +438,6 @@ impl WorkbookPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
     )
   }
-  pub fn worksheet_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
-    )
-  }
   pub fn worksheet_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -619,16 +449,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
-    )
-  }
-  pub fn excel_attached_toolbars_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
     )
   }
   pub fn excel_attached_toolbars_part<P: crate::sdk::SdkPackage>(
@@ -644,16 +464,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
     )
   }
-  pub fn vba_project_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    )
-  }
   pub fn vba_project_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -665,16 +475,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    )
-  }
-  pub fn macro_sheet_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
     )
   }
   pub fn macro_sheet_parts<'a, P: crate::sdk::SdkPackage>(
@@ -690,16 +490,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
     )
   }
-  pub fn international_macro_sheet_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
-    )
-  }
   pub fn international_macro_sheet_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -712,17 +502,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn custom_data_properties_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/customDataProps",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -741,17 +520,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn slicer_cache_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn slicer_cache_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -763,17 +531,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn time_line_cache_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/timelineCache",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -791,17 +548,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn workbook_person_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/10/relationships/person",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn workbook_person_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -816,17 +562,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn rd_rich_value_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_rich_value_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -838,17 +573,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn ct_rd_rich_value_structure_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -867,17 +591,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn rd_array_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_array_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -889,17 +602,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn rich_styles_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/richStyles",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -917,17 +619,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn rd_supporting_property_bag_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_supporting_property_bag_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -940,17 +631,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn rd_supporting_property_bag_structure_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -970,17 +650,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn rd_rich_value_types_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_rich_value_types_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -995,17 +664,6 @@ impl WorkbookPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn rd_rich_value_web_image_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_rich_value_web_image_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -1017,17 +675,6 @@ impl WorkbookPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn feature_property_bags_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag",
     )
   }
   #[cfg(feature = "microsoft365")]

@@ -60,16 +60,6 @@ impl ExtendedChartPart {
     as_extended_chart_part,
     as_extended_chart_part_mut
   );
-  pub fn chart_drawing_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
-    )
-  }
   pub fn chart_drawing_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -81,16 +71,6 @@ impl ExtendedChartPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
-    )
-  }
-  pub fn embedded_package_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
     )
   }
   pub fn embedded_package_part<P: crate::sdk::SdkPackage>(
@@ -106,16 +86,6 @@ impl ExtendedChartPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
     )
   }
-  pub fn image_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
   pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -127,16 +97,6 @@ impl ExtendedChartPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
-  pub fn theme_override_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
     )
   }
   pub fn theme_override_part<P: crate::sdk::SdkPackage>(
@@ -153,17 +113,6 @@ impl ExtendedChartPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn chart_style_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn chart_style_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -175,17 +124,6 @@ impl ExtendedChartPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn chart_color_style_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
     )
   }
   #[cfg(feature = "microsoft365")]

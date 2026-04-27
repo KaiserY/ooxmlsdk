@@ -30,17 +30,6 @@ impl WebExTaskpanesPart {
     as_web_ex_taskpanes_part_mut
   );
   #[cfg(feature = "microsoft365")]
-  pub fn web_extension_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/webextension",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn web_extension_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

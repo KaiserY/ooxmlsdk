@@ -37,16 +37,6 @@ impl DocumentSettingsPart {
     as_document_settings_part,
     as_document_settings_part_mut
   );
-  pub fn mail_merge_recipient_data_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
-    )
-  }
   pub fn mail_merge_recipient_data_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -58,16 +48,6 @@ impl DocumentSettingsPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
-    )
-  }
-  pub fn image_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
     )
   }
   pub fn image_parts<'a, P: crate::sdk::SdkPackage>(

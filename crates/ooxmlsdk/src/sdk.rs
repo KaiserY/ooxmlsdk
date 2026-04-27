@@ -1556,18 +1556,6 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn child_relationships_by_type<'a, P: SdkPackage>(
-    &'a self,
-    package: &'a P,
-    relationship_type: &'a str,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>>
-  where
-    Self: SdkPart,
-  {
-    <Self as crate::sdk::SdkPartInternal>::relationships_by_type(self, package, relationship_type)
-  }
-
-  #[inline]
   fn child_part_by_relationship_type<P, T>(&self, package: &P, relationship_type: &str) -> Option<T>
   where
     P: SdkPackage,
@@ -3328,22 +3316,6 @@ pub(crate) trait SdkPartInternal: Clone + Sized + 'static {
     Self: SdkPart,
   {
     crate::sdk::SdkPackageInternal::storage_mut(package).relationships_mut(self.part_id())
-  }
-
-  #[inline]
-  fn relationships_by_type<'a, P: SdkPackage>(
-    &'a self,
-    package: &'a P,
-    relationship_type: &'a str,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>>
-  where
-    Self: SdkPart,
-  {
-    self
-      .relationships(package)
-      .into_iter()
-      .flat_map(move |relationships| relationships.by_relationship_type(relationship_type))
-      .map(Into::into)
   }
 }
 

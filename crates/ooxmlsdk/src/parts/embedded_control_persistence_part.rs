@@ -24,20 +24,7 @@ pub struct EmbeddedControlPersistencePart {
   pub(crate) id: crate::common::PartId,
 }
 impl EmbeddedControlPersistencePart {
-  pub fn embedded_control_persistence_binary_data_parts_relationships<
-    'a,
-    P: crate::sdk::SdkPackage,
-  >(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
-    )
-  }
-    pub fn embedded_control_persistence_binary_data_parts<'a, P: crate::sdk::SdkPackage>(
+  pub fn embedded_control_persistence_binary_data_parts<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
     ) -> impl Iterator<

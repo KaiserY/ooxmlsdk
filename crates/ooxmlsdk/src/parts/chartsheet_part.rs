@@ -49,16 +49,6 @@ impl ChartsheetPart {
     as_chartsheet_part,
     as_chartsheet_part_mut
   );
-  pub fn spreadsheet_printer_settings_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    )
-  }
   pub fn spreadsheet_printer_settings_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -74,16 +64,6 @@ impl ChartsheetPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
     )
   }
-  pub fn drawings_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    )
-  }
   pub fn drawings_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -97,16 +77,6 @@ impl ChartsheetPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
     )
   }
-  pub fn vml_drawing_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    )
-  }
   pub fn vml_drawing_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -118,16 +88,6 @@ impl ChartsheetPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    )
-  }
-  pub fn image_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
     )
   }
   pub fn image_parts<'a, P: crate::sdk::SdkPackage>(

@@ -247,23 +247,9 @@ fn part_child_methods(part: &PartModuleDecl) -> Result<TokenStream> {
 
     let attrs = part_field_attrs(field);
     let method_ident: Ident = parse_str(&field.rust_name)?;
-    let relationship_method_ident: Ident =
-      parse_str(&format!("{}_relationships", field.rust_name))?;
     let part_ty: Type = parse_str(&field.rust_type)?;
     methods.push(match cardinality {
       PartChildCardinality::Repeated | PartChildCardinality::RequiredRepeated => quote! {
-        #( #attrs )*
-        pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
-          &'a self,
-          package: &'a P,
-        ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-          <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-            self,
-            package,
-            #relationship_type,
-          )
-        }
-
         #( #attrs )*
         pub fn #method_ident<'a, P: crate::sdk::SdkPackage>(
           &'a self,
@@ -277,18 +263,6 @@ fn part_child_methods(part: &PartModuleDecl) -> Result<TokenStream> {
         }
       },
       PartChildCardinality::Optional | PartChildCardinality::Required => quote! {
-        #( #attrs )*
-        pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
-          &'a self,
-          package: &'a P,
-        ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-          <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-            self,
-            package,
-            #relationship_type,
-          )
-        }
-
         #( #attrs )*
         pub fn #method_ident<P: crate::sdk::SdkPackage>(
           &self,

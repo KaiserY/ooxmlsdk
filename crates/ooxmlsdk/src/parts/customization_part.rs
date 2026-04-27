@@ -29,16 +29,6 @@ impl CustomizationPart {
     as_customization_part,
     as_customization_part_mut
   );
-  pub fn word_attached_toolbars_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
-    )
-  }
   pub fn word_attached_toolbars_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,

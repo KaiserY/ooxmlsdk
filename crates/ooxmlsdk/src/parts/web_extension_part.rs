@@ -29,16 +29,6 @@ impl WebExtensionPart {
     as_web_extension_part,
     as_web_extension_part_mut
   );
-  pub fn image_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
   pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

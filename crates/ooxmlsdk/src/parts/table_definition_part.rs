@@ -30,16 +30,6 @@ impl TableDefinitionPart {
     as_table_definition_part,
     as_table_definition_part_mut
   );
-  pub fn query_table_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
-    )
-  }
   pub fn query_table_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

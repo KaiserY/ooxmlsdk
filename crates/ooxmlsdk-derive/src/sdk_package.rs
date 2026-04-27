@@ -945,37 +945,15 @@ fn package_relationship_method_tokens(
       let attrs = &child.attrs;
       let field_ident = &child.field_ident;
       let method_ident = &child.field_ident;
-      let relationship_method_ident = relationship_accessor_ident(method_ident);
       let part_ty = &child.part_ty;
-      let relationship_type = &child.relationship_type;
       match child.kind {
         PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
-          #( #attrs )*
-          pub fn #relationship_method_ident(
-            &self,
-          ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> + '_ {
-            let _ = self.#field_ident;
-            crate::sdk::SdkPackageInternal::relationships(self)
-              .by_relationship_type(#relationship_type)
-              .map(Into::into)
-          }
-
           #( #attrs )*
           pub fn #method_ident(&self) -> impl Iterator<Item = #part_ty> + '_ {
             self.#field_ident.iter().cloned()
           }
         },
         PartChildKind::Required | PartChildKind::Optional => quote! {
-          #( #attrs )*
-          pub fn #relationship_method_ident(
-            &self,
-          ) -> impl Iterator<Item = crate::common::RelationshipRef<'_>> + '_ {
-            let _ = self.#field_ident;
-            crate::sdk::SdkPackageInternal::relationships(self)
-              .by_relationship_type(#relationship_type)
-              .map(Into::into)
-          }
-
           #( #attrs )*
           pub fn #method_ident(&self) -> Option<#part_ty> {
             self.#field_ident.as_deref().cloned()
@@ -1168,13 +1146,6 @@ fn package_relationship_method_tokens(
 
     #( #accessors )*
   }
-}
-
-fn relationship_accessor_ident(field_ident: &Ident) -> Ident {
-  Ident::new(
-    &format!("{}_relationships", field_ident),
-    field_ident.span(),
-  )
 }
 
 fn part_child_marker_info(ty: &Type) -> Option<PartChildMarkerInfo> {

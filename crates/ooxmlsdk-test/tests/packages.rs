@@ -302,18 +302,13 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
   let styles_part = main_part.style_definitions_part(&package).unwrap();
 
   assert!(main_part.path(&package).is_some());
-  assert_eq!(
-    main_part.get_id_of_part(&package, &styles_part),
-    main_part
-      .style_definitions_part_relationships(&package)
-      .next()
-      .map(|relationship| relationship.id())
-  );
+  assert!(main_part.get_id_of_part(&package, &styles_part).is_some());
   assert_eq!(
     main_part
-      .style_definitions_part_relationships(&package)
-      .count(),
-    1
+      .style_definitions_part(&package)
+      .unwrap()
+      .part_id(),
+    styles_part.part_id()
   );
   assert_eq!(
     main_part
@@ -601,10 +596,9 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
   let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
   assert_eq!(slides.len(), 2);
   assert!(
-    presentation_part
-      .slide_parts_relationships(&package)
-      .count()
-      >= 2
+    slides
+      .iter()
+      .all(|slide| presentation_part.get_id_of_part(&package, slide).is_some())
   );
 
   let media_part = package

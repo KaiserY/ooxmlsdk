@@ -217,16 +217,6 @@ impl GlossaryDocumentPart {
     as_glossary_document_part,
     as_glossary_document_part_mut
   );
-  pub fn wordprocessing_comments_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
-    )
-  }
   pub fn wordprocessing_comments_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -238,16 +228,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
-    )
-  }
-  pub fn document_settings_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
     )
   }
   pub fn document_settings_part<P: crate::sdk::SdkPackage>(
@@ -263,16 +243,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
     )
   }
-  pub fn endnotes_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
-    )
-  }
   pub fn endnotes_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -284,16 +254,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
-    )
-  }
-  pub fn font_table_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
     )
   }
   pub fn font_table_part<P: crate::sdk::SdkPackage>(
@@ -309,16 +269,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
     )
   }
-  pub fn footnotes_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
-    )
-  }
   pub fn footnotes_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -332,16 +282,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
     )
   }
-  pub fn numbering_definitions_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
-    )
-  }
   pub fn numbering_definitions_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -353,16 +293,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
-    )
-  }
-  pub fn style_definitions_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
     )
   }
   pub fn style_definitions_part<P: crate::sdk::SdkPackage>(
@@ -379,17 +309,6 @@ impl GlossaryDocumentPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn styles_with_effects_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn styles_with_effects_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -401,16 +320,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
-    )
-  }
-  pub fn web_settings_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
     )
   }
   pub fn web_settings_part<P: crate::sdk::SdkPackage>(
@@ -426,16 +335,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
     )
   }
-  pub fn footer_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
-    )
-  }
   pub fn footer_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -449,16 +348,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
     )
   }
-  pub fn header_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
-    )
-  }
   pub fn header_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -470,16 +359,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
-    )
-  }
-  pub fn wordprocessing_printer_settings_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
     )
   }
   pub fn wordprocessing_printer_settings_parts<'a, P: crate::sdk::SdkPackage>(
@@ -497,16 +376,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
     )
   }
-  pub fn customization_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations",
-    )
-  }
   pub fn customization_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -520,16 +389,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations",
     )
   }
-  pub fn vba_project_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    )
-  }
   pub fn vba_project_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -541,17 +400,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn wordprocessing_comments_ex_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -569,17 +417,6 @@ impl GlossaryDocumentPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn wordprocessing_people_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/people",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn wordprocessing_people_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -591,17 +428,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2011/relationships/people",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn wordprocessing_comments_ids_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -619,17 +445,6 @@ impl GlossaryDocumentPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn document_tasks_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn document_tasks_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -641,17 +456,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn word_comments_extensible_part_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -668,16 +472,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
     )
   }
-  pub fn alternative_format_import_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
-    )
-  }
   pub fn alternative_format_import_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -690,16 +484,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
-    )
-  }
-  pub fn chart_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
     )
   }
   pub fn chart_parts<'a, P: crate::sdk::SdkPackage>(
@@ -716,17 +500,6 @@ impl GlossaryDocumentPart {
     )
   }
   #[cfg(feature = "microsoft365")]
-  pub fn extended_chart_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
   pub fn extended_chart_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -738,16 +511,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    )
-  }
-  pub fn diagram_colors_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
     )
   }
   pub fn diagram_colors_parts<'a, P: crate::sdk::SdkPackage>(
@@ -763,16 +526,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
     )
   }
-  pub fn diagram_data_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-    )
-  }
   pub fn diagram_data_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -784,17 +537,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn diagram_persist_layout_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
     )
   }
   #[cfg(feature = "microsoft365")]
@@ -812,16 +554,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
     )
   }
-  pub fn diagram_layout_definition_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
-    )
-  }
   pub fn diagram_layout_definition_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -836,16 +568,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
     )
   }
-  pub fn diagram_style_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-    )
-  }
   pub fn diagram_style_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -857,16 +579,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-    )
-  }
-  pub fn embedded_control_persistence_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
     )
   }
   pub fn embedded_control_persistence_parts<'a, P: crate::sdk::SdkPackage>(
@@ -884,16 +596,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
     )
   }
-  pub fn embedded_object_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    )
-  }
   pub fn embedded_object_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -905,16 +607,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    )
-  }
-  pub fn embedded_package_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
     )
   }
   pub fn embedded_package_parts<'a, P: crate::sdk::SdkPackage>(
@@ -930,16 +622,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
     )
   }
-  pub fn image_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
   pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -951,17 +633,6 @@ impl GlossaryDocumentPart {
       self,
       package,
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
-  #[cfg(feature = "microsoft365")]
-  pub fn model3_d_reference_relationship_parts_relationships<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
     )
   }
   #[cfg(feature = "microsoft365")]

@@ -1967,7 +1967,6 @@ fn part_handle_child_methods_tokens(
 ) -> proc_macro2::TokenStream {
   let accessors = child_infos.iter().map(|child| {
     let method_ident = &child.field_ident;
-    let relationship_method_ident = relationship_accessor_ident(method_ident);
     let part_ty = &child.part_ty;
     let relationship_type = &child.relationship_type;
     let map_relationship = quote! {
@@ -1993,18 +1992,6 @@ fn part_handle_child_methods_tokens(
 
     match child.kind {
       PartChildKind::Repeated | PartChildKind::RequiredRepeated => quote! {
-        pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
-          &'a self,
-          package: &'a P,
-        ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-          let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartInternal>::relationships_by_type(
-            self,
-            package,
-            #relationship_type,
-          )
-        }
-
         pub fn #method_ident<'a, P: crate::sdk::SdkPackage>(
           &'a self,
           package: &'a P,
@@ -2017,18 +2004,6 @@ fn part_handle_child_methods_tokens(
         }
       },
       PartChildKind::Required | PartChildKind::Optional => quote! {
-        pub fn #relationship_method_ident<'a, P: crate::sdk::SdkPackage>(
-          &'a self,
-          package: &'a P,
-        ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
-          let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartInternal>::relationships_by_type(
-            self,
-            package,
-            #relationship_type,
-          )
-        }
-
         pub fn #method_ident<P: crate::sdk::SdkPackage>(
           &self,
           package: &P,
@@ -2384,13 +2359,6 @@ fn part_handle_child_methods_tokens(
       #( #accessors )*
     }
   }
-}
-
-fn relationship_accessor_ident(field_ident: &Ident) -> Ident {
-  Ident::new(
-    &format!("{}_relationships", field_ident),
-    field_ident.span(),
-  )
 }
 
 fn marker_inner_type(ty: &Type, marker: &str) -> Option<Type> {

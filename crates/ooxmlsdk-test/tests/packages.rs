@@ -28,7 +28,7 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  MediaDataPartType, SdkPackage, SdkPart, ThumbnailPartType,
+  MediaDataPartType, OpenSettings, SdkPackage, SdkPart, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -125,7 +125,11 @@ fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs
   //   OpenMcPackage
   for file_name in ["mcdoc.docx", "mcinleaf.docx"] {
-    let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample(file_name)).unwrap();
+    let mut package = WordprocessingDocument::new_from_file_lazy_with_settings(
+      doc_sample(file_name),
+      OpenSettings::default(),
+    )
+    .unwrap();
     let main_part = package.main_document_part().unwrap();
     assert!(main_part.root_element(&mut package).is_ok());
 
@@ -137,6 +141,32 @@ fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
     let reopened_main = reopened.main_document_part().unwrap();
     assert!(reopened_main.root_element(&mut reopened).is_ok());
   }
+}
+
+#[test]
+fn spreadsheet_missing_calc_chain_part_respects_open_settings() {
+  // Source: test/DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs
+  //   ThrowWithMissingCalcChainPart
+  //   SucceedWithMissingCalcChainPart
+  let path = doc_sample("missingcalcchainpart.xlsx");
+
+  let mut default_package = SpreadsheetDocument::new_from_file_lazy(&path).unwrap();
+  assert!(default_package.load_all_parts().is_err());
+
+  let settings = OpenSettings {
+    ignore_calculation_chain_part_relationship: true,
+    ..Default::default()
+  };
+  let mut ignored_package =
+    SpreadsheetDocument::new_from_file_lazy_with_settings(&path, settings).unwrap();
+  assert_eq!(ignored_package.open_settings(), &settings);
+  ignored_package.load_all_parts().unwrap();
+  let workbook_part = ignored_package.workbook_part().unwrap();
+  assert!(
+    workbook_part
+      .calculation_chain_part(&ignored_package)
+      .is_none()
+  );
 }
 
 #[test]

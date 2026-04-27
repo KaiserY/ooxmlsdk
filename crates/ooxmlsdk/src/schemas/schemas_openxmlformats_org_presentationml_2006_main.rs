@@ -4892,6 +4892,11 @@ pub struct TitleStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  /// _
+  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  pub list_style: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
+  >,
 }
 /// Slide Master Body Text Style.
 ///
@@ -4975,6 +4980,11 @@ pub struct BodyStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  /// _
+  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  pub list_style: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
+  >,
 }
 /// Slide Master Other Text Style.
 ///
@@ -5058,6 +5068,11 @@ pub struct OtherStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  /// _
+  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  pub list_style: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
+  >,
 }
 /// Defines the DefaultTextStyle Class.
 ///
@@ -5141,6 +5156,11 @@ pub struct DefaultTextStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  /// _
+  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  pub list_style: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
+  >,
 }
 /// Defines the NotesStyle Class.
 ///
@@ -5224,6 +5244,11 @@ pub struct NotesStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  /// _
+  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  pub list_style: Option<
+    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
+  >,
 }
 /// Defines the TextListStyleType Class.
 ///

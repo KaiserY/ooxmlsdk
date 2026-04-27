@@ -31,8 +31,8 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 
 ## Summary
 
-- `blocked_by_api`: 77
-- `covered`: 32
+- `blocked_by_api`: 75
+- `covered`: 34
 - `covered_by_doc_samples`: 38
 - `missing`: 85
 - `not_applicable`: 121
@@ -164,8 +164,8 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:243` `TestDataReferenceRelationshipsAreClonedCorrectly` | Fact | `partial` | `packaging` | Package public API behavior covered in packages.rs; exact .NET stream/options semantics not always applicable |
 | `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:272` `TestOpenModel3DWrittenByPowerPoint_DotMime` | Fact | `covered` | `packaging` | Model3D PowerPoint content type is covered by packages.rs |
 | `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:302` `TestOpenModel3DWrittenByPowerPoint_DashMime` | Fact | `covered` | `packaging` | Model3D PowerPoint content type is covered by packages.rs |
-| `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:321` `ThrowWithMissingCalcChainPart` | Fact | `blocked_by_api` | `open_settings` | Requires OpenSettings/IgnoreCalculationChainPartRelationship-style public API |
-| `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:333` `SucceedWithMissingCalcChainPart` | Fact | `blocked_by_api` | `open_settings` | Requires OpenSettings/IgnoreCalculationChainPartRelationship-style public API |
+| `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:321` `ThrowWithMissingCalcChainPart` | Fact | `covered` | `open_settings` | `packages.rs::spreadsheet_missing_calc_chain_part_respects_open_settings` verifies missing calcChain relationships fail during load-all validation by default |
+| `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:333` `SucceedWithMissingCalcChainPart` | Fact | `covered` | `open_settings` | `packages.rs::spreadsheet_missing_calc_chain_part_respects_open_settings` verifies `OpenSettings::ignore_calculation_chain_part_relationship` allows load-all validation to continue |
 | `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:347` `IsEncryptedOfficeFile_ReturnsTrue_ForEncryptedFile` | Fact | `blocked_by_api` | `encryption_detection` | Requires an IsEncryptedOfficeFile-style public API |
 | `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:356` `IsEncryptedOfficeFile_ReturnsFalse_ForUnencryptedFile` | Fact | `blocked_by_api` | `encryption_detection` | Requires an IsEncryptedOfficeFile-style public API |
 | `DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs:365` `IsEncryptedOfficeFile_ThrowsArgumentNullException_ForNullStream` | Fact | `blocked_by_api` | `encryption_detection` | Requires an IsEncryptedOfficeFile-style public API |

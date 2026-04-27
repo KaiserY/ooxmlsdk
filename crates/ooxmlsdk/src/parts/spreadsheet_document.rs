@@ -12,6 +12,7 @@ pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
 pub struct SpreadsheetDocument {
   pub(crate) storage: crate::common::SdkPackageStorage,
+  pub(crate) open_settings: crate::sdk::OpenSettings,
   pub(crate) main_part_id: Option<crate::common::PartId>,
   pub(crate) root_elements: Vec<Option<crate::parts::PartRootElement>>,
   #[sdk(package_main(accessor = "workbook_part"))]

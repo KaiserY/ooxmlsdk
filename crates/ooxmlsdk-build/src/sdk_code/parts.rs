@@ -70,6 +70,7 @@ fn gen_package_module(
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
     pub struct #struct_name_ident {
       pub(crate) storage: crate::common::SdkPackageStorage,
+      pub(crate) open_settings: crate::sdk::OpenSettings,
       pub(crate) main_part_id: Option<crate::common::PartId>,
       pub(crate) root_elements: Vec<Option<crate::parts::PartRootElement>>,
       #( #marker_fields )*
@@ -571,6 +572,95 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
       }
       Ok(root_elements)
+    }
+
+    pub(crate) fn load_all_part_roots<P>(
+      package: &mut P,
+    ) -> Result<(), crate::common::SdkError>
+    where
+      P: crate::sdk::SdkPackage,
+    {
+      validate_missing_internal_relationships(package)?;
+
+      let part_count = crate::sdk::SdkPackageInternal::storage(package).parts().len();
+      for index in 0..part_count {
+        let part_id = crate::common::PartId::from_index(index);
+        if crate::sdk::SdkPackageInternal::storage(package).part(part_id).is_none()
+          || crate::sdk::SdkPackageInternal::is_root_element_loaded(package, part_id)
+        {
+          continue;
+        }
+
+        let root_element = crate::parts::PartRootElement::from_part_id(
+          crate::sdk::SdkPackageInternal::storage(package),
+          part_id,
+        )?;
+        if let Some(root_element) = root_element
+          && let Some(slot) = crate::sdk::SdkPackageInternal::root_element_slot_mut(package, part_id)
+        {
+          *slot = Some(root_element);
+        }
+      }
+
+      Ok(())
+    }
+
+    fn validate_missing_internal_relationships<P>(
+      package: &P,
+    ) -> Result<(), crate::common::SdkError>
+    where
+      P: crate::sdk::SdkPackage,
+    {
+      let storage = crate::sdk::SdkPackageInternal::storage(package);
+
+      for relationship in storage.package_relationships().iter() {
+        validate_missing_internal_relationship(package, relationship)?;
+      }
+
+      for part in storage.parts().iter().filter(|part| !part.is_deleted()) {
+        for relationship in part.relationships().iter() {
+          validate_missing_internal_relationship(package, relationship)?;
+        }
+      }
+
+      Ok(())
+    }
+
+    fn validate_missing_internal_relationship<P>(
+      package: &P,
+      relationship: &crate::common::RelationshipInfo,
+    ) -> Result<(), crate::common::SdkError>
+    where
+      P: crate::sdk::SdkPackage,
+    {
+      if !matches!(
+        relationship.target_kind(),
+        crate::common::RelationshipTargetKind::Missing
+      ) || should_ignore_missing_relationship(package, relationship)
+      {
+        return Ok(());
+      }
+
+      Err(crate::common::SdkError::CommonError(format!(
+        "relationship {} targets missing part {}",
+        relationship.id(),
+        relationship.target()
+      )))
+    }
+
+    fn should_ignore_missing_relationship<P>(
+      package: &P,
+      relationship: &crate::common::RelationshipInfo,
+    ) -> bool
+    where
+      P: crate::sdk::SdkPackage,
+    {
+      crate::sdk::SdkPackageInternal::open_settings(package)
+        .ignore_calculation_chain_part_relationship
+        && crate::common::relationship_type_matches(
+          relationship.relationship_type(),
+          crate::parts::calculation_chain_part::RELATIONSHIP_TYPE,
+        )
     }
 
     pub fn save_package<P, W>(

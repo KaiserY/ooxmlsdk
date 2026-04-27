@@ -187,6 +187,23 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     .find(|field| field.ident.as_ref().is_some_and(|ident| ident == "storage"))
     .ok_or_else(|| syn::Error::new_spanned(input, "SdkPackage requires a `storage` field"))?;
   let storage_ident = storage_field.ident.as_ref().unwrap();
+  let open_settings_ident = fields.named.iter().find_map(|field| {
+    let ident = field.ident.as_ref()?;
+    (ident == "open_settings").then_some(ident)
+  });
+  let open_settings_method = open_settings_ident.map(|ident| {
+    quote! {
+      #[inline]
+      fn open_settings(&self) -> &crate::sdk::OpenSettings {
+        &self.#ident
+      }
+    }
+  });
+  let open_settings_init = open_settings_ident.map(|ident| {
+    quote! {
+      #ident: open_settings,
+    }
+  });
 
   let main_part_id_field = fields
     .named
@@ -219,6 +236,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       continue;
     };
     if field_ident == "storage"
+      || field_ident == "open_settings"
       || field_ident == "main_part_id"
       || field_ident == "root_elements"
       || is_relationship_model_field(field_ident)
@@ -415,6 +433,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         &mut self.#storage_ident
       }
 
+      #open_settings_method
+
       fn refresh_relationship_model_from_storage(&mut self) {
         let (
           #( #child_field_tuple_values, )*
@@ -450,13 +470,27 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn new<R: std::io::Read + std::io::Seek>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::new_inner(reader, crate::common::PackageOpenMode::Eager)
+        Self::new_with_settings(reader, crate::sdk::OpenSettings::default())
       }
 
       pub fn new_lazy<R: std::io::Read + std::io::Seek>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::new_inner(reader, crate::common::PackageOpenMode::Lazy)
+        Self::new_lazy_with_settings(reader, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn new_with_settings<R: std::io::Read + std::io::Seek>(
+        reader: R,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::new_inner(reader, crate::common::PackageOpenMode::Eager, open_settings)
+      }
+
+      pub fn new_lazy_with_settings<R: std::io::Read + std::io::Seek>(
+        reader: R,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::new_inner(reader, crate::common::PackageOpenMode::Lazy, open_settings)
       }
 
       pub fn new_from_file<P: AsRef<std::path::Path>>(
@@ -469,6 +503,36 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         path: P,
       ) -> Result<Self, crate::common::SdkError> {
         Self::new_lazy(std::io::BufReader::new(std::fs::File::open(path)?))
+      }
+
+      pub fn new_from_file_with_settings<P: AsRef<std::path::Path>>(
+        path: P,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::new_with_settings(
+          std::io::BufReader::new(std::fs::File::open(path)?),
+          open_settings,
+        )
+      }
+
+      pub fn new_from_file_lazy_with_settings<P: AsRef<std::path::Path>>(
+        path: P,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::new_lazy_with_settings(
+          std::io::BufReader::new(std::fs::File::open(path)?),
+          open_settings,
+        )
+      }
+
+      #[inline]
+      pub fn open_settings(&self) -> &crate::sdk::OpenSettings {
+        crate::sdk::SdkPackage::open_settings(self)
+      }
+
+      #[inline]
+      pub fn load_all_parts(&mut self) -> Result<(), crate::common::SdkError> {
+        crate::sdk::SdkPackage::load_all_parts(self)
       }
 
       #[inline]
@@ -849,6 +913,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       fn new_inner<R: std::io::Read + std::io::Seek>(
         reader: R,
         open_mode: crate::common::PackageOpenMode,
+        open_settings: crate::sdk::OpenSettings,
       ) -> Result<Self, crate::common::SdkError> {
         let storage = crate::common::SdkPackageStorage::open(reader, open_mode)?;
         let main_part_id = #main_relationship_expr;
@@ -864,6 +929,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           relationship_order,
           modeled_relationships,
           #storage_ident: storage,
+          #open_settings_init
         })
       }
     }

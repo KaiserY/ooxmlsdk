@@ -148,6 +148,10 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "svg.docx"
       | "Youtube.xlsx"
       | "mediareference.pptx"
+      | "layout_altcontent.pptx"
+      | "master_altcontent.pptx"
+      | "notes_altcontent.pptx"
+      | "slide_altcontent.pptx"
   )
 }
 

@@ -656,10 +656,69 @@ impl MediaDataPartType {
 }
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FileFormatVersion {
+  Office2007,
+  Office2010,
+  Office2013,
+  Office2016,
+  Office2019,
+  Office2021,
+  #[default]
+  Microsoft365,
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum MarkupCompatibilityProcessMode {
+  #[default]
+  NoProcess,
+  ProcessLoadedPartsOnly,
+  ProcessAllParts,
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MarkupCompatibilityProcessSettings {
+  pub process_mode: MarkupCompatibilityProcessMode,
+  pub target_file_format_version: FileFormatVersion,
+}
+
+#[cfg(feature = "parts")]
+impl Default for MarkupCompatibilityProcessSettings {
+  #[inline]
+  fn default() -> Self {
+    Self {
+      process_mode: MarkupCompatibilityProcessMode::NoProcess,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct OpenSettings {
+  pub markup_compatibility_process_settings: MarkupCompatibilityProcessSettings,
+  pub ignore_calculation_chain_part_relationship: bool,
+}
+
+#[cfg(feature = "parts")]
 pub(crate) trait SdkPackageInternal {
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 
   fn storage_mut(&mut self) -> &mut crate::common::SdkPackageStorage;
+
+  #[inline]
+  fn open_settings(&self) -> &OpenSettings {
+    static DEFAULT_SETTINGS: OpenSettings = OpenSettings {
+      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+        process_mode: MarkupCompatibilityProcessMode::NoProcess,
+        target_file_format_version: FileFormatVersion::Microsoft365,
+      },
+      ignore_calculation_chain_part_relationship: false,
+    };
+    &DEFAULT_SETTINGS
+  }
 
   #[inline]
   fn relationships(&self) -> &crate::common::RelationshipSet {
@@ -726,6 +785,19 @@ pub(crate) trait SdkPackageInternal {
 #[cfg(feature = "parts")]
 #[allow(private_bounds)]
 pub trait SdkPackage: SdkPackageInternal {
+  #[inline]
+  fn open_settings(&self) -> &OpenSettings {
+    crate::sdk::SdkPackageInternal::open_settings(self)
+  }
+
+  #[inline]
+  fn load_all_parts(&mut self) -> Result<(), crate::common::SdkError>
+  where
+    Self: Sized,
+  {
+    crate::parts::load_all_part_roots(self)
+  }
+
   #[inline]
   fn add_external_relationship(
     &mut self,

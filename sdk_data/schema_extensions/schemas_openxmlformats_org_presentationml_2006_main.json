@@ -1,6 +1,66 @@
 {
   "Types": [
     {
+      "ClassName": "TitleStyle",
+      "Children": [
+        {
+          "Name": "a:CT_TextListStyle/a:lstStyle",
+          "PropertyName": "list_style",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "default_paragraph_properties"
+        }
+      ]
+    },
+    {
+      "ClassName": "BodyStyle",
+      "Children": [
+        {
+          "Name": "a:CT_TextListStyle/a:lstStyle",
+          "PropertyName": "list_style",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "default_paragraph_properties"
+        }
+      ]
+    },
+    {
+      "ClassName": "OtherStyle",
+      "Children": [
+        {
+          "Name": "a:CT_TextListStyle/a:lstStyle",
+          "PropertyName": "list_style",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "default_paragraph_properties"
+        }
+      ]
+    },
+    {
+      "ClassName": "DefaultTextStyle",
+      "Children": [
+        {
+          "Name": "a:CT_TextListStyle/a:lstStyle",
+          "PropertyName": "list_style",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "default_paragraph_properties"
+        }
+      ]
+    },
+    {
+      "ClassName": "NotesStyle",
+      "Children": [
+        {
+          "Name": "a:CT_TextListStyle/a:lstStyle",
+          "PropertyName": "list_style",
+          "Kind": "Child",
+          "Optional": true,
+          "InsertBefore": "default_paragraph_properties"
+        }
+      ]
+    },
+    {
       "ClassName": "Extension",
       "Children": [
         {

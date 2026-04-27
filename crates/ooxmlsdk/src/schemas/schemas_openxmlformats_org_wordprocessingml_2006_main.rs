@@ -11156,6 +11156,7 @@ pub struct CustomXmlRuby {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -11249,6 +11250,7 @@ pub struct SimpleFieldRuby {
   #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
   pub field_data: Option<crate::simple_type::Base64BinaryValue>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -11364,6 +11366,7 @@ pub struct HyperlinkRuby {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -11541,6 +11544,7 @@ pub struct SdtRunRuby {
   #[sdk(child(qname = "w:CT_SdtContentRunRuby/w:sdtContent"))]
   pub sdt_content_run_ruby: Option<SdtContentRunRuby>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -11714,6 +11718,7 @@ pub struct InsertedRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -11826,6 +11831,7 @@ pub struct DeletedRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -11938,6 +11944,7 @@ pub struct MoveFromRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -12050,6 +12057,7 @@ pub struct MoveToRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -12261,6 +12269,7 @@ pub struct SdtRun {
   #[sdk(child(qname = "w:CT_SdtContentRun/w:sdtContent"))]
   pub sdt_content_run: Option<SdtContentRun>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12308,6 +12317,7 @@ pub struct CustomXmlBlock {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
     qname = "w:CT_P/w:p",
@@ -12363,6 +12373,7 @@ pub struct SdtBlock {
   #[sdk(child(qname = "w:CT_SdtContentBlock/w:sdtContent"))]
   pub sdt_content_block: Option<SdtContentBlock>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12476,6 +12487,7 @@ pub struct Paragraph {
   #[sdk(child(qname = "w:CT_PPr/w:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -12548,6 +12560,7 @@ pub struct Paragraph {
 #[sdk(qname = "w:CT_Tbl/w:tbl")]
 pub struct Table {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12582,6 +12595,7 @@ pub struct Table {
   #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
   pub w_tbl_grid: std::boxed::Box<TableGrid>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
     qname = "w:CT_SdtRow/w:sdt",
@@ -12688,6 +12702,7 @@ pub struct TableRow {
   #[sdk(child(qname = "w:CT_TrPr/w:trPr"))]
   pub table_row_properties: Option<std::boxed::Box<TableRowProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
     qname = "w:CT_SdtCell/w:sdt",
@@ -12736,6 +12751,7 @@ pub struct CustomXmlRow {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
     qname = "w:CT_SdtRow/w:sdt",
@@ -12790,6 +12806,7 @@ pub struct SdtRow {
   #[sdk(child(qname = "w:CT_SdtContentRow/w:sdtContent"))]
   pub sdt_content_row: Option<SdtContentRow>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12830,6 +12847,7 @@ pub struct TableCell {
   #[sdk(child(qname = "w:CT_TcPr/w:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -12880,6 +12898,7 @@ pub struct CustomXmlCell {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
     qname = "w:CT_SdtCell/w:sdt",
@@ -12934,6 +12953,7 @@ pub struct SdtCell {
   #[sdk(child(qname = "w:CT_SdtContentCell/w:sdtContent"))]
   pub sdt_content_cell: Option<SdtContentCell>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12981,6 +13001,7 @@ pub struct CustomXmlRun {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -13077,6 +13098,7 @@ pub struct SimpleField {
   #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
   pub field_data: Option<crate::simple_type::Base64BinaryValue>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -13195,6 +13217,7 @@ pub struct Hyperlink {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -15449,6 +15472,7 @@ pub struct Recipients {
 #[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
 pub struct TextBoxContent {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -15549,6 +15573,7 @@ pub struct Header {
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -15604,6 +15629,7 @@ pub struct Footer {
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -18053,6 +18079,7 @@ pub struct RubyProperties {
 #[sdk(qname = "w:CT_RubyContent/w:rt")]
 pub struct RubyContent {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -18127,6 +18154,7 @@ pub struct RubyContent {
 #[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
 pub struct RubyBase {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -18330,6 +18358,7 @@ pub struct ListItem {
 #[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
 pub struct SdtProperties {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_RPr/w:rPr",
     qname = "w:CT_String/w:alias",
     qname = "w:CT_Lock/w:lock",
@@ -18389,6 +18418,7 @@ pub struct SdtEndCharProperties {
 #[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
 pub struct SdtContentBlock {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
     qname = "w:CT_P/w:p",
@@ -18440,6 +18470,7 @@ pub struct SdtContentBlock {
 #[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
 pub struct SdtContentRun {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "m:CT_R/m:r",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
@@ -18517,6 +18548,7 @@ pub struct SdtContentRun {
 #[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
 pub struct SdtContentRunRuby {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -18591,6 +18623,7 @@ pub struct SdtContentRunRuby {
 #[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
 pub struct SdtContentCell {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
     qname = "w:CT_SdtCell/w:sdt",
@@ -18641,6 +18674,7 @@ pub struct SdtContentCell {
 #[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
 pub struct SdtContentRow {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
     qname = "w:CT_SdtRow/w:sdt",
@@ -21638,6 +21672,7 @@ pub struct Footnote {
   ))]
   pub id: crate::simple_type::IntegerValue,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -21706,6 +21741,7 @@ pub struct Endnote {
   ))]
   pub id: crate::simple_type::IntegerValue,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -22154,6 +22190,7 @@ pub struct DocPartProperties {
 #[sdk(qname = "w:CT_Body/w:docPartBody")]
 pub struct DocPartBody {
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -22208,6 +22245,7 @@ pub struct Body {
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -25177,6 +25215,12 @@ pub enum CustomXmlRubyChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRubyChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRuby>),
   #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
@@ -25422,6 +25466,12 @@ pub enum SimpleFieldRubyChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldRubyChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRuby>),
   #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
@@ -25437,7 +25487,13 @@ pub enum SimpleFieldRubyChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkRubyChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -25751,7 +25807,13 @@ pub enum RunChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunRubyChoice {
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
     WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
@@ -26044,6 +26106,12 @@ pub enum InsertedRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedRunChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
   #[sdk(choice)]
@@ -26289,6 +26357,12 @@ pub enum DeletedRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DeletedRunChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
   #[sdk(choice)]
@@ -26534,6 +26608,12 @@ pub enum MoveFromRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromRunChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
   #[sdk(choice)]
@@ -26779,6 +26859,12 @@ pub enum MoveToRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToRunChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
   #[sdk(choice)]
@@ -27030,7 +27116,13 @@ pub enum RunTrackChangeTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunChoice {
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
     WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
@@ -27093,7 +27185,13 @@ pub enum SdtRunChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlBlockChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
     #[sdk(child(qname = "w:CT_SdtBlock/w:sdt"))]
     WSdt(std::boxed::Box<SdtBlock>),
@@ -27199,7 +27297,13 @@ pub enum CustomXmlBlockChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtBlockChoice {
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
     WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
@@ -27492,6 +27596,12 @@ pub enum ParagraphChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
   #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
@@ -27515,7 +27625,13 @@ pub enum ParagraphChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice {
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
     WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
@@ -27578,7 +27694,13 @@ pub enum TableChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice2 {
-  #[sdk(child(qname = "w:CT_Row/w:tr"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     #[sdk(child(qname = "w:CT_CustomXmlRow/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRow>),
@@ -27682,7 +27804,13 @@ pub enum TableChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowChoice {
-  #[sdk(child(qname = "w:CT_Tc/w:tc"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     #[sdk(child(qname = "w:CT_CustomXmlCell/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlCell>),
@@ -27786,7 +27914,13 @@ pub enum TableRowChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRowChoice {
-  #[sdk(child(qname = "w:CT_Row/w:tr"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     #[sdk(child(qname = "w:CT_CustomXmlRow/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRow>),
@@ -27890,7 +28024,13 @@ pub enum CustomXmlRowChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRowChoice {
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
     WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
@@ -27953,7 +28093,13 @@ pub enum SdtRowChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -28061,7 +28207,13 @@ pub enum TableCellChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlCellChoice {
-  #[sdk(child(qname = "w:CT_Tc/w:tc"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     #[sdk(child(qname = "w:CT_CustomXmlCell/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlCell>),
@@ -28165,7 +28317,13 @@ pub enum CustomXmlCellChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtCellChoice {
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
     WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
@@ -28458,6 +28616,12 @@ pub enum CustomXmlRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRunChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
   #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
@@ -28711,6 +28875,12 @@ pub enum SimpleFieldChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
   #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
@@ -28734,7 +28904,13 @@ pub enum SimpleFieldChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRun>),
     #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleField>),
@@ -29464,7 +29640,13 @@ pub enum BidirectionalEmbeddingChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBoxContentChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -29572,7 +29754,13 @@ pub enum TextBoxContentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HeaderChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -29680,7 +29868,13 @@ pub enum HeaderChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FooterChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -29997,7 +30191,13 @@ pub enum CheckBoxChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyContentChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -30237,7 +30437,13 @@ pub enum RubyContentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyBaseChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -30713,6 +30919,12 @@ pub enum RubyContentTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtPropertiesChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   WRPr(std::boxed::Box<RunProperties>),
   #[sdk(child(qname = "w:CT_String/w:alias"))]
@@ -30813,7 +31025,13 @@ pub enum SdtPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentBlockChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
     #[sdk(child(qname = "w:CT_SdtBlock/w:sdt"))]
     WSdt(std::boxed::Box<SdtBlock>),
@@ -30919,7 +31137,13 @@ pub enum SdtContentBlockChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunChoice {
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
@@ -31167,7 +31391,13 @@ pub enum SdtContentRunChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunRubyChoice {
-  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -31407,7 +31637,13 @@ pub enum SdtContentRunRubyChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentCellChoice {
-  #[sdk(child(qname = "w:CT_Tc/w:tc"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     #[sdk(child(qname = "w:CT_CustomXmlCell/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlCell>),
@@ -31511,7 +31747,13 @@ pub enum SdtContentCellChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRowChoice {
-  #[sdk(child(qname = "w:CT_Row/w:tr"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     #[sdk(child(qname = "w:CT_CustomXmlRow/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRow>),
@@ -31678,7 +31920,13 @@ pub enum CommentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FootnoteChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -31786,7 +32034,13 @@ pub enum FootnoteChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndnoteChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -31998,7 +32252,13 @@ pub enum FootnoteEndnoteTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DocPartBodyChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -32106,7 +32366,13 @@ pub enum DocPartBodyChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyChoice {
-  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+    McAlternateContent(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+        >,
+    ),
+    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),

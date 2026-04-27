@@ -70,6 +70,10 @@ pub struct OneCellAnchor {
   /// _
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -100,6 +104,10 @@ pub struct AbsoluteAnchor {
   ///Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -180,6 +188,7 @@ pub struct GroupShape {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
@@ -1073,6 +1082,12 @@ pub enum AbsoluteAnchorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]

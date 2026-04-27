@@ -3821,6 +3821,10 @@ pub struct DiagramDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",

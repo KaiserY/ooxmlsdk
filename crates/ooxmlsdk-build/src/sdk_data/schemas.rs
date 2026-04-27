@@ -11,6 +11,8 @@ use crate::sdk_data::{
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use std::collections::{BTreeSet, HashMap};
 
+const MCE_ALTERNATE_CONTENT_NAME: &str = "mc:CT_AlternateContent/mc:AlternateContent";
+
 #[derive(Clone, Debug)]
 struct StableGroupSignature {
   property_name: String,
@@ -55,6 +57,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .flat_map(|schema| schema.types.iter())
     .map(|ty| (ty.name.as_str(), ty))
     .collect();
+  let has_mce_alternate_content =
+    type_map.contains_key("mc:CT_AlternateContent/mc:AlternateContent");
   let stable_group_signatures = load_stable_group_signatures(gen_context);
 
   let schemas: Vec<Schema> = gen_context
@@ -163,6 +167,9 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           assign_stable_group_names(&mut children, &stable_group_signatures);
           mark_sequence_collection_children_repeated(ty, &mut children);
           mark_mixed_sequence_direct_children_optional(&mut children);
+          if has_mce_alternate_content {
+            insert_mce_alternate_content_for_mixed_version_choices(ty, &mut children);
+          }
           assign_particle_ids(&mut children);
 
           let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
@@ -261,6 +268,58 @@ pub(crate) fn assign_schema_particle_ids(schemas: &mut [Schema]) {
   for schema in schemas {
     for schema_type in &mut schema.types {
       assign_particle_ids(&mut schema_type.children);
+    }
+  }
+}
+
+pub(crate) fn assign_mce_alternate_content_property_names(schemas: &mut [Schema]) {
+  for schema in schemas {
+    for schema_type in &mut schema.types {
+      assign_mce_alternate_content_property_names_in_children(&mut schema_type.children);
+    }
+  }
+}
+
+fn assign_mce_alternate_content_property_names_in_children(children: &mut [SchemaTypeChild]) {
+  let mut count = 0;
+  for child in children.iter_mut() {
+    if is_mce_alternate_content_child(child) {
+      count += 1;
+      child.property_name = if count == 1 {
+        "mc_alternate_content".to_string()
+      } else {
+        format!("mc_alternate_content{count}")
+      };
+    }
+  }
+
+  for child in children {
+    match child.kind {
+      SchemaTypeChildKind::Sequence => {
+        assign_mce_alternate_content_property_names_in_children(&mut child.children);
+      }
+      SchemaTypeChildKind::Choice => {
+        assign_mce_alternate_content_property_names_in_choice(&mut child.children);
+      }
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {}
+    }
+  }
+}
+
+fn assign_mce_alternate_content_property_names_in_choice(children: &mut [SchemaTypeChild]) {
+  for child in children {
+    if is_mce_alternate_content_child(child) {
+      child.property_name = "mc_alternate_content".to_string();
+    }
+
+    match child.kind {
+      SchemaTypeChildKind::Sequence => {
+        assign_mce_alternate_content_property_names_in_children(&mut child.children);
+      }
+      SchemaTypeChildKind::Choice => {
+        assign_mce_alternate_content_property_names_in_choice(&mut child.children);
+      }
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {}
     }
   }
 }
@@ -992,6 +1051,114 @@ fn mark_mixed_sequence_direct_children_optional(children: &mut [SchemaTypeChild]
       child.optional = true;
     }
   }
+}
+
+fn insert_mce_alternate_content_for_mixed_version_choices(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  children: &mut Vec<SchemaTypeChild>,
+) {
+  if !is_office2007_or_default(schema_type.version.as_deref()) {
+    return;
+  }
+
+  insert_mce_alternate_content_in_children(children);
+}
+
+fn insert_mce_alternate_content_in_children(children: &mut Vec<SchemaTypeChild>) {
+  let children = if children.len() == 1 && children[0].kind == SchemaTypeChildKind::Sequence {
+    &mut children[0].children
+  } else {
+    children
+  };
+
+  let mut index = 0;
+  while index < children.len() {
+    if is_mixed_version_choice(&children[index], "") {
+      if children[index].repeated {
+        insert_mce_alternate_content_choice_variant(&mut children[index]);
+        index += 1;
+      } else if index > 0 && is_mce_alternate_content_child(&children[index - 1]) {
+        index += 1;
+      } else {
+        children.insert(index, mce_alternate_content_child(true));
+        index += 2;
+      }
+    } else {
+      index += 1;
+    }
+  }
+}
+
+fn insert_mce_alternate_content_choice_variant(choice: &mut SchemaTypeChild) {
+  if choice.children.iter().any(is_mce_alternate_content_child) {
+    return;
+  }
+
+  choice
+    .children
+    .insert(0, mce_alternate_content_child(false));
+}
+
+fn mce_alternate_content_child(optional: bool) -> SchemaTypeChild {
+  SchemaTypeChild {
+    particle_id: String::new(),
+    name: MCE_ALTERNATE_CONTENT_NAME.to_string(),
+    property_name: "mc_alternate_content".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Child,
+    optional,
+    repeated: false,
+    initial_version: String::new(),
+    children: Vec::new(),
+  }
+}
+
+fn is_mce_alternate_content_child(child: &SchemaTypeChild) -> bool {
+  child.name == MCE_ALTERNATE_CONTENT_NAME
+}
+
+fn is_mixed_version_choice(child: &SchemaTypeChild, inherited_initial_version: &str) -> bool {
+  if child.kind != SchemaTypeChildKind::Choice {
+    return false;
+  }
+
+  let mut versions = ChoiceVersionCoverage::default();
+  collect_choice_version_coverage(child, inherited_initial_version, &mut versions);
+  versions.has_default && versions.has_later
+}
+
+#[derive(Default)]
+struct ChoiceVersionCoverage {
+  has_default: bool,
+  has_later: bool,
+}
+
+fn collect_choice_version_coverage(
+  child: &SchemaTypeChild,
+  inherited_initial_version: &str,
+  out: &mut ChoiceVersionCoverage,
+) {
+  let initial_version =
+    effective_initial_version(inherited_initial_version, child.initial_version.as_str());
+
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
+      if is_office2007_or_default(Some(initial_version)) {
+        out.has_default = true;
+      } else {
+        out.has_later = true;
+      }
+    }
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      for nested in &child.children {
+        collect_choice_version_coverage(nested, initial_version, out);
+      }
+    }
+  }
+}
+
+fn is_office2007_or_default(version: Option<&str>) -> bool {
+  matches!(version, None | Some("") | Some("Office2007"))
 }
 
 fn assign_particle_ids(children: &mut [SchemaTypeChild]) {

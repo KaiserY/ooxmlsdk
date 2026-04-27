@@ -3445,6 +3445,10 @@ pub struct FilterColumn {
   /// Represents the following attribute in the schema: :showButton
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "x:CT_Filters/x:filters",
     qname = "x:CT_Top10/x:top10",
@@ -3499,6 +3503,10 @@ pub struct SortState {
   /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(qname = "x:CT_SortCondition/x:sortCondition"))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -13832,7 +13840,10 @@ pub struct Value {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
-  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem"))]
+  #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
+    qname = "x:CT_OleItem/x:oleItem"
+  ))]
   #[cfg_attr(
     feature = "microsoft365",
     sdk(choice(qname = "x14:CT_OleItem/x14:oleItem"))
@@ -14926,6 +14937,10 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(feature = "microsoft365", sdk(choice(qname = "x:ST_Guid/x14:id")))]
   pub xml_children: Option<ConditionalFormattingRuleExtensionChoice>,
@@ -14946,6 +14961,10 @@ pub struct PivotHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -14969,6 +14988,10 @@ pub struct PivotFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -14992,6 +15015,10 @@ pub struct CacheSourceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -16860,6 +16887,10 @@ pub struct Filters {
   /// Represents the following attribute in the schema: :calendarType
   #[sdk(attr(qname = ":calendarType"))]
   pub calendar_type: Option<CalendarValues>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "x:CT_Filter/x:filter",
     qname = "x:CT_DateGroupItem/x:dateGroupItem"
@@ -17034,6 +17065,10 @@ pub struct SlicerCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17061,6 +17096,10 @@ pub struct PivotFilterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17087,6 +17126,10 @@ pub struct QueryTableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17477,6 +17520,10 @@ pub struct ConnectionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17681,6 +17728,10 @@ pub struct CacheFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17757,6 +17808,10 @@ pub struct CacheHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17795,6 +17850,10 @@ pub struct CalculatedMemberExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17833,6 +17892,10 @@ pub struct DataFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18144,6 +18207,10 @@ pub struct WorksheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18397,6 +18464,10 @@ pub struct StylesheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18806,6 +18877,10 @@ pub struct PivotTableDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -19052,6 +19127,10 @@ pub struct PivotCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -19197,6 +19276,10 @@ pub struct TableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -19925,6 +20008,10 @@ pub struct WorkbookExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -20155,6 +20242,12 @@ pub enum FillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleItemsChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "x:CT_OleItem/x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
   #[cfg(feature = "microsoft365")]

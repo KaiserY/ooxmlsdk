@@ -2068,6 +2068,10 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "p:CT_Empty/p:sldTgt",
     qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt",
@@ -3743,6 +3747,10 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3761,6 +3769,10 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -5904,6 +5916,10 @@ pub struct SlideExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5931,6 +5947,10 @@ pub struct CommonSlideDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5954,6 +5974,10 @@ pub struct ShowPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6069,6 +6093,10 @@ pub struct Transition {
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub advance_after_time: Option<crate::simple_type::StringValue>,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "p:CT_OrientationTransition/p:blinds",
     qname = "p:CT_OrientationTransition/p:checker",
@@ -6197,6 +6225,7 @@ pub struct ShapeTree {
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
@@ -6227,6 +6256,7 @@ pub struct GroupShape {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
+    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
@@ -6551,6 +6581,10 @@ pub struct CommentAuthorExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6574,6 +6608,10 @@ pub struct CommentExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6597,6 +6635,10 @@ pub struct SlideLayoutExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6620,6 +6662,10 @@ pub struct SlideMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6643,6 +6689,10 @@ pub struct HandoutMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6666,6 +6716,10 @@ pub struct NotesMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6751,6 +6805,10 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -7355,6 +7413,10 @@ pub struct PresentationExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -7634,6 +7696,10 @@ pub struct PresentationPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -8951,6 +9017,12 @@ pub enum BackgroundChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
@@ -8967,6 +9039,12 @@ pub enum ShapeTreeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  McAlternateContent(
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
+    >,
+  ),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]

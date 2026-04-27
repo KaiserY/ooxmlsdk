@@ -348,6 +348,10 @@ fn find_merge_target_legacy<'a>(
   target: &'a mut [SchemaTypeChild],
   extension: &SchemaTypeChildExtension,
 ) -> Option<&'a mut SchemaTypeChild> {
+  if is_mce_alternate_content_insert(extension) {
+    return None;
+  }
+
   if !extension.name.is_empty()
     && let Some(index) = target.iter().position(|child| child.name == extension.name)
   {
@@ -375,6 +379,12 @@ fn find_merge_target_legacy<'a>(
   }
 
   None
+}
+
+fn is_mce_alternate_content_insert(extension: &SchemaTypeChildExtension) -> bool {
+  extension.insert_before.is_some()
+    && extension.kind == SchemaTypeChildKind::Child
+    && extension.name == "mc:CT_AlternateContent/mc:AlternateContent"
 }
 
 fn find_insert_before_index(target: &[SchemaTypeChild], insert_before: &str) -> Option<usize> {

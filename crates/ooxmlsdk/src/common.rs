@@ -413,7 +413,7 @@ pub(crate) fn is_foreign_prefixed_child(name: &[u8], expected_prefix: &str) -> b
   };
   let prefix = &name[..separator_index];
 
-  prefix != b"mc" && prefix != expected_prefix.as_bytes()
+  prefix != expected_prefix.as_bytes()
 }
 
 #[inline]

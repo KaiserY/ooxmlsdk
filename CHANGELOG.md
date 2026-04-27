@@ -1,5 +1,36 @@
 # Change Log
 
+## 0.5.0
+
+### Breaking Changes
+
+- Aligned the generated `parts` API more closely with upstream Open XML SDK container concepts. Public package and part operations now favor upstream-style entry points such as `new`, `new_lazy`, `new_from_file`, `save`, `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, relationship-specific helpers, and typed child accessors.
+- Hid raw package storage, raw relationship storage, generated part factory plumbing, dynamic downcasts, and generic relationship mutation helpers from the public API. Consumers should use public package/part methods instead of depending on internal storage or relationship implementation details.
+- Removed generated part descriptor metadata and typed child relationship accessor surfaces that exposed implementation details rather than upstream-aligned package behavior.
+
+### New Features
+
+- Expanded storage-backed package APIs for Wordprocessing, Spreadsheet, and Presentation documents, including shallow part handles, relationship-backed child lookup, package copy/import helpers, data part reference relationships, and save/reopen flows.
+- Added broader upstream-derived package coverage for VML drawing parts, extended chart parts, font table parts, SDT mutation, media references, model3d relationships, and supported part creation/import paths.
+- Added `UPSTREAM_TEST_MATRIX.md` to track coverage against upstream Open XML SDK tests and to distinguish covered, partial, missing, not applicable, and API-blocked areas.
+
+### XML and MCE Compatibility
+
+- Improved `mc:AlternateContent` handling so body-level alternate content, choices, fallbacks, `mc:Ignorable`, `mc:MustUnderstand`, and fallback raw XML children round-trip more predictably.
+- Preserved additional markup compatibility attributes and extension attributes in Wordprocessing and Spreadsheet XML, including `mc:ProcessContent`, `mc:PreserveAttributes`, and Office extension namespace attributes.
+- Added coverage for upstream MCE samples such as `mcdoc.docx`, `mcinleaf.docx`, `MCExecl.xlsx`, `excel14.xlsx`, `extlst.xlsx`, and Office 2016 extended chart samples.
+
+### Bug Fixes
+
+- Kept no-default and `parts`-only feature lanes compiling cleanly by gating parts-only helpers and tightening feature-gated test imports.
+- Improved package relationship alias matching and descriptor checks used by generated part loading.
+- Preserved touched font table namespace declarations such as `w14` through package save/reopen cycles.
+
+### Testing
+
+- Expanded integration coverage in `ooxmlsdk-test` for upstream-aligned package APIs, schema round trips, MCE XML preservation, and document sample package flows.
+- Validated the release with the workspace default, `--no-default-features`, and `--no-default-features --features parts` test lanes, plus matching clippy lanes.
+
 ## 0.4.1
 
 ### New Features

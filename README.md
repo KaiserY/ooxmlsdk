@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/ooxmlsdk.svg)](https://crates.io/crates/ooxmlsdk)
 [![docs](https://docs.rs/ooxmlsdk/badge.svg)](https://docs.rs/ooxmlsdk)
 
-`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The overall API shape is inspired by the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK), but the implementation is code-generated for Rust and organized around generated schema types, namespaces, serializers, deserializers, and strongly typed package parts.
+`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The public package API is intentionally aligned with the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) container model, while the implementation is code-generated for Rust and organized around generated schema types, namespaces, serializers, deserializers, and strongly typed package parts.
 
 ## Features
 
@@ -53,23 +53,27 @@ Most users should keep the default features enabled:
 
 ```toml
 [dependencies]
-ooxmlsdk = "0.4.1"
+ooxmlsdk = "0.5.0"
 ```
 
 If you want the narrower Office 2007-oriented package surface, disable default features and enable only `parts`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.4.1", default-features = false, features = ["parts"] }
+ooxmlsdk = { version = "0.5.0", default-features = false, features = ["parts"] }
 ```
 
-Read and save a package:
+Read, inspect, and save a package:
 
 ```rust
 use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
+use ooxmlsdk::sdk::SdkPackage;
 
 fn round_trip(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
   let document = WordprocessingDocument::new_from_file(path)?;
+  let main_part = document.main_document_part().expect("main document part");
+  assert!(document.get_id_of_part(&main_part).is_some());
+
   let mut out = std::io::Cursor::new(Vec::new());
   document.save(&mut out)?;
   Ok(())
@@ -85,6 +89,26 @@ fn parse_core_properties(xml: &str) -> Result<CoreProperties, Box<dyn std::error
   Ok(xml.parse()?)
 }
 ```
+
+## Package API
+
+The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx` files. The intended public surface follows upstream Open XML SDK concepts:
+
+- open and create packages with constructors such as `new`, `new_lazy`, `new_from_file`, and `new_from_file_lazy`
+- save packages with `save`
+- inspect package and part relationships with `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, and relationship-specific helpers
+- access well-known child parts through typed methods such as `main_document_part`, `workbook_part`, `presentation_part`, `worksheet_parts`, `font_table_part`, and chart-related part accessors
+- read or replace part payloads through public data helpers and root-element helpers
+
+Raw package storage, raw relationship sets, generated factory internals, and unchecked dynamic part plumbing are not part of the public API. Prefer the package and part methods above when writing code that should survive generator updates.
+
+## XML And MCE Compatibility
+
+The generated XML reader/writer preserves markup compatibility data needed for stable round trips, including common `mc:*` attributes, `mc:AlternateContent`, choice/fallback content, and extension namespace attributes used by newer Office documents.
+
+Current integration coverage includes upstream-derived MCE and extension samples such as `mcdoc.docx`, `mcinleaf.docx`, `MCExecl.xlsx`, `excel14.xlsx`, `extlst.xlsx`, and Office 2016 extended chart packages. These tests focus on public Rust APIs and stable XML/package round trips.
+
+Full Open XML SDK-style `OpenSettings` markup compatibility processing, unknown-element DOM editing, and markup compatibility validator behavior are still future work.
 
 ## Project Structure
 
@@ -119,6 +143,7 @@ For runtime performance work, prefer evaluating `cargo bench -p ooxmlsdk-test` a
 
 - There is no `serde` integration.
 - The validator surface is optional and still narrower than the core read/write path.
+- Open XML SDK-style `OpenSettings`, full markup compatibility processing modes, and unknown-element DOM APIs are not yet exposed.
 - Some schema shapes still map to generated enum-based child collections rather than a fully particle-aware hand-modeled API.
 - `to_string()` is just `Display`; prefer the XML-oriented APIs when you care about write performance.
 

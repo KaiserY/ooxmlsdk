@@ -1,3 +1,4 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContentChoice;
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
@@ -603,6 +604,68 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
   assert_eq!(paragraph_bookmark_start_count(reparsed_paragraph), 1);
   assert_eq!(paragraph_bookmark_end_count(reparsed_paragraph), 1);
   assert!(paragraph_text(reparsed_paragraph).contains("Hello O14"));
+}
+
+#[test]
+fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadAttributeTest
+  //   LoadPreserveAttr
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   NonIgnored_UnknownElement_FullMode
+  //   ProcessContent_NonIgnored_UnknownElement_FullMode
+  //   MustUnderstand_NonIgnored_UnknownElement_FullMode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:body><w:p><w:r mc:PreserveAttributes="w14:editId" w14:myattr="myattr"><mc:AlternateContent mc:MustUnderstand="w14" mc:ProcessContent="w14:unknown"><mc:Choice Requires="w14"><w14:unknown attr="1">choice</w14:unknown></mc:Choice><mc:Fallback><w:t>fallback</w:t></mc:Fallback></mc:AlternateContent><w:t>after</w:t></w:r></w:p></w:body></w:document>"#;
+
+  let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
+
+  assert_eq!(document.mc_ignorable.as_deref(), Some("w14"));
+  let run = first_run(first_paragraph(first_body(&document)));
+  assert_eq!(run.mc_preserve_attributes.as_deref(), Some("w14:editId"));
+  assert_eq!(run.w14_myattr.as_deref(), Some("myattr"));
+
+  let alternate_content = run
+    .run_choice
+    .iter()
+    .find_map(|choice| match choice {
+      RunChoice::McAlternateContent(alternate_content) => Some(alternate_content.as_ref()),
+      _ => None,
+    })
+    .expect("expected alternate content in run");
+  assert_eq!(alternate_content.mc_must_understand.as_deref(), Some("w14"));
+  assert_eq!(
+    alternate_content.mc_process_content.as_deref(),
+    Some("w14:unknown")
+  );
+
+  let choice = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Choice");
+  assert_eq!(choice.requires.as_deref(), Some("w14"));
+  assert_eq!(
+    choice.xml_children,
+    vec![r#"<w14:unknown attr="1">choice</w14:unknown>"#.to_string()]
+  );
+
+  let fallback = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      AlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Fallback");
+  assert_eq!(fallback.xml_children, vec![r#"<w:t>fallback</w:t>"#]);
+  assert!(serialized.contains(r#"mc:Ignorable="w14""#));
+  assert!(serialized.contains(r#"mc:PreserveAttributes="w14:editId""#));
+  assert!(serialized.contains(r#"mc:MustUnderstand="w14""#));
+  assert!(serialized.contains(r#"mc:ProcessContent="w14:unknown""#));
+  assert!(serialized.contains(r#"<w14:unknown attr="1">choice</w14:unknown>"#));
 }
 
 #[test]

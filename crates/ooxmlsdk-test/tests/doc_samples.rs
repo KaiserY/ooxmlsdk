@@ -11,7 +11,7 @@ use ooxmlsdk::parts::{
   PartRef, presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
-use ooxmlsdk::sdk::{SdkPackage, SdkPartHandle};
+use ooxmlsdk::sdk::{SdkPackage, SdkPart};
 use ooxmlsdk_test::fixtures::doc_sample_path;
 use quick_xml::{Reader, escape::unescape, events::Event};
 use zip::ZipArchive;
@@ -218,7 +218,7 @@ fn assert_part_subgraph_equal<P, T>(
   roundtripped_part: T,
 ) where
   P: SdkPackage,
-  T: SdkPartHandle,
+  T: SdkPart,
 {
   assert_eq!(
     direct_part_signature(
@@ -271,7 +271,7 @@ fn all_part_signature(parts: Vec<PartRef>) -> Vec<String> {
 fn part_path<'a, P, T>(package: &'a P, part: &T) -> &'a str
 where
   P: ooxmlsdk::sdk::SdkPackage,
-  T: SdkPartHandle,
+  T: SdkPart,
 {
   part.path(package).unwrap()
 }

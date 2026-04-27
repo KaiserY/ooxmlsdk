@@ -78,7 +78,10 @@ fn main() {
 }
 
 fn is_invalid(file_name: &str) -> bool {
-  matches!(file_name, "5Errors.docx" | "UnknownElement.docx")
+  matches!(
+    file_name,
+    "5Errors.docx" | "UnknownElement.docx" | "encrypted_pptx.pptx"
+  )
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
@@ -149,7 +152,7 @@ fn is_round_trip_supported(file_name: &str) -> bool {
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {
-  matches!(file_name, "")
+  matches!(file_name, "InvalidDocProps.docx")
 }
 
 fn version_cfg_attr(file_name: &str) -> String {

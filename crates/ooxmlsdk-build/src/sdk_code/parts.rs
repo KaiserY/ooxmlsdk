@@ -413,7 +413,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         #( #part_attrs )*
         if #exact_match_condition {
           return Some(PartRef::#struct_ident(
-            <#part_ty as crate::sdk::SdkPart>::from_part_id_with_relationships(
+            <#part_ty as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
               crate::sdk::SdkPackageInternal::storage(package),
               part_id,
             ),
@@ -427,7 +427,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         #( #part_attrs )*
         if #exact_match_condition {
           return Some(PartRef::#struct_ident(
-            <#part_ty as crate::sdk::SdkPart>::from_relationship_id_with_relationships(
+            <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
               storage,
               relationship.id(),
               part_id,
@@ -447,7 +447,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         #target_name_str,
       ) {
         return Some(PartRef::#struct_ident(
-          <#part_ty as crate::sdk::SdkPart>::from_part_id_with_relationships(
+          <#part_ty as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
             crate::sdk::SdkPackageInternal::storage(package),
             part_id,
           ),
@@ -466,7 +466,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         #target_name_str,
       ) {
         return Some(PartRef::#struct_ident(
-          <#part_ty as crate::sdk::SdkPart>::from_relationship_id_with_relationships(
+          <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
             storage,
             relationship.id(),
             part_id,
@@ -508,7 +508,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         let part = crate::sdk::SdkPackageInternal::storage(package).part(part_id)?;
         let Some(relationship_type) = part.relationship_type() else {
           return Some(PartRef::ExtendedPart(
-            <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPart>::from_part_id_with_relationships(
+            <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
               crate::sdk::SdkPackageInternal::storage(package),
               part_id,
             ),
@@ -521,7 +521,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           }
         }
         Some(PartRef::ExtendedPart(
-          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPart>::from_part_id_with_relationships(
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
             crate::sdk::SdkPackageInternal::storage(package),
             part_id,
           ),
@@ -536,7 +536,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         let part = storage.part(part_id)?;
         let Some(relationship_type) = part.relationship_type() else {
           return Some(PartRef::ExtendedPart(
-            <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPart>::from_relationship_id_with_relationships(
+            <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
               storage,
               relationship.id(),
               part_id,
@@ -550,7 +550,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           }
         }
         Some(PartRef::ExtendedPart(
-          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPart>::from_relationship_id_with_relationships(
+          <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
             storage,
             relationship.id(),
             part_id,
@@ -594,7 +594,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
       }
 
-      pub fn from_part_id(
+      pub(crate) fn from_part_id(
         storage: &crate::common::SdkPackageStorage,
         part_id: crate::common::PartId,
       ) -> Result<Option<Self>, crate::common::SdkError> {
@@ -607,7 +607,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       }
     }
 
-    pub fn initialize_root_elements(
+    pub(crate) fn initialize_root_elements(
       storage: &crate::common::SdkPackageStorage,
       open_mode: crate::common::PackageOpenMode,
     ) -> Result<Vec<Option<crate::parts::PartRootElement>>, crate::common::SdkError> {
@@ -623,58 +623,12 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       Ok(root_elements)
     }
 
-    pub trait PartRootCache: crate::sdk::SdkPackage {
-      fn root_element(
-        &self,
-        part_id: crate::common::PartId,
-      ) -> Option<&crate::parts::PartRootElement>;
-
-      fn root_element_slot_mut(
-        &mut self,
-        part_id: crate::common::PartId,
-      ) -> Option<&mut Option<crate::parts::PartRootElement>>;
-
-      fn push_root_element_slot(&mut self);
-
-      #[inline]
-      fn is_root_element_loaded(&self, part_id: crate::common::PartId) -> bool {
-        self.root_element(part_id).is_some()
-      }
-
-      #[inline]
-      fn unload_root_element(
-        &mut self,
-        part_id: crate::common::PartId,
-      ) -> Option<crate::parts::PartRootElement> {
-        self.root_element_slot_mut(part_id)?.take()
-      }
-
-      #[inline]
-      fn part_bytes_for_copy(
-        &self,
-        part_id: crate::common::PartId,
-      ) -> Result<Vec<u8>, crate::common::SdkError> {
-        if let Some(root_element) = self.root_element(part_id) {
-          root_element.to_xml_bytes()
-        } else {
-          let part = crate::sdk::SdkPackageInternal::storage(self)
-            .part(part_id)
-            .ok_or_else(|| {
-              crate::common::SdkError::CommonError(format!(
-                "part id {part_id:?} is not present in package storage"
-              ))
-            })?;
-          Ok(part.data().bytes().to_vec())
-        }
-      }
-    }
-
     pub fn save_package<P, W>(
       package: &P,
       writer: W,
     ) -> Result<(), crate::common::SdkError>
     where
-      P: crate::parts::PartRootCache,
+      P: crate::sdk::SdkPackage,
       W: std::io::Write + std::io::Seek,
     {
       use std::io::Write as _;
@@ -722,7 +676,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
 
         zip.start_file(part.path(), options)?;
-        if let Some(root_element) = package.root_element(part_id) {
+        if let Some(root_element) = crate::sdk::SdkPackageInternal::root_element(package, part_id) {
           zip.write_all(&root_element.to_xml_bytes()?)?;
         } else {
           zip.write_all(part.data().bytes())?;
@@ -918,9 +872,9 @@ mod tests {
     assert!(!rendered.contains("pub fn downcast"));
     assert!(rendered.contains("pub struct IdPartPair < 'a >"));
     assert!(rendered.contains("pub enum PartRootElement"));
-    assert!(rendered.contains("pub trait PartRootCache"));
-    assert!(rendered.contains("pub fn initialize_root_elements"));
-    assert!(rendered.contains("pub fn from_part_id"));
+    assert!(!rendered.contains("pub trait PartRootCache"));
+    assert!(rendered.contains("pub (crate) fn initialize_root_elements"));
+    assert!(rendered.contains("pub (crate) fn from_part_id"));
     assert!(rendered.contains("PackageOpenMode :: Eager"));
     assert!(rendered.contains(
       "MainDocumentPart (Box < crate :: schemas :: schemas_openxmlformats_org_wordprocessingml_2006_main :: Document >)"

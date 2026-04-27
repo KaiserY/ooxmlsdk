@@ -7,7 +7,7 @@ mod error;
 #[cfg(feature = "parts")]
 pub mod extended_part;
 #[cfg(feature = "parts")]
-pub mod package;
+mod package;
 #[cfg(feature = "parts")]
 mod part;
 mod xml;
@@ -25,13 +25,15 @@ pub use extended_part::ExtendedPart;
 #[cfg(feature = "parts")]
 pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
-pub use package::{
-  NewPartDescriptor, NewPartTargetMode, PackageOpenMode, PartId, ReferenceRelationshipKind,
-  Relationship, RelationshipRef, RelationshipTargetKind, SdkPackageStorage, StoredPart,
-  StoredPartData, StoredPartDataKind,
+pub(crate) use package::{
+  NewPartDescriptor, NewPartTargetMode, RelationshipInfo, RelationshipSet, SdkPackageStorage,
+  StoredPart,
 };
 #[cfg(feature = "parts")]
-pub(crate) use package::{RelationshipInfo, RelationshipSet};
+pub use package::{
+  PackageOpenMode, PartId, ReferenceRelationshipKind, Relationship, RelationshipRef,
+  RelationshipTargetKind,
+};
 #[cfg(feature = "parts")]
 pub use part::{
   load_data_part_reference, load_extended_part, load_part_relationships, load_typed_child_part,

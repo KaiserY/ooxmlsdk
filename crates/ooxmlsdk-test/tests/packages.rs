@@ -5,16 +5,15 @@ use std::io::{Cursor, Write};
 
 use ooxmlsdk::common::{
   MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipRef, RelationshipTargetKind,
-  StoredPartDataKind,
 };
 use ooxmlsdk::parts::{
-  PartRef, PartRootCache, custom_xml_part::CustomXmlPart,
-  document_settings_part::DocumentSettingsPart, font_table_part::FontTablePart,
-  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
-  presentation_document::PresentationDocument, presentation_part::PresentationPart,
-  ribbon_extensibility_part::RibbonExtensibilityPart, slide_part::SlidePart,
-  spreadsheet_document::SpreadsheetDocument, style_definitions_part::StyleDefinitionsPart,
-  thumbnail_part::ThumbnailPart, wordprocessing_document::WordprocessingDocument,
+  PartRef, custom_xml_part::CustomXmlPart, document_settings_part::DocumentSettingsPart,
+  font_table_part::FontTablePart, header_part::HeaderPart, image_part::ImagePart,
+  main_document_part::MainDocumentPart, presentation_document::PresentationDocument,
+  presentation_part::PresentationPart, ribbon_extensibility_part::RibbonExtensibilityPart,
+  slide_part::SlidePart, spreadsheet_document::SpreadsheetDocument,
+  style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
+  wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
@@ -27,7 +26,7 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  MediaDataPartType, PartChildCardinality, SdkPackage, SdkPartHandle, ThumbnailPartType,
+  MediaDataPartType, SdkPackage, SdkPart, ThumbnailPartType,
 };
 use ooxmlsdk_test::fixtures;
 
@@ -91,51 +90,12 @@ fn media_data_part_by_id<P: SdkPackage>(package: &P, part_id: PartId) -> MediaDa
 fn part_relationship_count<P, T>(package: &P, part: &T) -> usize
 where
   P: SdkPackage,
-  T: SdkPartHandle,
+  T: SdkPart,
 {
   part.parts(package).count()
     + part.external_relationships(package).count()
     + part.hyperlink_relationships(package).count()
     + part.data_part_reference_relationships(package).count()
-}
-
-#[test]
-fn part_child_descriptors_are_generated_from_static_field_metadata() {
-  let slide_master_descriptor = PresentationPart::child_descriptors()
-    .iter()
-    .find(|descriptor| descriptor.field_name == "slide_master_parts")
-    .expect("presentation slide master child descriptor");
-
-  assert_eq!(
-    slide_master_descriptor.relationship_type,
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster"
-  );
-  assert_eq!(
-    slide_master_descriptor.child_part_type,
-    "crate::parts::slide_master_part::SlideMasterPart"
-  );
-  assert_eq!(
-    slide_master_descriptor.cardinality,
-    PartChildCardinality::RequiredRepeated
-  );
-
-  let main_document_descriptor = WordprocessingDocument::child_descriptors()
-    .iter()
-    .find(|descriptor| descriptor.field_name == "main_document_part")
-    .expect("wordprocessing main document child descriptor");
-
-  assert_eq!(
-    main_document_descriptor.relationship_type,
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-  );
-  assert_eq!(
-    main_document_descriptor.child_part_type,
-    "crate::parts::main_document_part::MainDocumentPart"
-  );
-  assert_eq!(
-    main_document_descriptor.cardinality,
-    PartChildCardinality::Required
-  );
 }
 
 fn package_entry_exists(bytes: Vec<u8>, path: &str) -> bool {
@@ -184,7 +144,8 @@ fn package_relationships_resolve_with_container_local_part_factory() {
 }
 
 #[test]
-fn package_relationship_set_can_be_edited_and_written_back() {
+fn package_external_relationship_can_be_edited_and_written_back() {
+  // Source: adapted from OpenXmlPackage package relationship mutation coverage.
   let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   package
     .add_external_relationship(
@@ -333,7 +294,8 @@ fn wordprocessing_child_accessors_are_relationship_backed_handles() {
 }
 
 #[test]
-fn part_relationship_set_classifies_children_and_references() {
+fn wordprocessing_part_relationship_helpers_classify_children_and_references() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: HyperlinkRelationshipTest
   let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
 
@@ -387,11 +349,7 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
 
   assert!(main_part.root_element(&mut package).is_ok());
   assert!(comments_part.root_element(&mut package).is_ok());
-  assert!(package.root_element(image_part.part_id()).is_none());
-  assert_eq!(
-    image_part.data_kind(&package),
-    Some(StoredPartDataKind::Binary)
-  );
+  assert!(!image_part.data(&package).unwrap().is_empty());
   assert_eq!(
     main_part.get_id_of_part(&package, &comments_part),
     Some("rId7")
@@ -412,7 +370,7 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
 }
 
 #[test]
-fn raw_whitespace_part_data_does_not_load_root_element() {
+fn part_root_element_rejects_whitespace_only_xml() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: RootElementTest2
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
   let main_part = package.add_main_document_part().unwrap();
@@ -521,7 +479,7 @@ fn delete_invalid_child_part_id_is_safe() {
 }
 
 #[test]
-fn package_storage_parts_match_openxml_package_get_all_parts_tests() {
+fn package_get_all_parts_matches_openxml_package_tests() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
   //   OpenXmlPackageGetAllPartsTestWord
   //   OpenXmlPackageGetAllPartsTestPowerPoint
@@ -1140,23 +1098,6 @@ fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test()
 }
 
 #[test]
-fn root_cache_reports_and_unloads_lazy_roots() {
-  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: UnloadRootElementTest
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
-  let main_part = package.main_document_part().unwrap();
-  let part_id = main_part.part_id();
-
-  assert!(!package.is_root_element_loaded(part_id));
-  assert!(!main_part.is_root_element_loaded(&package));
-  assert!(main_part.root_element(&mut package).is_ok());
-  assert!(main_part.is_root_element_loaded(&package));
-  assert!(package.is_root_element_loaded(part_id));
-  assert!(main_part.unload_root_element(&mut package).is_some());
-  assert!(!main_part.is_root_element_loaded(&package));
-  assert!(!package.is_root_element_loaded(part_id));
-}
-
-#[test]
 fn part_root_element_mutation_is_saved() {
   // Source: adapted from OpenXmlPart root element save/mutation coverage.
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
@@ -1181,15 +1122,11 @@ fn set_root_element_replaces_lazy_root_and_is_saved() {
   // Source: adapted from OpenXmlPart root element save/mutation coverage.
   let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let part_id = main_part.part_id();
-
-  assert!(!package.is_root_element_loaded(part_id));
 
   main_part
     .set_root_element(&mut package, empty_body_document())
     .unwrap();
 
-  assert!(package.is_root_element_loaded(part_id));
   assert_eq!(
     main_document_body_child_count(main_part.root_element(&mut package).unwrap()),
     0
@@ -1211,39 +1148,9 @@ fn root_element_mut_updates_eager_root_and_is_saved() {
   // Source: adapted from OpenXmlPart root element save/mutation coverage.
   let mut package = WordprocessingDocument::new_from_file(doc_sample("Of16-01.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
-  let part_id = main_part.part_id();
 
   assert!(main_part.root_element(&mut package).is_ok());
-  assert!(package.is_root_element_loaded(part_id));
   main_part.root_element_mut(&mut package).unwrap().body = Some(Box::new(Body::default()));
-
-  let mut buffer = Cursor::new(Vec::new());
-  package.save(&mut buffer).unwrap();
-
-  let mut reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
-  let reopened_main = reopened.main_document_part().unwrap();
-  let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
-
-  assert_eq!(main_document_body_child_count(reopened_root), 0);
-  assert!(reopened_root.body.is_some());
-}
-
-#[test]
-fn set_root_element_replaces_unloaded_root_cache() {
-  // Source: adapted from OpenXmlPart root element load/unload/save coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
-  let main_part = package.main_document_part().unwrap();
-  let part_id = main_part.part_id();
-
-  assert!(main_part.root_element(&mut package).is_ok());
-  assert!(package.unload_root_element(part_id).is_some());
-  assert!(!package.is_root_element_loaded(part_id));
-
-  main_part
-    .set_root_element(&mut package, empty_body_document())
-    .unwrap();
-
-  assert!(package.is_root_element_loaded(part_id));
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
@@ -1520,15 +1427,9 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
     Some("application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml")
   );
   assert_eq!(header_part.path(&package), Some("word/header1.xml"));
-  assert!(
-    !package.is_root_element_loaded(header_part.part_id()),
-    "new part should start with an empty lazy root slot"
-  );
-
   header_part
     .set_root_element(&mut package, Header::default())
     .unwrap();
-  assert!(package.is_root_element_loaded(header_part.part_id()));
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
@@ -3213,8 +3114,30 @@ fn presentation_child_accessors_resolve_repeated_parts() {
   assert!(presentation_part.slide_master_parts(&package).count() >= 1);
 }
 
+#[cfg(feature = "microsoft365")]
 #[test]
-fn package_save_roundtrips_unmodified_storage() {
+fn model3d_reference_relationship_parts_use_powerpoint_content_type() {
+  // Source: test/DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs
+  //   TestOpenModel3DWrittenByPowerPoint_DotMime
+  //   TestOpenModel3DWrittenByPowerPoint_DashMime
+  for file_name in ["3dtestdot.pptx", "3dtestdash.pptx"] {
+    let package = PresentationDocument::new_from_file(doc_sample(file_name)).unwrap();
+    let presentation_part = package.presentation_part().unwrap();
+    let slide_part = presentation_part.slide_parts(&package).next().unwrap();
+    let model3d_part = slide_part
+      .model3_d_reference_relationship_parts(&package)
+      .next()
+      .unwrap();
+
+    assert_eq!(
+      model3d_part.content_type(&package),
+      Some("model/gltf-binary")
+    );
+  }
+}
+
+#[test]
+fn package_save_roundtrips_unmodified_document() {
   let original = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
   let mut buffer = Cursor::new(Vec::new());
 
@@ -3227,7 +3150,7 @@ fn package_save_roundtrips_unmodified_storage() {
 }
 
 #[test]
-fn package_copy_helpers_include_dirty_root_cache() {
+fn package_copy_helpers_include_unsaved_root_changes() {
   // Source: upstream package Clone(stream) behavior adapted to Rust copy helpers.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
   let main_part = package.add_main_document_part().unwrap();

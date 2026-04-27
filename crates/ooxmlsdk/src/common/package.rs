@@ -44,14 +44,6 @@ impl PackageId {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum StoredPartDataKind {
-  Xml,
-  Text,
-  #[default]
-  Binary,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NewPartDescriptor {
   pub relationship_type: Cow<'static, str>,
@@ -70,20 +62,10 @@ pub enum NewPartTargetMode {
 
 #[derive(Clone, Debug)]
 pub enum StoredPartData {
-  Raw {
-    kind: StoredPartDataKind,
-    bytes: Vec<u8>,
-  },
+  Raw { bytes: Vec<u8> },
 }
 
 impl StoredPartData {
-  #[inline]
-  pub fn kind(&self) -> StoredPartDataKind {
-    match self {
-      Self::Raw { kind, .. } => *kind,
-    }
-  }
-
   #[inline]
   pub fn bytes(&self) -> &[u8] {
     match self {
@@ -847,7 +829,6 @@ impl SdkPackageStorage {
           .map(|relationship_type| relationship_type.clone().into_boxed_str()),
         relationships,
         data: StoredPartData::Raw {
-          kind: raw_part.data_kind,
           bytes: raw_part.bytes,
         },
         deleted: false,
@@ -885,11 +866,6 @@ impl SdkPackageStorage {
   }
 
   #[inline]
-  pub fn open_mode(&self) -> PackageOpenMode {
-    self.open_mode
-  }
-
-  #[inline]
   pub fn parts(&self) -> &[StoredPart] {
     &self.parts
   }
@@ -908,12 +884,6 @@ impl SdkPackageStorage {
       .parts
       .get_mut(part_id.index())
       .filter(|part| !part.is_deleted())
-  }
-
-  #[inline]
-  pub fn part_by_path(&self, path: &str) -> Option<(PartId, &StoredPart)> {
-    let part_id = *self.by_path.get(path)?;
-    self.part(part_id).map(|part| (part_id, part))
   }
 
   #[inline]
@@ -1466,16 +1436,12 @@ impl SdkPackageStorage {
     relationship_type: Option<&str>,
   ) -> PartId {
     let part_id = PartId::from_index(self.parts.len());
-    let data_kind = data_kind_for_content_type(content_type);
     self.parts.push(StoredPart {
       path: path.clone().into_boxed_str(),
       content_type: content_type.into(),
       relationship_type: relationship_type.map(Into::into),
       relationships: RelationshipSet::default(),
-      data: StoredPartData::Raw {
-        kind: data_kind,
-        bytes: Vec::new(),
-      },
+      data: StoredPartData::Raw { bytes: Vec::new() },
       deleted: false,
     });
     self.by_path.insert(path.clone().into_boxed_str(), part_id);
@@ -1711,7 +1677,6 @@ impl SdkPackageStorage {
 struct RawPart {
   path: Box<str>,
   content_type: Box<str>,
-  data_kind: StoredPartDataKind,
   bytes: Vec<u8>,
 }
 
@@ -1863,13 +1828,11 @@ fn read_raw_parts<R: Read + Seek>(
     }
 
     let content_type = content_type_for_part(content_types, &path).unwrap_or_default();
-    let data_kind = data_kind_for_content_type(content_type);
     let mut bytes = Vec::with_capacity(entry.size() as usize);
     entry.read_to_end(&mut bytes)?;
     parts.push(RawPart {
       path: path.into_boxed_str(),
       content_type: content_type.into(),
-      data_kind,
       bytes,
     });
   }
@@ -1946,19 +1909,6 @@ fn content_type_for_part<'a>(content_types: &'a Types, path: &str) -> Option<&'a
   default_content_type
 }
 
-fn data_kind_for_content_type(content_type: &str) -> StoredPartDataKind {
-  if content_type.ends_with("+xml")
-    || content_type == "application/xml"
-    || content_type == "text/xml"
-  {
-    StoredPartDataKind::Xml
-  } else if content_type.starts_with("text/") {
-    StoredPartDataKind::Text
-  } else {
-    StoredPartDataKind::Binary
-  }
-}
-
 fn is_relationships_part_path(path: &str) -> bool {
   path == "_rels/.rels" || path.contains("/_rels/") && path.ends_with(".rels")
 }
@@ -2016,6 +1966,5 @@ mod tests {
       relationship.target_kind(),
       RelationshipTargetKind::InternalPart
     );
-    assert_eq!(part.data().kind(), StoredPartDataKind::Xml);
   }
 }

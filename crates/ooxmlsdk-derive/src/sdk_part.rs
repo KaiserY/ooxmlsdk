@@ -1038,14 +1038,6 @@ fn expand_part_handle(
       }
 
       #[inline]
-      pub fn data_kind<P: crate::sdk::SdkPackage>(
-        &self,
-        package: &P,
-      ) -> Option<crate::common::StoredPartDataKind> {
-        <Self as crate::sdk::SdkPart>::data_kind(self, package)
-      }
-
-      #[inline]
       pub fn data<'a, P: crate::sdk::SdkPackage>(&self, package: &'a P) -> Option<&'a [u8]> {
         <Self as crate::sdk::SdkPart>::data(self, package)
       }
@@ -1195,7 +1187,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<T, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       {
         <Self as crate::sdk::SdkPart>::add_new_part(self,
@@ -1212,7 +1204,7 @@ fn expand_part_handle(
         content_type: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<T, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       {
         <Self as crate::sdk::SdkPart>::add_new_part_with_content_type(self,
@@ -1228,7 +1220,7 @@ fn expand_part_handle(
         package: &mut P,
       ) -> Result<T, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       {
         <Self as crate::sdk::SdkPart>::add_new_part_auto_id(self, package)
@@ -1241,7 +1233,7 @@ fn expand_part_handle(
         content_type: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<T, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       {
         <Self as crate::sdk::SdkPart>::add_new_part_with_content_type_auto_id(self,
@@ -1259,7 +1251,7 @@ fn expand_part_handle(
         extension: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<T, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       {
         <Self as crate::sdk::SdkPart>::add_new_part_with_content_type_and_extension(self,
@@ -1278,7 +1270,7 @@ fn expand_part_handle(
         extension: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<T, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       {
         <Self as crate::sdk::SdkPart>::add_new_part_with_content_type_and_extension_auto_id(self,
@@ -1297,7 +1289,7 @@ fn expand_part_handle(
         target_extension: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_extended_part(self,
           package,
@@ -1317,7 +1309,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::extended_part::ExtendedPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_extended_part_with_id(self,
           package,
@@ -1335,7 +1327,7 @@ fn expand_part_handle(
         content_type: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<crate::parts::image_part::ImagePart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_image_part(self,
           package,
@@ -1351,7 +1343,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::image_part::ImagePart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_image_part_with_id(self,
           package,
@@ -1370,7 +1362,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_alternative_format_import_part(self,
           package,
@@ -1389,7 +1381,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_alternative_format_import_part_with_id(self,
           package,
@@ -1408,7 +1400,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_alternative_format_import_part_by_type(self,
           package,
@@ -1427,7 +1419,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_alternative_format_import_part_by_type_with_id(self,
           package,
@@ -1443,7 +1435,7 @@ fn expand_part_handle(
         content_type: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_custom_xml_part(self,
           package,
@@ -1459,7 +1451,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_custom_xml_part_with_id(self,
           package,
@@ -1475,7 +1467,7 @@ fn expand_part_handle(
         part_type: crate::sdk::CustomXmlPartType,
       ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_custom_xml_part_by_type(self,
           package,
@@ -1491,7 +1483,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::custom_xml_part::CustomXmlPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_custom_xml_part_by_type_with_id(self,
           package,
@@ -1507,7 +1499,7 @@ fn expand_part_handle(
         part_type: crate::sdk::CustomPropertyPartType,
       ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_custom_property_part_by_type(self, package, part_type,
         )
@@ -1521,7 +1513,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::custom_property_part::CustomPropertyPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_custom_property_part_by_type_with_id(self,
           package,
@@ -1537,7 +1529,7 @@ fn expand_part_handle(
         part_type: crate::sdk::EmbeddedObjectPartType,
       ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_object_part_by_type(self, package, part_type,
         )
@@ -1551,7 +1543,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::embedded_object_part::EmbeddedObjectPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_object_part_by_type_with_id(self,
           package,
@@ -1567,7 +1559,7 @@ fn expand_part_handle(
         content_type: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_package_part(self,
           package,
@@ -1583,7 +1575,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_package_part_with_id(self,
           package,
@@ -1599,7 +1591,7 @@ fn expand_part_handle(
         part_type: crate::sdk::EmbeddedPackagePartType,
       ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_package_part_by_type(self, package, part_type,
         )
@@ -1613,7 +1605,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::embedded_package_part::EmbeddedPackagePart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_package_part_by_type_with_id(self,
           package,
@@ -1629,7 +1621,7 @@ fn expand_part_handle(
         part_type: crate::sdk::FontPartType,
       ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_font_part_by_type(self, package, part_type)
       }
@@ -1642,7 +1634,7 @@ fn expand_part_handle(
         relationship_id: impl Into<String>,
       ) -> Result<crate::parts::font_part::FontPart, crate::common::SdkError>
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_font_part_by_type_with_id(self,
           package,
@@ -1661,7 +1653,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_mail_merge_recipient_data_part_by_type(self, package, part_type,
         )
@@ -1678,7 +1670,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_mail_merge_recipient_data_part_by_type_with_id(self,
           package,
@@ -1697,7 +1689,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_control_persistence_binary_data_part_by_type(self, package, part_type,
         )
@@ -1714,7 +1706,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_control_persistence_binary_data_part_by_type_with_id(self,
           package,
@@ -1733,7 +1725,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_control_persistence_part_by_type(self, package, part_type,
         )
@@ -1750,7 +1742,7 @@ fn expand_part_handle(
         crate::common::SdkError,
       >
       where
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
       {
         <Self as crate::sdk::SdkPart>::add_embedded_control_persistence_part_by_type_with_id(self,
           package,
@@ -1854,24 +1846,23 @@ fn part_handle_root_method_tokens(
   quote! {
     impl #part_ident {
       #[inline]
-      pub fn is_root_element_loaded<P: crate::parts::PartRootCache>(&self, package: &P) -> bool {
-        package.is_root_element_loaded(self.id)
+      pub fn is_root_element_loaded<P: crate::sdk::SdkPackage>(&self, package: &P) -> bool {
+        crate::sdk::SdkPackageInternal::is_root_element_loaded(package, self.id)
       }
 
       #[inline]
-      pub fn unload_root_element<P: crate::parts::PartRootCache>(
+      pub fn unload_root_element<P: crate::sdk::SdkPackage>(
         &self,
         package: &mut P,
       ) -> Option<crate::parts::PartRootElement> {
-        package.unload_root_element(self.id)
+        crate::sdk::SdkPackageInternal::unload_root_element(package, self.id)
       }
 
-      pub fn root_element<'a, P: crate::parts::PartRootCache>(
+      pub fn root_element<'a, P: crate::sdk::SdkPackage>(
         &self,
         package: &'a mut P,
       ) -> Result<&'a #root_ty, crate::common::SdkError> {
-        if package
-          .root_element(self.id)
+        if crate::sdk::SdkPackageInternal::root_element(package, self.id)
           .and_then(crate::parts::PartRootElement::#root_accessor_ident)
           .is_none()
         {
@@ -1885,7 +1876,7 @@ fn part_handle_root_method_tokens(
             #root_ty::from_bytes(part.data().bytes())?
           };
 
-          *package.root_element_slot_mut(self.id).ok_or_else(|| {
+          *crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id).ok_or_else(|| {
             crate::common::SdkError::CommonError(format!(
               "part id {:?} is not present in package root cache",
               self.id,
@@ -1893,8 +1884,7 @@ fn part_handle_root_method_tokens(
           })? = Some(crate::parts::PartRootElement::#part_ident(Box::new(root_element)));
         }
 
-        package
-          .root_element(self.id)
+        crate::sdk::SdkPackageInternal::root_element(package, self.id)
           .and_then(crate::parts::PartRootElement::#root_accessor_ident)
           .ok_or_else(|| {
             crate::common::SdkError::CommonError(
@@ -1904,12 +1894,11 @@ fn part_handle_root_method_tokens(
           })
       }
 
-      pub fn root_element_mut<'a, P: crate::parts::PartRootCache>(
+      pub fn root_element_mut<'a, P: crate::sdk::SdkPackage>(
         &self,
         package: &'a mut P,
       ) -> Result<&'a mut #root_ty, crate::common::SdkError> {
-        if package
-          .root_element(self.id)
+        if crate::sdk::SdkPackageInternal::root_element(package, self.id)
           .and_then(crate::parts::PartRootElement::#root_accessor_ident)
           .is_none()
         {
@@ -1923,7 +1912,7 @@ fn part_handle_root_method_tokens(
             #root_ty::from_bytes(part.data().bytes())?
           };
 
-          *package.root_element_slot_mut(self.id).ok_or_else(|| {
+          *crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id).ok_or_else(|| {
             crate::common::SdkError::CommonError(format!(
               "part id {:?} is not present in package root cache",
               self.id,
@@ -1931,8 +1920,7 @@ fn part_handle_root_method_tokens(
           })? = Some(crate::parts::PartRootElement::#part_ident(Box::new(root_element)));
         }
 
-        package
-          .root_element_slot_mut(self.id)
+        crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id)
           .and_then(Option::as_mut)
           .and_then(crate::parts::PartRootElement::#root_accessor_mut_ident)
           .ok_or_else(|| {
@@ -1943,12 +1931,12 @@ fn part_handle_root_method_tokens(
           })
       }
 
-      pub fn set_root_element<P: crate::parts::PartRootCache>(
+      pub fn set_root_element<P: crate::sdk::SdkPackage>(
         &self,
         package: &mut P,
         root_element: #root_ty,
       ) -> Result<(), crate::common::SdkError> {
-        *package.root_element_slot_mut(self.id).ok_or_else(|| {
+        *crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id).ok_or_else(|| {
           crate::common::SdkError::CommonError(format!(
             "part id {:?} is not present in package root cache",
             self.id,
@@ -1978,7 +1966,7 @@ fn part_handle_child_methods_tokens(
           relationship
             .target_part_id()
             .map(|part_id| {
-              <#part_ty as crate::sdk::SdkPart>::from_relationship_id_with_relationships(
+              <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
                 crate::sdk::SdkPackageInternal::storage(package),
                 relationship.id(),
                 part_id,
@@ -2197,8 +2185,8 @@ fn part_handle_child_methods_tokens(
 
       #[inline]
       pub fn add_part_from_package<
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
-        S: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
+        S: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       >(
         &self,
@@ -2216,8 +2204,8 @@ fn part_handle_child_methods_tokens(
 
       #[inline]
       pub fn add_part_from_package_with_id<
-        P: crate::sdk::SdkPackage + crate::parts::PartRootCache,
-        S: crate::sdk::SdkPackage + crate::parts::PartRootCache,
+        P: crate::sdk::SdkPackage,
+        S: crate::sdk::SdkPackage,
         T: crate::sdk::SdkPart,
       >(
         &self,

@@ -46,12 +46,17 @@ impl crate::sdk::SdkPart for ExtendedPart {
   fn relationship_id(&self) -> Option<&str> {
     self.relationship_id.as_deref()
   }
+  fn set_relationship_id(&mut self, relationship_id: String) {
+    self.relationship_id = Some(relationship_id);
+  }
+}
+impl crate::sdk::SdkPartInternal for ExtendedPart {
   #[inline]
   fn from_part_id_with_relationships(
     storage: &crate::common::SdkPackageStorage,
     part_id: crate::common::PartId,
   ) -> Self {
-    let mut part = Self::from_part_id(part_id);
+    let mut part = <Self as crate::sdk::SdkPart>::from_part_id(part_id);
     if let Some(relationships) = storage.relationships(part_id) {
       for relationship in relationships.iter() {
         if relationship.is_reference_relationship() {
@@ -88,12 +93,9 @@ impl crate::sdk::SdkPart for ExtendedPart {
     relationship_id: impl Into<String>,
     part_id: crate::common::PartId,
   ) -> Self {
-    let mut part = Self::from_part_id_with_relationships(storage, part_id);
+    let mut part =
+      <Self as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(storage, part_id);
     part.relationship_id = Some(relationship_id.into());
     part
   }
-  fn set_relationship_id(&mut self, relationship_id: String) {
-    self.relationship_id = Some(relationship_id);
-  }
 }
-impl crate::sdk::SdkPartInternal for ExtendedPart {}

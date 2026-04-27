@@ -133,50 +133,6 @@ impl<T> Default for PartRoot<T> {
 }
 
 #[cfg(feature = "parts")]
-pub(crate) fn add_part_handle_to_relationship_set<T: SdkPartHandle>(
-  relationships: &mut crate::common::RelationshipSet,
-  storage: &crate::common::SdkPackageStorage,
-  source_part_id: Option<crate::common::PartId>,
-  part: &T,
-) -> Result<(), crate::common::SdkError> {
-  let Some(relationship_id) = part.relationship_id() else {
-    return Ok(());
-  };
-  let Some(stored_part) = storage.part(part.part_id()) else {
-    return Ok(());
-  };
-  if stored_part.is_deleted() {
-    return Ok(());
-  }
-  let relationship =
-    storage.internal_part_relationship_info(source_part_id, relationship_id, part.part_id())?;
-  relationships.add_relationship_info(relationship)?;
-  Ok(())
-}
-
-#[cfg(feature = "parts")]
-pub(crate) fn add_part_ref_to_relationship_set(
-  relationships: &mut crate::common::RelationshipSet,
-  storage: &crate::common::SdkPackageStorage,
-  source_part_id: Option<crate::common::PartId>,
-  part: &crate::parts::PartRef,
-) -> Result<(), crate::common::SdkError> {
-  let Some(relationship_id) = part.relationship_id() else {
-    return Ok(());
-  };
-  let Some(stored_part) = storage.part(part.part_id()) else {
-    return Ok(());
-  };
-  if stored_part.is_deleted() {
-    return Ok(());
-  }
-  let relationship =
-    storage.internal_part_relationship_info(source_part_id, relationship_id, part.part_id())?;
-  relationships.add_relationship_info(relationship)?;
-  Ok(())
-}
-
-#[cfg(feature = "parts")]
 impl<T> Eq for PartRoot<T> {}
 
 #[cfg(feature = "parts")]
@@ -294,7 +250,7 @@ impl PartChildDescriptor {
 }
 
 #[cfg(feature = "parts")]
-pub fn default_main_part_content_type<T: SdkPartHandle>() -> Option<&'static str> {
+pub fn default_main_part_content_type<T: SdkPart>() -> Option<&'static str> {
   match (T::RELATIONSHIP_TYPE, T::TARGET_NAME) {
     (
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
@@ -314,7 +270,7 @@ pub fn default_main_part_content_type<T: SdkPartHandle>() -> Option<&'static str
 
 #[cfg(feature = "parts")]
 #[inline]
-fn default_new_package_part_content_type<T: SdkPartHandle>() -> std::borrow::Cow<'static, str> {
+fn default_new_package_part_content_type<T: SdkPart>() -> std::borrow::Cow<'static, str> {
   if T::CONTENT_TYPE.is_empty() {
     default_main_part_content_type::<T>()
       .map(std::borrow::Cow::Borrowed)
@@ -758,39 +714,7 @@ pub(crate) trait SdkPackageInternal {
   }
 
   #[inline]
-  fn modeled_relationships(
-    &self,
-  ) -> Result<crate::common::RelationshipSet, crate::common::SdkError> {
-    Ok(crate::sdk::SdkPackageInternal::relationships(self).clone())
-  }
-
-  #[inline]
   fn refresh_relationship_model_from_storage(&mut self) {}
-
-  fn collect_modeled_part_relationships(
-    &self,
-    relationships: &mut std::collections::HashMap<
-      crate::common::PartId,
-      crate::common::RelationshipSet,
-    >,
-  ) -> Result<(), crate::common::SdkError> {
-    for (index, part) in crate::sdk::SdkPackageInternal::storage(self)
-      .parts()
-      .iter()
-      .enumerate()
-    {
-      if part.is_deleted() {
-        continue;
-      }
-      let part_id = crate::common::PartId::from_index(index);
-      if let Some(part_relationships) =
-        crate::sdk::SdkPackageInternal::storage(self).relationships(part_id)
-      {
-        relationships.insert(part_id, part_relationships.clone());
-      }
-    }
-    Ok(())
-  }
 }
 
 #[cfg(feature = "parts")]
@@ -1060,7 +984,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn get_id_of_part<T: SdkPartHandle>(&self, part: &T) -> Option<&str> {
+  fn get_id_of_part<T: SdkPart>(&self, part: &T) -> Option<&str> {
     let target_part_id = part.part_id();
     crate::sdk::SdkPackageInternal::relationships(self)
       .iter()
@@ -1070,10 +994,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn get_id_of_part_required<T: SdkPartHandle>(
-    &self,
-    part: &T,
-  ) -> Result<&str, crate::common::SdkError> {
+  fn get_id_of_part_required<T: SdkPart>(&self, part: &T) -> Result<&str, crate::common::SdkError> {
     self.get_id_of_part(part).ok_or_else(|| {
       crate::common::SdkError::CommonError(format!(
         "part id {:?} is not referenced by this package",
@@ -1083,7 +1004,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn change_id_of_part<T: SdkPartHandle>(
+  fn change_id_of_part<T: SdkPart>(
     &mut self,
     part: &T,
     new_relationship_id: impl Into<String>,
@@ -1104,7 +1025,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn delete_part<T: SdkPartHandle>(&mut self, part: T) -> Result<bool, crate::common::SdkError> {
+  fn delete_part<T: SdkPart>(&mut self, part: T) -> Result<bool, crate::common::SdkError> {
     let Some(relationship_id) = self.get_id_of_part(&part).map(str::to_string) else {
       return Ok(false);
     };
@@ -1114,7 +1035,7 @@ pub trait SdkPackage: SdkPackageInternal {
   #[inline]
   fn delete_parts<T, I>(&mut self, parts: I) -> Result<(), crate::common::SdkError>
   where
-    T: SdkPartHandle,
+    T: SdkPart,
     I: IntoIterator<Item = T>,
   {
     let relationship_ids: Vec<_> = parts
@@ -1128,7 +1049,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn add_part<T: SdkPartHandle>(&mut self, part: T) -> Result<T, crate::common::SdkError> {
+  fn add_part<T: SdkPart>(&mut self, part: T) -> Result<T, crate::common::SdkError> {
     if self.get_id_of_part(&part).is_some() {
       return Ok(part);
     }
@@ -1138,7 +1059,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn add_part_with_id<T: SdkPartHandle>(
+  fn add_part_with_id<T: SdkPart>(
     &mut self,
     part: T,
     relationship_id: impl Into<String>,
@@ -1160,7 +1081,7 @@ pub trait SdkPackage: SdkPackageInternal {
   where
     Self: crate::parts::PartRootCache,
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = part
       .relationship_id()
@@ -1181,7 +1102,7 @@ pub trait SdkPackage: SdkPackageInternal {
   where
     Self: crate::parts::PartRootCache,
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     if crate::sdk::SdkPackageInternal::storage(self).id()
@@ -1206,7 +1127,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn create_relationship_to_part<T: SdkPartHandle>(
+  fn create_relationship_to_part<T: SdkPart>(
     &mut self,
     part: T,
   ) -> Result<String, crate::common::SdkError> {
@@ -1219,7 +1140,7 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
-  fn create_relationship_to_part_with_id<T: SdkPartHandle>(
+  fn create_relationship_to_part_with_id<T: SdkPart>(
     &mut self,
     part: T,
     relationship_id: impl Into<String>,
@@ -1278,7 +1199,7 @@ pub trait SdkPackage: SdkPackageInternal {
   ) -> Result<T, crate::common::SdkError>
   where
     Self: crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     self.add_new_part_with_target_mode::<T>(
       relationship_id,
@@ -1290,7 +1211,7 @@ pub trait SdkPackage: SdkPackageInternal {
   fn add_new_part_auto_id<T>(&mut self) -> Result<T, crate::common::SdkError>
   where
     Self: crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id =
       crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
@@ -1305,7 +1226,7 @@ pub trait SdkPackage: SdkPackageInternal {
   ) -> Result<T, crate::common::SdkError>
   where
     Self: crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     self.add_new_part_with_content_type_and_extension::<T>(
       relationship_id,
@@ -1322,7 +1243,7 @@ pub trait SdkPackage: SdkPackageInternal {
   ) -> Result<T, crate::common::SdkError>
   where
     Self: crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id =
       crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
@@ -1337,7 +1258,7 @@ pub trait SdkPackage: SdkPackageInternal {
   ) -> Result<T, crate::common::SdkError>
   where
     Self: crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     let part_id = crate::sdk::SdkPackageInternal::storage_mut(self).add_package_part(
@@ -1435,7 +1356,7 @@ pub trait SdkPackage: SdkPackageInternal {
   ) -> Result<T, crate::common::SdkError>
   where
     Self: crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     let part_id = crate::sdk::SdkPackageInternal::storage_mut(self).add_package_part(
@@ -1564,7 +1485,7 @@ pub trait SdkPackage: SdkPackageInternal {
 
 #[cfg(feature = "parts")]
 #[allow(private_bounds)]
-pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
+pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   const CHILD_DESCRIPTORS: &'static [PartChildDescriptor] = &[];
   const DESCRIPTOR: PartDescriptor;
   const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
@@ -1632,6 +1553,62 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   #[inline(always)]
   fn extension() -> &'static str {
     Self::EXTENSION
+  }
+
+  #[inline]
+  fn child_relationships_by_type<'a, P: SdkPackage>(
+    &'a self,
+    package: &'a P,
+    relationship_type: &'a str,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>>
+  where
+    Self: SdkPart,
+  {
+    <Self as crate::sdk::SdkPartInternal>::relationships_by_type(self, package, relationship_type)
+  }
+
+  #[inline]
+  fn child_part_by_relationship_type<P, T>(&self, package: &P, relationship_type: &str) -> Option<T>
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    <Self as crate::sdk::SdkPartInternal>::relationships(self, package)
+      .into_iter()
+      .flat_map(|relationships| relationships.iter())
+      .find_map(|relationship| {
+        crate::common::relationship_type_matches(
+          relationship.relationship_type(),
+          relationship_type,
+        )
+        .then(|| relationship.target_part_id())
+        .flatten()
+        .map(|part_id| T::from_relationship_id(relationship.id(), part_id))
+      })
+  }
+
+  #[inline]
+  fn child_parts_by_relationship_type<'a, P, T>(
+    &'a self,
+    package: &'a P,
+    relationship_type: &'a str,
+  ) -> impl Iterator<Item = T> + 'a
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    <Self as crate::sdk::SdkPartInternal>::relationships(self, package)
+      .into_iter()
+      .flat_map(|relationships| relationships.iter())
+      .filter_map(move |relationship| {
+        crate::common::relationship_type_matches(
+          relationship.relationship_type(),
+          relationship_type,
+        )
+        .then(|| relationship.target_part_id())
+        .flatten()
+        .map(|part_id| T::from_relationship_id(relationship.id(), part_id))
+      })
   }
 
   #[inline]
@@ -1918,7 +1895,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     let part_id = crate::sdk::SdkPackageInternal::storage_mut(package).add_child_part(
@@ -1946,7 +1923,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     let part_id = crate::sdk::SdkPackageInternal::storage_mut(package).add_child_part(
@@ -1969,7 +1946,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   fn add_new_part_auto_id<P, T>(&self, package: &mut P) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = self
       .relationships(package)
@@ -1991,7 +1968,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = self
       .relationships(package)
@@ -2015,7 +1992,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     let part_id = crate::sdk::SdkPackageInternal::storage_mut(package).add_child_part(
@@ -2043,7 +2020,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   ) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = self
       .relationships(package)
@@ -3031,8 +3008,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
     &'a self,
     package: &'a P,
   ) -> impl Iterator<Item = crate::parts::PartRef> + 'a {
-    let Some(relationships) =
-      <Self as crate::sdk::SdkPartHandleInternal>::relationships(self, package)
+    let Some(relationships) = <Self as crate::sdk::SdkPartInternal>::relationships(self, package)
     else {
       return Vec::new().into_iter();
     };
@@ -3105,7 +3081,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn get_id_of_part<'a, P: SdkPackage, T: SdkPartHandle>(
+  fn get_id_of_part<'a, P: SdkPackage, T: SdkPart>(
     &'a self,
     package: &'a P,
     part: &T,
@@ -3120,7 +3096,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn get_id_of_part_required<'a, P: SdkPackage, T: SdkPartHandle>(
+  fn get_id_of_part_required<'a, P: SdkPackage, T: SdkPart>(
     &'a self,
     package: &'a P,
     part: &T,
@@ -3135,7 +3111,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn change_id_of_part<P: SdkPackage, T: SdkPartHandle>(
+  fn change_id_of_part<P: SdkPackage, T: SdkPart>(
     &self,
     package: &mut P,
     part: &T,
@@ -3161,7 +3137,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn delete_part<P: SdkPackage, T: SdkPartHandle>(
+  fn delete_part<P: SdkPackage, T: SdkPart>(
     &self,
     package: &mut P,
     part: T,
@@ -3176,7 +3152,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   fn delete_parts<P, T, I>(&self, package: &mut P, parts: I) -> Result<(), crate::common::SdkError>
   where
     P: SdkPackage,
-    T: SdkPartHandle,
+    T: SdkPart,
     I: IntoIterator<Item = T>,
   {
     let relationship_ids: Vec<_> = parts
@@ -3190,7 +3166,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn add_part<P: SdkPackage, T: SdkPartHandle>(
+  fn add_part<P: SdkPackage, T: SdkPart>(
     &self,
     package: &mut P,
     part: T,
@@ -3211,7 +3187,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn add_part_with_id<P: SdkPackage, T: SdkPartHandle>(
+  fn add_part_with_id<P: SdkPackage, T: SdkPart>(
     &self,
     package: &mut P,
     part: T,
@@ -3238,7 +3214,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   where
     P: SdkPackage + crate::parts::PartRootCache,
     S: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = part
       .relationship_id()
@@ -3263,7 +3239,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   where
     P: SdkPackage + crate::parts::PartRootCache,
     S: SdkPackage + crate::parts::PartRootCache,
-    T: SdkPartHandle,
+    T: SdkPart,
   {
     let relationship_id = relationship_id.into();
     if crate::sdk::SdkPackageInternal::storage(package).id()
@@ -3288,7 +3264,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn create_relationship_to_part<P: SdkPackage, T: SdkPartHandle>(
+  fn create_relationship_to_part<P: SdkPackage, T: SdkPart>(
     &self,
     package: &mut P,
     part: T,
@@ -3309,7 +3285,7 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
   }
 
   #[inline]
-  fn create_relationship_to_part_with_id<P: SdkPackage, T: SdkPartHandle>(
+  fn create_relationship_to_part_with_id<P: SdkPackage, T: SdkPart>(
     &self,
     package: &mut P,
     part: T,
@@ -3327,14 +3303,18 @@ pub trait SdkPartHandle: SdkPartHandleInternal + Clone + Sized + 'static {
 }
 
 #[cfg(feature = "parts")]
-pub(crate) trait SdkPartHandleInternal: Clone + Sized + 'static {
+#[doc(hidden)]
+pub use SdkPart as SdkPartHandle;
+
+#[cfg(feature = "parts")]
+pub(crate) trait SdkPartInternal: Clone + Sized + 'static {
   #[inline]
   fn relationships<'a, P: SdkPackage>(
     &'a self,
     package: &'a P,
   ) -> Option<&'a crate::common::RelationshipSet>
   where
-    Self: SdkPartHandle,
+    Self: SdkPart,
   {
     crate::sdk::SdkPackageInternal::storage(package).relationships(self.part_id())
   }
@@ -3345,7 +3325,7 @@ pub(crate) trait SdkPartHandleInternal: Clone + Sized + 'static {
     package: &'a mut P,
   ) -> Option<&'a mut crate::common::RelationshipSet>
   where
-    Self: SdkPartHandle,
+    Self: SdkPart,
   {
     crate::sdk::SdkPackageInternal::storage_mut(package).relationships_mut(self.part_id())
   }
@@ -3357,7 +3337,7 @@ pub(crate) trait SdkPartHandleInternal: Clone + Sized + 'static {
     relationship_type: &'a str,
   ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>>
   where
-    Self: SdkPartHandle,
+    Self: SdkPart,
   {
     self
       .relationships(package)
@@ -3368,7 +3348,7 @@ pub(crate) trait SdkPartHandleInternal: Clone + Sized + 'static {
 }
 
 #[cfg(feature = "parts")]
-pub trait SdkPart: Sized {
+pub trait SdkPartTree: Sized {
   const DESCRIPTOR: PartDescriptor;
   const RELATIONSHIP_TYPE: &'static str = Self::DESCRIPTOR.relationship_type;
   const PATH_PREFIX: &'static str = Self::DESCRIPTOR.path_prefix;
@@ -3402,6 +3382,133 @@ pub trait SdkPart: Sized {
   fn path_prefix() -> &'static str {
     Self::PATH_PREFIX
   }
+}
+
+#[cfg(feature = "parts")]
+#[macro_export]
+macro_rules! sdk_part_root_methods {
+  ($root_ty:ty, $part_variant:ident, $root_accessor:ident, $root_accessor_mut:ident) => {
+    #[inline]
+    pub fn is_root_element_loaded<P: $crate::parts::PartRootCache>(&self, package: &P) -> bool {
+      package.is_root_element_loaded(self.id)
+    }
+
+    #[inline]
+    pub fn unload_root_element<P: $crate::parts::PartRootCache>(
+      &self,
+      package: &mut P,
+    ) -> Option<$crate::parts::PartRootElement> {
+      package.unload_root_element(self.id)
+    }
+
+    pub fn root_element<'a, P: $crate::parts::PartRootCache>(
+      &self,
+      package: &'a mut P,
+    ) -> Result<&'a $root_ty, $crate::common::SdkError> {
+      if package
+        .root_element(self.id)
+        .and_then($crate::parts::PartRootElement::$root_accessor)
+        .is_none()
+      {
+        let root_element = {
+          let part = $crate::sdk::SdkPackageInternal::storage(package)
+            .part(self.id)
+            .ok_or_else(|| {
+              $crate::common::SdkError::CommonError(format!(
+                "part id {:?} is not present in package storage",
+                self.id,
+              ))
+            })?;
+          <$root_ty>::from_bytes(part.data().bytes())?
+        };
+
+        *package.root_element_slot_mut(self.id).ok_or_else(|| {
+          $crate::common::SdkError::CommonError(format!(
+            "part id {:?} is not present in package root cache",
+            self.id,
+          ))
+        })? = Some($crate::parts::PartRootElement::$part_variant(Box::new(
+          root_element,
+        )));
+      }
+
+      package
+        .root_element(self.id)
+        .and_then($crate::parts::PartRootElement::$root_accessor)
+        .ok_or_else(|| {
+          $crate::common::SdkError::CommonError(
+            concat!(
+              "cached root element has unexpected type for ",
+              stringify!($part_variant)
+            )
+            .to_string(),
+          )
+        })
+    }
+
+    pub fn root_element_mut<'a, P: $crate::parts::PartRootCache>(
+      &self,
+      package: &'a mut P,
+    ) -> Result<&'a mut $root_ty, $crate::common::SdkError> {
+      if package
+        .root_element(self.id)
+        .and_then($crate::parts::PartRootElement::$root_accessor)
+        .is_none()
+      {
+        let root_element = {
+          let part = $crate::sdk::SdkPackageInternal::storage(package)
+            .part(self.id)
+            .ok_or_else(|| {
+              $crate::common::SdkError::CommonError(format!(
+                "part id {:?} is not present in package storage",
+                self.id,
+              ))
+            })?;
+          <$root_ty>::from_bytes(part.data().bytes())?
+        };
+
+        *package.root_element_slot_mut(self.id).ok_or_else(|| {
+          $crate::common::SdkError::CommonError(format!(
+            "part id {:?} is not present in package root cache",
+            self.id,
+          ))
+        })? = Some($crate::parts::PartRootElement::$part_variant(Box::new(
+          root_element,
+        )));
+      }
+
+      package
+        .root_element_slot_mut(self.id)
+        .and_then(Option::as_mut)
+        .and_then($crate::parts::PartRootElement::$root_accessor_mut)
+        .ok_or_else(|| {
+          $crate::common::SdkError::CommonError(
+            concat!(
+              "cached root element has unexpected type for ",
+              stringify!($part_variant)
+            )
+            .to_string(),
+          )
+        })
+    }
+
+    pub fn set_root_element<P: $crate::parts::PartRootCache>(
+      &self,
+      package: &mut P,
+      root_element: $root_ty,
+    ) -> Result<(), $crate::common::SdkError> {
+      *package.root_element_slot_mut(self.id).ok_or_else(|| {
+        $crate::common::SdkError::CommonError(format!(
+          "part id {:?} is not present in package root cache",
+          self.id,
+        ))
+      })? = Some($crate::parts::PartRootElement::$part_variant(Box::new(
+        root_element,
+      )));
+
+      Ok(())
+    }
+  };
 }
 
 #[cfg(feature = "parts")]

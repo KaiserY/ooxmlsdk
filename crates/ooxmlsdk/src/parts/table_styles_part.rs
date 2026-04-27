@@ -11,15 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml";
 pub const TARGET_NAME: &str = "tableStyles";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct TableStylesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_table_styles_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl TableStylesPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TableStyleList,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    TableStylesPart,
+    as_table_styles_part,
+    as_table_styles_part_mut
+  );
 }

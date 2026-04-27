@@ -47,7 +47,7 @@ pub fn load_typed_child_part<R, T>(
 ) -> Result<Option<T>, SdkError>
 where
   R: Read + Seek,
-  T: crate::sdk::SdkPart,
+  T: crate::sdk::SdkPartTree,
 {
   let target_path = resolve_relationship_part_path(child_parent_path, relationship);
   let Some(target_index) = archive.index_for_name(&target_path) else {
@@ -148,7 +148,7 @@ pub fn save_typed_child_part<W, T>(
 ) -> Result<(), SdkError>
 where
   W: Write + Seek,
-  T: crate::sdk::SdkPart,
+  T: crate::sdk::SdkPartTree,
 {
   child.save_zip(child_parent_path, zip, entry_set, visited)
 }

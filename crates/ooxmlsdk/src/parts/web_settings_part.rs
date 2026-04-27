@@ -11,15 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml";
 pub const TARGET_NAME: &str = "webSettings";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebSettingsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_web_settings_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl WebSettingsPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    WebSettingsPart,
+    as_web_settings_part,
+    as_web_settings_part_mut
+  );
 }

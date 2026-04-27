@@ -11,36 +11,136 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml";
 pub const TARGET_NAME: &str = "sheet";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
+  crate::sdk::PartChildDescriptor::new(
+    "spreadsheet_printer_settings_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+    "crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "drawings_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+    "crate::parts::drawings_part::DrawingsPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "vml_drawing_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+    "crate::parts::vml_drawing_part::VmlDrawingPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "embedded_object_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+    "crate::parts::embedded_object_part::EmbeddedObjectPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct DialogsheetPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_dialogsheet_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl DialogsheetPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet,
-  >,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    kind = "repeated"
-  ))]
-  pub(crate) spreadsheet_printer_settings_parts:
-    Vec<crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    kind = "optional"
-  ))]
-  pub(crate) drawings_part: Option<Box<crate::parts::drawings_part::DrawingsPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    kind = "repeated"
-  ))]
-  pub(crate) vml_drawing_parts: Vec<crate::parts::vml_drawing_part::VmlDrawingPart>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    kind = "repeated"
-  ))]
-  pub(crate) embedded_object_parts: Vec<crate::parts::embedded_object_part::EmbeddedObjectPart>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    DialogsheetPart,
+    as_dialogsheet_part,
+    as_dialogsheet_part_mut
+  );
+  pub fn spreadsheet_printer_settings_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+    )
+  }
+  pub fn spreadsheet_printer_settings_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<
+    Item = crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+  > + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+    )
+  }
+  pub fn drawings_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+    )
+  }
+  pub fn drawings_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::drawings_part::DrawingsPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::drawings_part::DrawingsPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+    )
+  }
+  pub fn vml_drawing_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+    )
+  }
+  pub fn vml_drawing_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::vml_drawing_part::VmlDrawingPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::vml_drawing_part::VmlDrawingPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+    )
+  }
+  pub fn embedded_object_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+    )
+  }
+  pub fn embedded_object_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::embedded_object_part::EmbeddedObjectPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::embedded_object_part::EmbeddedObjectPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+    )
+  }
 }

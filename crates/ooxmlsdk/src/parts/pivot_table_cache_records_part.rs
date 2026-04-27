@@ -11,15 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml";
 pub const TARGET_NAME: &str = "pivotCacheRecords";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PivotTableCacheRecordsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_pivot_table_cache_records_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl PivotTableCacheRecordsPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheRecords,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    PivotTableCacheRecordsPart,
+    as_pivot_table_cache_records_part,
+    as_pivot_table_cache_records_part_mut
+  );
 }

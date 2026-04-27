@@ -10,21 +10,48 @@ pub const PATH_PREFIX: &str = "customData";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.customDataProperties+xml";
 pub const TARGET_NAME: &str = "customDataProps";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
+  &[crate::sdk::PartChildDescriptor::new(
+    "custom_data_part",
+    "http://schemas.microsoft.com/office/2007/relationships/customData",
+    "crate::parts::custom_data_part::CustomDataPart",
+    crate::sdk::PartChildCardinality::Optional,
+  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomDataPropertiesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_custom_data_properties_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl CustomDataPropertiesPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DatastoreItem,
-  >,
+    CustomDataPropertiesPart,
+    as_custom_data_properties_part,
+    as_custom_data_properties_part_mut
+  );
   #[cfg(feature = "microsoft365")]
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData",
-    kind = "optional"
-  ))]
-  pub(crate) custom_data_part: Option<Box<crate::parts::custom_data_part::CustomDataPart>>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+  pub fn custom_data_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2007/relationships/customData",
+    )
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn custom_data_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::custom_data_part::CustomDataPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::custom_data_part::CustomDataPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2007/relationships/customData",
+    )
+  }
 }

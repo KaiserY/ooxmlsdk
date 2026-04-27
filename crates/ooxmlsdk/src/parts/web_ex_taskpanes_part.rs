@@ -10,21 +10,48 @@ pub const PATH_PREFIX: &str = "../webextensions";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.webextensiontaskpanes+xml";
 pub const TARGET_NAME: &str = "taskpanes";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
+  &[crate::sdk::PartChildDescriptor::new(
+    "web_extension_parts",
+    "http://schemas.microsoft.com/office/2011/relationships/webextension",
+    "crate::parts::web_extension_part::WebExtensionPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WebExTaskpanesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_web_ex_taskpanes_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl WebExTaskpanesPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
-  >,
+    WebExTaskpanesPart,
+    as_web_ex_taskpanes_part,
+    as_web_ex_taskpanes_part_mut
+  );
   #[cfg(feature = "microsoft365")]
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension",
-    kind = "repeated"
-  ))]
-  pub(crate) web_extension_parts: Vec<crate::parts::web_extension_part::WebExtensionPart>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+  pub fn web_extension_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2011/relationships/webextension",
+    )
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn web_extension_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::web_extension_part::WebExtensionPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::web_extension_part::WebExtensionPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2011/relationships/webextension",
+    )
+  }
 }

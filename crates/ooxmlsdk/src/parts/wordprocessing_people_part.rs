@@ -10,14 +10,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
 pub const TARGET_NAME: &str = "people";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WordprocessingPeoplePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_wordprocessing_people_part"))]
-  pub(crate) root_element:
-    crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::People>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl WordprocessingPeoplePart {
+  crate::sdk_part_root_methods!(
+    crate::schemas::schemas_microsoft_com_office_word_2012_wordml::People,
+    WordprocessingPeoplePart,
+    as_wordprocessing_people_part,
+    as_wordprocessing_people_part_mut
+  );
 }

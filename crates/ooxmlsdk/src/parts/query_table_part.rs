@@ -11,15 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml";
 pub const TARGET_NAME: &str = "queryTable";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct QueryTablePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_query_table_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl QueryTablePart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    QueryTablePart,
+    as_query_table_part,
+    as_query_table_part_mut
+  );
 }

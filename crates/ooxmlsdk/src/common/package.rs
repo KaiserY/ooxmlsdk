@@ -944,63 +944,6 @@ impl SdkPackageStorage {
       .target_part_id()
   }
 
-  pub(crate) fn internal_part_relationship_info(
-    &self,
-    source_part_id: Option<PartId>,
-    relationship_id: impl Into<String>,
-    target_part_id: PartId,
-  ) -> Result<RelationshipInfo, SdkError> {
-    let relationship_id = relationship_id.into();
-    match source_part_id {
-      Some(part_id) => {
-        if let Some(relationships) = self.relationships(part_id)
-          && let Some(relationship) = relationships.get(&relationship_id)
-          && relationship.target_part_id() == Some(target_part_id)
-        {
-          return Ok(relationship.clone());
-        }
-      }
-      None => {
-        if let Some(relationship) = self.package_relationships().get(&relationship_id)
-          && relationship.target_part_id() == Some(target_part_id)
-        {
-          return Ok(relationship.clone());
-        }
-      }
-    }
-
-    let target_part = self.part(target_part_id).ok_or_else(|| {
-      SdkError::CommonError(format!(
-        "part id {target_part_id:?} is not present in package storage"
-      ))
-    })?;
-    let relationship_type = target_part.relationship_type().ok_or_else(|| {
-      SdkError::CommonError(format!(
-        "part id {target_part_id:?} does not have a relationship type"
-      ))
-    })?;
-    let target = if let Some(source_part_id) = source_part_id {
-      let source_part_path = self
-        .part(source_part_id)
-        .ok_or_else(|| {
-          SdkError::CommonError(format!(
-            "part id {source_part_id:?} is not present in package storage"
-          ))
-        })?
-        .path();
-      relationship_target_from_source(source_part_path, target_part.path())
-    } else {
-      target_part.path().to_string()
-    };
-
-    Ok(RelationshipInfo::internal_part(
-      relationship_id,
-      relationship_type.to_string(),
-      target,
-      target_part_id,
-    ))
-  }
-
   pub fn delete_package_part(&mut self, relationship_id: &str) -> Result<bool, SdkError> {
     let Some(target_part_id) = self
       .package_relationships

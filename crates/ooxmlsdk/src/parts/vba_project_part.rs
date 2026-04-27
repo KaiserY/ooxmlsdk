@@ -10,16 +10,40 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.vbaProject";
 pub const TARGET_NAME: &str = "vbaProject";
 pub const EXTENSION: &str = ".bin";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
+  &[crate::sdk::PartChildDescriptor::new(
+    "vba_data_part",
+    "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+    "crate::parts::vba_data_part::VbaDataPart",
+    crate::sdk::PartChildCardinality::Optional,
+  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct VbaProjectPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
-    kind = "optional"
-  ))]
-  pub(crate) vba_data_part: Option<Box<crate::parts::vba_data_part::VbaDataPart>>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl VbaProjectPart {
+  pub fn vba_data_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+    )
+  }
+  pub fn vba_data_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::vba_data_part::VbaDataPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::vba_data_part::VbaDataPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+    )
+  }
 }

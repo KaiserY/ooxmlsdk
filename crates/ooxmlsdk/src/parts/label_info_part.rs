@@ -10,15 +10,17 @@ pub const PATH_PREFIX: &str = "docMetadata";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.classificationlabels+xml";
 pub const TARGET_NAME: &str = "LabelInfo";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct LabelInfoPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_label_info_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl LabelInfoPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_microsoft_com_office_2020_mip_label_metadata::ClassificationLabelList,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    LabelInfoPart,
+    as_label_info_part,
+    as_label_info_part_mut
+  );
 }

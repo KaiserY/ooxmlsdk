@@ -11,21 +11,47 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml";
 pub const TARGET_NAME: &str = "revisionHeaders";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
+  &[crate::sdk::PartChildDescriptor::new(
+    "workbook_revision_log_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
+    "crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorkbookRevisionHeaderPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_workbook_revision_header_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl WorkbookRevisionHeaderPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers,
-  >,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
-    kind = "repeated"
-  ))]
-  pub(crate) workbook_revision_log_parts:
-    Vec<crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    WorkbookRevisionHeaderPart,
+    as_workbook_revision_header_part,
+    as_workbook_revision_header_part_mut
+  );
+  pub fn workbook_revision_log_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
+    )
+  }
+  pub fn workbook_revision_log_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart> + 'a
+  {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
+    )
+  }
 }

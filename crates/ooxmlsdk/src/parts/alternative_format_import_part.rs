@@ -10,11 +10,9 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "afchunk";
 pub const EXTENSION: &str = ".dat";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct AlternativeFormatImportPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
 }

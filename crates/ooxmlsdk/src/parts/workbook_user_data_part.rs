@@ -11,14 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml";
 pub const TARGET_NAME: &str = "userNames";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorkbookUserDataPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_workbook_user_data_part"))]
-  pub(crate) root_element:
-    crate::sdk::PartRoot<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+}
+impl WorkbookUserDataPart {
+  crate::sdk_part_root_methods!(
+    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users,
+    WorkbookUserDataPart,
+    as_workbook_user_data_part,
+    as_workbook_user_data_part_mut
+  );
 }

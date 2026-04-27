@@ -10,15 +10,17 @@ pub const PATH_PREFIX: &str = ".";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.wsSortMap+xml";
 pub const TARGET_NAME: &str = "wsSortMap";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorksheetSortMapPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_worksheet_sort_map_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl WorksheetSortMapPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    WorksheetSortMapPart,
+    as_worksheet_sort_map_part,
+    as_worksheet_sort_map_part_mut
+  );
 }

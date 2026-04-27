@@ -10,20 +10,46 @@ pub const PATH_PREFIX: &str = "embeddings";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "control";
 pub const EXTENSION: &str = ".bin";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
+  crate::sdk::PartChildDescriptor::new(
+    "embedded_control_persistence_binary_data_parts",
+    "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+    "crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct EmbeddedControlPersistencePart {
-    pub(crate) relationship_id: Option<String>,
-    pub(crate) id: crate::common::PartId,
-    #[sdk(
-        part_child(
-            relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
-            kind = "repeated"
+  pub(crate) relationship_id: Option<String>,
+  pub(crate) id: crate::common::PartId,
+}
+impl EmbeddedControlPersistencePart {
+  pub fn embedded_control_persistence_binary_data_parts_relationships<
+    'a,
+    P: crate::sdk::SdkPackage,
+  >(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
+    )
+  }
+    pub fn embedded_control_persistence_binary_data_parts<'a, P: crate::sdk::SdkPackage>(
+        &'a self,
+        package: &'a P,
+    ) -> impl Iterator<
+        Item = crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+  > + 'a{
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+            P,
+            crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+        >(
+            self,
+            package,
+            "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
         )
-    )]
-    pub(crate) embedded_control_persistence_binary_data_parts: Vec<
-        crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
-    >,
-    pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-    pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-    pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+  }
 }

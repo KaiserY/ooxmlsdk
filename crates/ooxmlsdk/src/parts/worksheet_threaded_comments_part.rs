@@ -10,15 +10,17 @@ pub const PATH_PREFIX: &str = "../threadedcomments";
 pub const CONTENT_TYPE: &str = "application/vnd.ms-excel.threadedcomments+xml";
 pub const TARGET_NAME: &str = "threadedcomment";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WorksheetThreadedCommentsPart {
-    pub(crate) relationship_id: Option<String>,
-    pub(crate) id: crate::common::PartId,
-    #[sdk(part_root(accessor = "as_worksheet_threaded_comments_part"))]
-    pub(crate) root_element: crate::sdk::PartRoot<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
-    >,
-    pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-    pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-    pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+  pub(crate) relationship_id: Option<String>,
+  pub(crate) id: crate::common::PartId,
+}
+impl WorksheetThreadedCommentsPart {
+  crate::sdk_part_root_methods!(
+        crate
+        ::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
+        WorksheetThreadedCommentsPart, as_worksheet_threaded_comments_part,
+        as_worksheet_threaded_comments_part_mut
+    );
 }

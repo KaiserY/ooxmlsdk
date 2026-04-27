@@ -220,7 +220,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
           pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
           pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
         }
-      impl crate::sdk::SdkPartHandle for ExtendedPart {
+      impl crate::sdk::SdkPart for ExtendedPart {
         const DESCRIPTOR: crate::sdk::PartDescriptor =
           crate::sdk::PartDescriptor::new("", "", "", "extendedPart", "");
 
@@ -310,7 +310,7 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
 
       }
 
-      impl crate::sdk::SdkPartHandleInternal for ExtendedPart {}
+      impl crate::sdk::SdkPartInternal for ExtendedPart {}
     },
   )?;
 

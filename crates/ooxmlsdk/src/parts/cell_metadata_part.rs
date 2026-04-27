@@ -11,15 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml";
 pub const TARGET_NAME: &str = "metadata";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CellMetadataPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_cell_metadata_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl CellMetadataPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    CellMetadataPart,
+    as_cell_metadata_part,
+    as_cell_metadata_part_mut
+  );
 }

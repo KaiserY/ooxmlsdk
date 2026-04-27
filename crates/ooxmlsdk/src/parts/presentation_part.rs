@@ -10,103 +10,486 @@ pub const PATH_PREFIX: &str = "ppt";
 pub const CONTENT_TYPE: &str = "";
 pub const TARGET_NAME: &str = "presentation";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[
+  crate::sdk::PartChildDescriptor::new(
+    "custom_xml_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+    "crate::parts::custom_xml_part::CustomXmlPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "font_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    "crate::parts::font_part::FontPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "presentation_properties_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
+    "crate::parts::presentation_properties_part::PresentationPropertiesPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "table_styles_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
+    "crate::parts::table_styles_part::TableStylesPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "theme_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+    "crate::parts::theme_part::ThemePart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "view_properties_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
+    "crate::parts::view_properties_part::ViewPropertiesPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "notes_master_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+    "crate::parts::notes_master_part::NotesMasterPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "slide_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+    "crate::parts::slide_part::SlidePart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "slide_master_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+    "crate::parts::slide_master_part::SlideMasterPart",
+    crate::sdk::PartChildCardinality::RequiredRepeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "user_defined_tags_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+    "crate::parts::user_defined_tags_part::UserDefinedTagsPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "comment_authors_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
+    "crate::parts::comment_authors_part::CommentAuthorsPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "handout_master_part",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
+    "crate::parts::handout_master_part::HandoutMasterPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "legacy_diagram_text_info_part",
+    "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
+    "crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "vba_project_part",
+    "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+    "crate::parts::vba_project_part::VbaProjectPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "comment_parts",
+    "http://schemas.microsoft.com/office/2018/10/relationships/comments",
+    "crate::parts::power_point_comment_part::PowerPointCommentPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  ),
+  crate::sdk::PartChildDescriptor::new(
+    "authors_part",
+    "http://schemas.microsoft.com/office/2018/10/relationships/authors",
+    "crate::parts::power_point_authors_part::PowerPointAuthorsPart",
+    crate::sdk::PartChildCardinality::Optional,
+  ),
+];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct PresentationPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_presentation_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl PresentationPart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation,
-  >,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-    kind = "repeated"
-  ))]
-  pub(crate) custom_xml_parts: Vec<crate::parts::custom_xml_part::CustomXmlPart>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-    kind = "repeated"
-  ))]
-  pub(crate) font_parts: Vec<crate::parts::font_part::FontPart>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
-    kind = "optional"
-  ))]
-  pub(crate) presentation_properties_part:
-    Option<Box<crate::parts::presentation_properties_part::PresentationPropertiesPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
-    kind = "optional"
-  ))]
-  pub(crate) table_styles_part: Option<Box<crate::parts::table_styles_part::TableStylesPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
-    kind = "optional"
-  ))]
-  pub(crate) theme_part: Option<Box<crate::parts::theme_part::ThemePart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
-    kind = "optional"
-  ))]
-  pub(crate) view_properties_part:
-    Option<Box<crate::parts::view_properties_part::ViewPropertiesPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
-    kind = "optional"
-  ))]
-  pub(crate) notes_master_part: Option<Box<crate::parts::notes_master_part::NotesMasterPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-    kind = "repeated"
-  ))]
-  pub(crate) slide_parts: Vec<crate::parts::slide_part::SlidePart>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
-    kind = "required_repeated"
-  ))]
-  pub(crate) slide_master_parts: Vec<crate::parts::slide_master_part::SlideMasterPart>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
-    kind = "optional"
-  ))]
-  pub(crate) user_defined_tags_part:
-    Option<Box<crate::parts::user_defined_tags_part::UserDefinedTagsPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
-    kind = "optional"
-  ))]
-  pub(crate) comment_authors_part:
-    Option<Box<crate::parts::comment_authors_part::CommentAuthorsPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
-    kind = "optional"
-  ))]
-  pub(crate) handout_master_part: Option<Box<crate::parts::handout_master_part::HandoutMasterPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
-    kind = "optional"
-  ))]
-  pub(crate) legacy_diagram_text_info_part:
-    Option<Box<crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart>>,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    kind = "optional"
-  ))]
-  pub(crate) vba_project_part: Option<Box<crate::parts::vba_project_part::VbaProjectPart>>,
+    PresentationPart,
+    as_presentation_part,
+    as_presentation_part_mut
+  );
+  pub fn custom_xml_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+    )
+  }
+  pub fn custom_xml_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::custom_xml_part::CustomXmlPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::custom_xml_part::CustomXmlPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+    )
+  }
+  pub fn font_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    )
+  }
+  pub fn font_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::font_part::FontPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::font_part::FontPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    )
+  }
+  pub fn presentation_properties_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
+    )
+  }
+  pub fn presentation_properties_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::presentation_properties_part::PresentationPropertiesPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::presentation_properties_part::PresentationPropertiesPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
+    )
+  }
+  pub fn table_styles_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
+    )
+  }
+  pub fn table_styles_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::table_styles_part::TableStylesPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::table_styles_part::TableStylesPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
+    )
+  }
+  pub fn theme_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+    )
+  }
+  pub fn theme_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::theme_part::ThemePart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::theme_part::ThemePart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+    )
+  }
+  pub fn view_properties_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
+    )
+  }
+  pub fn view_properties_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::view_properties_part::ViewPropertiesPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::view_properties_part::ViewPropertiesPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
+    )
+  }
+  pub fn notes_master_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+    )
+  }
+  pub fn notes_master_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::notes_master_part::NotesMasterPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::notes_master_part::NotesMasterPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
+    )
+  }
+  pub fn slide_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+    )
+  }
+  pub fn slide_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::slide_part::SlidePart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::slide_part::SlidePart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
+    )
+  }
+  pub fn slide_master_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+    )
+  }
+  pub fn slide_master_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::slide_master_part::SlideMasterPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::slide_master_part::SlideMasterPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+    )
+  }
+  pub fn user_defined_tags_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+    )
+  }
+  pub fn user_defined_tags_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::user_defined_tags_part::UserDefinedTagsPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::user_defined_tags_part::UserDefinedTagsPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
+    )
+  }
+  pub fn comment_authors_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
+    )
+  }
+  pub fn comment_authors_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::comment_authors_part::CommentAuthorsPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::comment_authors_part::CommentAuthorsPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
+    )
+  }
+  pub fn handout_master_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
+    )
+  }
+  pub fn handout_master_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::handout_master_part::HandoutMasterPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::handout_master_part::HandoutMasterPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
+    )
+  }
+  pub fn legacy_diagram_text_info_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
+    )
+  }
+  pub fn legacy_diagram_text_info_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
+    )
+  }
+  pub fn vba_project_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+    )
+  }
+  pub fn vba_project_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::vba_project_part::VbaProjectPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::vba_project_part::VbaProjectPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+    )
+  }
   #[cfg(feature = "microsoft365")]
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2018/10/relationships/comments",
-    kind = "repeated"
-  ))]
-  pub(crate) comment_parts: Vec<crate::parts::power_point_comment_part::PowerPointCommentPart>,
+  pub fn comment_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2018/10/relationships/comments",
+    )
+  }
   #[cfg(feature = "microsoft365")]
-  #[sdk(part_child(
-    relationship_type = "http://schemas.microsoft.com/office/2018/10/relationships/authors",
-    kind = "optional"
-  ))]
-  pub(crate) authors_part:
-    Option<Box<crate::parts::power_point_authors_part::PowerPointAuthorsPart>>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+  pub fn comment_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::power_point_comment_part::PowerPointCommentPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::power_point_comment_part::PowerPointCommentPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2018/10/relationships/comments",
+    )
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn authors_part_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2018/10/relationships/authors",
+    )
+  }
+  #[cfg(feature = "microsoft365")]
+  pub fn authors_part<P: crate::sdk::SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Option<crate::parts::power_point_authors_part::PowerPointAuthorsPart> {
+    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
+      P,
+      crate::parts::power_point_authors_part::PowerPointAuthorsPart,
+    >(
+      self,
+      package,
+      "http://schemas.microsoft.com/office/2018/10/relationships/authors",
+    )
+  }
 }

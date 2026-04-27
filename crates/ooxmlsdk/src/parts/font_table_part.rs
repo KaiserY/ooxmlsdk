@@ -11,20 +11,46 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml";
 pub const TARGET_NAME: &str = "fontTable";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] =
+  &[crate::sdk::PartChildDescriptor::new(
+    "font_parts",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    "crate::parts::font_part::FontPart",
+    crate::sdk::PartChildCardinality::Repeated,
+  )];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct FontTablePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_font_table_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl FontTablePart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
-  >,
-  #[sdk(part_child(
-    relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-    kind = "repeated"
-  ))]
-  pub(crate) font_parts: Vec<crate::parts::font_part::FontPart>,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    FontTablePart,
+    as_font_table_part,
+    as_font_table_part_mut
+  );
+  pub fn font_parts_relationships<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::common::RelationshipRef<'a>> + 'a {
+    <Self as crate::sdk::SdkPart>::child_relationships_by_type(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    )
+  }
+  pub fn font_parts<'a, P: crate::sdk::SdkPackage>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = crate::parts::font_part::FontPart> + 'a {
+    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
+      P,
+      crate::parts::font_part::FontPart,
+    >(
+      self,
+      package,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+    )
+  }
 }

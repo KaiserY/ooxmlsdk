@@ -11,15 +11,17 @@ pub const CONTENT_TYPE: &str =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml";
 pub const TARGET_NAME: &str = "commentsExtensible";
 pub const EXTENSION: &str = "";
+pub const CHILD_DESCRIPTORS: &[crate::sdk::PartChildDescriptor] = &[];
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct WordCommentsExtensiblePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_word_comments_extensible_part"))]
-  pub(crate) root_element: crate::sdk::PartRoot<
+}
+impl WordCommentsExtensiblePart {
+  crate::sdk_part_root_methods!(
     crate::schemas::schemas_microsoft_com_office_word_2018_wordml_cex::CommentsExtensible,
-  >,
-  pub(crate) fallback_parts: Vec<crate::parts::PartRef>,
-  pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
-  pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
+    WordCommentsExtensiblePart,
+    as_word_comments_extensible_part,
+    as_word_comments_extensible_part_mut
+  );
 }

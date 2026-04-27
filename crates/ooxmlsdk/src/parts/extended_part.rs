@@ -12,7 +12,7 @@ pub struct ExtendedPart {
   pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl crate::sdk::SdkPartHandle for ExtendedPart {
+impl crate::sdk::SdkPart for ExtendedPart {
   const DESCRIPTOR: crate::sdk::PartDescriptor =
     crate::sdk::PartDescriptor::new("", "", "", "extendedPart", "");
   #[inline]
@@ -96,4 +96,4 @@ impl crate::sdk::SdkPartHandle for ExtendedPart {
     self.relationship_id = Some(relationship_id);
   }
 }
-impl crate::sdk::SdkPartHandleInternal for ExtendedPart {}
+impl crate::sdk::SdkPartInternal for ExtendedPart {}

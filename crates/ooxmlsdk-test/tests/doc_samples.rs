@@ -354,15 +354,17 @@ fn is_xml_entry(name: &str) -> bool {
 }
 
 fn assert_xml_equivalent(original: &[u8], roundtripped: &[u8], file_name: &str, entry_name: &str) {
-  let strict_original = canonicalize_xml(original, false, file_name, entry_name);
-  let strict_roundtripped = canonicalize_xml(roundtripped, false, file_name, entry_name);
+  let strict_options = CanonicalOptions::strict();
+  let strict_original = canonicalize_xml(original, strict_options, file_name, entry_name);
+  let strict_roundtripped = canonicalize_xml(roundtripped, strict_options, file_name, entry_name);
 
   if strict_original == strict_roundtripped {
     return;
   }
 
-  let relaxed_original = canonicalize_xml(original, true, file_name, entry_name);
-  let relaxed_roundtripped = canonicalize_xml(roundtripped, true, file_name, entry_name);
+  let relaxed_options = CanonicalOptions::relaxed_for_entry(entry_name);
+  let relaxed_original = canonicalize_xml(original, relaxed_options, file_name, entry_name);
+  let relaxed_roundtripped = canonicalize_xml(roundtripped, relaxed_options, file_name, entry_name);
 
   assert_eq!(
     relaxed_original,
@@ -426,8 +428,15 @@ struct XmlElement {
 
 #[derive(Debug)]
 enum XmlNode {
+  Declaration(XmlDeclaration),
   Element(XmlElement),
   Text(String),
+}
+
+#[derive(Debug)]
+enum XmlDeclaration {
+  Plain,
+  Standalone,
 }
 
 #[derive(Debug)]
@@ -438,7 +447,43 @@ struct XmlFrame {
   ns: BTreeMap<String, String>,
 }
 
-fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name: &str) -> String {
+#[derive(Clone, Copy)]
+struct CanonicalOptions {
+  normalize_bool_attrs: bool,
+  normalize_bool_text: bool,
+  normalize_numeric: bool,
+  ignore_empty_core_property: bool,
+  sort_package_properties: bool,
+}
+
+impl CanonicalOptions {
+  fn strict() -> Self {
+    Self {
+      normalize_bool_attrs: false,
+      normalize_bool_text: false,
+      normalize_numeric: false,
+      ignore_empty_core_property: false,
+      sort_package_properties: false,
+    }
+  }
+
+  fn relaxed_for_entry(entry_name: &str) -> Self {
+    Self {
+      normalize_bool_attrs: true,
+      normalize_bool_text: matches!(entry_name, "docProps/app.xml" | "docProps/custom.xml"),
+      normalize_numeric: should_relax_numeric_lexemes(entry_name),
+      ignore_empty_core_property: entry_name == "docProps/core.xml",
+      sort_package_properties: matches!(entry_name, "docProps/app.xml" | "docProps/core.xml"),
+    }
+  }
+}
+
+fn canonicalize_xml(
+  xml: &[u8],
+  options: CanonicalOptions,
+  file_name: &str,
+  entry_name: &str,
+) -> String {
   let mut reader = Reader::from_reader(Cursor::new(xml));
   reader.config_mut().trim_text(false);
   let mut buf = Vec::new();
@@ -455,7 +500,7 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
           &reader,
           &event,
           inherited_ns,
-          relaxed_bool,
+          options,
           file_name,
           entry_name,
         );
@@ -473,7 +518,7 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
           &reader,
           &event,
           inherited_ns,
-          relaxed_bool,
+          options,
           file_name,
           entry_name,
         );
@@ -504,7 +549,7 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
         if raw.chars().all(|ch| ch.is_whitespace()) && should_skip_whitespace_text(&stack) {
           // Skip formatting-only whitespace.
         } else {
-          let text = normalize_xml_text(&raw, relaxed_bool, &stack);
+          let text = normalize_xml_text(&raw, options, &stack);
           push_xml_node(&mut roots, &mut stack, XmlNode::Text(text));
         }
       }
@@ -515,11 +560,18 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
           })
           .into_owned();
         if !raw.chars().all(|ch| ch.is_whitespace()) || !should_skip_whitespace_text(&stack) {
-          let text = normalize_xml_text(&raw, relaxed_bool, &stack);
+          let text = normalize_xml_text(&raw, options, &stack);
           push_xml_node(&mut roots, &mut stack, XmlNode::Text(text));
         }
       }
-      Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {}
+      Event::Decl(event) => {
+        push_xml_node(
+          &mut roots,
+          &mut stack,
+          XmlNode::Declaration(xml_declaration_from_event(&event)),
+        );
+      }
+      Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {}
       Event::GeneralRef(event) => {
         let raw = event.decode().unwrap_or_else(|err| {
           panic!("failed to decode xml general ref for {file_name}:{entry_name}: {err}");
@@ -541,14 +593,14 @@ fn canonicalize_xml(xml: &[u8], relaxed_bool: bool, file_name: &str, entry_name:
     stack.is_empty(),
     "unterminated xml for {file_name}:{entry_name}"
   );
-  render_xml_nodes_for_entry(&roots, relaxed_bool, entry_name)
+  render_xml_nodes_for_entry(&roots, options, entry_name)
 }
 
 fn parse_xml_node(
   reader: &Reader<Cursor<&[u8]>>,
   event: &quick_xml::events::BytesStart<'_>,
   inherited_ns: Option<&BTreeMap<String, String>>,
-  relaxed_bool: bool,
+  options: CanonicalOptions,
   file_name: &str,
   entry_name: &str,
 ) -> (String, Vec<(String, String)>, BTreeMap<String, String>) {
@@ -577,26 +629,30 @@ fn parse_xml_node(
 
   let mut attrs = Vec::new();
   for (key, value) in raw_attrs {
+    if key == "xmlns" || key.starts_with("xmlns:") {
+      continue;
+    }
+
     let expanded_key = expand_xml_name(&key, &ns, true);
-    let value = if entry_name.ends_with(".rels") && key == "Type" {
+    let value = if is_mc_ignorable_attr(&expanded_key) {
+      normalize_ignorable_prefix_list(&value, &ns)
+    } else if entry_name.ends_with(".rels") && key == "Type" {
       normalize_relationship_type_uri(&value)
     } else {
       value
     };
-    let value =
-      if relaxed_bool && should_normalize_bool_attr(file_name, entry_name, &name, &expanded_key) {
-        normalize_bool_lexeme(&value)
-      } else {
-        value
-      };
-    let value = if relaxed_bool {
+    let value = if options.normalize_bool_attrs
+      && should_normalize_bool_attr(file_name, entry_name, &name, &expanded_key)
+    {
+      normalize_bool_lexeme(&value)
+    } else {
+      value
+    };
+    let value = if options.normalize_numeric {
       normalize_numeric_lexeme(&value)
     } else {
       value
     };
-    if key == "xmlns" || key.starts_with("xmlns:") || key == "mc:Ignorable" {
-      continue;
-    }
 
     attrs.push((expanded_key, value));
   }
@@ -641,21 +697,41 @@ fn push_xml_node(roots: &mut Vec<XmlNode>, stack: &mut [XmlFrame], node: XmlNode
   }
 }
 
-fn render_xml_nodes_for_entry(nodes: &[XmlNode], relaxed_bool: bool, entry_name: &str) -> String {
+fn xml_declaration_from_event(event: &quick_xml::events::BytesDecl<'_>) -> XmlDeclaration {
+  if matches!(
+    event.standalone(),
+    Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+  ) {
+    XmlDeclaration::Standalone
+  } else {
+    XmlDeclaration::Plain
+  }
+}
+
+fn render_xml_nodes_for_entry(
+  nodes: &[XmlNode],
+  options: CanonicalOptions,
+  entry_name: &str,
+) -> String {
   let mut out = String::new();
   for node in nodes {
-    out.push_str(&render_xml_node_to_string(node, relaxed_bool, entry_name));
+    out.push_str(&render_xml_node_to_string(node, options, entry_name));
   }
   out
 }
 
-fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &str) -> String {
+fn render_xml_node_to_string(
+  node: &XmlNode,
+  options: CanonicalOptions,
+  entry_name: &str,
+) -> String {
   let mut out = String::new();
   match node {
+    XmlNode::Declaration(XmlDeclaration::Plain) => out.push_str("<?xml?>"),
+    XmlNode::Declaration(XmlDeclaration::Standalone) => out.push_str("<?xml standalone=\"yes\"?>"),
     XmlNode::Text(text) => out.push_str(text),
     XmlNode::Element(element) => {
-      if relaxed_bool
-        && entry_name == "docProps/core.xml"
+      if options.ignore_empty_core_property
         && element.children.is_empty()
         && element.attrs.is_empty()
       {
@@ -677,13 +753,14 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
         out.push_str("/>");
       } else {
         out.push('>');
-        if entry_name == "docProps/core.xml"
-          || (entry_name == "docProps/app.xml" && is_extended_properties_root(&element.name))
+        if options.sort_package_properties
+          && (entry_name == "docProps/core.xml"
+            || (entry_name == "docProps/app.xml" && is_extended_properties_root(&element.name)))
         {
           let mut children = element
             .children
             .iter()
-            .map(|child| render_xml_node_to_string(child, relaxed_bool, entry_name))
+            .map(|child| render_xml_node_to_string(child, options, entry_name))
             .collect::<Vec<_>>();
           children.sort();
           for child in children {
@@ -691,7 +768,7 @@ fn render_xml_node_to_string(node: &XmlNode, relaxed_bool: bool, entry_name: &st
           }
         } else {
           for child in &element.children {
-            out.push_str(&render_xml_node_to_string(child, relaxed_bool, entry_name));
+            out.push_str(&render_xml_node_to_string(child, options, entry_name));
           }
         }
         out.push_str("</");
@@ -763,12 +840,39 @@ fn normalize_numeric_lexeme(value: &str) -> String {
   value.to_string()
 }
 
-fn normalize_xml_text(value: &str, relaxed_bool: bool, stack: &[XmlFrame]) -> String {
+fn normalize_xml_text(value: &str, options: CanonicalOptions, stack: &[XmlFrame]) -> String {
   let value = value.replace("\r\n", "\n").replace('\r', "\n");
-  if relaxed_bool && should_normalize_bool_text(stack) {
+  if options.normalize_bool_text && should_normalize_bool_text(stack) {
     return normalize_bool_lexeme(&value);
   }
   value
+}
+
+fn should_relax_numeric_lexemes(entry_name: &str) -> bool {
+  entry_name.starts_with("word/")
+    || entry_name.starts_with("xl/")
+    || entry_name.starts_with("ppt/")
+    || entry_name == "docProps/app.xml"
+    || entry_name == "docProps/custom.xml"
+}
+
+fn is_mc_ignorable_attr(attr_name: &str) -> bool {
+  attr_name == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable"
+}
+
+fn normalize_ignorable_prefix_list(value: &str, namespaces: &BTreeMap<String, String>) -> String {
+  let mut values = value
+    .split_whitespace()
+    .map(|prefix| {
+      namespaces
+        .get(prefix)
+        .map(|uri| normalize_namespace_uri(uri))
+        .unwrap_or_else(|| format!("prefix:{prefix}"))
+    })
+    .collect::<Vec<_>>();
+  values.sort();
+  values.dedup();
+  values.join(" ")
 }
 
 fn should_normalize_bool_text(stack: &[XmlFrame]) -> bool {

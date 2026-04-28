@@ -7835,6 +7835,7 @@ pub struct Break {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:t")]
 pub struct Text {
+  pub mc_ignorable: Option<String>,
   /// space
   ///
   /// Available in Office2007 and above.

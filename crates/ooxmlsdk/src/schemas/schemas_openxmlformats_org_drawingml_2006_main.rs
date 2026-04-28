@@ -2742,6 +2742,8 @@ pub struct RgbColorModelPercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SRgbColor/a:srgbClr")]
 pub struct RgbColorModelHex {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub mc_ignorable: Option<String>,
   /// Value
   ///
   /// Available in Office2007 and above.

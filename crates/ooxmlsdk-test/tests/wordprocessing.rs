@@ -1,3 +1,4 @@
+use ooxmlsdk::common::XmlHeaderType;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContentChoice;
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
@@ -367,6 +368,7 @@ fn document_round_trip_from_openxml_reader_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_XML);
 
+  assert_eq!(parsed.xml_header, XmlHeaderType::None);
   assert_eq!(
     ooxmlsdk::common::find_xmlns_uri(&parsed.xmlns, "w"),
     Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
@@ -378,7 +380,19 @@ fn document_round_trip_from_openxml_reader_test() {
 
   let paragraph = first_paragraph(first_body(&parsed));
   assert_eq!(paragraph.rsid_paragraph_properties.as_deref(), Some("001"));
+  assert_eq!(reparsed.xml_header, XmlHeaderType::None);
   assert!(reparsed.body.is_some());
+}
+
+#[test]
+fn document_round_trip_preserves_plain_xml_declaration() {
+  let xml = r#"<?xml version="1.0" encoding="utf-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#;
+  let (parsed, serialized, reparsed) = assert_stable_roundtrip::<Document>(xml);
+
+  assert_eq!(parsed.xml_header, XmlHeaderType::Plain);
+  assert!(serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"));
+  assert!(!serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"));
+  assert_eq!(reparsed.xml_header, XmlHeaderType::Plain);
 }
 
 #[test]
@@ -397,6 +411,7 @@ fn document_round_trip_with_two_paragraphs_from_openxml_reader_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_TWO_PARAGRAPHS_XML);
 
+  assert_eq!(parsed.xml_header, XmlHeaderType::Standalone);
   let body = first_body(&parsed);
   assert_eq!(body.body_choice.len(), 2);
   assert!(body_choice_paragraph(&body.body_choice[0]).is_some());
@@ -404,6 +419,7 @@ fn document_round_trip_with_two_paragraphs_from_openxml_reader_test() {
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );
+  assert_eq!(reparsed.xml_header, XmlHeaderType::Standalone);
   assert!(reparsed.body.is_some());
 }
 

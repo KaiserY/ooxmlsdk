@@ -1,6 +1,11 @@
 {
   "Types": [
     {
+      "ClassName": "RgbColorModelHex",
+      "HasXmlnsFields": true,
+      "HasMcIgnorableField": true
+    },
+    {
       "ClassName": "PercentageType",
       "Attributes": [
         {

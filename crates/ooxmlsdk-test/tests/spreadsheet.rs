@@ -1,6 +1,7 @@
 #[cfg(feature = "microsoft365")]
 use std::io::{Cursor, Read};
 
+use ooxmlsdk::common::XmlHeaderType;
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::{
   ArrayFeatureProperty, ArrayFeaturePropertyChoice, BoolFeatureProperty, IntFeatureProperty,
@@ -57,12 +58,17 @@ fn workbook_round_trip_from_openxml_part_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Workbook>(fixtures::SPREADSHEET_WORKBOOK_XML);
 
+  assert_eq!(parsed.xml_header, XmlHeaderType::Standalone);
   assert_eq!(parsed.sheets.x_sheet.len(), 2);
   assert_eq!(parsed.sheets.x_sheet[0].name.as_str(), "Sheet1");
   assert_eq!(parsed.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert!(
+    serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
+  );
   assert!(serialized.contains("<x:sheet"));
   assert!(serialized.contains("name=\"Sheet1\""));
   assert!(serialized.contains("name=\"Sheet2\""));
+  assert_eq!(reparsed.xml_header, XmlHeaderType::Standalone);
   assert_eq!(reparsed.sheets.x_sheet.len(), 2);
 }
 
@@ -71,6 +77,7 @@ fn workbook_round_trip_from_complex01_part_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Workbook>(fixtures::SPREADSHEET_WORKBOOK_COMPLEX01_XML);
 
+  assert_eq!(parsed.xml_header, XmlHeaderType::Standalone);
   assert_eq!(parsed.mc_ignorable.as_deref(), Some("x15"));
   assert_eq!(
     parsed
@@ -91,9 +98,13 @@ fn workbook_round_trip_from_complex01_part_test() {
   assert_eq!(parsed.sheets.x_sheet.len(), 2);
   assert_eq!(parsed.sheets.x_sheet[0].name.as_str(), "Sheet1");
   assert_eq!(parsed.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert!(
+    serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
+  );
   assert!(trim_xml_declaration(&serialized).contains("mc:Ignorable=\"x15\""));
   assert!(trim_xml_declaration(&serialized).contains("<x:calcPr"));
   assert!(trim_xml_declaration(&serialized).contains("calcId=\"152511\""));
+  assert_eq!(reparsed.xml_header, XmlHeaderType::Standalone);
   assert_eq!(reparsed.mc_ignorable.as_deref(), Some("x15"));
   assert_eq!(reparsed.sheets.x_sheet.len(), 2);
 }

@@ -378,6 +378,7 @@ impl<'a> From<&'a RelationshipInfo> for RelationshipRef<'a> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct RelationshipSet {
+  xml_header: super::XmlHeaderType,
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
 }
@@ -663,12 +664,12 @@ impl RelationshipSet {
         "",
         "http://schemas.openxmlformats.org/package/2006/relationships",
       )],
+      xml_header: self.xml_header,
       relationship: self
         .relationships
         .iter()
         .map(RelationshipInfo::to_relationship)
         .collect(),
-      ..Default::default()
     }
   }
 
@@ -683,6 +684,7 @@ impl RelationshipSet {
 
     let source_parent_path = super::parent_zip_path(source_path);
     let mut set = Self {
+      xml_header: relationships.xml_header,
       relationships: Vec::with_capacity(relationships.relationship.len()),
       by_id: HashMap::with_capacity(relationships.relationship.len()),
     };

@@ -8,6 +8,7 @@ use crate::sdk_data::{
   xsd::{parse_named_groups, parse_xsd, resolve_named_group_leaf_sets},
 };
 
+use crate::sdk_code::versioning::effective_version;
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use std::collections::{BTreeSet, HashMap};
 
@@ -797,8 +798,7 @@ fn collect_choice_variant_children(
           child.optional |= optional;
           child.repeated |= repeated;
           child.initial_version =
-            effective_initial_version(initial_version.as_str(), child.initial_version.as_str())
-              .to_string();
+            effective_version(initial_version.as_str(), child.initial_version.as_str()).to_string();
           out.push(child);
           return;
         }
@@ -859,7 +859,7 @@ fn flatten_anonymous_choice_children(children: &mut Vec<SchemaTypeChild>) {
       for mut nested in child.children.drain(..) {
         nested.optional |= wrapper_optional;
         nested.repeated |= wrapper_repeated;
-        nested.initial_version = effective_initial_version(
+        nested.initial_version = effective_version(
           wrapper_initial_version.as_str(),
           nested.initial_version.as_str(),
         )
@@ -892,7 +892,7 @@ fn collapse_single_anonymous_sequence_child(child: &mut SchemaTypeChild) {
   let mut nested = child.children.remove(0);
   child.optional |= nested.optional;
   child.repeated |= nested.repeated;
-  child.initial_version = effective_initial_version(
+  child.initial_version = effective_version(
     child.initial_version.as_str(),
     nested.initial_version.as_str(),
   )
@@ -905,30 +905,6 @@ fn is_anonymous_wrapper(child: &SchemaTypeChild, kind: SchemaTypeChildKind) -> b
     && child.name.is_empty()
     && child.property_name.is_empty()
     && child.property_comments.is_empty()
-}
-
-fn effective_initial_version<'a>(left: &'a str, right: &'a str) -> &'a str {
-  match (left, right) {
-    ("", version) => version,
-    (version, "") => version,
-    (left, right) if left == right => left,
-    (left, right) => {
-      if is_microsoft365_version(left) {
-        left
-      } else if is_microsoft365_version(right) {
-        right
-      } else {
-        left
-      }
-    }
-  }
-}
-
-fn is_microsoft365_version(version: &str) -> bool {
-  matches!(
-    version,
-    "Office2010" | "Office2013" | "Office2016" | "Office2019" | "Office2021" | "Microsoft365"
-  )
 }
 
 fn schema_child_from_particle(
@@ -1195,7 +1171,7 @@ fn collect_choice_version_coverage(
   out: &mut ChoiceVersionCoverage,
 ) {
   let initial_version =
-    effective_initial_version(inherited_initial_version, child.initial_version.as_str());
+    effective_version(inherited_initial_version, child.initial_version.as_str());
 
   match child.kind {
     SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {

@@ -3154,16 +3154,7 @@ fn has_resolvable_single_choice_child(schema_type: &SchemaType) -> bool {
 }
 
 fn common_choice_version_ir<'a>(container_version: &'a str, variant_versions: &[&str]) -> &'a str {
-  if crate::sdk_code::versioning::is_microsoft365_version(container_version)
-    || (!variant_versions.is_empty()
-      && variant_versions
-        .iter()
-        .all(|version| crate::sdk_code::versioning::is_microsoft365_version(version)))
-  {
-    "Microsoft365"
-  } else {
-    ""
-  }
+  crate::sdk_code::versioning::common_choice_version(container_version, variant_versions)
 }
 
 fn build_attr_validator_decls(

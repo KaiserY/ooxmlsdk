@@ -398,383 +398,247 @@ impl PartRef {
     match relationship_type {
       "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedControlPersistenceBinaryDataPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars" => {
         if part.content_type() == "application/vnd.ms-excel.attachedToolbars" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExcelAttachedToolbarsPart(part));
+          return Some(
+            <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if part.content_type() == "application/vnd.ms-word.attachedToolbars" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordAttachedToolbarsPart(part));
+          return Some(
+            <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations" => {
         if part.content_type() == "application/vnd.ms-word.keyMapCustomizations+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomizationPart(part));
+          return Some(
+            <crate::parts::customization_part::CustomizationPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText" => {
         if part.content_type() == "application/vnd.ms-office.legacyDiagramText" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::LegacyDiagramTextPart(part));
+          return Some(
+            <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo" => {
         if part.content_type() == "application/vnd.ms-office.legacyDocTextInfo" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::LegacyDiagramTextInfoPart(part));
+          return Some(
+            <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility" => {
         if part.content_type() == "application/xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RibbonExtensibilityPart(part));
+          return Some(
+            <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization" => {
         if part.content_type() == "application/xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::QuickAccessToolbarCustomizationsPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject" => {
         if part.content_type() == "application/vnd.ms-office.vbaProject" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VbaProjectPart(part));
+          return Some(
+            <crate::parts::vba_project_part::VbaProjectPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/wordVbaData" => {
         if part.content_type() == "application/vnd.ms-word.vbaData+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VbaDataPart(part));
+          return Some(<crate::parts::vba_data_part::VbaDataPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/wsSortMap" => {
         if part.content_type() == "application/vnd.ms-excel.wsSortMap+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetSortMapPart(part));
+          return Some(
+            <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet" => {
         if part.content_type() == "application/vnd.ms-excel.intlmacrosheet+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::InternationalMacroSheetPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet" => {
         if part.content_type() == "application/vnd.ms-excel.macrosheet+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::MacroSheetPart(part));
+          return Some(
+            <crate::parts::macro_sheet_part::MacroSheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/customData" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/binary" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomDataPart(part));
+          return Some(
+            <crate::parts::custom_data_part::CustomDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/customDataProps" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.customDataProperties+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomDataPropertiesPart(part));
+          return Some(
+            <crate::parts::custom_data_properties_part::CustomDataPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.drawingml.diagramDrawing+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramPersistLayoutPart(part));
+          return Some(
+            <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/slicer" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.slicer+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlicersPart(part));
+          return Some(<crate::parts::slicers_part::SlicersPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/slicerCache" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.slicerCache+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlicerCachePart(part));
+          return Some(
+            <crate::parts::slicer_cache_part::SlicerCachePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-word.stylesWithEffects+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::StylesWithEffectsPart(part));
+          return Some(
+            <crate::parts::styles_with_effects_part::StylesWithEffectsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RibbonAndBackstageCustomizationsPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.chartcolorstyle+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartColorStylePart(part));
+          return Some(
+            <crate::parts::chart_color_style_part::ChartColorStylePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/chartStyle" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.chartstyle+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartStylePart(part));
+          return Some(
+            <crate::parts::chart_style_part::ChartStylePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/commentsExtended" => {
@@ -782,19 +646,13 @@ impl PartRef {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingCommentsExPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/people" => {
@@ -802,109 +660,71 @@ impl PartRef {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingPeoplePart(part));
+          return Some(
+            <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/timeline" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.timeline+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TimeLinePart(part));
+          return Some(<crate::parts::time_line_part::TimeLinePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/timelineCache" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.timelineCache+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TimeLineCachePart(part));
+          return Some(
+            <crate::parts::time_line_cache_part::TimeLineCachePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/webextension" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.webextension+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WebExtensionPart(part));
+          return Some(
+            <crate::parts::web_extension_part::WebExtensionPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.webextensiontaskpanes+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WebExTaskpanesPart(part));
+          return Some(
+            <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2014/relationships/chartEx" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.chartex+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExtendedChartPart(part));
+          return Some(
+            <crate::parts::extended_chart_part::ExtendedChartPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds" => {
@@ -912,200 +732,132 @@ impl PartRef {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingCommentsIdsPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/model3d" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "model/gltf-binary" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::Model3DReferenceRelationshipPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdArray" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdarray+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdArrayPart(part));
+          return Some(<crate::parts::rd_array_part::RdArrayPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvalue+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValuePart(part));
+          return Some(
+            <crate::parts::rd_rich_value_part::RdRichValuePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvaluestructure+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValueStructurePart(part));
+          return Some(
+            <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvaluetypes+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValueTypesPart(part));
+          return Some(
+            <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdsupportingpropertybag+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdSupportingPropertyBagPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure" =>
       {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdSupportingPropertyBagStructurePart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/richStyles" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.richstyles+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RichStylesPart(part));
+          return Some(
+            <crate::parts::rich_styles_part::RichStylesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2017/10/relationships/person" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.person+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookPersonPart(part));
+          return Some(
+            <crate::parts::workbook_person_part::WorkbookPersonPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.threadedcomments+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetThreadedCommentsPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible" => {
@@ -1113,1557 +865,1027 @@ impl PartRef {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordCommentsExtensiblePart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.microsoft.com/office/2018/10/relationships/authors" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-powerpoint.authors+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PowerPointAuthorsPart(part));
+          return Some(
+            <crate::parts::power_point_authors_part::PowerPointAuthorsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2018/10/relationships/comments" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-powerpoint.comments+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PowerPointCommentPart(part));
+          return Some(
+            <crate::parts::power_point_comment_part::PowerPointCommentPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.namedsheetviews+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NamedSheetViewsPart(part));
+          return Some(
+            <crate::parts::named_sheet_views_part::NamedSheetViewsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.documenttasks+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DocumentTasksPart(part));
+          return Some(
+            <crate::parts::document_tasks_part::DocumentTasksPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.classificationlabels+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::LabelInfoPart(part));
+          return Some(
+            <crate::parts::label_info_part::LabelInfoPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvaluewebimage+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValueWebImagePart(part));
+          return Some(
+            <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.featurepropertybag+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FeaturePropertyBagsPart(part));
+          return Some(
+            <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::alternative_format_import_part::AlternativeFormatImportPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::AlternativeFormatImportPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CalculationChainPart(part));
+          return Some(
+            <crate::parts::calculation_chain_part::CalculationChainPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartPart(part));
+          return Some(<crate::parts::chart_part::ChartPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartDrawingPart(part));
+          return Some(
+            <crate::parts::chart_drawing_part::ChartDrawingPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartsheetPart(part));
+          return Some(
+            <crate::parts::chartsheet_part::ChartsheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CommentAuthorsPart(part));
+          return Some(
+            <crate::parts::comment_authors_part::CommentAuthorsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.comments+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideCommentsPart(part));
+          return Some(
+            <crate::parts::slide_comments_part::SlideCommentsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingCommentsPart(part));
+          return Some(
+            <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetCommentsPart(part));
+          return Some(
+            <crate::parts::worksheet_comments_part::WorksheetCommentsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ConnectionsPart(part));
+          return Some(
+            <crate::parts::connections_part::ConnectionsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedControlPersistencePart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp" => {
         #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.controlproperties+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ControlPropertiesPart(part));
+          return Some(
+            <crate::parts::control_properties_part::ControlPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.custom-properties+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomFilePropertiesPart(part));
+          return Some(
+            <crate::parts::custom_file_properties_part::CustomFilePropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomPropertyPart(part));
+          return Some(
+            <crate::parts::custom_property_part::CustomPropertyPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomXmlPart(part));
+          return Some(
+            <crate::parts::custom_xml_part::CustomXmlPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.customXmlProperties+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomXmlPropertiesPart(part));
+          return Some(
+            <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramColorsPart(part));
+          return Some(
+            <crate::parts::diagram_colors_part::DiagramColorsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramDataPart(part));
+          return Some(
+            <crate::parts::diagram_data_part::DiagramDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramLayoutDefinitionPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramStylePart(part));
+          return Some(
+            <crate::parts::diagram_style_part::DiagramStylePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DialogsheetPart(part));
+          return Some(
+            <crate::parts::dialogsheet_part::DialogsheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" => {
         if part.content_type() == "application/vnd.openxmlformats-officedocument.drawing+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DrawingsPart(part));
+          return Some(<crate::parts::drawings_part::DrawingsPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EndnotesPart(part));
+          return Some(<crate::parts::endnotes_part::EndnotesPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.extended-properties+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExtendedFilePropertiesPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExternalWorkbookPart(part));
+          return Some(
+            <crate::parts::external_workbook_part::ExternalWorkbookPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::font_part::FontPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::font_part::FontPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FontPart(part));
+          return Some(<crate::parts::font_part::FontPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FontTablePart(part));
+          return Some(
+            <crate::parts::font_table_part::FontTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FooterPart(part));
+          return Some(<crate::parts::footer_part::FooterPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FootnotesPart(part));
+          return Some(
+            <crate::parts::footnotes_part::FootnotesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::GlossaryDocumentPart(part));
+          return Some(
+            <crate::parts::glossary_document_part::GlossaryDocumentPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::HandoutMasterPart(part));
+          return Some(
+            <crate::parts::handout_master_part::HandoutMasterPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::HeaderPart(part));
+          return Some(<crate::parts::header_part::HeaderPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::image_part::ImagePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::image_part::ImagePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ImagePart(part));
+          return Some(<crate::parts::image_part::ImagePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NotesMasterPart(part));
+          return Some(
+            <crate::parts::notes_master_part::NotesMasterPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NotesSlidePart(part));
+          return Some(
+            <crate::parts::notes_slide_part::NotesSlidePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NumberingDefinitionsPart(part));
+          return Some(
+            <crate::parts::numbering_definitions_part::NumberingDefinitionsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" => {
         if part.path() == "word/document.xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::MainDocumentPart(part));
+          return Some(
+            <crate::parts::main_document_part::MainDocumentPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if part.path() == "ppt/presentation.xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PresentationPart(part));
+          return Some(
+            <crate::parts::presentation_part::PresentationPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if part.path() == "xl/workbook.xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookPart(part));
+          return Some(<crate::parts::workbook_part::WorkbookPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedObjectPart(part));
+          return Some(
+            <crate::parts::embedded_object_part::EmbeddedObjectPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedPackagePart(part));
+          return Some(
+            <crate::parts::embedded_package_part::EmbeddedPackagePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PivotTableCacheDefinitionPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PivotTableCacheRecordsPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PivotTablePart(part));
+          return Some(
+            <crate::parts::pivot_table_part::PivotTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PresentationPropertiesPart(part));
+          return Some(
+            <crate::parts::presentation_properties_part::PresentationPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SpreadsheetPrinterSettingsPart(part));
+                        ),
+                    );
         }
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingPrinterSettingsPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::QueryTablePart(part));
+          return Some(
+            <crate::parts::query_table_part::QueryTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::MailMergeRecipientDataPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookRevisionHeaderPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookRevisionLogPart(part));
+          return Some(
+            <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DocumentSettingsPart(part));
+          return Some(
+            <crate::parts::document_settings_part::DocumentSettingsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SharedStringTablePart(part));
+          return Some(
+            <crate::parts::shared_string_table_part::SharedStringTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CellMetadataPart(part));
+          return Some(
+            <crate::parts::cell_metadata_part::CellMetadataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlidePart(part));
+          return Some(<crate::parts::slide_part::SlidePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideLayoutPart(part));
+          return Some(
+            <crate::parts::slide_layout_part::SlideLayoutPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideMasterPart(part));
+          return Some(
+            <crate::parts::slide_master_part::SlideMasterPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideUpdateInfo" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideSyncDataPart(part));
+          return Some(
+            <crate::parts::slide_sync_data_part::SlideSyncDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::StyleDefinitionsPart(part));
+          return Some(
+            <crate::parts::style_definitions_part::StyleDefinitionsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookStylesPart(part));
+          return Some(
+            <crate::parts::workbook_styles_part::WorkbookStylesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TableDefinitionPart(part));
+          return Some(
+            <crate::parts::table_definition_part::TableDefinitionPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SingleCellTablePart(part));
+          return Some(
+            <crate::parts::single_cell_table_part::SingleCellTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TableStylesPart(part));
+          return Some(
+            <crate::parts::table_styles_part::TableStylesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.tags+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::UserDefinedTagsPart(part));
+          return Some(
+            <crate::parts::user_defined_tags_part::UserDefinedTagsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" => {
         if part.content_type() == "application/vnd.openxmlformats-officedocument.theme+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ThemePart(part));
+          return Some(<crate::parts::theme_part::ThemePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride" => {
         if part.content_type() == "application/vnd.openxmlformats-officedocument.themeOverride+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ThemeOverridePart(part));
+          return Some(
+            <crate::parts::theme_override_part::ThemeOverridePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookUserDataPart(part));
+          return Some(
+            <crate::parts::workbook_user_data_part::WorkbookUserDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ViewPropertiesPart(part));
+          return Some(
+            <crate::parts::view_properties_part::ViewPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing" => {
         if part.content_type() == "application/vnd.openxmlformats-officedocument.vmlDrawing" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VmlDrawingPart(part));
+          return Some(
+            <crate::parts::vml_drawing_part::VmlDrawingPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VolatileDependenciesPart(part));
+          return Some(
+            <crate::parts::volatile_dependencies_part::VolatileDependenciesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WebSettingsPart(part));
+          return Some(
+            <crate::parts::web_settings_part::WebSettingsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" => {
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetPart(part));
+          return Some(
+            <crate::parts::worksheet_part::WorksheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps" => {
         if part.content_type() == "application/xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomXmlMappingsPart(part));
+          return Some(
+            <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin" => {
         if part.content_type() == "application/vnd.openxmlformats-package.digital-signature-origin"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DigitalSignatureOriginPart(part));
+                        ),
+                    );
         }
       }
       "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature" => {
         if part.content_type()
           == "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"
         {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::XmlSignaturePart(part));
+          return Some(
+            <crate::parts::xml_signature_part::XmlSignaturePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" => {
         if part.content_type() == "application/vnd.openxmlformats-package.core-properties+xml" {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CoreFilePropertiesPart(part));
+          return Some(
+            <crate::parts::core_file_properties_part::CoreFilePropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail" => {
         if true {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ThumbnailPart(part));
+          return Some(
+            <crate::parts::thumbnail_part::ThumbnailPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
       _ => {
@@ -2676,19 +1898,13 @@ impl PartRef {
           ".",
           "afchunk",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::alternative_format_import_part::AlternativeFormatImportPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::alternative_format_import_part::AlternativeFormatImportPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::AlternativeFormatImportPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2699,19 +1915,13 @@ impl PartRef {
           ".",
           "calcChain",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::calculation_chain_part::CalculationChainPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CalculationChainPart(part));
+          return Some(
+            <crate::parts::calculation_chain_part::CalculationChainPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2722,19 +1932,13 @@ impl PartRef {
           ".",
           "metadata",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::cell_metadata_part::CellMetadataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CellMetadataPart(part));
+          return Some(
+            <crate::parts::cell_metadata_part::CellMetadataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -2746,19 +1950,13 @@ impl PartRef {
           ".",
           "colors",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_color_style_part::ChartColorStylePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartColorStylePart(part));
+          return Some(
+            <crate::parts::chart_color_style_part::ChartColorStylePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2769,19 +1967,13 @@ impl PartRef {
           "../drawings",
           "drawing",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_drawing_part::ChartDrawingPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartDrawingPart(part));
+          return Some(
+            <crate::parts::chart_drawing_part::ChartDrawingPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2792,19 +1984,11 @@ impl PartRef {
           "charts",
           "chart",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_part::ChartPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartPart(part));
+          return Some(<crate::parts::chart_part::ChartPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -2816,19 +2000,13 @@ impl PartRef {
           ".",
           "style",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chart_style_part::ChartStylePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartStylePart(part));
+          return Some(
+            <crate::parts::chart_style_part::ChartStylePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2839,19 +2017,13 @@ impl PartRef {
           "chartsheets",
           "sheet",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::chartsheet_part::ChartsheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ChartsheetPart(part));
+          return Some(
+            <crate::parts::chartsheet_part::ChartsheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2862,19 +2034,13 @@ impl PartRef {
           ".",
           "commentAuthors",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::comment_authors_part::CommentAuthorsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CommentAuthorsPart(part));
+          return Some(
+            <crate::parts::comment_authors_part::CommentAuthorsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2885,19 +2051,13 @@ impl PartRef {
           ".",
           "connections",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::connections_part::ConnectionsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ConnectionsPart(part));
+          return Some(
+            <crate::parts::connections_part::ConnectionsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -2909,19 +2069,13 @@ impl PartRef {
           "../ctrlProps",
           "ctrlProp",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::control_properties_part::ControlPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ControlPropertiesPart(part));
+          return Some(
+            <crate::parts::control_properties_part::ControlPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -2932,19 +2086,13 @@ impl PartRef {
           "docProps",
           "core",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::core_file_properties_part::CoreFilePropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CoreFilePropertiesPart(part));
+          return Some(
+            <crate::parts::core_file_properties_part::CoreFilePropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -2956,19 +2104,13 @@ impl PartRef {
           "customData",
           "customData",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_data_part::CustomDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomDataPart(part));
+          return Some(
+            <crate::parts::custom_data_part::CustomDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -2980,19 +2122,13 @@ impl PartRef {
           "customData",
           "customDataProps",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_data_properties_part::CustomDataPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomDataPropertiesPart(part));
+          return Some(
+            <crate::parts::custom_data_properties_part::CustomDataPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3003,19 +2139,13 @@ impl PartRef {
           "docProps",
           "custom",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_file_properties_part::CustomFilePropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomFilePropertiesPart(part));
+          return Some(
+            <crate::parts::custom_file_properties_part::CustomFilePropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3026,19 +2156,13 @@ impl PartRef {
           ".",
           "CustomProperty",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_property_part::CustomPropertyPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomPropertyPart(part));
+          return Some(
+            <crate::parts::custom_property_part::CustomPropertyPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3049,19 +2173,13 @@ impl PartRef {
           ".",
           "xmlMaps",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomXmlMappingsPart(part));
+          return Some(
+            <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3072,19 +2190,13 @@ impl PartRef {
           "../customXml",
           "item",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_xml_part::CustomXmlPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomXmlPart(part));
+          return Some(
+            <crate::parts::custom_xml_part::CustomXmlPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3095,19 +2207,13 @@ impl PartRef {
           ".",
           "itemProps",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomXmlPropertiesPart(part));
+          return Some(
+            <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3118,19 +2224,13 @@ impl PartRef {
           ".",
           "customizations",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::customization_part::CustomizationPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::CustomizationPart(part));
+          return Some(
+            <crate::parts::customization_part::CustomizationPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3141,19 +2241,13 @@ impl PartRef {
           "../graphics",
           "colors",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_colors_part::DiagramColorsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramColorsPart(part));
+          return Some(
+            <crate::parts::diagram_colors_part::DiagramColorsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3164,19 +2258,13 @@ impl PartRef {
           "../graphics",
           "data",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_data_part::DiagramDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramDataPart(part));
+          return Some(
+            <crate::parts::diagram_data_part::DiagramDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3187,19 +2275,13 @@ impl PartRef {
           "../graphics",
           "layout",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramLayoutDefinitionPart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3211,19 +2293,13 @@ impl PartRef {
           "../diagrams",
           "drawing",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramPersistLayoutPart(part));
+          return Some(
+            <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3234,19 +2310,13 @@ impl PartRef {
           "../graphics",
           "quickStyle",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::diagram_style_part::DiagramStylePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DiagramStylePart(part));
+          return Some(
+            <crate::parts::diagram_style_part::DiagramStylePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3257,19 +2327,13 @@ impl PartRef {
           "dialogsheets",
           "sheet",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::dialogsheet_part::DialogsheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DialogsheetPart(part));
+          return Some(
+            <crate::parts::dialogsheet_part::DialogsheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3280,19 +2344,13 @@ impl PartRef {
           "_xmlsignatures",
           "origin",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DigitalSignatureOriginPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3303,19 +2361,13 @@ impl PartRef {
           ".",
           "settings",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::document_settings_part::DocumentSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DocumentSettingsPart(part));
+          return Some(
+            <crate::parts::document_settings_part::DocumentSettingsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3327,19 +2379,13 @@ impl PartRef {
           ".",
           "tasks",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::document_tasks_part::DocumentTasksPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DocumentTasksPart(part));
+          return Some(
+            <crate::parts::document_tasks_part::DocumentTasksPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3350,19 +2396,11 @@ impl PartRef {
           "../drawings",
           "drawing",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::drawings_part::DrawingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::DrawingsPart(part));
+          return Some(<crate::parts::drawings_part::DrawingsPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3373,19 +2411,13 @@ impl PartRef {
           ".",
           "ActiveXControl",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedControlPersistenceBinaryDataPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3396,19 +2428,13 @@ impl PartRef {
           "embeddings",
           "control",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedControlPersistencePart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3419,19 +2445,13 @@ impl PartRef {
           "embeddings",
           "embeddedObject",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_object_part::EmbeddedObjectPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedObjectPart(part));
+          return Some(
+            <crate::parts::embedded_object_part::EmbeddedObjectPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3442,19 +2462,13 @@ impl PartRef {
           "embeddings",
           "package",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::embedded_package_part::EmbeddedPackagePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EmbeddedPackagePart(part));
+          return Some(
+            <crate::parts::embedded_package_part::EmbeddedPackagePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3465,19 +2479,11 @@ impl PartRef {
           ".",
           "endnotes",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::endnotes_part::EndnotesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::EndnotesPart(part));
+          return Some(<crate::parts::endnotes_part::EndnotesPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3488,19 +2494,13 @@ impl PartRef {
           ".",
           "attachedToolbars",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExcelAttachedToolbarsPart(part));
+          return Some(
+            <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3512,19 +2512,13 @@ impl PartRef {
           "extendedCharts",
           "chart",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::extended_chart_part::ExtendedChartPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExtendedChartPart(part));
+          return Some(
+            <crate::parts::extended_chart_part::ExtendedChartPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3535,19 +2529,13 @@ impl PartRef {
           "docProps",
           "app",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExtendedFilePropertiesPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3558,19 +2546,13 @@ impl PartRef {
           "externalReferences",
           "externalReference",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::external_workbook_part::ExternalWorkbookPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ExternalWorkbookPart(part));
+          return Some(
+            <crate::parts::external_workbook_part::ExternalWorkbookPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3582,19 +2564,13 @@ impl PartRef {
           "featurePropertyBag",
           "featurePropertyBag",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FeaturePropertyBagsPart(part));
+          return Some(
+            <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3605,19 +2581,11 @@ impl PartRef {
           "fonts",
           "font",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::font_part::FontPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::font_part::FontPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FontPart(part));
+          return Some(<crate::parts::font_part::FontPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3628,19 +2596,13 @@ impl PartRef {
           ".",
           "fontTable",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::font_table_part::FontTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FontTablePart(part));
+          return Some(
+            <crate::parts::font_table_part::FontTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3651,19 +2613,11 @@ impl PartRef {
           ".",
           "footer",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::footer_part::FooterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FooterPart(part));
+          return Some(<crate::parts::footer_part::FooterPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3674,19 +2628,13 @@ impl PartRef {
           ".",
           "footnotes",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::footnotes_part::FootnotesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::FootnotesPart(part));
+          return Some(
+            <crate::parts::footnotes_part::FootnotesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3697,19 +2645,13 @@ impl PartRef {
           "glossary",
           "document",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::glossary_document_part::GlossaryDocumentPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::GlossaryDocumentPart(part));
+          return Some(
+            <crate::parts::glossary_document_part::GlossaryDocumentPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3720,19 +2662,13 @@ impl PartRef {
           "handoutMasters",
           "handoutMaster",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::handout_master_part::HandoutMasterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::HandoutMasterPart(part));
+          return Some(
+            <crate::parts::handout_master_part::HandoutMasterPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3743,19 +2679,11 @@ impl PartRef {
           ".",
           "header",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::header_part::HeaderPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::HeaderPart(part));
+          return Some(<crate::parts::header_part::HeaderPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3766,19 +2694,11 @@ impl PartRef {
           "../media",
           "image",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::image_part::ImagePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::image_part::ImagePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ImagePart(part));
+          return Some(<crate::parts::image_part::ImagePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3789,19 +2709,13 @@ impl PartRef {
           "macrosheets",
           "intlsheet",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::InternationalMacroSheetPart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3813,19 +2727,13 @@ impl PartRef {
           "docMetadata",
           "LabelInfo",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::label_info_part::LabelInfoPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::LabelInfoPart(part));
+          return Some(
+            <crate::parts::label_info_part::LabelInfoPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3836,19 +2744,13 @@ impl PartRef {
           ".",
           "legacyDocTextInfo",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::LegacyDiagramTextInfoPart(part));
+          return Some(
+            <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3859,19 +2761,13 @@ impl PartRef {
           ".",
           "legacyDiagramText",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::LegacyDiagramTextPart(part));
+          return Some(
+            <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3882,19 +2778,13 @@ impl PartRef {
           "macrosheets",
           "sheet",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::macro_sheet_part::MacroSheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::MacroSheetPart(part));
+          return Some(
+            <crate::parts::macro_sheet_part::MacroSheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3905,19 +2795,13 @@ impl PartRef {
           ".",
           "recipients",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::MailMergeRecipientDataPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3928,19 +2812,13 @@ impl PartRef {
           "word",
           "document",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::main_document_part::MainDocumentPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::MainDocumentPart(part));
+          return Some(
+            <crate::parts::main_document_part::MainDocumentPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3952,19 +2830,13 @@ impl PartRef {
           "../media",
           "model3d",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::Model3DReferenceRelationshipPart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -3976,19 +2848,13 @@ impl PartRef {
           "../namedSheetViews",
           "namedSheetView",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::named_sheet_views_part::NamedSheetViewsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NamedSheetViewsPart(part));
+          return Some(
+            <crate::parts::named_sheet_views_part::NamedSheetViewsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -3999,19 +2865,13 @@ impl PartRef {
           "notesMasters",
           "notesMaster",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::notes_master_part::NotesMasterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NotesMasterPart(part));
+          return Some(
+            <crate::parts::notes_master_part::NotesMasterPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4022,19 +2882,13 @@ impl PartRef {
           "../notesSlides",
           "notesSlide",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::notes_slide_part::NotesSlidePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NotesSlidePart(part));
+          return Some(
+            <crate::parts::notes_slide_part::NotesSlidePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4045,19 +2899,13 @@ impl PartRef {
           ".",
           "numbering",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::numbering_definitions_part::NumberingDefinitionsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::NumberingDefinitionsPart(part));
+          return Some(
+            <crate::parts::numbering_definitions_part::NumberingDefinitionsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4068,19 +2916,13 @@ impl PartRef {
           "../pivotCache",
           "pivotCacheDefinition",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PivotTableCacheDefinitionPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4091,19 +2933,13 @@ impl PartRef {
           ".",
           "pivotCacheRecords",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PivotTableCacheRecordsPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4114,19 +2950,13 @@ impl PartRef {
           "../pivotTables",
           "pivotTable",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::pivot_table_part::PivotTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PivotTablePart(part));
+          return Some(
+            <crate::parts::pivot_table_part::PivotTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4138,19 +2968,13 @@ impl PartRef {
           ".",
           "authors",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::power_point_authors_part::PowerPointAuthorsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PowerPointAuthorsPart(part));
+          return Some(
+            <crate::parts::power_point_authors_part::PowerPointAuthorsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4162,19 +2986,13 @@ impl PartRef {
           "../comments",
           "modernComment",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::power_point_comment_part::PowerPointCommentPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PowerPointCommentPart(part));
+          return Some(
+            <crate::parts::power_point_comment_part::PowerPointCommentPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4185,19 +3003,13 @@ impl PartRef {
           "ppt",
           "presentation",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::presentation_part::PresentationPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PresentationPart(part));
+          return Some(
+            <crate::parts::presentation_part::PresentationPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4208,19 +3020,13 @@ impl PartRef {
           ".",
           "presProps",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::presentation_properties_part::PresentationPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::PresentationPropertiesPart(part));
+          return Some(
+            <crate::parts::presentation_properties_part::PresentationPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4231,19 +3037,13 @@ impl PartRef {
           "../queryTables",
           "queryTable",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::query_table_part::QueryTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::QueryTablePart(part));
+          return Some(
+            <crate::parts::query_table_part::QueryTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4254,19 +3054,13 @@ impl PartRef {
           "userCustomization",
           "customUI",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::QuickAccessToolbarCustomizationsPart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4278,19 +3072,11 @@ impl PartRef {
           "richData",
           "rdarray",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_array_part::RdArrayPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdArrayPart(part));
+          return Some(<crate::parts::rd_array_part::RdArrayPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4302,19 +3088,13 @@ impl PartRef {
           "richData",
           "rdrichvalue",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_part::RdRichValuePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValuePart(part));
+          return Some(
+            <crate::parts::rd_rich_value_part::RdRichValuePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4326,19 +3106,13 @@ impl PartRef {
           "richData",
           "rdrichvaluestructure",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValueStructurePart(part));
+          return Some(
+            <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4350,19 +3124,13 @@ impl PartRef {
           "richData",
           "rdRichValueTypes",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValueTypesPart(part));
+          return Some(
+            <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4374,19 +3142,13 @@ impl PartRef {
           "richData",
           "rdRichValueWebImage",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdRichValueWebImagePart(part));
+          return Some(
+            <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4398,19 +3160,13 @@ impl PartRef {
           "richData",
           "rdsupportingpropertybag",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdSupportingPropertyBagPart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4422,19 +3178,13 @@ impl PartRef {
           "richData",
           "rdsupportingpropertybagstructure",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RdSupportingPropertyBagStructurePart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4446,19 +3196,13 @@ impl PartRef {
           "customUI",
           "customUI",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RibbonAndBackstageCustomizationsPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4469,19 +3213,13 @@ impl PartRef {
           "customUI",
           "customUI",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RibbonExtensibilityPart(part));
+          return Some(
+            <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4493,19 +3231,13 @@ impl PartRef {
           "richData",
           "richStyles",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::rich_styles_part::RichStylesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::RichStylesPart(part));
+          return Some(
+            <crate::parts::rich_styles_part::RichStylesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4516,19 +3248,13 @@ impl PartRef {
           ".",
           "sharedStrings",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::shared_string_table_part::SharedStringTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SharedStringTablePart(part));
+          return Some(
+            <crate::parts::shared_string_table_part::SharedStringTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4539,19 +3265,13 @@ impl PartRef {
           "../tables",
           "tableSingleCells",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::single_cell_table_part::SingleCellTablePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SingleCellTablePart(part));
+          return Some(
+            <crate::parts::single_cell_table_part::SingleCellTablePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4563,19 +3283,13 @@ impl PartRef {
           "slicerCaches",
           "slicerCache",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slicer_cache_part::SlicerCachePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlicerCachePart(part));
+          return Some(
+            <crate::parts::slicer_cache_part::SlicerCachePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4587,19 +3301,11 @@ impl PartRef {
           "../slicers",
           "slicer",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slicers_part::SlicersPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlicersPart(part));
+          return Some(<crate::parts::slicers_part::SlicersPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4610,19 +3316,13 @@ impl PartRef {
           "../comments",
           "comment",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_comments_part::SlideCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideCommentsPart(part));
+          return Some(
+            <crate::parts::slide_comments_part::SlideCommentsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4633,19 +3333,13 @@ impl PartRef {
           "../slideLayouts",
           "slideLayout",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_layout_part::SlideLayoutPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideLayoutPart(part));
+          return Some(
+            <crate::parts::slide_layout_part::SlideLayoutPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4656,19 +3350,13 @@ impl PartRef {
           "slideMasters",
           "slideMaster",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_master_part::SlideMasterPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideMasterPart(part));
+          return Some(
+            <crate::parts::slide_master_part::SlideMasterPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4679,19 +3367,11 @@ impl PartRef {
           "slides",
           "slide",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_part::SlidePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlidePart(part));
+          return Some(<crate::parts::slide_part::SlidePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4702,19 +3382,13 @@ impl PartRef {
           "slideUpdateInfo",
           "slideUpdateInfo",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::slide_sync_data_part::SlideSyncDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SlideSyncDataPart(part));
+          return Some(
+            <crate::parts::slide_sync_data_part::SlideSyncDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4725,19 +3399,13 @@ impl PartRef {
           "../printerSettings",
           "printerSettings",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::SpreadsheetPrinterSettingsPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4748,19 +3416,13 @@ impl PartRef {
           ".",
           "styles",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::style_definitions_part::StyleDefinitionsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::StyleDefinitionsPart(part));
+          return Some(
+            <crate::parts::style_definitions_part::StyleDefinitionsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4772,19 +3434,13 @@ impl PartRef {
           ".",
           "stylesWithEffects",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::styles_with_effects_part::StylesWithEffectsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::StylesWithEffectsPart(part));
+          return Some(
+            <crate::parts::styles_with_effects_part::StylesWithEffectsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4795,19 +3451,13 @@ impl PartRef {
           "../tables",
           "table",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::table_definition_part::TableDefinitionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TableDefinitionPart(part));
+          return Some(
+            <crate::parts::table_definition_part::TableDefinitionPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4818,19 +3468,13 @@ impl PartRef {
           ".",
           "tableStyles",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::table_styles_part::TableStylesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TableStylesPart(part));
+          return Some(
+            <crate::parts::table_styles_part::TableStylesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4841,19 +3485,13 @@ impl PartRef {
           "theme",
           "themeoverride",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::theme_override_part::ThemeOverridePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ThemeOverridePart(part));
+          return Some(
+            <crate::parts::theme_override_part::ThemeOverridePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4864,19 +3502,11 @@ impl PartRef {
           "theme",
           "theme",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::theme_part::ThemePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ThemePart(part));
+          return Some(<crate::parts::theme_part::ThemePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4887,19 +3517,13 @@ impl PartRef {
           "docProps",
           "thumbnail",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::thumbnail_part::ThumbnailPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ThumbnailPart(part));
+          return Some(
+            <crate::parts::thumbnail_part::ThumbnailPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4911,19 +3535,13 @@ impl PartRef {
           "timelineCaches",
           "timelineCache",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::time_line_cache_part::TimeLineCachePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TimeLineCachePart(part));
+          return Some(
+            <crate::parts::time_line_cache_part::TimeLineCachePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -4935,19 +3553,11 @@ impl PartRef {
           "../timelines",
           "timeline",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::time_line_part::TimeLinePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::TimeLinePart(part));
+          return Some(<crate::parts::time_line_part::TimeLinePart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4958,19 +3568,13 @@ impl PartRef {
           "tags",
           "tag",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::user_defined_tags_part::UserDefinedTagsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::UserDefinedTagsPart(part));
+          return Some(
+            <crate::parts::user_defined_tags_part::UserDefinedTagsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -4981,19 +3585,11 @@ impl PartRef {
           ".",
           "vbaData",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::vba_data_part::VbaDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VbaDataPart(part));
+          return Some(<crate::parts::vba_data_part::VbaDataPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5004,19 +3600,13 @@ impl PartRef {
           ".",
           "vbaProject",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::vba_project_part::VbaProjectPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VbaProjectPart(part));
+          return Some(
+            <crate::parts::vba_project_part::VbaProjectPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5027,19 +3617,13 @@ impl PartRef {
           ".",
           "viewProps",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::view_properties_part::ViewPropertiesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::ViewPropertiesPart(part));
+          return Some(
+            <crate::parts::view_properties_part::ViewPropertiesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5050,19 +3634,13 @@ impl PartRef {
           "../drawings",
           "vmldrawing",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::vml_drawing_part::VmlDrawingPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VmlDrawingPart(part));
+          return Some(
+            <crate::parts::vml_drawing_part::VmlDrawingPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5073,19 +3651,13 @@ impl PartRef {
           ".",
           "volatileDependencies",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::volatile_dependencies_part::VolatileDependenciesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::VolatileDependenciesPart(part));
+          return Some(
+            <crate::parts::volatile_dependencies_part::VolatileDependenciesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5097,19 +3669,13 @@ impl PartRef {
           "../webextensions",
           "taskpanes",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WebExTaskpanesPart(part));
+          return Some(
+            <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5121,19 +3687,13 @@ impl PartRef {
           "../webextensions",
           "webextension",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::web_extension_part::WebExtensionPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WebExtensionPart(part));
+          return Some(
+            <crate::parts::web_extension_part::WebExtensionPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5144,19 +3704,13 @@ impl PartRef {
           ".",
           "webSettings",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::web_settings_part::WebSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WebSettingsPart(part));
+          return Some(
+            <crate::parts::web_settings_part::WebSettingsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5167,19 +3721,13 @@ impl PartRef {
           ".",
           "attachedToolbars",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordAttachedToolbarsPart(part));
+          return Some(
+            <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5191,19 +3739,13 @@ impl PartRef {
           ".",
           "commentsExtensible",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordCommentsExtensiblePart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5215,19 +3757,13 @@ impl PartRef {
           ".",
           "commentsExtended",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingCommentsExPart(part));
+                        ),
+                    );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5239,19 +3775,13 @@ impl PartRef {
           ".",
           "commentsIds",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingCommentsIdsPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5262,19 +3792,13 @@ impl PartRef {
           ".",
           "comments",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingCommentsPart(part));
+          return Some(
+            <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5286,19 +3810,13 @@ impl PartRef {
           ".",
           "people",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingPeoplePart(part));
+          return Some(
+            <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5309,19 +3827,13 @@ impl PartRef {
           "../printerSettings",
           "printerSettings",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WordprocessingPrinterSettingsPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5332,19 +3844,11 @@ impl PartRef {
           "xl",
           "workbook",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_part::WorkbookPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookPart(part));
+          return Some(<crate::parts::workbook_part::WorkbookPart>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5356,19 +3860,13 @@ impl PartRef {
           "persons",
           "person",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_person_part::WorkbookPersonPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookPersonPart(part));
+          return Some(
+            <crate::parts::workbook_person_part::WorkbookPersonPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5379,19 +3877,13 @@ impl PartRef {
           "revisions",
           "revisionHeaders",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookRevisionHeaderPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5402,19 +3894,13 @@ impl PartRef {
           ".",
           "revisionLog",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookRevisionLogPart(part));
+          return Some(
+            <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5425,19 +3911,13 @@ impl PartRef {
           ".",
           "styles",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_styles_part::WorkbookStylesPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookStylesPart(part));
+          return Some(
+            <crate::parts::workbook_styles_part::WorkbookStylesPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5448,19 +3928,13 @@ impl PartRef {
           "revisions",
           "userNames",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::workbook_user_data_part::WorkbookUserDataPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorkbookUserDataPart(part));
+          return Some(
+            <crate::parts::workbook_user_data_part::WorkbookUserDataPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5471,19 +3945,13 @@ impl PartRef {
           "..",
           "comments",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_comments_part::WorksheetCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetCommentsPart(part));
+          return Some(
+            <crate::parts::worksheet_comments_part::WorksheetCommentsPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5494,19 +3962,13 @@ impl PartRef {
           "worksheets",
           "sheet",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_part::WorksheetPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetPart(part));
+          return Some(
+            <crate::parts::worksheet_part::WorksheetPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5517,19 +3979,13 @@ impl PartRef {
           ".",
           "wsSortMap",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetSortMapPart(part));
+          return Some(
+            <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
         #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
@@ -5541,19 +3997,13 @@ impl PartRef {
           "../threadedcomments",
           "threadedcomment",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          return Some(
+                        <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart>::make_part_ref(
                             storage,
+                            part_id,
                             relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::WorksheetThreadedCommentsPart(part));
+                        ),
+                    );
         }
         if crate::common::part_descriptor_matches(
           relationship_type,
@@ -5564,19 +4014,13 @@ impl PartRef {
           "_xmlsignatures",
           "sig",
         ) {
-          let part = if let Some(relationship_id) = relationship_id {
-            <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                            storage,
-                            relationship_id,
-                            part_id,
-                        )
-          } else {
-            <crate::parts::xml_signature_part::XmlSignaturePart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                            storage,
-                            part_id,
-                        )
-          };
-          return Some(PartRef::XmlSignaturePart(part));
+          return Some(
+            <crate::parts::xml_signature_part::XmlSignaturePart>::make_part_ref(
+              storage,
+              part_id,
+              relationship_id,
+            ),
+          );
         }
       }
     }

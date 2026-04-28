@@ -6,11 +6,48 @@ enum DeserializeMode {
   Io,
 }
 
-fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
-  match mode {
-    DeserializeMode::Borrowed => Ident::new("deserialize_borrowed_inner", Span::call_site()),
-    DeserializeMode::Io => Ident::new("deserialize_io_inner", Span::call_site()),
+impl DeserializeMode {
+  fn deserialize_inner_ident(self) -> Ident {
+    match self {
+      Self::Borrowed => Ident::new("deserialize_borrowed_inner", Span::call_site()),
+      Self::Io => Ident::new("deserialize_io_inner", Span::call_site()),
+    }
   }
+
+  fn tag_event_ty(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::SliceTagEvent },
+      Self::Io => quote! { crate::common::IoTagEvent },
+    }
+  }
+
+  fn skip_foreign_element_children_tokens(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! {
+        crate::common::skip_foreign_element_children_borrowed(
+          xml_reader,
+          next_empty,
+        )?;
+      },
+      Self::Io => quote! {
+        crate::common::skip_foreign_element_children_io(
+          xml_reader,
+          next_empty,
+        )?;
+      },
+    }
+  }
+
+  fn read_outer_xml_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_outer_xml_borrowed },
+      Self::Io => quote! { crate::common::read_outer_xml_io },
+    }
+  }
+}
+
+fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
+  mode.deserialize_inner_ident()
 }
 
 #[derive(Clone)]
@@ -59,24 +96,8 @@ fn empty_child_skip_tokens(
   let qname_patterns = choice_qname_patterns(qnames);
   let first_qname = qnames.first().map(String::as_str).unwrap_or("");
   let QNameInfo { tag_prefix, .. } = parse_qname_info(first_qname);
-  let skip_foreign_children = match mode {
-    DeserializeMode::Borrowed => quote! {
-      crate::common::skip_foreign_element_children_borrowed(
-        xml_reader,
-        next_empty,
-      )?;
-    },
-    DeserializeMode::Io => quote! {
-      crate::common::skip_foreign_element_children_io(
-        xml_reader,
-        next_empty,
-      )?;
-    },
-  };
-  let next_tag_event = match mode {
-    DeserializeMode::Borrowed => quote! { crate::common::SliceTagEvent },
-    DeserializeMode::Io => quote! { crate::common::IoTagEvent },
-  };
+  let skip_foreign_children = mode.skip_foreign_element_children_tokens();
+  let next_tag_event = mode.tag_event_ty();
 
   quote! {
     if !empty_tag {
@@ -107,6 +128,22 @@ fn empty_child_skip_tokens(
           #next_tag_event::Decl(_) | #next_tag_event::Other => {}
         }
       }
+    }
+  }
+}
+
+fn any_child_dispatch_tokens(
+  mode: DeserializeMode,
+  cfg_attrs: &[Attribute],
+  constructor: &proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let read_outer_xml = mode.read_outer_xml_fn();
+
+  quote! {
+    #(#cfg_attrs)*
+    {
+      let xml = #read_outer_xml(xml_reader, e, empty_tag)?;
+      return Ok(#constructor);
     }
   }
 }
@@ -785,20 +822,16 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident(_) => Ok(()),
         });
-        any_dispatch_tokens_borrowed.push(quote! {
-          #(#cfg_attrs)*
-          {
-            let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, empty_tag)?;
-            return Ok(#constructor);
-          }
-        });
-        any_dispatch_tokens_io.push(quote! {
-          #(#cfg_attrs)*
-          {
-            let xml = crate::common::read_outer_xml_io(xml_reader, e, empty_tag)?;
-            return Ok(#constructor);
-          }
-        });
+        any_dispatch_tokens_borrowed.push(any_child_dispatch_tokens(
+          DeserializeMode::Borrowed,
+          &cfg_attrs,
+          &constructor,
+        ));
+        any_dispatch_tokens_io.push(any_child_dispatch_tokens(
+          DeserializeMode::Io,
+          &cfg_attrs,
+          &constructor,
+        ));
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Text) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;

@@ -1014,6 +1014,27 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub(crate) fn make_part_ref(
+        storage: &crate::common::SdkPackageStorage,
+        part_id: crate::common::PartId,
+        relationship_id: Option<&str>,
+      ) -> crate::parts::PartRef {
+        let part = if let Some(relationship_id) = relationship_id {
+          <Self as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+            storage,
+            relationship_id,
+            part_id,
+          )
+        } else {
+          <Self as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
+            storage,
+            part_id,
+          )
+        };
+        crate::parts::PartRef::#ident(part)
+      }
+
+      #[inline]
       pub fn path<'a, P: crate::sdk::SdkPackage>(&self, package: &'a P) -> Option<&'a str> {
         <Self as crate::sdk::SdkPart>::path(self, package)
       }

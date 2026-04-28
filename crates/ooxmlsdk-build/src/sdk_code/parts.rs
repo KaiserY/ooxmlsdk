@@ -321,19 +321,11 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       .push(quote! {
         #( #part_attrs )*
         if #exact_match_condition {
-          let part = if let Some(relationship_id) = relationship_id {
-            <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-              storage,
-              relationship_id,
-              part_id,
-            )
-          } else {
-            <#part_ty as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-              storage,
-              part_id,
-            )
-          };
-          return Some(PartRef::#struct_ident(part));
+          return Some(<#part_ty>::make_part_ref(
+            storage,
+            part_id,
+            relationship_id,
+          ));
         }
       });
     part_ref_from_relationship_type_branches.push(quote! {
@@ -347,19 +339,11 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         #path_prefix_str,
         #target_name_str,
       ) {
-        let part = if let Some(relationship_id) = relationship_id {
-          <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-            storage,
-            relationship_id,
-            part_id,
-          )
-        } else {
-          <#part_ty as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-            storage,
-            part_id,
-          )
-        };
-        return Some(PartRef::#struct_ident(part));
+        return Some(<#part_ty>::make_part_ref(
+          storage,
+          part_id,
+          relationship_id,
+        ));
       }
     });
   }

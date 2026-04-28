@@ -16,7 +16,9 @@ use crate::sdk_code::helpers::{
   AttrTypeKind, StructuredChoice, StructuredChoiceVariant, StructuredParticleKind,
   classify_attr_type,
 };
-use crate::sdk_code::versioning::{is_microsoft365_version, version_cfg_attrs};
+use crate::sdk_code::versioning::{
+  common_choice_version, is_microsoft365_version, version_cfg_attrs,
+};
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeChild, SchemaTypeChildKind,
 };
@@ -1632,19 +1634,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
   Ok(quote! {
     #( #token_stream_list )*
   })
-}
-
-fn common_choice_version<'a>(container_version: &'a str, variant_versions: &[&str]) -> &'a str {
-  if is_microsoft365_version(container_version)
-    || (!variant_versions.is_empty()
-      && variant_versions
-        .iter()
-        .all(|version| is_microsoft365_version(version)))
-  {
-    "Microsoft365"
-  } else {
-    ""
-  }
 }
 
 fn sdk_type_derive_tokens() -> TokenStream {

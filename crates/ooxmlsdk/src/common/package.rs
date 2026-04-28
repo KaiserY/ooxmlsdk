@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Seek};
+use std::io::{BufRead, Read, Seek, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::schemas::opc_content_types::{Types, TypesChoice};
@@ -10,7 +10,13 @@ use crate::schemas::opc_relationships::{
 
 use super::{
   SdkError, part_relationships_path, resolve_relationship_target_path, resolve_zip_file_path,
+  unexpected_eof,
 };
+
+const FLAT_OPC_PACKAGE_NS: &str = "http://schemas.microsoft.com/office/2006/xmlPackage";
+const RELATIONSHIP_CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml";
+const ALT_CHUNK_RELATIONSHIP_TYPE: &str =
+  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum PackageOpenMode {
@@ -861,6 +867,136 @@ impl SdkPackageStorage {
     })
   }
 
+  pub(crate) fn open_flat_opc<R: BufRead>(
+    reader: R,
+    open_mode: PackageOpenMode,
+  ) -> Result<Self, SdkError> {
+    let mut flat_parts = read_flat_opc_parts(reader)?;
+    flat_parts.sort_by(|left, right| left.path.cmp(&right.path));
+
+    let mut raw_parts = Vec::new();
+    let mut relationship_parts = HashMap::new();
+    for flat_part in flat_parts {
+      if is_relationships_part_path(&flat_part.path) {
+        relationship_parts.insert(flat_part.path, flat_part.bytes);
+      } else {
+        raw_parts.push(RawPart {
+          path: flat_part.path.into_boxed_str(),
+          content_type: flat_part.content_type.into_boxed_str(),
+          bytes: flat_part.bytes,
+        });
+      }
+    }
+
+    let mut by_path = HashMap::with_capacity(raw_parts.len());
+    for (index, raw_part) in raw_parts.iter().enumerate() {
+      by_path.insert(raw_part.path.clone(), PartId::from_index(index));
+    }
+
+    let content_types = content_types_from_raw_parts(&raw_parts);
+    let package_relationships = relationships_from_flat_opc_part(
+      relationship_parts.remove("_rels/.rels").as_deref(),
+      "",
+      &by_path,
+    )?;
+
+    let mut part_relationships = Vec::with_capacity(raw_parts.len());
+    for raw_part in &raw_parts {
+      let rels_path = part_relationships_path(&raw_part.path);
+      part_relationships.push(relationships_from_flat_opc_part(
+        relationship_parts.remove(&rels_path).as_deref(),
+        &raw_part.path,
+        &by_path,
+      )?);
+    }
+
+    let relationship_types =
+      relationship_types_by_part(&package_relationships, &part_relationships)?;
+
+    let mut parts = Vec::with_capacity(raw_parts.len());
+    for (index, (raw_part, relationships)) in
+      raw_parts.into_iter().zip(part_relationships).enumerate()
+    {
+      parts.push(StoredPart {
+        path: raw_part.path,
+        content_type: raw_part.content_type,
+        relationship_type: relationship_types
+          .get(&PartId::from_index(index))
+          .map(|relationship_type| relationship_type.clone().into_boxed_str()),
+        relationships,
+        data: StoredPartData::Raw {
+          bytes: raw_part.bytes,
+        },
+        deleted: false,
+      });
+    }
+
+    Ok(Self {
+      id: PackageId::new(),
+      content_types,
+      package_relationships,
+      parts,
+      by_path,
+      open_mode,
+    })
+  }
+
+  pub(crate) fn write_flat_opc<W, F>(
+    &self,
+    writer: &mut W,
+    mut part_data: F,
+  ) -> Result<(), SdkError>
+  where
+    W: Write,
+    F: FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
+  {
+    writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
+    writer.write_all(b"\n<pkg:package")?;
+    super::write_xmlns_attr(writer, Some("pkg"), FLAT_OPC_PACKAGE_NS)?;
+    writer.write_all(b">\n")?;
+
+    if !self.package_relationships.is_empty() {
+      write_flat_opc_xml_part(
+        writer,
+        "/_rels/.rels",
+        RELATIONSHIP_CONTENT_TYPE,
+        &self
+          .package_relationships
+          .to_relationships()
+          .to_xml_bytes()?,
+      )?;
+    }
+
+    let alt_chunk_part_ids = self.alt_chunk_part_ids();
+    for (index, part) in self.parts.iter().enumerate() {
+      if part.is_deleted() {
+        continue;
+      }
+
+      let part_id = PartId::from_index(index);
+      let data = part_data(part_id, part)?;
+      let part_name = format!("/{}", part.path());
+      if flat_opc_part_is_xml(part, part_id, &alt_chunk_part_ids) {
+        write_flat_opc_xml_part(writer, &part_name, part.content_type(), &data)?;
+      } else {
+        write_flat_opc_binary_part(writer, &part_name, part.content_type(), &data)?;
+      }
+
+      if !part.relationships().is_empty() {
+        let rels_name = format!("/{}", part_relationships_path(part.path()));
+        write_flat_opc_xml_part(
+          writer,
+          &rels_name,
+          RELATIONSHIP_CONTENT_TYPE,
+          &part.relationships().to_relationships().to_xml_bytes()?,
+        )?;
+      }
+    }
+
+    writer.write_all(b"</pkg:package>")?;
+    Ok(())
+  }
+
   #[inline]
   pub(crate) fn id(&self) -> PackageId {
     self.id
@@ -1692,12 +1828,266 @@ impl SdkPackageStorage {
 
     unreachable!("usize iteration should always find a free data part path")
   }
+
+  fn alt_chunk_part_ids(&self) -> HashSet<PartId> {
+    self
+      .parts
+      .iter()
+      .filter(|part| !part.is_deleted())
+      .flat_map(|part| part.relationships().iter())
+      .chain(self.package_relationships().iter())
+      .filter(|relationship| relationship.relationship_type() == ALT_CHUNK_RELATIONSHIP_TYPE)
+      .filter_map(RelationshipInfo::target_part_id)
+      .collect()
+  }
 }
 
 struct RawPart {
   path: Box<str>,
   content_type: Box<str>,
   bytes: Vec<u8>,
+}
+
+struct FlatOpcPart {
+  path: String,
+  content_type: String,
+  bytes: Vec<u8>,
+}
+
+fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
+  Types {
+    xmlns: vec![super::XmlNamespaceDecl::new(
+      "",
+      "http://schemas.openxmlformats.org/package/2006/content-types",
+    )],
+    xml_header: super::XmlHeaderType::Standalone,
+    xml_children: raw_parts
+      .iter()
+      .map(|part| {
+        TypesChoice::Override(Box::new(crate::schemas::opc_content_types::Override {
+          content_type: part.content_type.to_string(),
+          part_name: format!("/{}", part.path),
+        }))
+      })
+      .collect(),
+  }
+}
+
+fn relationships_from_flat_opc_part(
+  bytes: Option<&[u8]>,
+  source_path: &str,
+  by_path: &HashMap<Box<str>, PartId>,
+) -> Result<RelationshipSet, SdkError> {
+  let relationships = bytes.map(Relationships::from_bytes).transpose()?;
+  Ok(RelationshipSet::from_relationships(
+    relationships,
+    source_path,
+    by_path,
+  ))
+}
+
+fn read_flat_opc_parts<R: BufRead>(reader: R) -> Result<Vec<FlatOpcPart>, SdkError> {
+  let mut xml_reader = super::from_reader_inner(reader)?;
+  let mut parts = Vec::new();
+
+  loop {
+    match xml_reader.next_tag_event()? {
+      super::IoTagEvent::Start(start, empty_tag)
+        if qname_matches(start.name().as_ref(), b"part") =>
+      {
+        if empty_tag {
+          return Err(SdkError::CommonError(
+            "Flat OPC part must contain xmlData or binaryData".to_string(),
+          ));
+        }
+        parts.push(read_flat_opc_part(&mut xml_reader, start)?);
+      }
+      super::IoTagEvent::Eof => break,
+      _ => {}
+    }
+  }
+
+  Ok(parts)
+}
+
+fn read_flat_opc_part<R: BufRead>(
+  xml_reader: &mut super::IoReader<R>,
+  start: quick_xml::events::BytesStart<'static>,
+) -> Result<FlatOpcPart, SdkError> {
+  let decoder = xml_reader.decoder();
+  let mut path = None;
+  let mut content_type = None;
+
+  for attr in start.attributes() {
+    let attr = attr?;
+    if qname_matches(attr.key.as_ref(), b"name") {
+      let value = super::decode_attr_value(&attr, decoder)?;
+      path = Some(normalize_flat_opc_part_name(&value));
+    } else if qname_matches(attr.key.as_ref(), b"contentType") {
+      content_type = Some(super::decode_attr_value(&attr, decoder)?);
+    }
+  }
+
+  let path =
+    path.ok_or_else(|| SdkError::CommonError("Flat OPC part missing pkg:name".to_string()))?;
+  let content_type = content_type
+    .ok_or_else(|| SdkError::CommonError("Flat OPC part missing pkg:contentType".to_string()))?;
+  let mut bytes = None;
+
+  loop {
+    match xml_reader.next_tag_event()? {
+      super::IoTagEvent::Start(start, empty_tag)
+        if qname_matches(start.name().as_ref(), b"xmlData") =>
+      {
+        bytes = Some(read_flat_opc_xml_data(xml_reader, empty_tag)?);
+      }
+      super::IoTagEvent::Start(start, empty_tag)
+        if qname_matches(start.name().as_ref(), b"binaryData") =>
+      {
+        bytes = Some(read_flat_opc_binary_data(xml_reader, empty_tag)?);
+      }
+      super::IoTagEvent::Start(_, true) => {}
+      super::IoTagEvent::Start(_, false) => {
+        return Err(SdkError::CommonError(
+          "unsupported Flat OPC part child element".to_string(),
+        ));
+      }
+      super::IoTagEvent::End(end) if qname_matches(end.name().as_ref(), b"part") => break,
+      super::IoTagEvent::Eof => return Err(unexpected_eof("Flat OPC part")),
+      _ => {}
+    }
+  }
+
+  let bytes = bytes.ok_or_else(|| {
+    SdkError::CommonError("Flat OPC part must contain xmlData or binaryData".to_string())
+  })?;
+
+  Ok(FlatOpcPart {
+    path,
+    content_type,
+    bytes,
+  })
+}
+
+fn read_flat_opc_xml_data<R: BufRead>(
+  xml_reader: &mut super::IoReader<R>,
+  empty_tag: bool,
+) -> Result<Vec<u8>, SdkError> {
+  if empty_tag {
+    return Err(SdkError::CommonError(
+      "Flat OPC xmlData must contain an XML root element".to_string(),
+    ));
+  }
+
+  let mut bytes = None;
+  loop {
+    match xml_reader.next_tag_event()? {
+      super::IoTagEvent::Start(start, empty_tag) => {
+        bytes = Some(super::read_outer_xml_io(xml_reader, start, empty_tag)?.into_bytes());
+      }
+      super::IoTagEvent::End(end) if qname_matches(end.name().as_ref(), b"xmlData") => break,
+      super::IoTagEvent::Eof => return Err(unexpected_eof("Flat OPC xmlData")),
+      _ => {}
+    }
+  }
+
+  bytes.ok_or_else(|| {
+    SdkError::CommonError("Flat OPC xmlData must contain an XML root element".to_string())
+  })
+}
+
+fn read_flat_opc_binary_data<R: BufRead>(
+  xml_reader: &mut super::IoReader<R>,
+  empty_tag: bool,
+) -> Result<Vec<u8>, SdkError> {
+  if empty_tag {
+    return Ok(Vec::new());
+  }
+
+  let mut text = String::new();
+  loop {
+    match xml_reader.next()? {
+      quick_xml::events::Event::Text(event) => {
+        text.push_str(event.xml10_content()?.as_ref());
+      }
+      quick_xml::events::Event::CData(event) => {
+        text.push_str(event.xml10_content()?.as_ref());
+      }
+      quick_xml::events::Event::End(end) if qname_matches(end.name().as_ref(), b"binaryData") => {
+        break;
+      }
+      quick_xml::events::Event::Eof => return Err(unexpected_eof("Flat OPC binaryData")),
+      _ => {}
+    }
+  }
+
+  let compact: Vec<u8> = text
+    .bytes()
+    .filter(|byte| !byte.is_ascii_whitespace())
+    .collect();
+  base64::Engine::decode(&base64::engine::general_purpose::STANDARD, compact)
+    .map_err(|err| SdkError::CommonError(format!("invalid Flat OPC binaryData: {err}")))
+}
+
+fn write_flat_opc_xml_part<W: Write>(
+  writer: &mut W,
+  name: &str,
+  content_type: &str,
+  bytes: &[u8],
+) -> Result<(), SdkError> {
+  writer.write_all(b"  <pkg:part")?;
+  super::write_attr_value_str(writer, "pkg:name", name)?;
+  super::write_attr_value_str(writer, "pkg:contentType", content_type)?;
+  writer.write_all(b">\n    <pkg:xmlData>")?;
+  writer.write_all(root_xml_bytes(bytes)?.as_slice())?;
+  writer.write_all(b"</pkg:xmlData>\n  </pkg:part>\n")?;
+  Ok(())
+}
+
+fn write_flat_opc_binary_part<W: Write>(
+  writer: &mut W,
+  name: &str,
+  content_type: &str,
+  bytes: &[u8],
+) -> Result<(), SdkError> {
+  writer.write_all(b"  <pkg:part")?;
+  super::write_attr_value_str(writer, "pkg:name", name)?;
+  super::write_attr_value_str(writer, "pkg:contentType", content_type)?;
+  super::write_attr_value_str(writer, "pkg:compression", "store")?;
+  writer.write_all(b">\n    <pkg:binaryData>")?;
+  let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
+  writer.write_all(encoded.as_bytes())?;
+  writer.write_all(b"</pkg:binaryData>\n  </pkg:part>\n")?;
+  Ok(())
+}
+
+fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
+  let mut xml_reader = super::from_bytes_inner(bytes)?;
+  loop {
+    match xml_reader.next_tag_event()? {
+      super::SliceTagEvent::Start(start, empty_tag) => {
+        return Ok(super::read_outer_xml_borrowed(&mut xml_reader, start, empty_tag)?.into_bytes());
+      }
+      super::SliceTagEvent::Eof => return Err(unexpected_eof("Flat OPC XML part")),
+      _ => {}
+    }
+  }
+}
+
+fn flat_opc_part_is_xml(
+  part: &StoredPart,
+  part_id: PartId,
+  alt_chunk_part_ids: &HashSet<PartId>,
+) -> bool {
+  part.content_type().ends_with("xml") && !alt_chunk_part_ids.contains(&part_id)
+}
+
+fn qname_matches(qname: &[u8], local_name: &[u8]) -> bool {
+  qname == local_name || qname.rsplit(|byte| *byte == b':').next() == Some(local_name)
+}
+
+fn normalize_flat_opc_part_name(name: &str) -> String {
+  resolve_zip_file_path(name.trim_start_matches('/'))
 }
 
 fn child_part_directory_path(source_part_path: &str, path_prefix: &str) -> String {

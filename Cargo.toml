@@ -25,6 +25,7 @@ ooxmlsdk = { version = "0.5.2", path = "crates/ooxmlsdk", default-features = fal
 ooxmlsdk-build = { version = "0.5.2", path = "crates/ooxmlsdk-build" }
 ooxmlsdk-derive = { version = "0.5.2", path = "crates/ooxmlsdk-derive" }
 ooxmlsdk-test = { version = "0.5.2", path = "crates/ooxmlsdk-test" }
+base64 = "0.22.1"
 quick-xml = "0.39.2"
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }

@@ -525,6 +525,82 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
+      pub fn from_flat_opc_str(text: &str) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_str_with_settings(text, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn from_flat_opc_str_lazy(text: &str) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_str_lazy_with_settings(text, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn from_flat_opc_str_with_settings(
+        text: &str,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_reader_with_settings(
+          std::io::Cursor::new(text.as_bytes()),
+          open_settings,
+        )
+      }
+
+      pub fn from_flat_opc_str_lazy_with_settings(
+        text: &str,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_reader_lazy_with_settings(
+          std::io::Cursor::new(text.as_bytes()),
+          open_settings,
+        )
+      }
+
+      pub fn from_flat_opc_reader<R: std::io::BufRead>(
+        reader: R,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_reader_with_settings(reader, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn from_flat_opc_reader_lazy<R: std::io::BufRead>(
+        reader: R,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_reader_lazy_with_settings(reader, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn from_flat_opc_reader_with_settings<R: std::io::BufRead>(
+        reader: R,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_reader_inner(
+          reader,
+          crate::common::PackageOpenMode::Eager,
+          open_settings,
+        )
+      }
+
+      pub fn from_flat_opc_reader_lazy_with_settings<R: std::io::BufRead>(
+        reader: R,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::from_flat_opc_reader_inner(
+          reader,
+          crate::common::PackageOpenMode::Lazy,
+          open_settings,
+        )
+      }
+
+      pub fn to_flat_opc_string(&self) -> Result<String, crate::common::SdkError> {
+        let mut bytes = Vec::new();
+        self.write_flat_opc_to(&mut bytes)?;
+        String::from_utf8(bytes)
+          .map_err(|err| crate::common::SdkError::CommonError(format!("invalid Flat OPC UTF-8: {err}")))
+      }
+
+      pub fn write_flat_opc_to<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+      ) -> Result<(), crate::common::SdkError> {
+        crate::sdk::SdkPackage::write_flat_opc_to(self, writer)
+      }
+
       #[inline]
       pub fn open_settings(&self) -> &crate::sdk::OpenSettings {
         crate::sdk::SdkPackage::open_settings(self)
@@ -919,6 +995,23 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         open_settings: crate::sdk::OpenSettings,
       ) -> Result<Self, crate::common::SdkError> {
         let storage = crate::common::SdkPackageStorage::open(reader, open_mode)?;
+        Self::from_storage(storage, open_mode, open_settings)
+      }
+
+      fn from_flat_opc_reader_inner<R: std::io::BufRead>(
+        reader: R,
+        open_mode: crate::common::PackageOpenMode,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
+        let storage = crate::common::SdkPackageStorage::open_flat_opc(reader, open_mode)?;
+        Self::from_storage(storage, open_mode, open_settings)
+      }
+
+      fn from_storage(
+        storage: crate::common::SdkPackageStorage,
+        open_mode: crate::common::PackageOpenMode,
+        open_settings: crate::sdk::OpenSettings,
+      ) -> Result<Self, crate::common::SdkError> {
         let main_part_id = #main_relationship_expr;
         #root_elements_local
         #( #child_field_locals )*

@@ -109,6 +109,77 @@ fn package_entry_exists(bytes: Vec<u8>, path: &str) -> bool {
 }
 
 #[test]
+fn wordprocessing_document_loads_minimal_flat_opc_package() {
+  // Source: mirrors Open XML SDK FlatOpcExtensions.FromFlatOpcString coverage.
+  let flat_opc = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/_rels/.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml">
+    <pkg:xmlData>
+      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+      </Relationships>
+    </pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:r>
+              <w:t>Hello Flat OPC</w:t>
+            </w:r>
+          </w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>"#;
+
+  let mut package = WordprocessingDocument::from_flat_opc_str(flat_opc).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element(&mut package).unwrap();
+
+  assert_eq!(main_document_body_child_count(root), 1);
+
+  let saved = package.to_package_bytes().unwrap();
+  let reopened = WordprocessingDocument::new(Cursor::new(saved)).unwrap();
+  assert!(reopened.main_document_part().is_ok());
+}
+
+#[test]
+fn wordprocessing_document_flat_opc_round_trips_xml_and_binary_parts() {
+  // Source: aligned with Open XML SDK DocumentTests.FlatOpcTests and SVG/binary Flat OPC coverage.
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+  let image_part = main_part.add_image_part(&mut package, "image/png").unwrap();
+  image_part
+    .set_data(&mut package, [0_u8, 1, 2, 3, 250, 251, 252])
+    .unwrap();
+  let image_part_name = format!("/{}", image_part.path(&package).unwrap());
+
+  let flat_opc = package.to_flat_opc_string().unwrap();
+  assert!(flat_opc.contains("<pkg:package"));
+  assert!(flat_opc.contains("pkg:name=\"/word/document.xml\""));
+  assert!(flat_opc.contains(&format!("pkg:name=\"{image_part_name}\"")));
+  assert!(flat_opc.contains("<pkg:binaryData>"));
+
+  let reopened = WordprocessingDocument::from_flat_opc_str(&flat_opc).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_image = reopened_main
+    .parts(&reopened)
+    .find_map(|part| part_ref_variant!(part.part, ImagePart))
+    .unwrap();
+
+  assert_eq!(
+    reopened_image.data(&reopened).unwrap(),
+    [0_u8, 1, 2, 3, 250, 251, 252]
+  );
+}
+
+#[test]
 fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
   let path = doc_sample("Of16-01.docx");
 

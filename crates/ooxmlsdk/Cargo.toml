@@ -14,11 +14,12 @@ readme.workspace = true
 
 [features]
 default = ["microsoft365", "parts"]
-parts = ["dep:zip"]
+parts = ["dep:base64", "dep:zip"]
 microsoft365 = []
 validators = ["dep:regex"]
 
 [dependencies]
+base64 = { workspace = true, optional = true }
 ooxmlsdk-derive = { workspace = true }
 quick-xml = { workspace = true }
 regex = { workspace = true, optional = true }

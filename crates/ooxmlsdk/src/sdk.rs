@@ -799,6 +799,20 @@ pub trait SdkPackage: SdkPackageInternal {
   }
 
   #[inline]
+  fn write_flat_opc_to<W: std::io::Write>(
+    &self,
+    writer: &mut W,
+  ) -> Result<(), crate::common::SdkError> {
+    crate::sdk::SdkPackageInternal::storage(self).write_flat_opc(writer, |part_id, part| {
+      if let Some(root_element) = crate::sdk::SdkPackageInternal::root_element(self, part_id) {
+        root_element.to_xml_bytes()
+      } else {
+        Ok(part.data().bytes().to_vec())
+      }
+    })
+  }
+
+  #[inline]
   fn add_external_relationship(
     &mut self,
     relationship_id: impl Into<String>,

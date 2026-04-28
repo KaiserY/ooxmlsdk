@@ -1,39 +1,64 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-This repository is a Rust workspace with three crates under `crates/`:
+## Agent Harness
+Start from local evidence. Use `rg`/`rg --files` first, read only the files needed for the task, and keep summaries diff-based rather than conversation-based. Do not paste large generated snippets or broad search output back into the conversation unless the user asks.
 
-- `crates/ooxmlsdk`: the runtime library exposed to consumers. Its public entry point is `src/lib.rs`. Generated code lives under `src/schemas/`, `src/deserializers/`, `src/serializers/`, `src/parts/`, plus generated module files such as `src/schemas.rs`, `src/deserializers.rs`, `src/serializers.rs`, and `src/namespaces.rs`. Shared parsing helpers and error types live in `src/common.rs`.
-- `crates/ooxmlsdk-build`: the code generation crate. It owns the JSON and Rust code generation pipeline.
-- `crates/ooxmlsdk-test`: the integration-test crate. It depends only on `crates/ooxmlsdk` and covers schema round trips plus package-level read/write flows using fixtures under `crates/ooxmlsdk-test/samples/` and `crates/ooxmlsdk-test/doc_samples/`.
+Run commands from the repository root. Cargo generation, format, test, clippy, and bench commands must run sequentially in the default `target/` directory; do not set `CARGO_TARGET_DIR`. If Cargo reports a target lock, wait for Cargo rather than probing processes.
 
-Treat the checked-in `sdk_data/`, `data/`, and `schemas/OpenPackagingConventions-XMLSchema/` directories as committed generator inputs. The checked-in files under `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, `crates/ooxmlsdk/src/schemas.rs`, `crates/ooxmlsdk/src/deserializers.rs`, `crates/ooxmlsdk/src/serializers.rs`, and `crates/ooxmlsdk/src/namespaces.rs` are generated artifacts.
+This Rust workspace has four crates:
 
-When working on particle decomposition or schema modeling, treat `data/` as the source of truth. Use `schemas/OfficeOpenXML-XMLSchema-Transitional/` and other checked-in XSDs as auxiliary references for coverage checks and real naming sources such as `xsd:group` names. Do not invent semantic names when the true source does not provide one; keep generic `Choice`/`Sequence` naming until a real XSD/data-backed name is available.
+- `crates/ooxmlsdk`: runtime crate and public API. Generated schema/deserializer/serializer/parts output lives under `src/schemas/`, `src/deserializers/`, `src/serializers/`, `src/parts/`, plus `src/schemas.rs`, `src/deserializers.rs`, `src/serializers.rs`, and `src/namespaces.rs`. Shared runtime helpers live in `src/common.rs`.
+- `crates/ooxmlsdk-build`: generator and checked-in input model code.
+- `crates/ooxmlsdk-derive`: procedural macros used by generated/runtime schema types.
+- `crates/ooxmlsdk-test`: integration tests, fixtures, doc samples, upstream coverage matrix, and performance benches.
 
-`crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is part of the generator input model, not a generated artifact. Keep it in sync with `sdk_data/` when adding new schema or package-level knobs such as compatibility flags.
+Runtime features are `microsoft365`, `parts`, and `validators`; defaults are `microsoft365` and `parts`. There is no Cargo `strict` feature. Strict OOXML is handled as fixture/document behavior.
 
-The repository also keeps checked-in `sdk_data/`, but the current ignored generator test still reads upstream data from `../Open-XML-SDK/data` before regenerating `sdk_data/` and runtime code. Do not assume that external checkout is available unless you have explicitly prepared it.
+## Upstream Alignment
+This project broadly mirrors the API, package model, schema behavior, validators, fixtures, and tests of upstream `dotnet/Open-XML-SDK`.
 
-The runtime crate currently exports `common`, `deserializers`, `namespaces`, `parts` behind the `parts` feature, `schemas`, `serializers`, `simple_type`, and `validator` behind the `validators` feature. The public feature surface in this repository is currently `microsoft365`, `parts`, `strict`, and `validators`. The `strict` feature gates strict OOXML compatibility coverage and the corresponding feature-gated integration tests. The `validators` feature gates optional schema validator APIs and validator-focused integration tests.
+When comparing behavior, prefer the local checkout at `../Open-XML-SDK` if it exists. Useful upstream paths include:
 
-## Build, Test, and Development Commands
-- `cargo build --workspace`: build all workspace crates.
-- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and the checked-in Rust code in `crates/ooxmlsdk/src/`. This currently requires an external `../Open-XML-SDK/data` checkout.
-- `cargo test -p ooxmlsdk-test`: run the integration tests that exercise stable round trips for representative Wordprocessing and Presentation XML samples.
-- `cargo test -p ooxmlsdk-test --features strict`: run the integration tests including strict OOXML package coverage such as `Strict01.docx`.
-- `cargo test --workspace`: run the full workspace test suite.
-- `cargo test --workspace --no-default-features`: run the workspace test suite with default features disabled.
-- `cargo test --workspace --no-default-features --features parts`: run the workspace test suite for the Office2007-oriented `parts` surface without `microsoft365`.
-- `cargo test -p ooxmlsdk-test --features validators`: run validator-focused integration tests, including file-level validate coverage.
-- `cargo bench -p ooxmlsdk-build --bench serde_bench`: run the serde comparison benchmark in the generator crate.
-- `cargo fmt --all`: format the workspace.
-- `cargo clippy --workspace --all-targets -- -D warnings`: run lints for the default `microsoft365` feature set.
-- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: run lints with default features disabled.
-- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: run lints for the Office2007-oriented `parts` surface without `microsoft365`.
-- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: lint the validator-focused integration lane.
+- `../Open-XML-SDK/src/DocumentFormat.OpenXml*` for public API and packaging behavior.
+- `../Open-XML-SDK/generated/DocumentFormat.OpenXml` for generated types.
+- `../Open-XML-SDK/data` for upstream-shaped metadata.
+- `../Open-XML-SDK/test` and `../Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets` for tests and fixtures.
 
-Run commands from the repository root. For normal validation, use this order. When generation is part of the workflow, run `cargo fmt --all` immediately after `test_gen` before reviewing diffs or drawing conclusions; generated files may otherwise appear to have large formatting-only churn because generation and repository rustfmt settings can differ. Keep a final `cargo fmt --all` at the end as well:
+If the local checkout is missing or clearly stale and exact upstream behavior matters, use the GitHub source as a fallback reference. Keep Rust APIs idiomatic, but preserve upstream concepts such as document/package constructors, save/open flows, part containers, relationship helpers, and part traversal. Do not expose raw storage, relationship sets, generated factories, or internal caches just to match an upstream internal test.
+
+Use `crates/ooxmlsdk-test/UPSTREAM_TEST_MATRIX.md` to decide whether upstream behavior is already covered, missing, partial, blocked by API, or not applicable. Add or update `// Source:` comments on upstream-derived tests so coverage remains auditable.
+
+## Generated Data
+Treat checked-in `data/`, `sdk_data/`, and `schemas/OpenPackagingConventions-XMLSchema/` as generator inputs. `crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is hand-written input model code, not generated output.
+
+For schema modeling and particle decomposition, treat `data/` as source of truth and use checked-in XSDs such as `schemas/OfficeOpenXML-XMLSchema-Transitional/` only as auxiliary references. Do not invent semantic names when upstream data/XSDs do not provide them; keep generic `Choice`/`Sequence` names until a real source-backed name exists.
+
+Avoid editing generated runtime files directly unless also changing generator/input data and intentionally regenerating output. After `test_gen`, run `cargo fmt --all` before reviewing diffs; do not revert generated churn before checking the formatted diff.
+
+## Commands
+- `cargo build --workspace`: build all crates.
+- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and runtime generated code from checked-in `data/` and package schemas.
+- `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
+- `cargo test --workspace`: default full test lane.
+- `cargo test --workspace --no-default-features`: no-default-features lane.
+- `cargo test --workspace --no-default-features --features parts`: Office2007-oriented parts lane without `microsoft365`.
+- `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
+- `cargo fmt --all`: format.
+- `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: no-default-features clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: Office2007 parts clippy lane.
+- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
+- `cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
+
+Default dev loop after generator work:
+
+- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+- `cargo fmt --all`
+- `cargo test --workspace`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo fmt --all`
+
+Full generator/feature validation:
 
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
 - `cargo fmt --all`
@@ -45,66 +70,34 @@ Run commands from the repository root. For normal validation, use this order. Wh
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo fmt --all`
 
-For fast iteration on runtime or doc-sample work, treat `cargo test -p ooxmlsdk-test` as the primary gate first. Defer workspace-wide, `strict`, and clippy runs unless the change touches generator code, shared runtime code, or feature-gated behavior.
+For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
 
-After running `test_gen`, do not revert generated files just because the diff is large before formatting. First run `cargo fmt --all`, then inspect the formatted diff. If unrelated generated areas still changed after formatting, understand why before deciding whether to narrow the change; do not blindly reverse generated output.
+## Testing Rules
+Place tests near the behavior they protect:
 
-When changing validator IR, validator runtime helpers, or validator-facing derive output, also run the validator-specific lane:
+- Schema/simple XML round trips: `wordprocessing.rs`, `presentation.rs`, `spreadsheet.rs`, `properties.rs`, or `simple_types.rs`.
+- Package/parts behavior: `packages.rs`, using public APIs such as `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, relationship helpers, paths, content/data helpers, and saved package contents.
+- Validators: `validators.rs` and `file_validators.rs`, behind `validators`.
+- Doc samples: `doc_samples.rs` and `crates/ooxmlsdk-test/build.rs`.
 
-- `cargo test -p ooxmlsdk-test --features validators`
-- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`
+Prefer upstream-derived fixtures and assertions. For package-level validator migrations where upstream reports multiple errors, asserting the first Rust-side validation error is acceptable if the implementation intentionally stops at first failure.
 
-Execute Cargo commands in the repository's default `target/` directory. Do not switch `target/` directories or introduce `CARGO_TARGET_DIR`. Run generation, test, clippy, and format commands sequentially, never in parallel. If Cargo reports a lock on the artifact directory, wait for the lock to clear and then continue.
+The Office2007 parts lane must not include fixtures that require Office 2010+ relationships, ChartEx, model3d, `stylesWithEffects`, Word 2013+ settings, or other `microsoft365`-gated coverage. Gate only the smallest affected test/assertion with `#[cfg(feature = "microsoft365")]`.
 
-For long-running Cargo commands such as `cargo test`, `cargo clippy`, and generation flows, prefer linear execution and patient waiting over short polling loops. Start the command, let it run, and wait for completion before analyzing results unless there is a concrete reason to interrupt. Do not rely on `ps`, process-list probing, or similar background-process heuristics to decide whether Cargo is still active; sandboxing and wrapper processes can make those signals misleading. Treat Cargo's own lock messages and final exit status as the source of truth.
+`crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` as `open_failure`, `open_valid`, or `round_trip`. Promote a sample to `round_trip` only when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid`.
 
-When checking runtime performance, prefer evaluating `cargo bench -p ooxmlsdk-test` as a whole rather than drawing conclusions from a single case. The `packages` and `xml` suites have repeatedly disagreed on `wordprocessing_document/write/parsed`, so treat that one metric as a known benchmark anomaly until it is investigated; rely on the surrounding read, write, and round-trip trends before deciding whether a performance change is real.
+## Code Style
+Keep Rust `rustfmt`-clean. Use snake_case for modules/functions, PascalCase for types, and preserve schema-derived module names such as `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
 
-## Coding Style & Naming Conventions
-Follow standard Rust formatting and keep the workspace `rustfmt`-clean. Use snake_case for modules and functions, PascalCase for Rust types, and preserve the schema-derived module naming pattern already in use, for example `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
+Keep hand-written logic in `crates/ooxmlsdk-build`, `crates/ooxmlsdk-derive`, or small generic runtime helpers. For the `parts` API, keep the public surface aligned with upstream Open XML SDK concepts and established constructors/save entry points such as `new`, `new_lazy`, `new_from_file`, and `save`.
 
-Prefer keeping hand-written logic in `crates/ooxmlsdk-build`. Avoid editing generated files in `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, or `crates/ooxmlsdk/src/schemas.rs` unless you are also updating the generator or the source metadata and intentionally regenerating the output. Keep runtime-only helpers in `crates/ooxmlsdk/src/common.rs` small and generic.
-
-For the `parts` API, keep the public surface aligned with upstream Open XML SDK container concepts and preserve established constructors/save entry points such as `new`, `new_lazy`, `new_from_file`, and `save`. Do not expose implementation structures such as raw `RelationshipSet`, package storage, relationship model rebuilding, or generated factory helpers just to satisfy tests. Prefer crate-internal traits/helpers such as internal package or part plumbing for storage/model access, with public inherent methods wrapping only upstream-style operations.
-
-The fixtures in `crates/ooxmlsdk-test/src/fixtures.rs` are intentionally tied back to upstream .NET Open XML SDK tests. When adding coverage, prefer representative sample XML with a traceable origin instead of ad hoc snippets.
-
-## Testing Guidelines
-The generator entry point is `test_gen` in `crates/ooxmlsdk-build/src/lib.rs`. Run it first whenever you change generator code, checked-in metadata under `sdk_data/`, package schemas under `schemas/OpenPackagingConventions-XMLSchema/`, or feature-gated generation behavior, but note that it currently depends on an external `../Open-XML-SDK/data` checkout. Review the generated diff in `crates/ooxmlsdk/src/schemas/`, `crates/ooxmlsdk/src/deserializers/`, `crates/ooxmlsdk/src/serializers/`, `crates/ooxmlsdk/src/parts/`, `crates/ooxmlsdk/src/schemas.rs`, `crates/ooxmlsdk/src/deserializers.rs`, `crates/ooxmlsdk/src/serializers.rs`, and `crates/ooxmlsdk/src/namespaces.rs`.
-
-When validating generator changes, feature-gated code, or generated schema output, use this sequence:
-
-- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
-- `cargo fmt --all`
-- `cargo test --workspace`
-- `cargo test --workspace --no-default-features`
-- `cargo test --workspace --no-default-features --features parts`
-- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
-- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
-- `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo fmt --all`
-
-Runtime behavior is currently covered by focused round-trip tests in `crates/ooxmlsdk-test/tests/wordprocessing.rs` and `crates/ooxmlsdk-test/tests/presentation.rs`. Add new tests close to the behavior they protect and keep assertions stable: verify both parsed fields and serialized XML where possible.
-
-Additional integration coverage also lives in `crates/ooxmlsdk-test/tests/spreadsheet.rs`, `crates/ooxmlsdk-test/tests/properties.rs`, and `crates/ooxmlsdk-test/tests/packages.rs`. Add new tests close to the behavior they protect.
-
-Package/parts tests should assert behavior through public, upstream-aligned APIs such as `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, relationship-specific helpers, part path/content/data helpers, and saved package contents. Do not add tests that require exposing raw `storage()`, raw package or part `relationships()`, or `RelationshipSet` internals unless the API is intentionally public and matched to upstream.
-
-Validator-focused integration coverage lives in `crates/ooxmlsdk-test/tests/validators.rs` and `crates/ooxmlsdk-test/tests/file_validators.rs`. Keep these tests behind `validators` and prefer traceable upstream Open XML SDK fixtures and assertions. For package-level validator migrations where upstream reports multiple errors, it is acceptable to assert the first Rust-side validation error when the implementation intentionally stops at first failure.
-
-The `cargo test --workspace --no-default-features --features parts` lane is the Office2007-oriented `parts` validation surface. Keep fixtures that require Office 2010+ relationships, ChartEx, model3d, `stylesWithEffects`, Word 2013+ compatibility settings, or other `microsoft365`-gated runtime coverage out of that lane by gating the affected tests with `#[cfg(feature = "microsoft365")]`. Do not hide true Office2007 regressions behind that gate.
-
-Strict OOXML samples may still need separate gating from the default surface. If a test genuinely depends on strict-only runtime behavior, keep it out of the Office2007 `parts` lane and document why.
-
-`crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` fixtures into `open_failure`, `open_valid`, and `round_trip`. Only promote a fixture to `round_trip` when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid` so they do not get revisited as false positives.
-
-When adjusting `doc_samples` or package tests, gate only fixtures that are demonstrably version- or feature-specific. Prefer the smallest possible `#[cfg(...)]` around a test or assertion. Do not broadly gate failing tests until you have distinguished between a real runtime bug and a fixture that depends on disabled feature coverage.
-
-When validating work, do not overlap `cargo fmt`, `cargo test`, `cargo clippy`, or generation commands. Finish one command, capture its result, and only then start the next one. Do not switch target directories to avoid locks. If you encounter a target directory lock, wait for the existing lock to release.
-
-When a validation command is expected to take a long time, avoid frequent status checks that only poll for intermediate output. Prefer waiting for the command to complete, then inspect the final output and failures in one pass. This keeps execution predictable and avoids false conclusions from partial logs.
+When benchmarking, evaluate `cargo bench -p ooxmlsdk-test --bench perf` as a whole. The `packages` and `xml` suites have historically disagreed on `wordprocessing_document/write/parsed`; treat that single metric as a known anomaly unless investigated with surrounding trends.
 
 ## Commit Guidelines
-Keep commit subjects short, imperative, and scoped to the affected area, for example `Regenerate spreadsheet serializer output` or `Tighten XML attribute decoding errors`.
+Keep commit subjects short, imperative, and scoped, for example `Regenerate spreadsheet serializer output` or `Tighten XML attribute decoding errors`.
 
-Generate a commit message when needed, but do not create a commit unless the user explicitly confirms. There is no PR-specific checklist in this repository guidance.
+When generating a commit message, base it on repository state, not the latest chat turn. Inspect `git status --short`, `git diff --stat`, and relevant `git diff` hunks. If changes are staged, also inspect `git diff --cached --stat` and `git diff --cached`, and state whether the message covers staged changes, unstaged changes, or both.
+
+Summarize the coherent change set visible in the diff. Distinguish documentation-only edits from code, metadata, generated output, fixtures, and tests. Mention generated churn only when intended. Do not fold unrelated worktree edits into the message unless the user asks for a message covering all changes.
+
+Generate a commit message when needed, but do not create a commit unless the user explicitly confirms.

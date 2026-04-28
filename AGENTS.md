@@ -89,7 +89,7 @@ The Office2007 parts lane must not include fixtures that require Office 2010+ re
 ## Code Style
 Keep Rust `rustfmt`-clean. Use snake_case for modules/functions, PascalCase for types, and preserve schema-derived module names such as `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
 
-Keep hand-written logic in `crates/ooxmlsdk-build`, `crates/ooxmlsdk-derive`, or small generic runtime helpers. For the `parts` API, keep the public surface aligned with upstream Open XML SDK concepts and established constructors/save entry points such as `new`, `new_lazy`, `new_from_file`, and `save`.
+Keep hand-written logic in `crates/ooxmlsdk-build`, `crates/ooxmlsdk-derive`, or small generic runtime helpers. For the `parts` API, keep the public surface aligned with upstream Open XML SDK concepts and established constructors/save entry points such as `new`, `new_with_settings`, `new_from_file`, and `save`; configure eager/lazy loading through `OpenSettings.open_mode`.
 
 When benchmarking, evaluate `cargo bench -p ooxmlsdk-test --bench perf` as a whole. The `packages` and `xml` suites have historically disagreed on `wordprocessing_document/write/parsed`; treat that single metric as a known anomaly unless investigated with surrounding trends.
 

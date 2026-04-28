@@ -9,6 +9,8 @@ mod package;
 mod xml;
 
 #[cfg(feature = "parts")]
+pub(crate) use crate::sdk::PackageOpenMode;
+#[cfg(feature = "parts")]
 pub use data_part::{
   AudioReferenceRelationship, MediaDataPart, MediaReferenceRelationship, VideoReferenceRelationship,
 };
@@ -20,8 +22,8 @@ pub use error::{
 pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub(crate) use package::{
-  NewPartDescriptor, NewPartTargetMode, PackageOpenMode, RelationshipInfo, RelationshipSet,
-  SdkPackageStorage, StoredPart,
+  NewPartDescriptor, NewPartTargetMode, RelationshipInfo, RelationshipSet, SdkPackageStorage,
+  StoredPart,
 };
 #[cfg(feature = "parts")]
 pub use package::{

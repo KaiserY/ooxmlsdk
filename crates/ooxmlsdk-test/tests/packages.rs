@@ -29,7 +29,7 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  MediaDataPartType, OpenSettings, SdkPackage, SdkPart, ThumbnailPartType,
+  MediaDataPartType, OpenSettings, PackageOpenMode, SdkPackage, SdkPart, ThumbnailPartType,
 };
 use ooxmlsdk::sdk::{
   FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
@@ -49,6 +49,13 @@ fn doc_sample(file_name: &str) -> std::path::PathBuf {
   let path = fixtures::doc_sample_path(file_name);
   assert!(path.is_file(), "missing doc sample: {}", path.display());
   path
+}
+
+fn lazy_open_settings() -> OpenSettings {
+  OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    ..Default::default()
+  }
 }
 
 fn main_document_body_child_count(
@@ -207,7 +214,8 @@ fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
   let eager_root = eager_main.root_element(&mut eager).unwrap();
   assert!(main_document_body_child_count(eager_root) > 0);
 
-  let mut lazy = WordprocessingDocument::new_from_file_lazy(&path).unwrap();
+  let mut lazy =
+    WordprocessingDocument::new_from_file_with_settings(&path, lazy_open_settings()).unwrap();
   let lazy_main = lazy.main_document_part().unwrap();
   let lazy_root = lazy_main.root_element(&mut lazy).unwrap();
   assert!(main_document_body_child_count(lazy_root) > 0);
@@ -217,8 +225,11 @@ fn wordprocessing_document_supports_eager_and_lazy_root_loading() {
 fn wordprocessing_part_unload_root_element_matches_openxml_part_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs
   //   UnloadRootElementTest
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Document.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
 
   assert!(!main_part.is_root_element_loaded(&package));
@@ -248,9 +259,9 @@ fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs
   //   OpenMcPackage
   for file_name in ["mcdoc.docx", "mcinleaf.docx"] {
-    let mut package = WordprocessingDocument::new_from_file_lazy_with_settings(
+    let mut package = WordprocessingDocument::new_from_file_with_settings(
       doc_sample(file_name),
-      OpenSettings::default(),
+      lazy_open_settings(),
     )
     .unwrap();
     let main_part = package.main_document_part().unwrap();
@@ -260,7 +271,8 @@ fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
     package.save(&mut saved).unwrap();
     saved.set_position(0);
 
-    let mut reopened = WordprocessingDocument::new_lazy(saved).unwrap();
+    let mut reopened =
+      WordprocessingDocument::new_with_settings(saved, lazy_open_settings()).unwrap();
     let reopened_main = reopened.main_document_part().unwrap();
     assert!(reopened_main.root_element(&mut reopened).is_ok());
   }
@@ -277,21 +289,27 @@ fn open_settings_default_markup_compatibility_matches_upstream() {
       target_file_format_version: FileFormatVersion::Office2007,
     }
   );
+  assert_eq!(settings.open_mode, PackageOpenMode::Eager);
 
-  let implicit = WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let implicit = WordprocessingDocument::new_from_file(doc_sample("Document.docx")).unwrap();
   assert_eq!(implicit.open_settings(), &settings);
 
   let explicit =
-    WordprocessingDocument::new_from_file_lazy_with_settings(doc_sample("Document.docx"), settings)
+    WordprocessingDocument::new_from_file_with_settings(doc_sample("Document.docx"), settings)
       .unwrap();
   assert_eq!(explicit.open_settings(), &settings);
 
+  let lazy_settings = lazy_open_settings();
+  let lazy =
+    WordprocessingDocument::new_from_file_with_settings(doc_sample("Document.docx"), lazy_settings)
+      .unwrap();
+  assert_eq!(lazy.open_settings(), &lazy_settings);
+
   let spreadsheet =
-    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+    SpreadsheetDocument::new_from_file(doc_sample("basicspreadsheet.xlsx")).unwrap();
   assert_eq!(spreadsheet.open_settings(), &settings);
 
-  let presentation =
-    PresentationDocument::new_from_file_lazy(doc_sample("Presentation.pptx")).unwrap();
+  let presentation = PresentationDocument::new_from_file(doc_sample("Presentation.pptx")).unwrap();
   assert_eq!(presentation.open_settings(), &settings);
 }
 
@@ -317,11 +335,9 @@ fn open_settings_no_process_accepts_all_supported_target_versions() {
       },
       ..Default::default()
     };
-    let package = WordprocessingDocument::new_from_file_lazy_with_settings(
-      doc_sample("Document.docx"),
-      settings,
-    )
-    .unwrap();
+    let package =
+      WordprocessingDocument::new_from_file_with_settings(doc_sample("Document.docx"), settings)
+        .unwrap();
 
     assert_eq!(package.open_settings(), &settings);
   }
@@ -339,9 +355,10 @@ fn package_to_owned_package_preserves_open_settings() {
       target_file_format_version: FileFormatVersion::Office2013,
     },
     ignore_calculation_chain_part_relationship: true,
+    ..Default::default()
   };
   let package =
-    WordprocessingDocument::new_from_file_lazy_with_settings(doc_sample("Document.docx"), settings)
+    WordprocessingDocument::new_from_file_with_settings(doc_sample("Document.docx"), settings)
       .unwrap();
 
   let cloned = package.to_owned_package().unwrap();
@@ -357,7 +374,8 @@ fn spreadsheet_missing_calc_chain_part_respects_open_settings() {
   //   SucceedWithMissingCalcChainPart
   let path = doc_sample("missingcalcchainpart.xlsx");
 
-  let mut default_package = SpreadsheetDocument::new_from_file_lazy(&path).unwrap();
+  let mut default_package =
+    SpreadsheetDocument::new_from_file_with_settings(&path, lazy_open_settings()).unwrap();
   assert!(default_package.load_all_parts().is_err());
 
   let settings = OpenSettings {
@@ -365,7 +383,7 @@ fn spreadsheet_missing_calc_chain_part_respects_open_settings() {
     ..Default::default()
   };
   let mut ignored_package =
-    SpreadsheetDocument::new_from_file_lazy_with_settings(&path, settings).unwrap();
+    SpreadsheetDocument::new_from_file_with_settings(&path, settings).unwrap();
   assert_eq!(ignored_package.open_settings(), &settings);
   ignored_package.load_all_parts().unwrap();
   let workbook_part = ignored_package.workbook_part().unwrap();
@@ -380,8 +398,11 @@ fn spreadsheet_missing_calc_chain_part_respects_open_settings() {
 fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
   //   ParticalProperty
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("simpleSdt.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("simpleSdt.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let root = main_part.root_element_mut(&mut package).unwrap();
   let sdt = root
@@ -410,7 +431,8 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
   package.save(&mut saved).unwrap();
   saved.set_position(0);
 
-  let mut reopened = WordprocessingDocument::new_lazy(saved).unwrap();
+  let mut reopened =
+    WordprocessingDocument::new_with_settings(saved, lazy_open_settings()).unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_root = reopened_main.root_element(&mut reopened).unwrap();
   let reopened_alias = reopened_root
@@ -436,8 +458,11 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
 fn wordprocessing_font_table_touch_preserves_w14_namespace_from_mc_support_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
   //   WriteExtraAttr
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("HelloO14.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("HelloO14.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let font_table_part = main_part.font_table_part(&package).unwrap();
   let fonts = font_table_part.root_element(&mut package).unwrap();
@@ -447,7 +472,7 @@ fn wordprocessing_font_table_touch_preserves_w14_namespace_from_mc_support_test(
   package.save(&mut saved).unwrap();
   saved.set_position(0);
 
-  let reopened = WordprocessingDocument::new_lazy(saved).unwrap();
+  let reopened = WordprocessingDocument::new_with_settings(saved, lazy_open_settings()).unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
   let reopened_font_table_part = reopened_main.font_table_part(&reopened).unwrap();
   let font_table_xml = reopened_font_table_part
@@ -522,7 +547,11 @@ fn package_external_relationship_can_be_edited_and_written_back() {
 #[test]
 fn package_relationship_helpers_match_openxml_container_api_shape() {
   // Source: adapted from OpenXmlPartContainer external relationship and required lookup APIs.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let main_part_id = package
     .get_id_of_part_required(&main_part)
@@ -726,8 +755,11 @@ fn part_root_element_rejects_whitespace_only_xml() {
 #[test]
 fn part_relationship_ids_can_change_for_child_parts() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: ChangePartIdTest
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("complex0.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("complex0.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let comments_part = main_part.wordprocessing_comments_part(&package).unwrap();
   let image_part = main_part.image_parts(&package).next().unwrap();
@@ -934,8 +966,11 @@ fn media_reference_relationships_resolve_shared_data_part_from_openxml_package_t
 fn media_data_part_reference_relationships_can_be_added_removed_and_reopened() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
   //   LoadPackageWithMediaReferenceTest
-  let mut package =
-    PresentationDocument::new_from_file_lazy(doc_sample("mediareference.pptx")).unwrap();
+  let mut package = PresentationDocument::new_from_file_with_settings(
+    doc_sample("mediareference.pptx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let media_data_parts: Vec<_> = package.media_data_parts().collect();
   assert_eq!(media_data_parts.len(), 1);
   let media_data_part = media_data_parts[0].clone();
@@ -1129,8 +1164,11 @@ fn media_data_part_type_maps_upstream_content_types_and_extensions() {
 fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
   //   MediaDataPartReferenceTest
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
 
   let default_ext = package
@@ -1334,8 +1372,11 @@ fn media_data_part_rejects_foreign_package_relationships() {
 fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target() {
   // Source: src/DocumentFormat.OpenXml.Framework/Packaging/OpenXmlPartContainer.cs
   //   AddDataPartReferenceRelationship(DataPartReferenceRelationship)
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let header = main_part
     .add_new_part::<_, HeaderPart>(&mut package, "rIdSdkHeaderForDataRef")
@@ -1443,7 +1484,11 @@ fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test()
 #[test]
 fn part_root_element_mutation_is_saved() {
   // Source: adapted from OpenXmlPart root element save/mutation coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
 
   let root = main_part.root_element_mut(&mut package).unwrap();
@@ -1463,7 +1508,11 @@ fn part_root_element_mutation_is_saved() {
 #[test]
 fn set_root_element_replaces_lazy_root_and_is_saved() {
   // Source: adapted from OpenXmlPart root element save/mutation coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
 
   main_part
@@ -1509,7 +1558,11 @@ fn root_element_mut_updates_eager_root_and_is_saved() {
 #[test]
 fn part_hyperlink_relationship_mutation_is_saved() {
   // Source: adapted from OpenXmlPartContainer hyperlink relationship mutation coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkHyperlink";
   let target = "https://example.com/ooxmlsdk";
@@ -1559,7 +1612,11 @@ fn part_hyperlink_relationship_mutation_is_saved() {
 #[test]
 fn part_hyperlink_relationship_supports_internal_targets() {
   // Source: adapted from OpenXmlPartContainer.AddHyperlinkRelationship(uri, isExternal).
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkInternalHyperlink";
 
@@ -1618,7 +1675,11 @@ fn part_hyperlink_relationship_supports_internal_targets() {
 #[test]
 fn part_external_relationship_ids_can_change_and_remove() {
   // Source: adapted from OpenXmlPartContainer external relationship mutation coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkExternal";
   let changed_relationship_id = "rIdSdkExternalChanged";
@@ -1686,7 +1747,11 @@ fn part_external_relationship_ids_can_change_and_remove() {
 #[test]
 fn part_external_relationship_helpers_are_kind_specific() {
   // Source: adapted from OpenXmlPartContainer external relationship get/delete coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship = main_part
     .add_external_relationship_auto_id(
@@ -1723,7 +1788,11 @@ fn part_external_relationship_helpers_are_kind_specific() {
 #[test]
 fn package_external_relationship_mutation_is_saved() {
   // Source: adapted from OpenXmlPackage relationship mutation coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let relationship_id = "rIdPackageExternal".to_string();
   let relationship_type = "http://example.com/package/relationship";
   let target = "https://example.com/package";
@@ -1754,7 +1823,11 @@ fn package_external_relationship_mutation_is_saved() {
 #[test]
 fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
   // Source: upstream AddNewPart<HeaderPart> coverage adapted to package-level save/reopen.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkHeader";
 
@@ -1815,7 +1888,11 @@ fn add_new_parts_use_unique_upstream_style_part_names() {
 #[test]
 fn add_new_part_auto_id_skips_existing_relationship_ids() {
   // Source: upstream AddNewPart<T>() auto relationship-id behavior adapted for Rust handles.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_count = part_relationship_count(&package, &main_part);
 
@@ -1846,7 +1923,11 @@ fn add_new_part_auto_id_skips_existing_relationship_ids() {
 #[test]
 fn package_add_new_part_creates_package_relationship() {
   // Source: upstream WordprocessingDocument.AddNewPart<T>() package-level coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let relationship_id = "rIdSdkRibbon";
 
   let ribbon_part = package
@@ -1873,8 +1954,11 @@ fn package_add_new_part_creates_package_relationship() {
 #[test]
 fn image_part_feed_data_is_saved() {
   // Source: upstream AddNewPart<ImagePart>(mime).FeedData(...) coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkImage";
   let image_bytes = b"\x89PNG\r\n\x1a\nsdk-image-bytes".to_vec();
@@ -1906,8 +1990,11 @@ fn image_part_feed_data_is_saved() {
 #[test]
 fn set_data_replaces_existing_part_bytes() {
   // Source: upstream GetStream(FileMode.Create) replacement semantics adapted to raw bytes.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let image_part = main_part
     .add_new_part_with_content_type_auto_id::<_, ImagePart>(&mut package, "image/png")
@@ -1940,8 +2027,11 @@ fn set_data_replaces_existing_part_bytes() {
 #[test]
 fn part_data_helpers_read_text_and_write_bytes() {
   // Source: upstream GetStream(FileMode.Open) read semantics adapted to Rust helpers.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let xml = "<properties><property name=\"sdk\">text</property></properties>";
   let custom_xml = main_part
@@ -1972,8 +2062,11 @@ fn part_data_helpers_read_text_and_write_bytes() {
 #[test]
 fn add_image_part_with_id_feeds_data_and_saves() {
   // Source: upstream MainDocumentPart.AddImagePart(mime, id).FeedData(...) coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkImageWithId";
   let image_bytes = b"\x89PNG\r\n\x1a\nsdk-image-with-id".to_vec();
@@ -2008,8 +2101,11 @@ fn add_image_part_with_id_feeds_data_and_saves() {
 #[test]
 fn add_image_part_auto_id_uses_next_relationship_id() {
   // Source: upstream MainDocumentPart.AddImagePart(mime).FeedData(...) coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_count = part_relationship_count(&package, &main_part);
 
@@ -2048,8 +2144,11 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
 #[test]
 fn add_alternative_format_import_part_with_id_feeds_data_and_saves() {
   // Source: upstream AddAlternativeFormatImportPart(type, id).GetStream(Create) coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkAltChunk";
   let html = b"<!doctype html><html><body>alt chunk</body></html>".to_vec();
@@ -2088,8 +2187,11 @@ fn add_alternative_format_import_part_with_id_feeds_data_and_saves() {
 #[test]
 fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
   // Source: upstream AddAlternativeFormatImportPart(type) coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_count = part_relationship_count(&package, &main_part);
 
@@ -2143,8 +2245,11 @@ fn add_alternative_format_import_part_auto_id_uses_part_type_content_type() {
 #[test]
 fn add_custom_xml_part_by_type_feeds_data_and_saves() {
   // Source: upstream AddCustomXmlPart(CustomXmlPartType.CustomXml) coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_count = part_relationship_count(&package, &main_part);
   let xml = b"<properties><property name=\"sdk\">custom xml</property></properties>".to_vec();
@@ -2187,8 +2292,11 @@ fn add_custom_xml_part_by_type_feeds_data_and_saves() {
 #[test]
 fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
   // Source: upstream AddCustomXmlPart(contentType, id) supported relationship overload.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkCustomXml";
   let inkml = b"<ink xmlns=\"http://www.w3.org/2003/InkML\"/>".to_vec();
@@ -2227,8 +2335,11 @@ fn add_custom_xml_part_with_id_uses_content_type_and_relationship_id() {
 #[test]
 fn generic_add_new_part_with_content_type_and_extension_saves_custom_extension() {
   // Source: upstream AddNewPart<T>(contentType, id) plus PartTypeInfo extension semantics.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let relationship_id = "rIdSdkGenericCustomXml";
   let custom_xml = b"<ink xmlns=\"http://www.w3.org/2003/InkML\"/>".to_vec();
@@ -2319,8 +2430,11 @@ fn part_extension_selection_matches_openxml_part_tests() {
 #[test]
 fn package_add_new_part_with_content_type_and_extension_auto_id_saves_custom_extension() {
   // Source: package-level AddNewPart<T>() creation semantics with Rust extension override.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let relationship_count = package.parts().count();
   let png = b"package thumbnail png".to_vec();
 
@@ -2354,8 +2468,11 @@ fn package_add_new_part_with_content_type_and_extension_auto_id_saves_custom_ext
 #[test]
 fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
   // Source: upstream OpenXmlSupportedRelationshipExtensions typed PartTypeInfo overloads.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
 
   let embedded_object = main_part
@@ -2446,7 +2563,11 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
 
-  let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened = WordprocessingDocument::new_with_settings(
+    Cursor::new(buffer.into_inner()),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let reopened_main = reopened.main_document_part().unwrap();
 
   let reopened_embedded_object = reopened_main
@@ -2492,8 +2613,11 @@ fn add_extensible_supported_relationship_parts_by_type_save_and_reopen() {
 #[test]
 fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
   // Source: upstream WorksheetPart supported relationship constraints for custom properties and controls.
-  let mut package =
-    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let mut package = SpreadsheetDocument::new_from_file_with_settings(
+    doc_sample("basicspreadsheet.xlsx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let workbook_part = package.workbook_part().unwrap();
   let worksheet = workbook_part.worksheet_parts(&package).next().unwrap();
 
@@ -2581,7 +2705,9 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
 
-  let reopened = SpreadsheetDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened =
+    SpreadsheetDocument::new_with_settings(Cursor::new(buffer.into_inner()), lazy_open_settings())
+      .unwrap();
   let reopened_workbook = reopened.workbook_part().unwrap();
   let reopened_worksheet = reopened_workbook.worksheet_parts(&reopened).next().unwrap();
   let reopened_custom_property = reopened_worksheet
@@ -2619,8 +2745,11 @@ fn add_spreadsheet_supported_relationship_parts_by_type_save_and_reopen() {
 #[test]
 fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
   // Source: upstream AddThumbnailPart(ThumbnailPartType.Jpeg) package coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let relationship_count = package.parts().count();
   let jpeg = b"thumbnail jpeg bytes".to_vec();
 
@@ -2658,8 +2787,11 @@ fn add_thumbnail_part_by_type_uses_jpeg_content_type_and_extension() {
 #[test]
 fn add_thumbnail_part_with_id_uses_content_type_and_relationship_id() {
   // Source: upstream AddThumbnailPart(contentType) package coverage.
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Hyperlink.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let relationship_id = "rIdSdkThumbnail";
   let jpeg = b"thumbnail jpg bytes".to_vec();
 
@@ -2790,7 +2922,11 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
 
-  let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened = WordprocessingDocument::new_with_settings(
+    Cursor::new(buffer.into_inner()),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let reopened_package_extended = reopened
     .get_part_by_id("rIdSdkPackageExtended")
     .and_then(|part| part_ref_variant!(part, ExtendedPart))
@@ -3051,7 +3187,11 @@ fn add_part_and_create_relationship_to_part_share_existing_parts() {
 #[test]
 fn create_relationship_to_part_reuses_existing_parts_from_package() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs :: CreateRelationshipToPartTest
-  let mut package = PresentationDocument::new_from_file_lazy(doc_sample("autosave.pptx")).unwrap();
+  let mut package = PresentationDocument::new_from_file_with_settings(
+    doc_sample("autosave.pptx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let presentation_part = package.presentation_part().unwrap();
   let slides: Vec<_> = presentation_part.slide_parts(&package).collect();
   assert!(slides.len() >= 2);
@@ -3120,7 +3260,11 @@ fn create_relationship_to_part_reuses_existing_parts_from_package() {
 #[test]
 fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
   // Source: adapted from OpenXmlPartContainer.AddPart cross-package copy behavior.
-  let mut source = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut source = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let source_main = source.main_document_part().unwrap();
   let source_header = source_main
     .add_new_part_auto_id::<_, HeaderPart>(&mut source)
@@ -3160,7 +3304,11 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
     .add_media_reference_relationship_with_id(&mut source, &source_media, "rIdSourceMedia")
     .unwrap();
 
-  let mut target = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-02.docx")).unwrap();
+  let mut target = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-02.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let target_main = target.main_document_part().unwrap();
   let imported_header = target_main
     .add_part_from_package_with_id(&mut target, &source, &source_header, "rIdImportedHeader")
@@ -3404,7 +3552,11 @@ fn add_file_properties_and_signature_origin_parts_create_fixed_package_relations
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
 
-  let reopened = WordprocessingDocument::new_lazy(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened = WordprocessingDocument::new_with_settings(
+    Cursor::new(buffer.into_inner()),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let reopened_core = reopened
     .get_part_by_id(core_id.as_str())
     .and_then(|part| part_ref_variant!(part, CoreFilePropertiesPart))
@@ -3449,7 +3601,11 @@ fn add_file_properties_and_signature_origin_parts_create_fixed_package_relations
 #[test]
 fn add_main_document_part_errors_when_main_part_exists() {
   // Source: upstream AddMainDocumentPart duplicate-main-part exception coverage.
-  let mut package = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
 
   assert!(package.add_main_document_part().is_err());
 }
@@ -3552,8 +3708,11 @@ fn model3d_reference_relationship_parts_use_powerpoint_content_type() {
 fn wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/TestOffice2016.cs
   //   OF16_006_AccessChartPart_IntentionalUnknownElement
-  let mut package =
-    WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-09-UnknownElement.docx")).unwrap();
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-09-UnknownElement.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let main_part = package.main_document_part().unwrap();
   let chart_part = main_part.extended_chart_parts(&package).next().unwrap();
 
@@ -3580,7 +3739,11 @@ fn wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element
 
 #[test]
 fn package_save_roundtrips_unmodified_document() {
-  let original = WordprocessingDocument::new_from_file_lazy(doc_sample("Of16-01.docx")).unwrap();
+  let original = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Of16-01.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let mut buffer = Cursor::new(Vec::new());
 
   original.save(&mut buffer).unwrap();
@@ -3652,7 +3815,11 @@ fn wordprocessing_clone_mutation_is_saved_without_changing_source_package() {
   //   CanDoPackageBasedCloningWord
   //   CanDoStreamBasedCloningWord
   //   CanSave
-  let source = WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let source = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Document.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let source_bytes = source.to_package_bytes().unwrap();
   let source_document_xml = package_entry_data(source_bytes.clone(), "word/document.xml");
   assert!(!String::from_utf8_lossy(&source_document_xml).contains("Hello World from clone"));
@@ -3694,8 +3861,11 @@ fn package_copy_helpers_round_trip_spreadsheet_and_presentation_documents() {
   //   CanDoPackageBasedCloningPowerpoint
   //   CanDoStreamBasedCloningExcel
   //   CanDoStreamBasedCloningPowerpoint
-  let spreadsheet =
-    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let spreadsheet = SpreadsheetDocument::new_from_file_with_settings(
+    doc_sample("basicspreadsheet.xlsx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let spreadsheet_bytes = spreadsheet.to_package_bytes().unwrap();
   let mut spreadsheet_stream = Cursor::new(Vec::new());
   spreadsheet.copy_to(&mut spreadsheet_stream).unwrap();
@@ -3725,8 +3895,11 @@ fn package_copy_helpers_round_trip_spreadsheet_and_presentation_documents() {
       .is_ok()
   );
 
-  let presentation =
-    PresentationDocument::new_from_file_lazy(doc_sample("Presentation.pptx")).unwrap();
+  let presentation = PresentationDocument::new_from_file_with_settings(
+    doc_sample("Presentation.pptx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let presentation_bytes = presentation.to_package_bytes().unwrap();
   let mut presentation_stream = Cursor::new(Vec::new());
   presentation.copy_to(&mut presentation_stream).unwrap();
@@ -3760,7 +3933,11 @@ fn package_save_as_file_round_trips_office_document_types() {
   //   CanSaveAsWord
   //   CanSaveAsExcel
   //   CanSaveAsPowerpoint
-  let mut word = WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let mut word = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Document.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let word_main = word.main_document_part().unwrap();
   assert!(word_main.root_element(&mut word).is_ok());
   let word_bytes = word.to_package_bytes().unwrap();
@@ -3773,8 +3950,11 @@ fn package_save_as_file_round_trips_office_document_types() {
   );
   std::fs::remove_file(&word_path).unwrap();
 
-  let mut spreadsheet =
-    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let mut spreadsheet = SpreadsheetDocument::new_from_file_with_settings(
+    doc_sample("basicspreadsheet.xlsx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let workbook_part = spreadsheet.workbook_part().unwrap();
   assert!(workbook_part.root_element(&mut spreadsheet).is_ok());
   let spreadsheet_bytes = spreadsheet.to_package_bytes().unwrap();
@@ -3789,8 +3969,11 @@ fn package_save_as_file_round_trips_office_document_types() {
   );
   std::fs::remove_file(&spreadsheet_path).unwrap();
 
-  let mut presentation =
-    PresentationDocument::new_from_file_lazy(doc_sample("Presentation.pptx")).unwrap();
+  let mut presentation = PresentationDocument::new_from_file_with_settings(
+    doc_sample("Presentation.pptx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
   let presentation_part = presentation.presentation_part().unwrap();
   assert!(presentation_part.root_element(&mut presentation).is_ok());
   let presentation_bytes = presentation.to_package_bytes().unwrap();

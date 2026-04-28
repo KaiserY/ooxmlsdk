@@ -7,6 +7,7 @@ use crate::schemas::opc_content_types::{Types, TypesChoice};
 use crate::schemas::opc_relationships::{
   Relationship as OpcRelationship, Relationships, TargetMode,
 };
+use crate::sdk::PackageOpenMode;
 
 use super::{
   SdkError, part_relationships_path, resolve_relationship_target_path, resolve_zip_file_path,
@@ -17,13 +18,6 @@ const FLAT_OPC_PACKAGE_NS: &str = "http://schemas.microsoft.com/office/2006/xmlP
 const RELATIONSHIP_CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml";
 const ALT_CHUNK_RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum PackageOpenMode {
-  #[default]
-  Eager,
-  Lazy,
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct PartId(u32);

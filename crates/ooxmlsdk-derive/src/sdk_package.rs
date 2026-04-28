@@ -473,36 +473,17 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Self::new_with_settings(reader, crate::sdk::OpenSettings::default())
       }
 
-      pub fn new_lazy<R: std::io::Read + std::io::Seek>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::new_lazy_with_settings(reader, crate::sdk::OpenSettings::default())
-      }
-
       pub fn new_with_settings<R: std::io::Read + std::io::Seek>(
         reader: R,
         open_settings: crate::sdk::OpenSettings,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::new_inner(reader, crate::common::PackageOpenMode::Eager, open_settings)
-      }
-
-      pub fn new_lazy_with_settings<R: std::io::Read + std::io::Seek>(
-        reader: R,
-        open_settings: crate::sdk::OpenSettings,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::new_inner(reader, crate::common::PackageOpenMode::Lazy, open_settings)
+        Self::new_inner(reader, open_settings.open_mode, open_settings)
       }
 
       pub fn new_from_file<P: AsRef<std::path::Path>>(
         path: P,
       ) -> Result<Self, crate::common::SdkError> {
         Self::new(std::io::BufReader::new(std::fs::File::open(path)?))
-      }
-
-      pub fn new_from_file_lazy<P: AsRef<std::path::Path>>(
-        path: P,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::new_lazy(std::io::BufReader::new(std::fs::File::open(path)?))
       }
 
       pub fn new_from_file_with_settings<P: AsRef<std::path::Path>>(
@@ -515,22 +496,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
-      pub fn new_from_file_lazy_with_settings<P: AsRef<std::path::Path>>(
-        path: P,
-        open_settings: crate::sdk::OpenSettings,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::new_lazy_with_settings(
-          std::io::BufReader::new(std::fs::File::open(path)?),
-          open_settings,
-        )
-      }
-
       pub fn from_flat_opc_str(text: &str) -> Result<Self, crate::common::SdkError> {
         Self::from_flat_opc_str_with_settings(text, crate::sdk::OpenSettings::default())
-      }
-
-      pub fn from_flat_opc_str_lazy(text: &str) -> Result<Self, crate::common::SdkError> {
-        Self::from_flat_opc_str_lazy_with_settings(text, crate::sdk::OpenSettings::default())
       }
 
       pub fn from_flat_opc_str_with_settings(
@@ -543,26 +510,10 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
-      pub fn from_flat_opc_str_lazy_with_settings(
-        text: &str,
-        open_settings: crate::sdk::OpenSettings,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::from_flat_opc_reader_lazy_with_settings(
-          std::io::Cursor::new(text.as_bytes()),
-          open_settings,
-        )
-      }
-
       pub fn from_flat_opc_reader<R: std::io::BufRead>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         Self::from_flat_opc_reader_with_settings(reader, crate::sdk::OpenSettings::default())
-      }
-
-      pub fn from_flat_opc_reader_lazy<R: std::io::BufRead>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::from_flat_opc_reader_lazy_with_settings(reader, crate::sdk::OpenSettings::default())
       }
 
       pub fn from_flat_opc_reader_with_settings<R: std::io::BufRead>(
@@ -571,18 +522,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       ) -> Result<Self, crate::common::SdkError> {
         Self::from_flat_opc_reader_inner(
           reader,
-          crate::common::PackageOpenMode::Eager,
-          open_settings,
-        )
-      }
-
-      pub fn from_flat_opc_reader_lazy_with_settings<R: std::io::BufRead>(
-        reader: R,
-        open_settings: crate::sdk::OpenSettings,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::from_flat_opc_reader_inner(
-          reader,
-          crate::common::PackageOpenMode::Lazy,
+          open_settings.open_mode,
           open_settings,
         )
       }

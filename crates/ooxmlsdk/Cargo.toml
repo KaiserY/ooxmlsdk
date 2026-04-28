@@ -17,6 +17,7 @@ default = ["microsoft365", "parts"]
 parts = ["dep:base64", "dep:zip"]
 microsoft365 = []
 validators = ["dep:regex"]
+mce = ["parts"]
 
 [dependencies]
 base64 = { workspace = true, optional = true }

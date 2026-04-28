@@ -657,6 +657,14 @@ impl MediaDataPartType {
 
 #[cfg(feature = "parts")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PackageOpenMode {
+  #[default]
+  Eager,
+  Lazy,
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum FileFormatVersion {
   Office2007,
   Office2010,
@@ -673,7 +681,9 @@ pub enum FileFormatVersion {
 pub enum MarkupCompatibilityProcessMode {
   #[default]
   NoProcess,
+  #[cfg(feature = "mce")]
   ProcessLoadedPartsOnly,
+  #[cfg(feature = "mce")]
   ProcessAllParts,
 }
 
@@ -698,6 +708,7 @@ impl Default for MarkupCompatibilityProcessSettings {
 #[cfg(feature = "parts")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct OpenSettings {
+  pub open_mode: PackageOpenMode,
   pub markup_compatibility_process_settings: MarkupCompatibilityProcessSettings,
   pub ignore_calculation_chain_part_relationship: bool,
 }
@@ -711,6 +722,7 @@ pub(crate) trait SdkPackageInternal {
   #[inline]
   fn open_settings(&self) -> &OpenSettings {
     static DEFAULT_SETTINGS: OpenSettings = OpenSettings {
+      open_mode: PackageOpenMode::Eager,
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
         process_mode: MarkupCompatibilityProcessMode::NoProcess,
         target_file_format_version: FileFormatVersion::Office2007,

@@ -10,6 +10,7 @@ default = ["microsoft365", "parts"]
 parts = ["ooxmlsdk/parts"]
 microsoft365 = ["ooxmlsdk/microsoft365"]
 validators = ["ooxmlsdk/validators"]
+mce = ["ooxmlsdk/mce"]
 
 [dependencies]
 ooxmlsdk = { workspace = true, default-features = false }

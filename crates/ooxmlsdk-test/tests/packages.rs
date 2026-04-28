@@ -254,6 +254,27 @@ fn wordprocessing_part_unload_root_element_matches_openxml_part_test() {
   assert!(main_part.is_root_element_loaded(&package));
 }
 
+#[cfg(feature = "mce")]
+#[test]
+fn process_all_parts_forces_lazy_package_roots_to_load_on_open() {
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+
+  let package =
+    WordprocessingDocument::new_from_file_with_settings(doc_sample("Document.docx"), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  assert_eq!(package.open_settings(), &settings);
+  assert!(main_part.is_root_element_loaded(&package));
+}
+
 #[test]
 fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs

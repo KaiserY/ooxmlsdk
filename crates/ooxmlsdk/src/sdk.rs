@@ -714,6 +714,22 @@ pub struct OpenSettings {
 }
 
 #[cfg(feature = "parts")]
+impl OpenSettings {
+  #[inline]
+  pub(crate) fn root_element_open_mode(self) -> PackageOpenMode {
+    #[cfg(feature = "mce")]
+    if matches!(
+      self.markup_compatibility_process_settings.process_mode,
+      MarkupCompatibilityProcessMode::ProcessAllParts
+    ) {
+      return PackageOpenMode::Eager;
+    }
+
+    self.open_mode
+  }
+}
+
+#[cfg(feature = "parts")]
 pub(crate) trait SdkPackageInternal {
   fn storage(&self) -> &crate::common::SdkPackageStorage;
 

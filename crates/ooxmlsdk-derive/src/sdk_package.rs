@@ -222,7 +222,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   });
   let root_elements_local = root_elements_ident.map(|_| {
     quote! {
-      let root_elements = crate::parts::initialize_root_elements(&storage, open_mode)?;
+      let root_elements = crate::parts::initialize_root_elements(&storage, &open_settings)?;
     }
   });
   let root_elements_init = root_elements_ident.map(|ident| {

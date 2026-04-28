@@ -4451,10 +4451,13 @@ define_part_root_element! {
 }
 pub(crate) fn initialize_root_elements(
   storage: &crate::common::SdkPackageStorage,
-  open_mode: crate::common::PackageOpenMode,
+  open_settings: &crate::sdk::OpenSettings,
 ) -> Result<Vec<Option<crate::parts::PartRootElement>>, crate::common::SdkError> {
   let mut root_elements = vec![None; storage.parts().len()];
-  if matches!(open_mode, crate::common::PackageOpenMode::Eager) {
+  if matches!(
+    open_settings.root_element_open_mode(),
+    crate::common::PackageOpenMode::Eager
+  ) {
     for (index, slot) in root_elements.iter_mut().enumerate() {
       let part_id = crate::common::PartId::from_index(index);
       if let Some(root_element) = crate::parts::PartRootElement::from_part_id(storage, part_id)? {

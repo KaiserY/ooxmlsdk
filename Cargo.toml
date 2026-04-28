@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.5.2"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["KaiserY"]
@@ -21,10 +21,10 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { version = "0.5.2", path = "crates/ooxmlsdk", default-features = false }
-ooxmlsdk-build = { version = "0.5.2", path = "crates/ooxmlsdk-build" }
-ooxmlsdk-derive = { version = "0.5.2", path = "crates/ooxmlsdk-derive" }
-ooxmlsdk-test = { version = "0.5.2", path = "crates/ooxmlsdk-test" }
+ooxmlsdk = { version = "0.6.0", path = "crates/ooxmlsdk", default-features = false }
+ooxmlsdk-build = { version = "0.6.0", path = "crates/ooxmlsdk-build" }
+ooxmlsdk-derive = { version = "0.6.0", path = "crates/ooxmlsdk-derive" }
+ooxmlsdk-test = { version = "0.6.0", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.39.2"
 regex = "1.12.3"

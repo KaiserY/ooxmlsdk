@@ -95,7 +95,7 @@ pub struct WebExtensionProperty {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/we:extLst")]
 pub struct OfficeArtExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
@@ -271,14 +271,12 @@ pub enum SnapshotChoice {
   AAlphaBiLevel(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaBiLevel>,
   ),
-  #[sdk(child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaCeiling>,
-  ),
-  #[sdk(child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaFloor>,
-  ),
+  /// Alpha Ceiling Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
+  AAlphaCeiling,
+  /// Alpha Floor Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
+  AAlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaInverse>,
@@ -323,10 +321,9 @@ pub enum SnapshotChoice {
   AFillOverlay(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillOverlay>,
   ),
-  #[sdk(child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Grayscale>,
-  ),
+  /// Gray Scale Effect.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
+  AGrayscl,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]

@@ -69,7 +69,7 @@ pub struct DesignerTag {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p202:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:
     Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,

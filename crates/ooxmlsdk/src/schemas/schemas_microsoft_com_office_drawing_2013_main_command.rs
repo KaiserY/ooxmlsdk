@@ -232,10 +232,10 @@ pub struct Transform2D {
   /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
-  ///Offset
+  /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
   pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
-  ///Extents
+  /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
@@ -250,14 +250,6 @@ pub struct GroupShapeMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
-/// Defines the DrawingElementPackage Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:dePkg.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingElementPackage/oac:dePkg")]
-pub struct DrawingElementPackage {}
 /// Defines the DeMkLstDrawingElementMonikerList Class.
 ///
 /// Available in Office2016 and above.
@@ -302,14 +294,6 @@ pub struct DeTgtMkLstDrawingElementMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
-/// Defines the OpenXmlDrawingElementMonikerListElement Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingElementMonikerList/")]
-pub struct OpenXmlDrawingElementMonikerListElement {}
 /// Defines the ImgDataImgData Class.
 ///
 /// Available in Office2016 and above.
@@ -359,14 +343,6 @@ pub struct ResourceUrl {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub linkage: Option<ResourceLinkage>,
 }
-/// Defines the TextBodyPackage Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:txBodyPkg.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TextBodyPackage/oac:txBodyPkg")]
-pub struct TextBodyPackage {}
 /// Defines the GroupCommand Class.
 ///
 /// Available in Office2016 and above.
@@ -924,17 +900,17 @@ pub struct TextParagraphPropertiesType {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineSpacing>,
   >,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SpaceBefore>,
   >,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SpaceAfter>,
@@ -1139,7 +1115,7 @@ pub struct TextBodyProperties {
   /// Represents the following attribute in the schema: :compatLnSpc
   #[sdk(attr(qname = ":compatLnSpc"))]
   pub compatible_line_spacing: Option<crate::simple_type::BooleanValue>,
-  ///Preset Text Shape
+  /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetTextWarp>,
@@ -1283,7 +1259,7 @@ pub struct ShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
@@ -1328,238 +1304,6 @@ pub struct ShapeProperties {
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
   >,
 }
-/// Defines the XfrmEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:xfrm.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:xfrm")]
-pub struct XfrmEmpty {}
-/// Defines the GeomEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:geom.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:geom")]
-pub struct GeomEmpty {}
-/// Defines the FillEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:fill.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:fill")]
-pub struct FillEmpty {}
-/// Defines the LnEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:ln.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:ln")]
-pub struct LnEmpty {}
-/// Defines the EffectEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:effect.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:effect")]
-pub struct EffectEmpty {}
-/// Defines the Scene3dEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:scene3d.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:scene3d")]
-pub struct Scene3dEmpty {}
-/// Defines the Sp3dEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:sp3d.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:sp3d")]
-pub struct Sp3dEmpty {}
-/// Defines the ExtLstEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:extLst.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:extLst")]
-pub struct ExtLstEmpty {}
-/// Defines the BwModeEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:bwMode.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:bwMode")]
-pub struct BwModeEmpty {}
-/// Defines the SrcRectEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:srcRect.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:srcRect")]
-pub struct SrcRectEmpty {}
-/// Defines the FillModeEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:fillMode.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:fillMode")]
-pub struct FillModeEmpty {}
-/// Defines the DpiEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:dpi.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:dpi")]
-pub struct DpiEmpty {}
-/// Defines the RotWithShapeEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:rotWithShape.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:rotWithShape")]
-pub struct RotWithShapeEmpty {}
-/// Defines the StCxnEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:stCxn.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:stCxn")]
-pub struct StCxnEmpty {}
-/// Defines the EndCxnEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:endCxn.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:endCxn")]
-pub struct EndCxnEmpty {}
-/// Defines the NoGrpEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noGrp.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noGrp")]
-pub struct NoGrpEmpty {}
-/// Defines the NoSelectEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noSelect.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noSelect")]
-pub struct NoSelectEmpty {}
-/// Defines the NoRotEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noRot.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noRot")]
-pub struct NoRotEmpty {}
-/// Defines the NoChangeAspectEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noChangeAspect.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noChangeAspect")]
-pub struct NoChangeAspectEmpty {}
-/// Defines the NoMoveEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noMove.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noMove")]
-pub struct NoMoveEmpty {}
-/// Defines the NoResizeEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noResize.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noResize")]
-pub struct NoResizeEmpty {}
-/// Defines the NoEditPointsEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noEditPoints.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noEditPoints")]
-pub struct NoEditPointsEmpty {}
-/// Defines the NoAdjustHandlesEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noAdjustHandles.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noAdjustHandles")]
-pub struct NoAdjustHandlesEmpty {}
-/// Defines the NoChangeArrowheadsEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noChangeArrowheads.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noChangeArrowheads")]
-pub struct NoChangeArrowheadsEmpty {}
-/// Defines the NoChangeShapeTypeEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:noChangeShapeType.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:noChangeShapeType")]
-pub struct NoChangeShapeTypeEmpty {}
-/// Defines the LfPrEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:lfPr.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:lfPr")]
-pub struct LfPrEmpty {}
-/// Defines the HlinkClickEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlinkClick.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:hlinkClick")]
-pub struct HlinkClickEmpty {}
-/// Defines the HlinkHoverEmpty Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlinkHover.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/oac:hlinkHover")]
-pub struct HlinkHoverEmpty {}
-/// Defines the OpenXmlEmptyElement Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Empty/")]
-pub struct OpenXmlEmptyElement {}
 /// Defines the ResetShapeProperties Class.
 ///
 /// Available in Office2016 and above.
@@ -1568,33 +1312,33 @@ pub struct OpenXmlEmptyElement {}
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetShapeProperties/oac:spPr")]
 pub struct ResetShapeProperties {
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:xfrm"))]
-  pub xfrm_empty: Option<XfrmEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:geom"))]
-  pub geom_empty: Option<GeomEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:fill"))]
-  pub fill_empty: Option<FillEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:ln"))]
-  pub ln_empty: Option<LnEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:effect"))]
-  pub effect_empty: Option<EffectEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:scene3d"))]
-  pub scene3d_empty: Option<Scene3dEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:sp3d"))]
-  pub sp3d_empty: Option<Sp3dEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:extLst"))]
-  pub ext_lst_empty: Option<ExtLstEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:bwMode"))]
-  pub bw_mode_empty: Option<BwModeEmpty>,
+  /// Defines the XfrmEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:xfrm"))]
+  pub xfrm_empty: Option<()>,
+  /// Defines the GeomEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:geom"))]
+  pub geom_empty: Option<()>,
+  /// Defines the FillEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:fill"))]
+  pub fill_empty: Option<()>,
+  /// Defines the LnEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:ln"))]
+  pub ln_empty: Option<()>,
+  /// Defines the EffectEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:effect"))]
+  pub effect_empty: Option<()>,
+  /// Defines the Scene3dEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:scene3d"))]
+  pub scene3d_empty: Option<()>,
+  /// Defines the Sp3dEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:sp3d"))]
+  pub sp3d_empty: Option<()>,
+  /// Defines the ExtLstEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:extLst"))]
+  pub ext_lst_empty: Option<()>,
+  /// Defines the BwModeEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:bwMode"))]
+  pub bw_mode_empty: Option<()>,
 }
 /// Defines the LnRefStyleMatrixReference Class.
 ///
@@ -1782,7 +1526,7 @@ pub struct BlipFillProperties {
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
   pub blip:
     Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blip>>,
-  ///Source Rectangle
+  /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SourceRectangle>,
@@ -1911,18 +1655,18 @@ pub struct OpenXmlRelativeRectPropsElement {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetBlipFillProperties/oac:blipFill")]
 pub struct ResetBlipFillProperties {
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:srcRect"))]
-  pub src_rect_empty: Option<SrcRectEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:fillMode"))]
-  pub fill_mode_empty: Option<FillModeEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:dpi"))]
-  pub dpi_empty: Option<DpiEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:rotWithShape"))]
-  pub rot_with_shape_empty: Option<RotWithShapeEmpty>,
+  /// Defines the SrcRectEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:srcRect"))]
+  pub src_rect_empty: Option<()>,
+  /// Defines the FillModeEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:fillMode"))]
+  pub fill_mode_empty: Option<()>,
+  /// Defines the DpiEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:dpi"))]
+  pub dpi_empty: Option<()>,
+  /// Defines the RotWithShapeEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:rotWithShape"))]
+  pub rot_with_shape_empty: Option<()>,
 }
 /// Defines the ModifyNonVisualGroupDrawingShapeProps Class.
 ///
@@ -1999,7 +1743,7 @@ pub struct GroupShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Grouped Objects
+  /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
@@ -2036,24 +1780,24 @@ pub struct GroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetGroupShapeProperties/oac:grpSpPr")]
 pub struct ResetGroupShapeProperties {
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:xfrm"))]
-  pub xfrm_empty: Option<XfrmEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:fill"))]
-  pub fill_empty: Option<FillEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:effect"))]
-  pub effect_empty: Option<EffectEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:scene3d"))]
-  pub scene3d_empty: Option<Scene3dEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:extLst"))]
-  pub ext_lst_empty: Option<ExtLstEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:bwMode"))]
-  pub bw_mode_empty: Option<BwModeEmpty>,
+  /// Defines the XfrmEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:xfrm"))]
+  pub xfrm_empty: Option<()>,
+  /// Defines the FillEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:fill"))]
+  pub fill_empty: Option<()>,
+  /// Defines the EffectEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:effect"))]
+  pub effect_empty: Option<()>,
+  /// Defines the Scene3dEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:scene3d"))]
+  pub scene3d_empty: Option<()>,
+  /// Defines the ExtLstEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:extLst"))]
+  pub ext_lst_empty: Option<()>,
+  /// Defines the BwModeEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:bwMode"))]
+  pub bw_mode_empty: Option<()>,
 }
 /// Defines the NonVisualDrawingProps Class.
 ///
@@ -2098,21 +1842,21 @@ pub struct NonVisualDrawingProps {
     /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
-    ///Hyperlink associated with clicking or selecting the element.
+    /// Hyperlink associated with clicking or selecting the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
     pub hyperlink_on_click: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
         >,
     >,
-    ///Hyperlink associated with hovering over the element.
+    /// Hyperlink associated with hovering over the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
     pub hyperlink_on_hover: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
         >,
     >,
-    ///Future extension
+    /// Future extension
     #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
     pub non_visual_drawing_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
@@ -2352,42 +2096,42 @@ pub struct ModifyNonVisualConnectorProps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetNonVisualConnectorProps/oac:cNvCxnSpPr")]
 pub struct ResetNonVisualConnectorProps {
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:stCxn"))]
-  pub st_cxn_empty: Option<StCxnEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:endCxn"))]
-  pub end_cxn_empty: Option<EndCxnEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noGrp"))]
-  pub no_grp_empty: Option<NoGrpEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noSelect"))]
-  pub no_select_empty: Option<NoSelectEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noRot"))]
-  pub no_rot_empty: Option<NoRotEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noChangeAspect"))]
-  pub no_change_aspect_empty: Option<NoChangeAspectEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noMove"))]
-  pub no_move_empty: Option<NoMoveEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noResize"))]
-  pub no_resize_empty: Option<NoResizeEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noEditPoints"))]
-  pub no_edit_points_empty: Option<NoEditPointsEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noAdjustHandles"))]
-  pub no_adjust_handles_empty: Option<NoAdjustHandlesEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noChangeArrowheads"))]
-  pub no_change_arrowheads_empty: Option<NoChangeArrowheadsEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:noChangeShapeType"))]
-  pub no_change_shape_type_empty: Option<NoChangeShapeTypeEmpty>,
+  /// Defines the StCxnEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:stCxn"))]
+  pub st_cxn_empty: Option<()>,
+  /// Defines the EndCxnEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:endCxn"))]
+  pub end_cxn_empty: Option<()>,
+  /// Defines the NoGrpEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noGrp"))]
+  pub no_grp_empty: Option<()>,
+  /// Defines the NoSelectEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noSelect"))]
+  pub no_select_empty: Option<()>,
+  /// Defines the NoRotEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noRot"))]
+  pub no_rot_empty: Option<()>,
+  /// Defines the NoChangeAspectEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noChangeAspect"))]
+  pub no_change_aspect_empty: Option<()>,
+  /// Defines the NoMoveEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noMove"))]
+  pub no_move_empty: Option<()>,
+  /// Defines the NoResizeEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noResize"))]
+  pub no_resize_empty: Option<()>,
+  /// Defines the NoEditPointsEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noEditPoints"))]
+  pub no_edit_points_empty: Option<()>,
+  /// Defines the NoAdjustHandlesEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noAdjustHandles"))]
+  pub no_adjust_handles_empty: Option<()>,
+  /// Defines the NoChangeArrowheadsEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noChangeArrowheads"))]
+  pub no_change_arrowheads_empty: Option<()>,
+  /// Defines the NoChangeShapeTypeEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noChangeShapeType"))]
+  pub no_change_shape_type_empty: Option<()>,
 }
 /// Defines the CompressPictureProps Class.
 ///
@@ -2522,9 +2266,9 @@ pub struct ModifyNonVisualPictureProps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetNonVisualPictureProps/oac:cNvPicPr")]
 pub struct ResetNonVisualPictureProps {
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:lfPr"))]
-  pub lf_pr_empty: Option<LfPrEmpty>,
+  /// Defines the LfPrEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:lfPr"))]
+  pub lf_pr_empty: Option<()>,
 }
 /// Defines the BoundRect Class.
 ///
@@ -2973,12 +2717,12 @@ pub struct ModifyHyperlinkProps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oac:CT_ResetHyperlinkProps/oac:hlink")]
 pub struct ResetHyperlinkProps {
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:hlinkClick"))]
-  pub hlink_click_empty: Option<HlinkClickEmpty>,
-  /// _
-  #[sdk(child(qname = "oac:CT_Empty/oac:hlinkHover"))]
-  pub hlink_hover_empty: Option<HlinkHoverEmpty>,
+  /// Defines the HlinkClickEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:hlinkClick"))]
+  pub hlink_click_empty: Option<()>,
+  /// Defines the HlinkHoverEmpty Class.
+  #[sdk(empty_child(qname = "oac:CT_Empty/oac:hlinkHover"))]
+  pub hlink_hover_empty: Option<()>,
 }
 /// Defines the TextCharRangeContext Class.
 ///
@@ -3020,12 +2764,9 @@ pub enum GroupCommandChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletColorText,
-    >,
-  ),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletColor>,
@@ -3033,10 +2774,9 @@ pub enum TextParagraphPropertiesTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletSizeText>,
-  ),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(
     std::boxed::Box<
@@ -3052,10 +2792,9 @@ pub enum TextParagraphPropertiesTypeChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletFontText>,
-  ),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BulletFont>,
@@ -3063,10 +2802,9 @@ pub enum TextParagraphPropertiesTypeChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoBullet>,
-  ),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(
     std::boxed::Box<
@@ -3086,10 +2824,9 @@ pub enum TextParagraphPropertiesTypeChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
-  ANoAutofit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoAutoFit>,
-  ),
+  /// No AutoFit.
+  #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
+  ANoAutofit,
   #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
   ANormAutofit(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NormalAutoFit>,
@@ -3141,10 +2878,9 @@ pub enum ShapePropertiesChoice2 {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
@@ -3159,30 +2895,36 @@ pub enum ShapePropertiesChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LnRefStyleMatrixReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -3190,30 +2932,36 @@ pub enum LnRefStyleMatrixReferenceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillRefStyleMatrixReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -3221,30 +2969,36 @@ pub enum FillRefStyleMatrixReferenceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectRefStyleMatrixReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -3252,30 +3006,36 @@ pub enum EffectRefStyleMatrixReferenceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleMatrixReferenceTypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -3283,30 +3043,36 @@ pub enum StyleMatrixReferenceTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -3341,10 +3107,9 @@ pub enum GroupShapePropertiesChoice {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
@@ -3387,12 +3152,12 @@ pub enum LinePropertiesTypeChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesTypeChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineJoinBevel>,
-  ),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Miter>),
 }

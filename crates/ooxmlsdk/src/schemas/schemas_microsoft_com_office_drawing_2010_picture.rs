@@ -25,7 +25,7 @@ pub struct ShapeStyle {
   pub effect_reference: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectReference,
   >,
-  ///Font Reference
+  /// Font Reference
   #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
   pub font_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
@@ -38,7 +38,7 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/pic14:extLst")]
 pub struct OfficeArtExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }

@@ -1608,10 +1608,10 @@ pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Authors
+  /// Authors
   #[sdk(child(qname = "x:CT_Authors/x:authors"))]
   pub authors: std::boxed::Box<Authors>,
-  ///List of Comments
+  /// List of Comments
   #[sdk(child(qname = "x:CT_CommentList/x:commentList"))]
   pub comment_list: std::boxed::Box<CommentList>,
   /// _
@@ -2910,16 +2910,16 @@ pub struct Chartsheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Chart Sheet Properties
+  /// Chart Sheet Properties
   #[sdk(child(qname = "x:CT_ChartsheetPr/x:sheetPr"))]
   pub chart_sheet_properties: Option<std::boxed::Box<ChartSheetProperties>>,
-  ///Chart Sheet Views
+  /// Chart Sheet Views
   #[sdk(child(qname = "x:CT_ChartsheetViews/x:sheetViews"))]
   pub chart_sheet_views: std::boxed::Box<ChartSheetViews>,
-  ///Chart Sheet Protection
+  /// Chart Sheet Protection
   #[sdk(child(qname = "x:CT_ChartsheetProtection/x:sheetProtection"))]
   pub chart_sheet_protection: Option<ChartSheetProtection>,
-  ///Custom Chart Sheet Views
+  /// Custom Chart Sheet Views
   #[sdk(child(qname = "x:CT_CustomChartsheetViews/x:customSheetViews"))]
   pub custom_chartsheet_views: Option<CustomChartsheetViews>,
   /// _
@@ -2931,13 +2931,13 @@ pub struct Chartsheet {
   /// _
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  ///Drawing
+  /// Drawing
   #[sdk(child(qname = "x:CT_Drawing/x:drawing"))]
   pub drawing: std::boxed::Box<Drawing>,
   /// _
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawing"))]
   pub legacy_drawing: Option<LegacyDrawing>,
-  ///Legacy Drawing Reference in  Header Footer
+  /// Legacy Drawing Reference in  Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
   /// _
@@ -2969,44 +2969,44 @@ pub struct DialogSheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Sheet Properties
+  /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
-  ///Dialog Sheet Views
+  /// Dialog Sheet Views
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<std::boxed::Box<SheetViews>>,
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Dialog Sheet Format Properties
+  /// Dialog Sheet Format Properties
   #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<SheetFormatProperties>,
-  ///Sheet Protection
+  /// Sheet Protection
   #[sdk(child(qname = "x:CT_SheetProtection/x:sheetProtection"))]
   pub sheet_protection: Option<SheetProtection>,
-  ///Custom Sheet Views
+  /// Custom Sheet Views
   #[sdk(child(qname = "x:CT_CustomSheetViews/x:customSheetViews"))]
   pub custom_sheet_views: Option<CustomSheetViews>,
-  ///Print Options
+  /// Print Options
   #[sdk(child(qname = "x:CT_PrintOptions/x:printOptions"))]
   pub print_options: Option<PrintOptions>,
-  ///Page Margins
+  /// Page Margins
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub page_margins: Option<PageMargins>,
-  ///Page Setup Settings
+  /// Page Setup Settings
   #[sdk(child(qname = "x:CT_PageSetup/x:pageSetup"))]
   pub page_setup: Option<PageSetup>,
-  ///Header and Footer Settings
+  /// Header and Footer Settings
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  ///Drawing
+  /// Drawing
   #[sdk(child(qname = "x:CT_Drawing/x:drawing"))]
   pub drawing: Option<Drawing>,
-  ///Legacy Drawing
+  /// Legacy Drawing
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawing"))]
   pub legacy_drawing: std::boxed::Box<LegacyDrawing>,
-  ///Legacy Drawing Header Footer
+  /// Legacy Drawing Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
   #[cfg(feature = "microsoft365")]
@@ -3020,7 +3020,7 @@ pub struct DialogSheet {
   /// _
   #[sdk(child(qname = "x:CT_Controls/x:controls"))]
   pub controls: Option<Controls>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3035,13 +3035,13 @@ pub struct Metadata {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Metadata Types Collection
+  /// Metadata Types Collection
   #[sdk(child(qname = "x:CT_MetadataTypes/x:metadataTypes"))]
   pub metadata_types: Option<MetadataTypes>,
-  ///Metadata String Store
+  /// Metadata String Store
   #[sdk(child(qname = "x:CT_MetadataStrings/x:metadataStrings"))]
   pub metadata_strings: Option<MetadataStrings>,
-  ///MDX Metadata Information
+  /// MDX Metadata Information
   #[sdk(child(qname = "x:CT_MdxMetadata/x:mdxMetadata"))]
   pub mdx_metadata: Option<MdxMetadata>,
   /// _
@@ -3314,19 +3314,19 @@ pub struct Table {
   /// Represents the following attribute in the schema: xr:uid
   #[sdk(attr(qname = "xr:uid"))]
   pub xr_uid: Option<crate::simple_type::StringValue>,
-  ///Table AutoFilter
+  /// Table AutoFilter
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub auto_filter: Option<std::boxed::Box<AutoFilter>>,
-  ///Sort State
+  /// Sort State
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub sort_state: Option<std::boxed::Box<SortState>>,
-  ///Table Columns
+  /// Table Columns
   #[sdk(child(qname = "x:CT_TableColumns/x:tableColumns"))]
   pub table_columns: std::boxed::Box<TableColumns>,
-  ///Table Style
+  /// Table Style
   #[sdk(child(qname = "x:CT_TableStyleInfo/x:tableStyleInfo"))]
   pub table_style_info: Option<TableStyleInfo>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_TableExtensionList/x:extLst"))]
   pub table_extension_list: Option<TableExtensionList>,
 }
@@ -3541,7 +3541,7 @@ pub struct SortState {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/x:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<Extension>,
 }
@@ -3689,7 +3689,7 @@ pub struct Comment {
   /// Represents the following attribute in the schema: :shapeId
   #[sdk(attr(qname = ":shapeId"))]
   pub shape_id: Option<crate::simple_type::UInt32Value>,
-  ///Comment Text
+  /// Comment Text
   #[sdk(child(qname = "x:CT_Rst/x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
   /// _
@@ -4113,7 +4113,7 @@ pub struct Map {
   /// Represents the following attribute in the schema: :PreserveFormat
   #[sdk(attr(qname = ":PreserveFormat"))]
   pub preserve_format: crate::simple_type::BooleanValue,
-  ///XML Mapping
+  /// XML Mapping
   #[sdk(child(qname = "x:CT_DataBinding/x:DataBinding"))]
   pub data_binding: Option<std::boxed::Box<DataBinding>>,
 }
@@ -4431,22 +4431,6 @@ pub struct Parameter {
   #[sdk(attr(qname = ":cell"))]
   pub cell: Option<crate::simple_type::StringValue>,
 }
-/// No Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x:m.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_TableMissing/x:m")]
-pub struct MissingTable {}
-/// No Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:no.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Empty/w14:no")]
-pub struct No {}
 /// Character Value.
 ///
 /// Available in Office2007 and above.
@@ -5088,7 +5072,7 @@ pub struct ErrorItem {
   /// Represents the following attribute in the schema: :b
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
-  ///Tuples
+  /// Tuples
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub tuples: Option<Tuples>,
   /// _
@@ -5296,7 +5280,7 @@ pub struct TuplesType {
   /// Represents the following attribute in the schema: :c
   #[sdk(attr(qname = ":c"))]
   pub member_name_count: Option<crate::simple_type::UInt32Value>,
-  ///Tuple.
+  /// Tuple.
   #[sdk(child(qname = "x:CT_Tuple/x:tpl"))]
   pub tuple: Vec<Tuple>,
 }
@@ -5498,10 +5482,10 @@ pub struct GroupLevel {
   /// Represents the following attribute in the schema: :customRollUp
   #[sdk(attr(qname = ":customRollUp"))]
   pub custom_roll_up: Option<crate::simple_type::BooleanValue>,
-  ///OLAP Level Groups
+  /// OLAP Level Groups
   #[sdk(child(qname = "x:CT_Groups/x:groups"))]
   pub groups: Option<Groups>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5567,7 +5551,7 @@ pub struct Group {
   /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::Int32Value>,
-  ///OLAP Group Members
+  /// OLAP Group Members
   #[sdk(child(qname = "x:CT_GroupMembers/x:groupMembers"))]
   pub group_members: std::boxed::Box<GroupMembers>,
 }
@@ -5811,7 +5795,7 @@ pub struct Query {
   /// Represents the following attribute in the schema: :mdx
   #[sdk(attr(qname = ":mdx"))]
   pub mdx: crate::simple_type::StringValue,
-  ///Tuples
+  /// Tuples
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub tuples: Option<Tuples>,
 }
@@ -5837,10 +5821,10 @@ pub struct CalculatedItem {
   /// Represents the following attribute in the schema: :formula
   #[sdk(attr(qname = ":formula"))]
   pub formula: Option<crate::simple_type::StringValue>,
-  ///Calculated Item Location
+  /// Calculated Item Location
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5936,10 +5920,10 @@ pub struct PivotArea {
   /// Represents the following attribute in the schema: :fieldPosition
   #[sdk(attr(qname = ":fieldPosition"))]
   pub field_position: Option<crate::simple_type::UInt32Value>,
-  ///References
+  /// References
   #[sdk(child(qname = "x:CT_PivotAreaReferences/x:references"))]
   pub pivot_area_references: Option<PivotAreaReferences>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -6348,13 +6332,13 @@ pub struct PivotField {
   /// Represents the following attribute in the schema: :defaultAttributeDrillState
   #[sdk(attr(qname = ":defaultAttributeDrillState"))]
   pub default_attribute_drill_state: Option<crate::simple_type::BooleanValue>,
-  ///Field Items
+  /// Field Items
   #[sdk(child(qname = "x:CT_Items/x:items"))]
   pub items: Option<Items>,
-  ///AutoSort Scope
+  /// AutoSort Scope
   #[sdk(child(qname = "x:CT_AutoSortScope/x:autoSortScope"))]
   pub auto_sort_scope: Option<std::boxed::Box<AutoSortScope>>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_PivotFieldExtensionList/x:extLst"))]
   pub pivot_field_extension_list: Option<PivotFieldExtensionList>,
 }
@@ -6576,10 +6560,10 @@ pub struct Format {
   /// Represents the following attribute in the schema: :dxfId
   #[sdk(attr(qname = ":dxfId"))]
   pub format_id: Option<crate::simple_type::UInt32Value>,
-  ///Pivot Table Location
+  /// Pivot Table Location
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -6612,7 +6596,7 @@ pub struct ConditionalFormat {
   /// Represents the following attribute in the schema: :priority
   #[sdk(attr(qname = ":priority"))]
   pub priority: crate::simple_type::UInt32Value,
-  ///Pivot Areas
+  /// Pivot Areas
   #[sdk(child(qname = "x:CT_PivotAreas/x:pivotAreas"))]
   pub pivot_areas: std::boxed::Box<PivotAreas>,
   /// _
@@ -6667,7 +6651,7 @@ pub struct ChartFormat {
   /// Represents the following attribute in the schema: :series
   #[sdk(attr(qname = ":series"))]
   pub series: Option<crate::simple_type::BooleanValue>,
-  ///Pivot Table Location Rule
+  /// Pivot Table Location Rule
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
 }
@@ -6756,7 +6740,7 @@ pub struct PivotHierarchy {
   /// Represents the following attribute in the schema: :caption
   #[sdk(attr(qname = ":caption"))]
   pub caption: Option<crate::simple_type::StringValue>,
-  ///OLAP Member Properties
+  /// OLAP Member Properties
   #[sdk(child(qname = "x:CT_MemberProperties/x:mps"))]
   pub member_properties: Option<MemberProperties>,
   /// _
@@ -7401,7 +7385,7 @@ pub struct PageField {
   /// Represents the following attribute in the schema: :cap
   #[sdk(attr(qname = ":cap"))]
   pub caption: Option<crate::simple_type::StringValue>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -7669,7 +7653,7 @@ pub struct QueryTableField {
   /// Represents the following attribute in the schema: :tableColumnId
   #[sdk(attr(qname = ":tableColumnId"))]
   pub table_column_id: Option<crate::simple_type::UInt32Value>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -7693,10 +7677,10 @@ pub struct SharedStringItem {
   /// _
   #[sdk(child(qname = "w14:CT_Rst/w14:placeholder"))]
   pub w14_placeholder: Option<std::boxed::Box<Placeholder>>,
-  /// _
-  #[sdk(child(qname = "w14:CT_Empty/w14:no"))]
-  pub w14_no: Option<No>,
-  ///Text
+  /// No Value.
+  #[sdk(empty_child(qname = "w14:CT_Empty/w14:no"))]
+  pub w14_no: Option<()>,
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
   /// _
@@ -7743,10 +7727,10 @@ pub struct Placeholder {
   /// _
   #[sdk(child(qname = "w14:CT_Rst/w14:placeholder"))]
   pub w14_placeholder: Option<std::boxed::Box<Placeholder>>,
-  /// _
-  #[sdk(child(qname = "w14:CT_Empty/w14:no"))]
-  pub w14_no: Option<No>,
-  ///Text
+  /// No Value.
+  #[sdk(empty_child(qname = "w14:CT_Empty/w14:no"))]
+  pub w14_no: Option<()>,
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
   /// _
@@ -7767,7 +7751,7 @@ pub struct Placeholder {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Rst/x:is")]
 pub struct InlineString {
-  ///Text
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
   /// _
@@ -7788,7 +7772,7 @@ pub struct InlineString {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Rst/x:text")]
 pub struct CommentText {
-  ///Text
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
   /// _
@@ -8360,10 +8344,10 @@ pub struct RunProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RElt/x:r")]
 pub struct Run {
-  ///Run Properties
+  /// Run Properties
   #[sdk(child(qname = "x:CT_RPrElt/x:rPr"))]
   pub run_properties: Option<RunProperties>,
-  ///Text
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: std::boxed::Box<Text>,
 }
@@ -8389,7 +8373,7 @@ pub struct PhoneticRun {
   /// Represents the following attribute in the schema: :eb
   #[sdk(attr(qname = ":eb"))]
   pub ending_base_index: crate::simple_type::UInt32Value,
-  ///Text
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: std::boxed::Box<Text>,
 }
@@ -8485,10 +8469,10 @@ pub struct Header {
   /// Represents the following attribute in the schema: :maxRId
   #[sdk(attr(qname = ":maxRId"))]
   pub max_revision_id: Option<crate::simple_type::UInt32Value>,
-  ///Sheet Id Map
+  /// Sheet Id Map
   #[sdk(child(qname = "x:CT_SheetIdMap/x:sheetIdMap"))]
   pub sheet_id_map: std::boxed::Box<SheetIdMap>,
-  ///Reviewed List
+  /// Reviewed List
   #[sdk(child(qname = "x:CT_ReviewedRevisions/x:reviewedList"))]
   pub reviewed_list: Option<ReviewedList>,
   /// _
@@ -8869,16 +8853,16 @@ pub struct RevisionCellChange {
   /// Represents the following attribute in the schema: :endOfListFormulaUpdate
   #[sdk(attr(qname = ":endOfListFormulaUpdate"))]
   pub end_of_list_formula_update: Option<crate::simple_type::BooleanValue>,
-  ///Old Cell Data
+  /// Old Cell Data
   #[sdk(child(qname = "x:CT_Cell/x:oc"))]
   pub old_cell: Option<std::boxed::Box<OldCell>>,
-  ///New Cell Data
+  /// New Cell Data
   #[sdk(child(qname = "x:CT_NewCell/x:nc"))]
   pub new_cell: std::boxed::Box<NewCell>,
-  ///Old Formatting Information
+  /// Old Formatting Information
   #[sdk(child(qname = "x:CT_Dxf/x:odxf"))]
   pub old_differential_format: Option<std::boxed::Box<OldDifferentialFormat>>,
-  ///New Formatting Information
+  /// New Formatting Information
   #[sdk(child(qname = "x:CT_Dxf/x:ndxf"))]
   pub new_differential_format: Option<std::boxed::Box<NewDifferentialFormat>>,
   /// _
@@ -8935,7 +8919,7 @@ pub struct RevisionFormat {
   /// Represents the following attribute in the schema: :length
   #[sdk(attr(qname = ":length"))]
   pub length: Option<crate::simple_type::UInt32Value>,
-  ///Formatting
+  /// Formatting
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
   pub differential_format: Option<std::boxed::Box<DifferentialFormat>>,
   /// _
@@ -9190,10 +9174,10 @@ pub struct RevisionDefinedName {
   /// Represents the following attribute in the schema: :oldComment
   #[sdk(attr(qname = ":oldComment"))]
   pub old_comment: Option<crate::simple_type::StringValue>,
-  ///Formula
+  /// Formula
   #[sdk(child(qname = "x:CT_Xstring/x:formula"))]
   pub formula: Option<Formula>,
-  ///Old Formula
+  /// Old Formula
   #[sdk(child(qname = "x:CT_Xstring/x:oldFormula"))]
   pub old_formula: Option<OldFormula>,
   /// _
@@ -9548,16 +9532,16 @@ pub struct OldCell {
   /// Represents the following attribute in the schema: :ph
   #[sdk(attr(qname = ":ph"))]
   pub show_phonetic: Option<crate::simple_type::BooleanValue>,
-  ///Formula
+  /// Formula
   #[sdk(child(qname = "x:CT_CellFormula/x:f"))]
   pub cell_formula: Option<CellFormula>,
-  ///Cell Value
+  /// Cell Value
   #[sdk(child(qname = "x:CT_Xstring/x:v"))]
   pub cell_value: Option<CellValue>,
-  ///Rich Text Inline
+  /// Rich Text Inline
   #[sdk(child(qname = "x:CT_Rst/x:is"))]
   pub inline_string: Option<std::boxed::Box<InlineString>>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -9611,16 +9595,16 @@ pub struct Cell {
   /// Represents the following attribute in the schema: :ph
   #[sdk(attr(qname = ":ph"))]
   pub show_phonetic: Option<crate::simple_type::BooleanValue>,
-  ///Formula
+  /// Formula
   #[sdk(child(qname = "x:CT_CellFormula/x:f"))]
   pub cell_formula: Option<CellFormula>,
-  ///Cell Value
+  /// Cell Value
   #[sdk(child(qname = "x:CT_Xstring/x:v"))]
   pub cell_value: Option<CellValue>,
-  ///Rich Text Inline
+  /// Rich Text Inline
   #[sdk(child(qname = "x:CT_Rst/x:is"))]
   pub inline_string: Option<std::boxed::Box<InlineString>>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -9732,16 +9716,16 @@ pub struct NewCell {
   /// Represents the following attribute in the schema: :ph
   #[sdk(attr(qname = ":ph"))]
   pub show_phonetic: Option<crate::simple_type::BooleanValue>,
-  ///Formula
+  /// Formula
   #[sdk(child(qname = "x:CT_CellFormula/x:f"))]
   pub cell_formula: Option<CellFormula>,
-  ///Cell Value
+  /// Cell Value
   #[sdk(child(qname = "x:CT_Xstring/x:v"))]
   pub cell_value: Option<CellValue>,
-  ///Rich Text Inline
+  /// Rich Text Inline
   #[sdk(child(qname = "x:CT_Rst/x:is"))]
   pub inline_string: Option<std::boxed::Box<InlineString>>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -9753,25 +9737,25 @@ pub struct NewCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/x:odxf")]
 pub struct OldDifferentialFormat {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<std::boxed::Box<Font>>,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<std::boxed::Box<Fill>>,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment: Option<Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<std::boxed::Box<Border>>,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection: Option<Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -9783,25 +9767,25 @@ pub struct OldDifferentialFormat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/x:ndxf")]
 pub struct NewDifferentialFormat {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<std::boxed::Box<Font>>,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<std::boxed::Box<Fill>>,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment: Option<Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<std::boxed::Box<Border>>,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection: Option<Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -9813,25 +9797,25 @@ pub struct NewDifferentialFormat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/x:dxf")]
 pub struct DifferentialFormat {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<std::boxed::Box<Font>>,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<std::boxed::Box<Fill>>,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment: Option<Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<std::boxed::Box<Border>>,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection: Option<Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -10472,7 +10456,7 @@ pub struct PivotSelection {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
-  ///Pivot Area
+  /// Pivot Area
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
 }
@@ -10631,7 +10615,7 @@ pub struct PageBreakType {
   /// Represents the following attribute in the schema: :manualBreakCount
   #[sdk(attr(qname = ":manualBreakCount"))]
   pub manual_break_count: Option<crate::simple_type::UInt32Value>,
-  ///Break.
+  /// Break.
   #[sdk(child(qname = "x:CT_Break/x:brk"))]
   pub r#break: Vec<Break>,
 }
@@ -10894,22 +10878,22 @@ pub struct HeaderFooter {
   /// Represents the following attribute in the schema: :alignWithMargins
   #[sdk(attr(qname = ":alignWithMargins"))]
   pub align_with_margins: Option<crate::simple_type::BooleanValue>,
-  ///Odd Header
+  /// Odd Header
   #[sdk(child(qname = "x:CT_Xstring/x:oddHeader"))]
   pub odd_header: Option<OddHeader>,
-  ///Odd Page Footer
+  /// Odd Page Footer
   #[sdk(child(qname = "x:CT_Xstring/x:oddFooter"))]
   pub odd_footer: Option<OddFooter>,
-  ///Even Page Header
+  /// Even Page Header
   #[sdk(child(qname = "x:CT_Xstring/x:evenHeader"))]
   pub even_header: Option<EvenHeader>,
-  ///Even Page Footer
+  /// Even Page Footer
   #[sdk(child(qname = "x:CT_Xstring/x:evenFooter"))]
   pub even_footer: Option<EvenFooter>,
-  ///First Page Header
+  /// First Page Header
   #[sdk(child(qname = "x:CT_Xstring/x:firstHeader"))]
   pub first_header: Option<FirstHeader>,
-  ///First Page Footer
+  /// First Page Footer
   #[sdk(child(qname = "x:CT_Xstring/x:firstFooter"))]
   pub first_footer: Option<FirstFooter>,
 }
@@ -11554,7 +11538,7 @@ pub struct CustomChartsheetView {
   /// _
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub page_margins: Option<PageMargins>,
-  ///Chart Sheet Page Setup
+  /// Chart Sheet Page Setup
   #[sdk(child(qname = "x:CT_CsPageSetup/x:pageSetup"))]
   pub chart_sheet_page_setup: Option<ChartSheetPageSetup>,
   /// _
@@ -12000,7 +11984,7 @@ pub struct SheetView {
   /// Represents the following attribute in the schema: :workbookViewId
   #[sdk(attr(qname = ":workbookViewId"))]
   pub workbook_view_id: crate::simple_type::UInt32Value,
-  ///View Pane
+  /// View Pane
   #[sdk(child(qname = "x:CT_Pane/x:pane"))]
   pub pane: Option<Pane>,
   /// _
@@ -12166,31 +12150,31 @@ pub struct CustomSheetView {
   /// Represents the following attribute in the schema: :topLeftCell
   #[sdk(attr(qname = ":topLeftCell"))]
   pub top_left_cell: Option<crate::simple_type::StringValue>,
-  ///Pane Split Information
+  /// Pane Split Information
   #[sdk(child(qname = "x:CT_Pane/x:pane"))]
   pub pane: Option<Pane>,
-  ///Selection
+  /// Selection
   #[sdk(child(qname = "x:CT_Selection/x:selection"))]
   pub selection: Option<Selection>,
-  ///Horizontal Page Breaks
+  /// Horizontal Page Breaks
   #[sdk(child(qname = "x:CT_PageBreak/x:rowBreaks"))]
   pub row_breaks: Option<RowBreaks>,
-  ///Vertical Page Breaks
+  /// Vertical Page Breaks
   #[sdk(child(qname = "x:CT_PageBreak/x:colBreaks"))]
   pub column_breaks: Option<ColumnBreaks>,
-  ///Page Margins
+  /// Page Margins
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub page_margins: Option<PageMargins>,
-  ///Print Options
+  /// Print Options
   #[sdk(child(qname = "x:CT_PrintOptions/x:printOptions"))]
   pub print_options: Option<PrintOptions>,
-  ///Page Setup Settings
+  /// Page Setup Settings
   #[sdk(child(qname = "x:CT_PageSetup/x:pageSetup"))]
   pub page_setup: Option<PageSetup>,
-  ///Header Footer Settings
+  /// Header Footer Settings
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  ///AutoFilter Settings
+  /// AutoFilter Settings
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub auto_filter: Option<std::boxed::Box<AutoFilter>>,
   /// _
@@ -12402,7 +12386,7 @@ pub struct MetadataBlocksType {
   /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  ///Metadata Block.
+  /// Metadata Block.
   #[sdk(child(qname = "x:CT_MetadataBlock/x:bk"))]
   pub metadata_block: Vec<MetadataBlock>,
 }
@@ -12654,7 +12638,7 @@ pub struct MetadataRecord {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FutureMetadataBlock/x:bk")]
 pub struct FutureMetadataBlock {
-  ///Future Feature Storage Area
+  /// Future Feature Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -12910,10 +12894,10 @@ pub struct SingleXmlCell {
   /// Represents the following attribute in the schema: :connectionId
   #[sdk(attr(qname = ":connectionId"))]
   pub connection_id: crate::simple_type::UInt32Value,
-  ///Cell Properties
+  /// Cell Properties
   #[sdk(child(qname = "x:CT_XmlCellPr/x:xmlCellPr"))]
   pub xml_cell_properties: std::boxed::Box<XmlCellProperties>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -12939,10 +12923,10 @@ pub struct XmlCellProperties {
   /// Represents the following attribute in the schema: :uniqueName
   #[sdk(attr(qname = ":uniqueName"))]
   pub unique_name: crate::simple_type::StringValue,
-  ///Column XML Properties
+  /// Column XML Properties
   #[sdk(child(qname = "x:CT_XmlPr/x:xmlPr"))]
   pub xml_properties: std::boxed::Box<XmlProperties>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -12975,7 +12959,7 @@ pub struct XmlProperties {
   /// Represents the following attribute in the schema: :xmlDataType
   #[sdk(attr(qname = ":xmlDataType"))]
   pub xml_data_type: XmlDataValues,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -12994,10 +12978,10 @@ pub struct PatternFill {
   /// Represents the following attribute in the schema: :patternType
   #[sdk(attr(qname = ":patternType"))]
   pub pattern_type: Option<PatternValues>,
-  ///Foreground Color
+  /// Foreground Color
   #[sdk(child(qname = "x:CT_Color/x:fgColor"))]
   pub foreground_color: Option<ForegroundColor>,
-  ///Background Color
+  /// Background Color
   #[sdk(child(qname = "x:CT_Color/x:bgColor"))]
   pub background_color: Option<BackgroundColor>,
 }
@@ -13070,7 +13054,7 @@ pub struct GradientStop {
   /// Represents the following attribute in the schema: :position
   #[sdk(attr(qname = ":position"))]
   pub position: crate::simple_type::DoubleValue,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: std::boxed::Box<Color>,
 }
@@ -13207,49 +13191,49 @@ pub struct Protection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Font/x:font")]
 pub struct Font {
-  ///Bold
+  /// Bold
   #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
   pub bold: Option<Bold>,
-  ///Italic
+  /// Italic
   #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
   pub italic: Option<Italic>,
-  ///Strike Through
+  /// Strike Through
   #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
   pub strike: Option<Strike>,
-  ///Condense
+  /// Condense
   #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
   pub condense: Option<Condense>,
-  ///Extend
+  /// Extend
   #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
   pub extend: Option<Extend>,
-  ///Outline
+  /// Outline
   #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
   pub outline: Option<Outline>,
-  ///Shadow
+  /// Shadow
   #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
   pub shadow: Option<Shadow>,
-  ///Underline
+  /// Underline
   #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
   pub underline: Option<Underline>,
-  ///Text Vertical Alignment
+  /// Text Vertical Alignment
   #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
   pub vertical_text_alignment: Option<VerticalTextAlignment>,
-  ///Font Size
+  /// Font Size
   #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
   pub font_size: Option<FontSize>,
-  ///Text Color
+  /// Text Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
-  ///Font Name
+  /// Font Name
   #[sdk(child(qname = "x:CT_FontNameNonEmpty/x:name"))]
   pub font_name: Option<FontName>,
-  ///Font Family
+  /// Font Family
   #[sdk(child(qname = "x:CT_FontFamilyNum/x:family"))]
   pub font_family_numbering: Option<FontFamilyNumbering>,
-  ///Character Set
+  /// Character Set
   #[sdk(child(qname = "x:CT_ByteProperty/x:charset"))]
   pub font_char_set: Option<FontCharSet>,
-  ///Scheme
+  /// Scheme
   #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
   pub font_scheme: Option<FontScheme>,
 }
@@ -13308,25 +13292,25 @@ pub struct Border {
   /// _
   #[sdk(child(qname = "x:CT_BorderPr/x:end"))]
   pub end_border: Option<std::boxed::Box<EndBorder>>,
-  ///Left Border
+  /// Left Border
   #[sdk(child(qname = "x:CT_BorderPr/x:left"))]
   pub left_border: Option<std::boxed::Box<LeftBorder>>,
-  ///Right Border
+  /// Right Border
   #[sdk(child(qname = "x:CT_BorderPr/x:right"))]
   pub right_border: Option<std::boxed::Box<RightBorder>>,
-  ///Top Border
+  /// Top Border
   #[sdk(child(qname = "x:CT_BorderPr/x:top"))]
   pub top_border: Option<std::boxed::Box<TopBorder>>,
-  ///Bottom Border
+  /// Bottom Border
   #[sdk(child(qname = "x:CT_BorderPr/x:bottom"))]
   pub bottom_border: Option<std::boxed::Box<BottomBorder>>,
-  ///Diagonal
+  /// Diagonal
   #[sdk(child(qname = "x:CT_BorderPr/x:diagonal"))]
   pub diagonal_border: Option<std::boxed::Box<DiagonalBorder>>,
-  ///Vertical Inner Border
+  /// Vertical Inner Border
   #[sdk(child(qname = "x:CT_BorderPr/x:vertical"))]
   pub vertical_border: Option<std::boxed::Box<VerticalBorder>>,
-  ///Horizontal Inner Borders
+  /// Horizontal Inner Borders
   #[sdk(child(qname = "x:CT_BorderPr/x:horizontal"))]
   pub horizontal_border: Option<std::boxed::Box<HorizontalBorder>>,
 }
@@ -13461,7 +13445,7 @@ pub struct CellStyle {
   /// Represents the following attribute in the schema: :customBuiltin
   #[sdk(attr(qname = ":customBuiltin"))]
   pub custom_builtin: Option<crate::simple_type::BooleanValue>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -13564,13 +13548,13 @@ pub struct CellFormat {
   /// Represents the following attribute in the schema: :applyProtection
   #[sdk(attr(qname = ":applyProtection"))]
   pub apply_protection: Option<crate::simple_type::BooleanValue>,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment: Option<Alignment>,
-  ///Protection
+  /// Protection
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection: Option<Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -13771,7 +13755,7 @@ pub struct ExternalCell {
   /// Represents the following attribute in the schema: :vm
   #[sdk(attr(qname = ":vm"))]
   pub value_meta_index: Option<crate::simple_type::UInt32Value>,
-  ///Value
+  /// Value
   #[sdk(text_child(qname = "x:ST_Xstring/x:v"))]
   pub xstring: Option<crate::simple_type::StringValue>,
 }
@@ -13823,7 +13807,7 @@ pub struct DdeItem {
   /// Represents the following attribute in the schema: :preferPic
   #[sdk(attr(qname = ":preferPic"))]
   pub prefer_picture: Option<crate::simple_type::BooleanValue>,
-  ///DDE Name Values
+  /// DDE Name Values
   #[sdk(child(qname = "x:CT_DdeValues/x:values"))]
   pub values: Option<Values>,
 }
@@ -13868,7 +13852,7 @@ pub struct Value {
   /// Represents the following attribute in the schema: :t
   #[sdk(attr(qname = ":t"))]
   pub value_type: Option<DdeValues>,
-  ///DDE Link Value
+  /// DDE Link Value
   #[sdk(child(qname = "x:CT_Xstring/x:val"))]
   pub dde_link_value: std::boxed::Box<DdeLinkValue>,
 }
@@ -13911,20 +13895,20 @@ pub struct ExternalBook {
         crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
     >,
     #[cfg(feature = "microsoft365")]
-    ///Alternate URLs and identifiers of the external book
+    /// Alternate URLs and identifiers of the external book
     #[sdk(child(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"))]
     pub external_book_alternate_urls: Option<
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2021_extlinks2021::ExternalBookAlternateUrls,
         >,
     >,
-    ///Sheet names of supporting book
+    /// Sheet names of supporting book
     #[sdk(child(qname = "x:CT_ExternalSheetNames/x:sheetNames"))]
     pub sheet_names: Option<SheetNames>,
-    ///Defined names associated with supporting book.
+    /// Defined names associated with supporting book.
     #[sdk(child(qname = "x:CT_ExternalDefinedNames/x:definedNames"))]
     pub external_defined_names: Option<ExternalDefinedNames>,
-    ///Cached worksheet data associated with supporting book
+    /// Cached worksheet data associated with supporting book
     #[sdk(child(qname = "x:CT_ExternalSheetDataSet/x:sheetDataSet"))]
     pub sheet_data_set: Option<SheetDataSet>,
 }
@@ -13950,7 +13934,7 @@ pub struct DdeLink {
   /// Represents the following attribute in the schema: :ddeTopic
   #[sdk(attr(qname = ":ddeTopic"))]
   pub dde_topic: crate::simple_type::StringValue,
-  ///DDE Items Collection
+  /// DDE Items Collection
   #[sdk(child(qname = "x:CT_DdeItems/x:ddeItems"))]
   pub dde_items: Option<DdeItems>,
 }
@@ -13976,7 +13960,7 @@ pub struct OleLink {
   /// Represents the following attribute in the schema: :progId
   #[sdk(attr(qname = ":progId"))]
   pub prog_id: crate::simple_type::StringValue,
-  ///OLE Link Items
+  /// OLE Link Items
   #[sdk(child(qname = "x:CT_OleItems/x:oleItems"))]
   pub ole_items: Option<OleItems>,
 }
@@ -14101,16 +14085,16 @@ pub struct TableColumn {
   /// Represents the following attribute in the schema: xr3:uid
   #[sdk(attr(qname = "xr3:uid"))]
   pub xr3_uid: Option<crate::simple_type::StringValue>,
-  ///Calculated Column Formula
+  /// Calculated Column Formula
   #[sdk(child(qname = "x:CT_TableFormula/x:calculatedColumnFormula"))]
   pub calculated_column_formula: Option<CalculatedColumnFormula>,
-  ///Totals Row Formula
+  /// Totals Row Formula
   #[sdk(child(qname = "x:CT_TableFormula/x:totalsRowFormula"))]
   pub totals_row_formula: Option<TotalsRowFormula>,
-  ///XML Column Properties
+  /// XML Column Properties
   #[sdk(child(qname = "x:CT_XmlColumnPr/x:xmlColumnPr"))]
   pub xml_column_properties: Option<std::boxed::Box<XmlColumnProperties>>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -14225,7 +14209,7 @@ pub struct XmlColumnProperties {
   /// Represents the following attribute in the schema: :xmlDataType
   #[sdk(attr(qname = ":xmlDataType"))]
   pub xml_data_type: XmlDataValues,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -14282,7 +14266,7 @@ pub struct Topic {
   /// Represents the following attribute in the schema: :t
   #[sdk(attr(qname = ":t"))]
   pub value_type: Option<VolatileValues>,
-  ///Topic Value
+  /// Topic Value
   #[sdk(text_child(qname = "x:ST_Xstring/x:v"))]
   pub xstring: crate::simple_type::StringValue,
   /// _
@@ -14915,16 +14899,16 @@ pub struct ObjectAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/x:from")]
 pub struct FromMarker {
-  ///Column)
+  /// Column)
   #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::simple_type::Int32Value,
-  ///Column Offset
+  /// Column Offset
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: crate::simple_type::Int64Value,
-  ///Row
+  /// Row
   #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: crate::simple_type::Int32Value,
-  ///Row Offset
+  /// Row Offset
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::simple_type::Int64Value,
 }
@@ -14937,16 +14921,16 @@ pub struct FromMarker {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/x:to")]
 pub struct ToMarker {
-  ///Column)
+  /// Column)
   #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::simple_type::Int32Value,
-  ///Column Offset
+  /// Column Offset
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: crate::simple_type::Int64Value,
-  ///Row
+  /// Row
   #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: crate::simple_type::Int32Value,
-  ///Row Offset
+  /// Row Offset
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::simple_type::Int64Value,
 }
@@ -15124,7 +15108,7 @@ pub struct StartBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15144,7 +15128,7 @@ pub struct EndBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15163,7 +15147,7 @@ pub struct LeftBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15182,7 +15166,7 @@ pub struct RightBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15201,7 +15185,7 @@ pub struct TopBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15220,7 +15204,7 @@ pub struct BottomBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15239,7 +15223,7 @@ pub struct DiagonalBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15258,7 +15242,7 @@ pub struct VerticalBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15277,7 +15261,7 @@ pub struct HorizontalBorder {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
@@ -15296,7 +15280,7 @@ pub struct BorderPropertiesType {
   /// Represents the following attribute in the schema: :style
   #[sdk(attr(qname = ":style"))]
   pub style: Option<BorderStyleValues>,
-  ///Color
+  /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Vec<Color>,
 }
@@ -16061,13 +16045,13 @@ pub struct SheetProperties {
   /// Represents the following attribute in the schema: :enableFormatConditionsCalculation
   #[sdk(attr(qname = ":enableFormatConditionsCalculation"))]
   pub enable_format_conditions_calculation: Option<crate::simple_type::BooleanValue>,
-  ///Sheet Tab Color
+  /// Sheet Tab Color
   #[sdk(child(qname = "x:CT_Color/x:tabColor"))]
   pub tab_color: Option<TabColor>,
-  ///Outline Properties
+  /// Outline Properties
   #[sdk(child(qname = "x:CT_OutlinePr/x:outlinePr"))]
   pub outline_properties: Option<OutlineProperties>,
-  ///Page Setup Properties
+  /// Page Setup Properties
   #[sdk(child(qname = "x:CT_PageSetUpPr/x:pageSetUpPr"))]
   pub page_setup_properties: Option<PageSetupProperties>,
 }
@@ -16447,7 +16431,7 @@ pub struct DataConsolidate {
   /// Represents the following attribute in the schema: :link
   #[sdk(attr(qname = ":link"))]
   pub link: Option<crate::simple_type::BooleanValue>,
-  ///Data Consolidation References
+  /// Data Consolidation References
   #[sdk(child(qname = "x:CT_DataRefs/x:dataRefs"))]
   pub data_references: Option<DataReferences>,
 }
@@ -16577,7 +16561,7 @@ pub struct Items {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_AutoSortScope/x:autoSortScope")]
 pub struct AutoSortScope {
-  ///Auto Sort Scope
+  /// Auto Sort Scope
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
 }
@@ -16645,10 +16629,10 @@ pub struct Consolidation {
   /// Represents the following attribute in the schema: :autoPage
   #[sdk(attr(qname = ":autoPage"))]
   pub auto_page: Option<crate::simple_type::BooleanValue>,
-  ///Page Item Values
+  /// Page Item Values
   #[sdk(child(qname = "x:CT_Pages/x:pages"))]
   pub pages: Option<Pages>,
-  ///Range Sets
+  /// Range Sets
   #[sdk(child(qname = "x:CT_RangeSets/x:rangeSets"))]
   pub range_sets: std::boxed::Box<RangeSets>,
 }
@@ -17394,7 +17378,7 @@ pub struct WebQueryProperties {
   /// Represents the following attribute in the schema: :editPage
   #[sdk(attr(qname = ":editPage"))]
   pub edit_page: Option<crate::simple_type::StringValue>,
-  ///Tables
+  /// Tables
   #[sdk(child(qname = "x:CT_Tables/x:tables"))]
   pub tables: Option<Tables>,
 }
@@ -18024,16 +18008,16 @@ pub struct QueryTableRefresh {
   /// Represents the following attribute in the schema: :unboundColumnsRight
   #[sdk(attr(qname = ":unboundColumnsRight"))]
   pub unbound_columns_right: Option<crate::simple_type::UInt32Value>,
-  ///Query table fields
+  /// Query table fields
   #[sdk(child(qname = "x:CT_QueryTableFields/x:queryTableFields"))]
   pub query_table_fields: std::boxed::Box<QueryTableFields>,
-  ///Deleted Fields
+  /// Deleted Fields
   #[sdk(child(qname = "x:CT_QueryTableDeletedFields/x:queryTableDeletedFields"))]
   pub query_table_deleted_fields: Option<QueryTableDeletedFields>,
-  ///Sort State
+  /// Sort State
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub sort_state: Option<std::boxed::Box<SortState>>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -18477,10 +18461,10 @@ pub struct TableStyles {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Colors/x:colors")]
 pub struct Colors {
-  ///Color Indexes
+  /// Color Indexes
   #[sdk(child(qname = "x:CT_IndexedColors/x:indexedColors"))]
   pub indexed_colors: Option<IndexedColors>,
-  ///MRU Colors
+  /// MRU Colors
   #[sdk(child(qname = "x:CT_MRUColors/x:mruColors"))]
   pub mru_colors: Option<MruColors>,
 }
@@ -19036,19 +19020,19 @@ pub struct Kpis {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TupleCache/x:tupleCache")]
 pub struct TupleCache {
-  ///Entries
+  /// Entries
   #[sdk(child(qname = "x:CT_PCDSDTCEntries/x:entries"))]
   pub entries: Option<Entries>,
-  ///Sets
+  /// Sets
   #[sdk(child(qname = "x:CT_Sets/x:sets"))]
   pub sets: Option<Sets>,
-  ///OLAP Query Cache
+  /// OLAP Query Cache
   #[sdk(child(qname = "x:CT_QueryCache/x:queryCache"))]
   pub query_cache: Option<QueryCache>,
-  ///Server Formats
+  /// Server Formats
   #[sdk(child(qname = "x:CT_ServerFormats/x:serverFormats"))]
   pub server_formats: Option<ServerFormats>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -20085,28 +20069,40 @@ pub struct WorkbookExtension {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionsChoice {
+  /// Revision Row Column Insert Delete.
   #[sdk(child(qname = "x:CT_RevisionRowColumn/x:rrc"))]
   XRrc(std::boxed::Box<RevisionRowColumn>),
+  /// Revision Cell Move.
   #[sdk(child(qname = "x:CT_RevisionMove/x:rm"))]
   XRm(std::boxed::Box<RevisionMove>),
+  /// Revision Custom View.
   #[sdk(child(qname = "x:CT_RevisionCustomView/x:rcv"))]
   XRcv(std::boxed::Box<RevisionCustomView>),
+  /// Revision Sheet Name.
   #[sdk(child(qname = "x:CT_RevisionSheetRename/x:rsnm"))]
   XRsnm(std::boxed::Box<RevisionSheetName>),
+  /// Revision Insert Sheet.
   #[sdk(child(qname = "x:CT_RevisionInsertSheet/x:ris"))]
   XRis(std::boxed::Box<RevisionInsertSheet>),
+  /// Revision Cell Change.
   #[sdk(child(qname = "x:CT_RevisionCellChange/x:rcc"))]
   XRcc(std::boxed::Box<RevisionCellChange>),
+  /// Revision Format.
   #[sdk(child(qname = "x:CT_RevisionFormatting/x:rfmt"))]
   XRfmt(std::boxed::Box<RevisionFormat>),
+  /// Revision AutoFormat.
   #[sdk(child(qname = "x:CT_RevisionAutoFormatting/x:raf"))]
   XRaf(std::boxed::Box<RevisionAutoFormat>),
+  /// Revision Defined Name.
   #[sdk(child(qname = "x:CT_RevisionDefinedName/x:rdn"))]
   XRdn(std::boxed::Box<RevisionDefinedName>),
+  /// Revision Cell Comment.
   #[sdk(child(qname = "x:CT_RevisionComment/x:rcmt"))]
   XRcmt(std::boxed::Box<RevisionComment>),
+  /// Revision Query Table.
   #[sdk(child(qname = "x:CT_RevisionQueryTableField/x:rqt"))]
   XRqt(std::boxed::Box<RevisionQueryTable>),
+  /// Revision Merge Conflict.
   #[sdk(child(qname = "x:CT_RevisionConflict/x:rcft"))]
   XRcft(std::boxed::Box<RevisionConflict>),
 }
@@ -20164,58 +20160,79 @@ pub enum SortStateChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablesChoice {
-  #[sdk(child(qname = "x:CT_TableMissing/x:m"))]
-  XM(std::boxed::Box<MissingTable>),
+  /// No Value.
+  #[sdk(empty_child(qname = "x:CT_TableMissing/x:m"))]
+  XM,
+  /// Character Value.
   #[sdk(child(qname = "x:CT_XStringElement/x:s"))]
   XS(std::boxed::Box<CharacterValue>),
+  /// Index.
   #[sdk(child(qname = "x:CT_Index/x:x"))]
   XX(std::boxed::Box<FieldItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotCacheRecordChoice {
+  /// No Value.
   #[sdk(child(qname = "x:CT_Missing/x:m"))]
   XM(std::boxed::Box<MissingItem>),
+  /// Numeric.
   #[sdk(child(qname = "x:CT_Number/x:n"))]
   XN(std::boxed::Box<NumberItem>),
+  /// Boolean.
   #[sdk(child(qname = "x:CT_Boolean/x:b"))]
   XB(std::boxed::Box<BooleanItem>),
+  /// Error Value.
   #[sdk(child(qname = "x:CT_Error/x:e"))]
   XE(std::boxed::Box<ErrorItem>),
+  /// Character Value.
   #[sdk(child(qname = "x:CT_String/x:s"))]
   XS(std::boxed::Box<StringItem>),
+  /// Date Time.
   #[sdk(child(qname = "x:CT_DateTime/x:d"))]
   XD(std::boxed::Box<DateTimeItem>),
+  /// Index.
   #[sdk(child(qname = "x:CT_Index/x:x"))]
   XX(std::boxed::Box<FieldItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EntriesChoice {
+  /// No Value.
   #[sdk(child(qname = "x:CT_Missing/x:m"))]
   XM(std::boxed::Box<MissingItem>),
+  /// Numeric.
   #[sdk(child(qname = "x:CT_Number/x:n"))]
   XN(std::boxed::Box<NumberItem>),
+  /// Error Value.
   #[sdk(child(qname = "x:CT_Error/x:e"))]
   XE(std::boxed::Box<ErrorItem>),
+  /// Character Value.
   #[sdk(child(qname = "x:CT_String/x:s"))]
   XS(std::boxed::Box<StringItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupItemsChoice {
+  /// No Value.
   #[sdk(child(qname = "x:CT_Missing/x:m"))]
   XM(std::boxed::Box<MissingItem>),
+  /// Numeric.
   #[sdk(child(qname = "x:CT_Number/x:n"))]
   XN(std::boxed::Box<NumberItem>),
+  /// Boolean.
   #[sdk(child(qname = "x:CT_Boolean/x:b"))]
   XB(std::boxed::Box<BooleanItem>),
+  /// Error Value.
   #[sdk(child(qname = "x:CT_Error/x:e"))]
   XE(std::boxed::Box<ErrorItem>),
+  /// Character Value.
   #[sdk(child(qname = "x:CT_String/x:s"))]
   XS(std::boxed::Box<StringItem>),
+  /// Date Time.
   #[sdk(child(qname = "x:CT_DateTime/x:d"))]
   XD(std::boxed::Box<DateTimeItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RstTypeChoice {
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   XT(std::boxed::Box<Text>),
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
@@ -20227,79 +20244,105 @@ pub enum RstTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionRowColumnChoice {
+  /// Undo.
   #[sdk(child(qname = "x:CT_UndoInfo/x:undo"))]
   XUndo(std::boxed::Box<Undo>),
+  /// Revision Cell Change.
   #[sdk(child(qname = "x:CT_RevisionCellChange/x:rcc"))]
   XRcc(std::boxed::Box<RevisionCellChange>),
+  /// Revision Format.
   #[sdk(child(qname = "x:CT_RevisionFormatting/x:rfmt"))]
   XRfmt(std::boxed::Box<RevisionFormat>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionMoveChoice {
+  /// Undo.
   #[sdk(child(qname = "x:CT_UndoInfo/x:undo"))]
   XUndo(std::boxed::Box<Undo>),
+  /// Revision Cell Change.
   #[sdk(child(qname = "x:CT_RevisionCellChange/x:rcc"))]
   XRcc(std::boxed::Box<RevisionCellChange>),
+  /// Revision Format.
   #[sdk(child(qname = "x:CT_RevisionFormatting/x:rfmt"))]
   XRfmt(std::boxed::Box<RevisionFormat>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CellTypeChoice {
+  /// Formula
   #[sdk(child(qname = "x:CT_CellFormula/x:f"))]
   XF(std::boxed::Box<CellFormula>),
+  /// Cell Value
   #[sdk(child(qname = "x:CT_Xstring/x:v"))]
   XV(std::boxed::Box<CellValue>),
+  /// Rich Text Inline
   #[sdk(child(qname = "x:CT_Rst/x:is"))]
   XIs(std::boxed::Box<InlineString>),
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   XExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DifferentialFormatTypeChoice {
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   XFont(std::boxed::Box<Font>),
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   XNumFmt(std::boxed::Box<NumberingFormat>),
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   XFill(std::boxed::Box<Fill>),
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   XAlignment(std::boxed::Box<Alignment>),
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   XBorder(std::boxed::Box<Border>),
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   XProtection(std::boxed::Box<Protection>),
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   XExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MdxChoice {
+  /// Tuple MDX Metadata.
   #[sdk(child(qname = "x:CT_MdxTuple/x:t"))]
   XT(std::boxed::Box<MdxTuple>),
+  /// Set MDX Metadata.
   #[sdk(child(qname = "x:CT_MdxSet/x:ms"))]
   XMs(std::boxed::Box<MdxSet>),
+  /// Member Property MDX Metadata.
   #[sdk(child(qname = "x:CT_MdxMemeberProp/x:p"))]
   XP(std::boxed::Box<MdxMemberProp>),
+  /// KPI MDX Metadata.
   #[sdk(child(qname = "x:CT_MdxKPI/x:k"))]
   XK(std::boxed::Box<MdxKpi>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillChoice {
+  /// Pattern.
   #[sdk(child(qname = "x:CT_PatternFill/x:patternFill"))]
   XPatternFill(std::boxed::Box<PatternFill>),
+  /// Gradient.
   #[sdk(child(qname = "x:CT_GradientFill/x:gradientFill"))]
   XGradientFill(std::boxed::Box<GradientFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleItemsChoice {
+  /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
     >,
   ),
+  /// OLE Link Item.
   #[sdk(child(qname = "x:CT_OleItem/x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
   #[cfg(feature = "microsoft365")]
+  /// Defines the OleItem Class.
   #[sdk(child(qname = "x14:CT_OleItem/x14:oleItem"))]
   X14OleItem(
     std::boxed::Box<
@@ -20309,12 +20352,16 @@ pub enum OleItemsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MarkerTypeChoice {
+  /// Column)
   #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
   XdrCol(crate::simple_type::Int32Value),
+  /// Column Offset
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
   XdrColOff(crate::simple_type::Int64Value),
+  /// Row
   #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
   XdrRow(crate::simple_type::Int32Value),
+  /// Row Offset
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
   XdrRowOff(crate::simple_type::Int64Value),
 }
@@ -20454,16 +20501,22 @@ pub enum ConnectionExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SharedItemsChoice {
+  /// No Value.
   #[sdk(child(qname = "x:CT_Missing/x:m"))]
   XM(std::boxed::Box<MissingItem>),
+  /// Numeric.
   #[sdk(child(qname = "x:CT_Number/x:n"))]
   XN(std::boxed::Box<NumberItem>),
+  /// Boolean.
   #[sdk(child(qname = "x:CT_Boolean/x:b"))]
   XB(std::boxed::Box<BooleanItem>),
+  /// Error Value.
   #[sdk(child(qname = "x:CT_Error/x:e"))]
   XE(std::boxed::Box<ErrorItem>),
+  /// Character Value.
   #[sdk(child(qname = "x:CT_String/x:s"))]
   XS(std::boxed::Box<StringItem>),
+  /// Date Time.
   #[sdk(child(qname = "x:CT_DateTime/x:d"))]
   XD(std::boxed::Box<DateTimeItem>),
 }
@@ -20679,10 +20732,13 @@ pub enum PivotTableDefinitionExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceChoice {
+  /// Defines the WorksheetSource Class.
   #[sdk(child(qname = "x:CT_WorksheetSource/x:worksheetSource"))]
   XWorksheetSource(std::boxed::Box<WorksheetSource>),
+  /// Defines the Consolidation Class.
   #[sdk(child(qname = "x:CT_Consolidation/x:consolidation"))]
   XConsolidation(std::boxed::Box<Consolidation>),
+  /// Defines the CacheSourceExtensionList Class.
   #[sdk(child(qname = "x:CT_CacheSourceExtensionList/x:extLst"))]
   XExtLst(std::boxed::Box<CacheSourceExtensionList>),
 }

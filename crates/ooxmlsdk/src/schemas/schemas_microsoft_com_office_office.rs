@@ -333,16 +333,16 @@ pub struct ShapeDefaults {
   /// _
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
   pub extrusion: Option<Extrusion>,
-  ///Callout
+  /// Callout
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
   pub callout: Option<Callout>,
-  ///Shape Protections
+  /// Shape Protections
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
   pub lock: Option<Lock>,
-  ///Most Recently Used Colors
+  /// Most Recently Used Colors
   #[sdk(child(qname = "o:CT_ColorMru/o:colormru"))]
   pub color_most_recently_used: Option<ColorMostRecentlyUsed>,
-  ///UI Default Colors
+  /// UI Default Colors
   #[sdk(child(qname = "o:CT_ColorMenu/o:colormenu"))]
   pub color_menu: Option<ColorMenu>,
 }
@@ -361,13 +361,13 @@ pub struct ShapeLayout {
   /// Represents the following attribute in the schema: v:ext
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
-  ///Shape ID Map
+  /// Shape ID Map
   #[sdk(child(qname = "o:CT_IdMap/o:idmap"))]
   pub shape_id_map: Option<ShapeIdMap>,
-  ///Shape Grouping History
+  /// Shape Grouping History
   #[sdk(child(qname = "o:CT_RegroupTable/o:regrouptable"))]
   pub regroup_table: Option<RegroupTable>,
-  ///Rule Set
+  /// Rule Set
   #[sdk(child(qname = "o:CT_Rules/o:rules"))]
   pub rules: Option<Rules>,
 }
@@ -582,7 +582,7 @@ pub struct Diagram {
   /// Represents the following attribute in the schema: :dgmbasetextscale
   #[sdk(attr(qname = ":dgmbasetextscale"))]
   pub base_text_scale: Option<crate::simple_type::IntegerValue>,
-  ///Diagram Relationship Table
+  /// Diagram Relationship Table
   #[sdk(child(qname = "o:CT_RelationTable/o:relationtable"))]
   pub relation_table: Option<RelationTable>,
 }
@@ -1120,13 +1120,13 @@ pub struct OleObject {
   /// Represents the following attribute in the schema: :UpdateMode
   #[sdk(attr(qname = ":UpdateMode"))]
   pub update_mode: Option<OleUpdateModeValues>,
-  ///Embedded Object Alternate Image Request
+  /// Embedded Object Alternate Image Request
   #[sdk(text_child(qname = "o:ST_OLELinkType/o:LinkType"))]
   pub link_type: Option<OleLinkValues>,
-  ///Embedded Object Cannot Be Refreshed
+  /// Embedded Object Cannot Be Refreshed
   #[sdk(text_child(qname = "o:ST_TrueFalseBlank/o:LockedField"))]
   pub locked_field: Option<crate::simple_type::TrueFalseBlankValue>,
-  ///WordprocessingML Field Switches
+  /// WordprocessingML Field Switches
   #[sdk(text_child(qname = "xsd:string/o:FieldCodes"))]
   pub field_codes: Option<crate::simple_type::StringValue>,
 }

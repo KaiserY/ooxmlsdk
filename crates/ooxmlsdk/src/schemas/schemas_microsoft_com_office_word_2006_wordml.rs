@@ -544,7 +544,7 @@ pub struct MismatchedKeyMapCustomization {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Keymaps/")]
 pub struct KeymapsType {
-  ///Defines the KeyMapEntry Class.
+  /// Defines the KeyMapEntry Class.
   #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
   pub key_map_entry: Vec<KeyMapEntry>,
 }
@@ -624,14 +624,19 @@ pub struct SingleDataSourceRecord {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum KeyMapEntryChoice {
+  /// Defines the FixedCommandKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_Fci/wne:fci"))]
   WneFci(std::boxed::Box<FixedCommandKeyboardCustomization>),
+  /// Defines the MacroKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_MacroWll/wne:macro"))]
   WneMacro(std::boxed::Box<MacroKeyboardCustomization>),
+  /// Defines the AllocatedCommandKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_AcdKeymap/wne:acd"))]
   WneAcd(std::boxed::Box<AllocatedCommandKeyboardCustomization>),
+  /// Defines the WllMacroKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_MacroWll/wne:wll"))]
   WneWll(std::boxed::Box<WllMacroKeyboardCustomization>),
+  /// Defines the CharacterInsertion Class.
   #[sdk(child(qname = "wne:CT_LongHexNumber/wne:wch"))]
   WneWch(std::boxed::Box<CharacterInsertion>),
 }

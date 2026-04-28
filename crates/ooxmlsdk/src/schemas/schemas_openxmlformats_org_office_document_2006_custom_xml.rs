@@ -27,7 +27,7 @@ pub struct DataStoreItem {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub item_id: crate::simple_type::StringValue,
-  ///Set of Associated XML Schemas
+  /// Set of Associated XML Schemas
   #[sdk(child(qname = "ds:CT_DatastoreSchemaRefs/ds:schemaRefs"))]
   pub schema_references: Option<SchemaReferences>,
 }

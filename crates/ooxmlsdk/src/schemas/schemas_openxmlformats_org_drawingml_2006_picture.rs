@@ -12,13 +12,13 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
-  ///Non-Visual Picture Properties
+  /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
-  ///Picture Fill
+  /// Picture Fill
   #[sdk(child(qname = "a:CT_BlipFillProperties/pic:blipFill"))]
   pub blip_fill: std::boxed::Box<BlipFill>,
-  ///Shape Properties
+  /// Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/pic:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
@@ -81,21 +81,21 @@ pub struct NonVisualDrawingProperties {
     /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
-    ///Hyperlink associated with clicking or selecting the element.
+    /// Hyperlink associated with clicking or selecting the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
     pub hyperlink_on_click: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
         >,
     >,
-    ///Hyperlink associated with hovering over the element.
+    /// Hyperlink associated with hovering over the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
     pub hyperlink_on_hover: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
         >,
     >,
-    ///Future extension
+    /// Future extension
     #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
     pub non_visual_drawing_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
@@ -137,10 +137,10 @@ pub struct NonVisualPictureDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_PictureNonVisual/pic:nvPicPr")]
 pub struct NonVisualPictureProperties {
-  ///Non-Visual Drawing Properties
+  /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/pic:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Picture Drawing Properties
+  /// Non-Visual Picture Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualPictureProperties/pic:cNvPicPr"))]
   pub non_visual_picture_drawing_properties: std::boxed::Box<NonVisualPictureDrawingProperties>,
 }
@@ -170,7 +170,7 @@ pub struct BlipFill {
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
   pub blip:
     Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blip>>,
-  ///Source Rectangle
+  /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SourceRectangle>,
@@ -197,7 +197,7 @@ pub struct ShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
@@ -282,10 +282,9 @@ pub enum ShapePropertiesChoice2 {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {

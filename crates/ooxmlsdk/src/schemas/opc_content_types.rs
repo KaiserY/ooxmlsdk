@@ -65,8 +65,10 @@ pub struct Override {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TypesChoice {
+  /// Default content type.
   #[sdk(child(qname = "CT_Default/Default"))]
   Default(std::boxed::Box<Default>),
+  /// Override content type.
   #[sdk(child(qname = "CT_Override/Override"))]
   Override(std::boxed::Box<Override>),
 }

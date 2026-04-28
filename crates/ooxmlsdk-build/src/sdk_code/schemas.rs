@@ -9,7 +9,7 @@ use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, FieldDecl, FieldWireDecl, MemberDecl,
   SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind, VariantDecl,
-  VariantWireDecl,
+  VariantWireDecl, XmlHeaderMode, XmlnsMode,
 };
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::helpers::{
@@ -127,6 +127,9 @@ pub struct ResolvedOneChoice<'a> {
 #[derive(Debug, Default)]
 pub(crate) struct TypeContainmentGraph {
   edges: HashMap<String, Vec<String>>,
+  empty_leaf_marker_ambiguous_rust_names: HashSet<String>,
+  empty_leaf_marker_docs: HashMap<String, String>,
+  empty_leaf_marker_docs_by_rust_name: HashMap<String, String>,
   nodes: HashSet<String>,
 }
 
@@ -136,9 +139,23 @@ impl TypeContainmentGraph {
 
     for module in modules {
       for type_decl in &module.types {
-        graph
-          .nodes
-          .insert(local_type_key(module, &type_decl.rust_name));
+        let type_key = local_type_key(module, &type_decl.rust_name);
+        graph.nodes.insert(type_key.clone());
+        if is_empty_leaf_marker_type(type_decl) {
+          graph
+            .empty_leaf_marker_docs
+            .insert(type_key, type_decl.docs.clone());
+          let generated_rust_name = type_decl.rust_name.to_upper_camel_case();
+          if graph
+            .empty_leaf_marker_docs_by_rust_name
+            .insert(generated_rust_name.clone(), type_decl.docs.clone())
+            .is_some()
+          {
+            graph
+              .empty_leaf_marker_ambiguous_rust_names
+              .insert(generated_rust_name);
+          }
+        }
       }
     }
 
@@ -150,11 +167,7 @@ impl TypeContainmentGraph {
         for member in &type_decl.members {
           match member {
             MemberDecl::Field(field) => {
-              if matches!(field.cardinality, Cardinality::Many) {
-                continue;
-              }
-
-              let target = match &field.wire {
+              let referenced_target = match &field.wire {
                 FieldWireDecl::Child { .. } | FieldWireDecl::Any | FieldWireDecl::Choice => {
                   schema_type_key_from_ref(module, &field.type_ref)
                 }
@@ -167,8 +180,11 @@ impl TypeContainmentGraph {
                 }
                 FieldWireDecl::Attribute { .. } | FieldWireDecl::Text => None,
               };
+              if matches!(field.cardinality, Cardinality::Many) {
+                continue;
+              }
 
-              if let Some(target) = target {
+              if let Some(target) = referenced_target {
                 owner_edges.push(target);
               }
             }
@@ -210,6 +226,23 @@ impl TypeContainmentGraph {
       .edges
       .get(node)
       .is_some_and(|children| !children.is_empty())
+  }
+
+  fn empty_leaf_marker_doc(&self, node: &str) -> Option<&str> {
+    self.empty_leaf_marker_docs.get(node).map(String::as_str)
+  }
+
+  fn empty_leaf_marker_doc_by_rust_name(&self, rust_name: &str) -> Option<&str> {
+    if self
+      .empty_leaf_marker_ambiguous_rust_names
+      .contains(rust_name)
+    {
+      return None;
+    }
+    self
+      .empty_leaf_marker_docs_by_rust_name
+      .get(rust_name)
+      .map(String::as_str)
   }
 
   fn can_reach(&self, start: &str, goal: &str) -> bool {
@@ -879,6 +912,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
   let version_cfg = VersionCfgContext::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<TokenStream> = vec![];
   let mut helper_token_stream_list: Vec<(String, bool, TokenStream)> = vec![];
+  let omitted_empty_leaf_marker_type_names = empty_leaf_marker_type_names_to_omit(ir);
   let type_decl_by_name: std::collections::HashMap<_, _> = ir
     .types
     .iter()
@@ -888,6 +922,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .types
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
+    .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
     .map(|ty| ty.rust_name.as_str())
     .collect();
 
@@ -902,6 +937,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .types
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
+    .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
   {
     let attr_fields: Vec<&FieldDecl> = type_decl
       .members
@@ -1832,6 +1868,118 @@ fn inline_sequence_field_forces_box(field: &FieldDecl) -> bool {
   )
 }
 
+fn type_decl_for_ref<'a>(
+  module: &'a SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+) -> Option<&'a TypeDecl> {
+  if type_ref.module_path.is_some() {
+    return None;
+  }
+  module
+    .types
+    .iter()
+    .find(|type_decl| type_decl.rust_name == type_ref.rust_type)
+}
+
+fn is_empty_leaf_marker_type(type_decl: &TypeDecl) -> bool {
+  let is_leaf_element_marker = type_decl.element_kind == Some(ElementKind::Leaf)
+    && type_decl.base_rust_name.as_deref() == Some("OpenXmlLeafElement");
+  let is_empty_element_marker = matches!(
+    type_decl.base_rust_name.as_deref(),
+    Some("OpenXmlEmptyElement" | "EmptyType")
+  );
+
+  type_decl.kind == TypeKind::ElementStruct
+    && (is_leaf_element_marker || is_empty_element_marker)
+    && !type_decl.is_abstract
+    && type_decl.xml_content.is_none()
+    && type_decl.members.is_empty()
+    && type_decl.support.xmlns_mode == XmlnsMode::None
+    && type_decl.support.xml_header == XmlHeaderMode::None
+    && !type_decl.support.has_mce
+}
+
+fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
+  type_decl.kind == TypeKind::ElementStruct
+    && type_decl.is_abstract
+    && type_decl
+      .xml_qname
+      .as_deref()
+      .is_some_and(|qname| qname.ends_with('/'))
+    && type_decl.xml_content.is_none()
+    && type_decl.members.is_empty()
+    && type_decl.support.xmlns_mode == XmlnsMode::None
+    && type_decl.support.xml_header == XmlHeaderMode::None
+    && !type_decl.support.has_mce
+}
+
+fn empty_leaf_marker_doc_for_ref<'a>(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &'a TypeContainmentGraph,
+) -> Option<&'a str> {
+  if let Some(target_key) = schema_type_key_from_ref(module, type_ref)
+    && let Some(doc) = type_graph.empty_leaf_marker_doc(&target_key)
+  {
+    return Some(doc);
+  }
+
+  type_graph.empty_leaf_marker_doc_by_rust_name(&type_ref.rust_type)
+}
+
+fn is_empty_leaf_marker_ref_with_graph(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  empty_leaf_marker_doc_for_ref(module, type_ref, type_graph).is_some()
+}
+
+fn meaningful_doc_text(doc: &str) -> Option<String> {
+  let trimmed = doc.trim();
+  if trimmed.is_empty() || trimmed == "_" {
+    None
+  } else {
+    Some(format!(" {trimmed}"))
+  }
+}
+
+fn choice_variant_doc_attrs(
+  variant: &VariantDecl,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+  prefer_payload_docs: bool,
+) -> TokenStream {
+  let doc_text = if prefer_payload_docs {
+    empty_leaf_marker_doc_for_ref(module, &variant.payload, type_graph)
+      .and_then(meaningful_doc_text)
+      .or_else(|| {
+        type_decl_for_ref(module, &variant.payload)
+          .and_then(|type_decl| meaningful_doc_text(&type_decl.docs))
+      })
+      .or_else(|| meaningful_doc_text(&variant.docs))
+  } else {
+    meaningful_doc_text(&variant.docs)
+  };
+
+  if let Some(doc_text) = doc_text {
+    quote! { #[doc = #doc_text] }
+  } else {
+    quote! {}
+  }
+}
+
+fn empty_leaf_marker_type_names_to_omit(module: &SchemaModuleDecl) -> HashSet<&str> {
+  module
+    .types
+    .iter()
+    .filter(|type_decl| {
+      is_empty_leaf_marker_type(type_decl) || is_abstract_empty_base_type(type_decl)
+    })
+    .map(|type_decl| type_decl.rust_name.as_str())
+    .collect()
+}
+
 fn helper_struct_is_inline_sequence_clippy_safe(
   type_decl: &TypeDecl,
   module: &SchemaModuleDecl,
@@ -1861,6 +2009,8 @@ fn helper_struct_is_inline_sequence_clippy_safe(
 const MAX_NAMED_CHOICE_INLINE_VARIANTS_THROUGH_ANONYMOUS_WRAPPER: usize = 12;
 
 fn inline_single_field_sequence_variant_tokens(
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
   variant_ident: &Ident,
   variant_attrs: &[Attribute],
   field: &FieldDecl,
@@ -1870,13 +2020,31 @@ fn inline_single_field_sequence_variant_tokens(
   }
 
   let payload_type = type_from_decl_ref(&field.type_ref)?;
+  let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
+  let empty_leaf_doc_attrs = if let Some(doc) = empty_leaf_marker_doc.and_then(meaningful_doc_text)
+  {
+    quote! { #[doc = #doc] }
+  } else {
+    quote! {}
+  };
 
   match &field.wire {
-    FieldWireDecl::Child { qname } => Ok(Some(quote! {
-      #( #variant_attrs )*
-      #[sdk(child(qname = #qname))]
-      #variant_ident(std::boxed::Box<#payload_type>),
-    })),
+    FieldWireDecl::Child { qname } => {
+      if empty_leaf_marker_doc.is_some() {
+        Ok(Some(quote! {
+          #( #variant_attrs )*
+          #empty_leaf_doc_attrs
+          #[sdk(empty_child(qname = #qname))]
+          #variant_ident,
+        }))
+      } else {
+        Ok(Some(quote! {
+          #( #variant_attrs )*
+          #[sdk(child(qname = #qname))]
+          #variant_ident(std::boxed::Box<#payload_type>),
+        }))
+      }
+    }
     FieldWireDecl::TextChild { qname } => Ok(Some(quote! {
       #( #variant_attrs )*
       #[sdk(text_child(qname = #qname))]
@@ -1907,6 +2075,18 @@ fn gen_choice_variant_tokens(
     .unwrap_or(&variant.rust_name);
   let variant_ident: Ident = parse_str(rendered_variant_name)?;
   let variant_attrs = module_version_cfg_attrs(&variant.version, render_context.variant_cfg);
+  let variant_doc_attrs = choice_variant_doc_attrs(
+    variant,
+    render_context.module,
+    render_context.type_graph,
+    false,
+  );
+  let empty_leaf_variant_doc_attrs = choice_variant_doc_attrs(
+    variant,
+    render_context.module,
+    render_context.type_graph,
+    true,
+  );
 
   match &variant.wire {
     crate::sdk_code::codegen_ir::VariantWireDecl::Any => {
@@ -1914,6 +2094,7 @@ fn gen_choice_variant_tokens(
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
+        #variant_doc_attrs
         #[sdk(any)]
         #variant_ident(#payload_type),
       }])
@@ -1932,6 +2113,8 @@ fn gen_choice_variant_tokens(
           .collect();
         if helper_fields.len() == 1
           && let Some(single_field_tokens) = inline_single_field_sequence_variant_tokens(
+            render_context.module,
+            render_context.type_graph,
             &variant_ident,
             &variant_attrs,
             helper_fields[0],
@@ -1951,6 +2134,7 @@ fn gen_choice_variant_tokens(
           return Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
+            #variant_doc_attrs
             #[sdk(sequence)]
             #variant_ident(std::boxed::Box<#payload_type>),
           }]);
@@ -1965,6 +2149,7 @@ fn gen_choice_variant_tokens(
         Ok(vec![quote! {
           #prefix_attrs
           #( #variant_attrs )*
+          #variant_doc_attrs
           #[sdk(sequence)]
           #variant_ident {
             #( #inline_fields )*
@@ -1975,6 +2160,7 @@ fn gen_choice_variant_tokens(
         Ok(vec![quote! {
           #prefix_attrs
           #( #variant_attrs )*
+          #variant_doc_attrs
           #[sdk(sequence)]
           #variant_ident(std::boxed::Box<#payload_type>),
         }])
@@ -1992,6 +2178,7 @@ fn gen_choice_variant_tokens(
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
+        #variant_doc_attrs
         #( #qname_attrs )*
         #variant_ident(#payload_type),
       }])
@@ -2055,6 +2242,7 @@ fn gen_choice_variant_tokens(
           Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
+            #variant_doc_attrs
             #[sdk(choice)]
             #variant_ident(std::boxed::Box<#payload_type>),
           }])
@@ -2070,6 +2258,7 @@ fn gen_choice_variant_tokens(
           Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
+            #variant_doc_attrs
             #[sdk(choice)]
             #variant_ident(std::boxed::Box<#payload_type>),
           }])
@@ -2077,16 +2266,35 @@ fn gen_choice_variant_tokens(
           if qnames.is_empty() {
             return Err(variant.rust_name.clone().into());
           }
-          let qname_attrs = qnames
-            .iter()
-            .map(|qname| quote! { #[sdk(child(qname = #qname))] })
-            .collect::<Vec<_>>();
-          Ok(vec![quote! {
-            #prefix_attrs
-            #( #variant_attrs )*
-            #( #qname_attrs )*
-            #variant_ident(std::boxed::Box<#payload_type>),
-          }])
+          if is_empty_leaf_marker_ref_with_graph(
+            render_context.module,
+            &variant.payload,
+            render_context.type_graph,
+          ) {
+            let qname_attrs = qnames
+              .iter()
+              .map(|qname| quote! { #[sdk(empty_child(qname = #qname))] })
+              .collect::<Vec<_>>();
+            Ok(vec![quote! {
+              #prefix_attrs
+              #( #variant_attrs )*
+              #empty_leaf_variant_doc_attrs
+              #( #qname_attrs )*
+              #variant_ident,
+            }])
+          } else {
+            let qname_attrs = qnames
+              .iter()
+              .map(|qname| quote! { #[sdk(child(qname = #qname))] })
+              .collect::<Vec<_>>();
+            Ok(vec![quote! {
+              #prefix_attrs
+              #( #variant_attrs )*
+              #variant_doc_attrs
+              #( #qname_attrs )*
+              #variant_ident(std::boxed::Box<#payload_type>),
+            }])
+          }
         }
       }
     }
@@ -2095,6 +2303,7 @@ fn gen_choice_variant_tokens(
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
+        #variant_doc_attrs
         #[sdk(text)]
         #variant_ident(#payload_type),
       }])
@@ -2962,7 +3171,8 @@ fn module_type_namespace(module_name: &str) -> String {
 fn local_type_key(module: &SchemaModuleDecl, rust_type: &str) -> String {
   format!(
     "{}::{rust_type}",
-    module_type_namespace(&module.module_name)
+    module_type_namespace(&module.module_name),
+    rust_type = rust_type.to_upper_camel_case()
   )
 }
 
@@ -2973,7 +3183,10 @@ fn schema_type_key_from_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -
     None => module_type_namespace(&module.module_name),
   };
 
-  Some(format!("{module_path}::{}", type_ref.rust_type))
+  Some(format!(
+    "{module_path}::{}",
+    type_ref.rust_type.to_upper_camel_case()
+  ))
 }
 
 fn direct_child_field_needs_box(
@@ -3185,20 +3398,34 @@ fn gen_direct_child_fields_from_decl(
   for field in fields {
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
+    let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
     let field_type = type_from_decl_ref(&field.type_ref)?;
-    let property_comments = field.docs.as_str();
+    let property_comments_owned = empty_leaf_marker_doc
+      .and_then(meaningful_doc_text)
+      .or_else(|| meaningful_doc_text(&field.docs))
+      .unwrap_or_else(|| " _".to_string());
+    let property_comments = property_comments_owned.as_str();
     let sdk_field_attrs = match &field.wire {
+      FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
+        quote! { #[sdk(empty_child(qname = #qname))] }
+      }
       FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
       FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
-    let wrap_box = direct_child_field_needs_box(
-      owner_rust_name,
-      field,
-      module,
-      type_graph,
-      force_optional_when_not_repeated,
-    );
+    let field_type = if empty_leaf_marker_doc.is_some() {
+      parse_str("()")?
+    } else {
+      field_type
+    };
+    let wrap_box = empty_leaf_marker_doc.is_none()
+      && direct_child_field_needs_box(
+        owner_rust_name,
+        field,
+        module,
+        type_graph,
+        force_optional_when_not_repeated,
+      );
 
     let effective_cardinality =
       if force_optional_when_not_repeated && !matches!(field.cardinality, Cardinality::Many) {
@@ -3258,9 +3485,17 @@ fn gen_inline_sequence_variant_fields_from_decl(
   for field in fields {
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
+    let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
     let field_type = type_from_decl_ref(&field.type_ref)?;
-    let property_comments = field.docs.as_str();
+    let property_comments_owned = empty_leaf_marker_doc
+      .and_then(meaningful_doc_text)
+      .or_else(|| meaningful_doc_text(&field.docs))
+      .unwrap_or_else(|| " _".to_string());
+    let property_comments = property_comments_owned.as_str();
     let sdk_field_attrs = match &field.wire {
+      FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
+        quote! { #[sdk(empty_child(qname = #qname))] }
+      }
       FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
       FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
       _ => {
@@ -3273,8 +3508,14 @@ fn gen_inline_sequence_variant_fields_from_decl(
         );
       }
     };
-    let wrap_box = inline_sequence_field_forces_box(field)
-      || direct_child_field_needs_box(owner_rust_name, field, module, type_graph, false);
+    let field_type = if empty_leaf_marker_doc.is_some() {
+      parse_str("()")?
+    } else {
+      field_type
+    };
+    let wrap_box = empty_leaf_marker_doc.is_none()
+      && (inline_sequence_field_forces_box(field)
+        || direct_child_field_needs_box(owner_rust_name, field, module, type_graph, false));
 
     let field_tokens = match field.cardinality {
       Cardinality::Many => quote! {
@@ -3574,6 +3815,58 @@ mod tests {
 
     schemas.sort_by(|left, right| left.module_name.cmp(&right.module_name));
     schemas
+  }
+
+  #[test]
+  fn lowers_empty_leaf_marker_choice_variants_to_unit_variants() {
+    let schema = read_codegen_ir_schema_json(
+      "../../sdk_data/schemas/schemas_openxmlformats_org_office_document_2006_doc_props_v_types.json",
+    );
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:CT_Empty/vt:empty\"))] VtEmpty"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:CT_Null/vt:null\"))] VtNull"));
+    assert!(!generated.contains("pub struct VtEmpty"));
+    assert!(!generated.contains("pub struct VtNull"));
+    assert!(!generated.contains("VtEmpty (std :: boxed :: Box < VtEmpty >)"));
+    assert!(!generated.contains("VtNull (std :: boxed :: Box < VtNull >)"));
+  }
+
+  #[test]
+  fn lowers_openxml_empty_element_fields_to_unit_fields() {
+    let schema = read_codegen_ir_schema_json(
+      "../../sdk_data/schemas/schemas_microsoft_com_office_drawing_2013_main_command.json",
+    );
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("# [sdk (empty_child (qname = \"oac:CT_Empty/oac:fill\"))]"));
+    assert!(generated.contains("pub fill_empty : Option < () >"));
+    assert!(!generated.contains("pub struct FillEmpty"));
+    assert!(!generated.contains("pub fill_empty : Option < FillEmpty >"));
+  }
+
+  #[test]
+  fn lowers_empty_type_derived_choice_variants_to_unit_variants() {
+    let schema = read_codegen_ir_schema_json(
+      "../../sdk_data/schemas/schemas_microsoft_com_office_word_2010_wordml.json",
+    );
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("# [sdk (empty_child (qname = \"w:CT_Empty/w14:noFill\"))]"));
+    assert!(generated.contains("W14NoFill ,"));
+    assert!(!generated.contains("pub struct NoFillEmpty"));
+    assert!(!generated.contains("W14NoFill (std :: boxed :: Box < NoFillEmpty >)"));
+  }
+
+  #[test]
+  fn omits_abstract_empty_base_types_without_element_name() {
+    let schema = read_codegen_ir_schema_json(
+      "../../sdk_data/schemas/schemas_microsoft_com_office_powerpoint_2022_08_main.json",
+    );
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(!generated.contains("pub struct EmptyType"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"p:CT_Empty/p228:add\"))]"));
   }
 
   fn read_codegen_ir_schema_json(path: &str) -> SchemaModuleDecl {
@@ -5563,6 +5856,90 @@ mod tests {
 
     assert!(generated.contains("t:CT_Leaf/t:leaf"));
     assert!(!generated.contains("pub enum ChoiceHolderChoice"));
+  }
+
+  #[test]
+  fn renders_empty_leaf_marker_choice_variants_as_unit_variants() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_empty_leaf_choice".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.EmptyLeafChoice".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "Marker".to_string(),
+          xml_qname: Some("t:CT_Marker/t:marker".to_string()),
+          docs: "Defines the Marker Class.".to_string(),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          base_rust_name: Some("OpenXmlLeafElement".to_string()),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "AttributedMarker".to_string(),
+          xml_qname: Some("t:CT_AttributedMarker/t:attributedMarker".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          base_rust_name: Some("OpenXmlLeafElement".to_string()),
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "value".to_string(),
+            docs: "Value".to_string(),
+            wire: FieldWireDecl::Attribute {
+              qname: ":val".to_string(),
+              bit: None,
+            },
+            type_ref: TypeRefDecl {
+              rust_type: "StringValue".to_string(),
+              module_path: Some("crate::simple_type".to_string()),
+            },
+            ..Default::default()
+          })],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "MarkerChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TMarker".to_string(),
+              docs: " _".to_string(),
+              wire: VariantWireDecl::Child {
+                qnames: vec!["t:CT_Marker/t:marker".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "Marker".to_string(),
+                module_path: None,
+              },
+              ..Default::default()
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "TAttributedMarker".to_string(),
+              wire: VariantWireDecl::Child {
+                qnames: vec!["t:CT_AttributedMarker/t:attributedMarker".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "AttributedMarker".to_string(),
+                module_path: None,
+              },
+              ..Default::default()
+            }),
+          ],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(!generated.contains("pub struct Marker"));
+    assert!(generated.contains("pub struct AttributedMarker"));
+    assert!(generated.contains("# [doc = \" Defines the Marker Class.\"]"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"t:CT_Marker/t:marker\"))]"));
+    assert!(generated.contains("TMarker ,"));
+    assert!(
+      generated.contains("# [sdk (child (qname = \"t:CT_AttributedMarker/t:attributedMarker\"))]")
+    );
+    assert!(generated.contains("TAttributedMarker (std :: boxed :: Box < AttributedMarker >)"));
   }
 
   #[test]

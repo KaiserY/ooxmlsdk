@@ -230,34 +230,34 @@ pub struct RevExStream {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/xr:dxf")]
 pub struct DifferentialFormatType {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
   >,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
   >,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
   >,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -426,9 +426,9 @@ pub struct RevExFuture {
   /// Represents the following attribute in the schema: :sti
   #[sdk(attr(qname = ":sti"))]
   pub sti: Option<crate::simple_type::BooleanValue>,
-  ///Defines the RevExTest Class.
-  #[sdk(child(qname = "xr:CT_RevExTest/xr:xrrtest"))]
-  pub rev_ex_test: Option<RevExTest>,
+  /// Defines the RevExTest Class.
+  #[sdk(empty_child(qname = "xr:CT_RevExTest/xr:xrrtest"))]
+  pub rev_ex_test: Option<()>,
 }
 /// Defines the RevExUnsupported Class.
 ///
@@ -1612,14 +1612,6 @@ pub struct RevGroup {
   ))]
   pub xml_children: Vec<RevGroupChoice>,
 }
-/// Defines the RevExTest Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrtest.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExTest/xr:xrrtest")]
-pub struct RevExTest {}
 /// Defines the RevCell Class.
 ///
 /// Available in Office2016 and above.
@@ -1714,7 +1706,7 @@ pub struct ChangeCellSubEdit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xr:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
@@ -1985,7 +1977,7 @@ pub type Xstring = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Rst/xr:is")]
 pub struct RstType {
-  ///Text
+  /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Text>,
   /// _
@@ -2279,14 +2271,6 @@ pub struct RefOartAnchor {
   #[sdk(attr(qname = ":oat"))]
   pub oat: OartAnchorType,
 }
-/// Defines the RefFuture Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:future.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RefFuture/xr:future")]
-pub struct RefFuture {}
 /// Defines the RefTest Class.
 ///
 /// Available in Office2016 and above.
@@ -2683,11 +2667,11 @@ pub struct SparklineGroup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Comments/xr:comments")]
 pub struct Comments {
-  ///Authors
+  /// Authors
   #[sdk(child(qname = "x:CT_Authors/x:authors"))]
   pub authors:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Authors>,
-  ///List of Comments
+  /// List of Comments
   #[sdk(child(qname = "x:CT_CommentList/x:commentList"))]
   pub comment_list: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CommentList,
@@ -3298,47 +3282,67 @@ pub struct PivotTableDefinition {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExStreamChoice {
+  /// Defines the RevExFuture Class.
   #[sdk(child(qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   XrXrrftr(std::boxed::Box<RevExFuture>),
+  /// Defines the RevExUnsupported Class.
   #[sdk(child(qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
   XrXrrUspt(std::boxed::Box<RevExUnsupported>),
+  /// Defines the RevExTrimmed Class.
   #[sdk(child(qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
   XrXrrTrim(std::boxed::Box<RevExTrimmed>),
+  /// Defines the RevExRowColumn Class.
   #[sdk(child(qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
   XrXrrrc(std::boxed::Box<RevExRowColumn>),
+  /// Defines the RevExMove Class.
   #[sdk(child(qname = "xr:CT_RevExMove/xr:xrrm"))]
   XrXrrm(std::boxed::Box<RevExMove>),
+  /// Defines the RevExChangeCell Class.
   #[sdk(child(qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
   XrXrrc(std::boxed::Box<RevExChangeCell>),
+  /// Defines the RevExFormatting Class.
   #[sdk(child(qname = "xr:CT_RevExFormatting/xr:xrrf"))]
   XrXrrf(std::boxed::Box<RevExFormatting>),
+  /// Defines the RevExDefinedName Class.
   #[sdk(child(qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
   XrXrrDefName(std::boxed::Box<RevExDefinedName>),
+  /// Defines the RevExDelObj Class.
   #[sdk(child(qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
   XrXrrdo(std::boxed::Box<RevExDelObj>),
+  /// Defines the RevExChgObj Class.
   #[sdk(child(qname = "xr:CT_RevExChgObj/xr:xrrco"))]
   XrXrrco(std::boxed::Box<RevExChgObj>),
+  /// Defines the RevExSheetOp Class.
   #[sdk(child(qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
   XrXrrSheet(std::boxed::Box<RevExSheetOp>),
+  /// Defines the RevisionList Class.
   #[sdk(child(qname = "xr:CT_RevisionList/xr:xrrList"))]
   XrXrrList(std::boxed::Box<RevisionList>),
+  /// Defines the RevListAutoExpandRw Class.
   #[sdk(child(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   XrXrrListExpR(std::boxed::Box<RevListAutoExpandRw>),
+  /// Defines the RevGroup Class.
   #[sdk(child(qname = "xr:CT_RevGroup/xr:xrrg"))]
   XrXrrg(std::boxed::Box<RevGroup>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StateBasedObjectChoice {
+  /// Represents an external link to another workbook..
   #[sdk(child(qname = "x:CT_DataValidation/xr:dataValidation"))]
   XrDataValidation(std::boxed::Box<DataValidation>),
+  /// Represents a hyperlink within a cell..
   #[sdk(child(qname = "x:CT_Hyperlink/xr:hyperlink"))]
   XrHyperlink(std::boxed::Box<Hyperlink>),
+  /// Represents a sparkline group of 1 or more sparklines..
   #[sdk(child(qname = "x14:CT_SparklineGroup/xr:sparklineGroup"))]
   XrSparklineGroup(std::boxed::Box<SparklineGroup>),
+  /// Represents one comment within a cell..
   #[sdk(child(qname = "x:CT_Comments/xr:comments"))]
   XrComments(std::boxed::Box<Comments>),
+  /// Represents an autofilter..
   #[sdk(child(qname = "x:CT_AutoFilter/xr:autoFilter"))]
   XrAutoFilter(std::boxed::Box<AutoFilter>),
+  /// Represents a PivotTable View..
   #[sdk(child(qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"))]
   XrPivotTableDefinition(std::boxed::Box<PivotTableDefinition>),
 }
@@ -3351,56 +3355,79 @@ pub enum RevExChgObjChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevGroupChoice {
+  /// Defines the RevExFuture Class.
   #[sdk(child(qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   XrXrrftr(std::boxed::Box<RevExFuture>),
+  /// Defines the RevExUnsupported Class.
   #[sdk(child(qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
   XrXrrUspt(std::boxed::Box<RevExUnsupported>),
+  /// Defines the RevExTrimmed Class.
   #[sdk(child(qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
   XrXrrTrim(std::boxed::Box<RevExTrimmed>),
+  /// Defines the RevExRowColumn Class.
   #[sdk(child(qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
   XrXrrrc(std::boxed::Box<RevExRowColumn>),
+  /// Defines the RevExMove Class.
   #[sdk(child(qname = "xr:CT_RevExMove/xr:xrrm"))]
   XrXrrm(std::boxed::Box<RevExMove>),
+  /// Defines the RevExChangeCell Class.
   #[sdk(child(qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
   XrXrrc(std::boxed::Box<RevExChangeCell>),
+  /// Defines the RevExFormatting Class.
   #[sdk(child(qname = "xr:CT_RevExFormatting/xr:xrrf"))]
   XrXrrf(std::boxed::Box<RevExFormatting>),
+  /// Defines the RevExDefinedName Class.
   #[sdk(child(qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
   XrXrrDefName(std::boxed::Box<RevExDefinedName>),
+  /// Defines the RevExDelObj Class.
   #[sdk(child(qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
   XrXrrdo(std::boxed::Box<RevExDelObj>),
+  /// Defines the RevExChgObj Class.
   #[sdk(child(qname = "xr:CT_RevExChgObj/xr:xrrco"))]
   XrXrrco(std::boxed::Box<RevExChgObj>),
+  /// Defines the RevExSheetOp Class.
   #[sdk(child(qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
   XrXrrSheet(std::boxed::Box<RevExSheetOp>),
+  /// Defines the RevisionList Class.
   #[sdk(child(qname = "xr:CT_RevisionList/xr:xrrList"))]
   XrXrrList(std::boxed::Box<RevisionList>),
+  /// Defines the RevListAutoExpandRw Class.
   #[sdk(child(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   XrXrrListExpR(std::boxed::Box<RevListAutoExpandRw>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionStateChoice {
+  /// Defines the RowColVisualOps Class.
   #[sdk(child(qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps"))]
   XrRowColVisualOps(std::boxed::Box<RowColVisualOps>),
+  /// Defines the HideUnhideSheet Class.
   #[sdk(child(qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet"))]
   XrHideUnhideSheet(std::boxed::Box<HideUnhideSheet>),
+  /// Defines the ShowGridlinesHeadings Class.
   #[sdk(child(qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings"))]
   XrShowGridlinesHeadings(std::boxed::Box<ShowGridlinesHeadings>),
+  /// Defines the FreezePanes Class.
   #[sdk(child(qname = "xr:CT_FreezePanes/xr:freezePanes"))]
   XrFreezePanes(std::boxed::Box<FreezePanes>),
+  /// Defines the Outlines Class.
   #[sdk(child(qname = "xr:CT_Outlines/xr:outlines"))]
   XrOutlines(std::boxed::Box<Outlines>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RefMapChoice {
+  /// Defines the RefCell Class.
   #[sdk(child(qname = "xr:CT_RefCell/xr:ref"))]
   XrRef(std::boxed::Box<RefCell>),
+  /// Defines the SheetXluid Class.
   #[sdk(child(qname = "xr:CT_SheetXluid/xr:sheetUid"))]
   XrSheetUid(std::boxed::Box<SheetXluid>),
+  /// Defines the RefOartAnchor Class.
   #[sdk(child(qname = "xr:CT_RefOartAnchor/xr:oartAnchor"))]
   XrOartAnchor(std::boxed::Box<RefOartAnchor>),
-  #[sdk(child(qname = "xr:CT_RefFuture/xr:future"))]
-  XrFuture(std::boxed::Box<RefFuture>),
+  /// Defines the RefFuture Class.
+  #[sdk(empty_child(qname = "xr:CT_RefFuture/xr:future"))]
+  XrFuture,
+  /// Defines the RefTest Class.
   #[sdk(child(qname = "xr:CT_RefTest/xr:test"))]
   XrTest(std::boxed::Box<RefTest>),
 }

@@ -342,7 +342,7 @@ pub struct FeaturePropertyBag {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xfpb:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
@@ -487,34 +487,34 @@ pub struct RelFeatureProperty {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/xfpb:dxf")]
 pub struct DifferentialFormatType {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
   >,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
   >,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
   >,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -557,10 +557,13 @@ pub type Xsdboolean = crate::simple_type::BooleanValue;
 pub type Xsddouble = crate::simple_type::DoubleValue;
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OpenXmlFeaturePropertyBagsElementChoice {
+  /// Defines the BagExtensions Class.
   #[sdk(child(qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
   XfpbBagExt(std::boxed::Box<BagExtensions>),
+  /// Defines the FeaturePropertyBag Class.
   #[sdk(child(qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag"))]
   XfpbBag(std::boxed::Box<FeaturePropertyBag>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/xfpb:extLst"))]
   XfpbExtLst(std::boxed::Box<ExtensionList>),
 }
@@ -573,33 +576,46 @@ pub enum OpenXmlTableRevDxfElementChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FeaturePropertyBagChoice {
+  /// Defines the ArrayFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a"))]
   XfpbA(std::boxed::Box<ArrayFeatureProperty>),
+  /// Defines the BagFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId"))]
   XfpbBagId(std::boxed::Box<BagFeatureProperty>),
+  /// Defines the IntFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_IntFeatureProperty/xfpb:i"))]
   XfpbI(std::boxed::Box<IntFeatureProperty>),
+  /// Defines the StringFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_StringFeatureProperty/xfpb:s"))]
   XfpbS(std::boxed::Box<StringFeatureProperty>),
+  /// Defines the BoolFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_BoolFeatureProperty/xfpb:b"))]
   XfpbB(std::boxed::Box<BoolFeatureProperty>),
+  /// Defines the DecimalFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d"))]
   XfpbD(std::boxed::Box<DecimalFeatureProperty>),
+  /// Defines the RelFeatureProperty Class.
   #[sdk(child(qname = "xfpb:CT_RelFeatureProperty/xfpb:rel"))]
   XfpbRel(std::boxed::Box<RelFeatureProperty>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArrayFeaturePropertyChoice {
+  /// Defines the XsdunsignedInt Class.
   #[sdk(text_child(qname = "xsd:unsignedInt/xfpb:bagId"))]
   XfpbBagId(crate::simple_type::UInt32Value),
+  /// Defines the Xsdinteger Class.
   #[sdk(text_child(qname = "xsd:integer/xfpb:i"))]
   XfpbI(crate::simple_type::IntegerValue),
+  /// Defines the SXsdstring Class.
   #[sdk(text_child(qname = "xsd:string/xfpb:s"))]
   XfpbS(crate::simple_type::StringValue),
+  /// Defines the Xsdboolean Class.
   #[sdk(text_child(qname = "xsd:boolean/xfpb:b"))]
   XfpbB(crate::simple_type::BooleanValue),
+  /// Defines the Xsddouble Class.
   #[sdk(text_child(qname = "xsd:double/xfpb:d"))]
   XfpbD(crate::simple_type::DoubleValue),
+  /// Defines the RelXsdstring Class.
   #[sdk(text_child(qname = "xsd:string/xfpb:rel"))]
   XfpbRel(crate::simple_type::StringValue),
 }

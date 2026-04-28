@@ -12,12 +12,12 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShape/lc:lockedCanvas")]
 pub struct LockedCanvas {
-  ///Non-Visual Properties for a Group Shape
+  /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualGroupShapeProperties,
   >,
-  ///Visual Group Shape Properties
+  /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
   pub visual_group_shape_properties: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::VisualGroupShapeProperties,

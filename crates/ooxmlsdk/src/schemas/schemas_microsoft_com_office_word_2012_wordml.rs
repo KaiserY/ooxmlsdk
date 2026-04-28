@@ -155,14 +155,6 @@ pub struct SdtRepeatedSection {
   #[sdk(child(qname = "w:CT_OnOff/w15:doNotAllowInsertDeleteSection"))]
   pub do_not_allow_insert_delete_section: Option<DoNotAllowInsertDeleteSection>,
 }
-/// Defines the SdtRepeatedSectionItem Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w15:repeatingSectionItem.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Empty/w15:repeatingSectionItem")]
-pub struct SdtRepeatedSectionItem {}
 /// Defines the ChartTrackingRefBased Class.
 ///
 /// Available in Office2013 and above.

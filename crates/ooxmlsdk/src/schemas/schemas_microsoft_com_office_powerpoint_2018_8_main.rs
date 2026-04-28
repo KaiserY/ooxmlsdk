@@ -14,14 +14,6 @@ pub enum CommentStatus {
   #[sdk(rename = "closed")]
   Closed,
 }
-/// Defines the CommentUnknownAnchor Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p188:unknownAnchor.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor")]
-pub struct CommentUnknownAnchor {}
 /// Defines the TextBodyType Class.
 ///
 /// Available in Office2021 and above.
@@ -30,11 +22,11 @@ pub struct CommentUnknownAnchor {}
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/p188:txBody")]
 pub struct TextBodyType {
-  ///Body Properties
+  /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
-  ///Text List Styles
+  /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
@@ -51,7 +43,7 @@ pub struct TextBodyType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst")]
 pub struct CommentPropertiesExtensionList {
-  ///Data for the Windows platform..
+  /// Data for the Windows platform..
   #[sdk(child(qname = "p188:CT_CommentPropertiesExtension/p:ext"))]
   pub comment_properties_extension: Vec<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentPropertiesExtension,
@@ -111,7 +103,7 @@ pub struct CommentRelationship {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p188:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:
     Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
@@ -217,10 +209,10 @@ pub struct CommentReply {
   /// Represents the following attribute in the schema: :likes
   #[sdk(attr(qname = ":likes"))]
   pub likes: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  ///Defines the TextBodyType Class.
+  /// Defines the TextBodyType Class.
   #[sdk(child(qname = "a:CT_TextBody/p188:txBody"))]
   pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
-  ///Defines the CommentPropertiesExtensionList Class.
+  /// Defines the CommentPropertiesExtensionList Class.
   #[sdk(child(qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"))]
   pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
@@ -401,10 +393,10 @@ pub struct Comment {
   /// _
   #[sdk(child(qname = "p188:CT_CommentReplyList/p188:replyLst"))]
   pub p188_reply_lst: Option<CommentReplyList>,
-  ///Defines the TextBodyType Class.
+  /// Defines the TextBodyType Class.
   #[sdk(child(qname = "a:CT_TextBody/p188:txBody"))]
   pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
-  ///Defines the CommentPropertiesExtensionList Class.
+  /// Defines the CommentPropertiesExtensionList Class.
   #[sdk(child(qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"))]
   pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
@@ -464,6 +456,7 @@ pub enum CommentChoice {
             crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableColumnMonikerList,
         >,
     ),
-    #[sdk(child(qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"))]
-    P188UnknownAnchor(std::boxed::Box<CommentUnknownAnchor>),
+    /// Defines the CommentUnknownAnchor Class.
+    #[sdk(empty_child(qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"))]
+    P188UnknownAnchor,
 }

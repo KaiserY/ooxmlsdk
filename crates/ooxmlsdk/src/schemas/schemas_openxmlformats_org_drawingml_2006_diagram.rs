@@ -993,16 +993,16 @@ pub struct DataModelRoot {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Point List
+  /// Point List
   #[sdk(child(qname = "dgm:CT_PtList/dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
-  ///Connection List
+  /// Connection List
   #[sdk(child(qname = "dgm:CT_CxnList/dgm:cxnLst"))]
   pub connection_list: Option<ConnectionList>,
-  ///Background Formatting
+  /// Background Formatting
   #[sdk(child(qname = "a:CT_BackgroundFormatting/dgm:bg"))]
   pub background: Option<std::boxed::Box<Background>>,
-  ///Whole E2O Formatting
+  /// Whole E2O Formatting
   #[sdk(child(qname = "a:CT_WholeE2oFormatting/dgm:whole"))]
   pub whole: Option<std::boxed::Box<Whole>>,
   /// _
@@ -1532,7 +1532,7 @@ pub struct ColorsType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dgm:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
@@ -1609,22 +1609,22 @@ pub struct ColorTransformStyleLabel {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  ///Fill Color List
+  /// Fill Color List
   #[sdk(child(qname = "dgm:CT_Colors/dgm:fillClrLst"))]
   pub fill_color_list: Option<FillColorList>,
-  ///Line Color List
+  /// Line Color List
   #[sdk(child(qname = "dgm:CT_Colors/dgm:linClrLst"))]
   pub line_color_list: Option<LineColorList>,
-  ///Effect Color List
+  /// Effect Color List
   #[sdk(child(qname = "dgm:CT_Colors/dgm:effectClrLst"))]
   pub effect_color_list: Option<EffectColorList>,
-  ///Text Line Color List
+  /// Text Line Color List
   #[sdk(child(qname = "dgm:CT_Colors/dgm:txLinClrLst"))]
   pub text_line_color_list: Option<TextLineColorList>,
-  ///Text Fill Color List
+  /// Text Fill Color List
   #[sdk(child(qname = "dgm:CT_Colors/dgm:txFillClrLst"))]
   pub text_fill_color_list: Option<TextFillColorList>,
-  ///Text Effect Color List
+  /// Text Effect Color List
   #[sdk(child(qname = "dgm:CT_Colors/dgm:txEffectClrLst"))]
   pub text_effect_color_list: Option<TextEffectColorList>,
   /// _
@@ -1673,13 +1673,13 @@ pub struct Point {
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
   ))]
   pub connection_id: Option<crate::simple_type::StringValue>,
-  ///Property Set
+  /// Property Set
   #[sdk(child(qname = "dgm:CT_ElemPropSet/dgm:prSet"))]
   pub property_set: Option<std::boxed::Box<PropertySet>>,
-  ///Shape Properties
+  /// Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/dgm:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
-  ///Text Body
+  /// Text Body
   #[sdk(child(qname = "a:CT_TextBody/dgm:t"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
   /// _
@@ -2411,7 +2411,7 @@ pub struct Shape {
   /// Represents the following attribute in the schema: :blipPhldr
   #[sdk(attr(qname = ":blipPhldr"))]
   pub blip_placeholder: Option<crate::simple_type::BooleanValue>,
-  ///Shape Adjust List
+  /// Shape Adjust List
   #[sdk(child(qname = "dgm:CT_AdjLst/dgm:adjLst"))]
   pub adjust_list: Option<AdjustList>,
   /// _
@@ -2504,31 +2504,31 @@ pub struct RuleList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/dgm:varLst")]
 pub struct VariableList {
-  ///Show Organization Chart User Interface
+  /// Show Organization Chart User Interface
   #[sdk(child(qname = "dgm:CT_OrgChart/dgm:orgChart"))]
   pub organization_chart: Option<OrganizationChart>,
-  ///Maximum Children
+  /// Maximum Children
   #[sdk(child(qname = "dgm:CT_ChildMax/dgm:chMax"))]
   pub max_number_of_children: Option<MaxNumberOfChildren>,
-  ///Preferred Number of Children
+  /// Preferred Number of Children
   #[sdk(child(qname = "dgm:CT_ChildPref/dgm:chPref"))]
   pub preferred_number_of_children: Option<PreferredNumberOfChildren>,
-  ///Show Insert Bullet
+  /// Show Insert Bullet
   #[sdk(child(qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled"))]
   pub bullet_enabled: Option<BulletEnabled>,
-  ///Diagram Direction
+  /// Diagram Direction
   #[sdk(child(qname = "dgm:CT_Direction/dgm:dir"))]
   pub direction: Option<Direction>,
-  ///Organization Chart Branch Style
+  /// Organization Chart Branch Style
   #[sdk(child(qname = "dgm:CT_HierBranchStyle/dgm:hierBranch"))]
   pub hierarchy_branch: Option<HierarchyBranch>,
-  ///One by One Animation String
+  /// One by One Animation String
   #[sdk(child(qname = "dgm:CT_AnimOne/dgm:animOne"))]
   pub animate_one_by_one: Option<AnimateOneByOne>,
-  ///Level Animation
+  /// Level Animation
   #[sdk(child(qname = "dgm:CT_AnimLvl/dgm:animLvl"))]
   pub animation_level: Option<AnimationLevel>,
-  ///Shape Resize Style
+  /// Shape Resize Style
   #[sdk(child(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"))]
   pub resize_handles: Option<ResizeHandles>,
 }
@@ -2540,31 +2540,31 @@ pub struct VariableList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/dgm:presLayoutVars")]
 pub struct PresentationLayoutVariables {
-  ///Show Organization Chart User Interface
+  /// Show Organization Chart User Interface
   #[sdk(child(qname = "dgm:CT_OrgChart/dgm:orgChart"))]
   pub organization_chart: Option<OrganizationChart>,
-  ///Maximum Children
+  /// Maximum Children
   #[sdk(child(qname = "dgm:CT_ChildMax/dgm:chMax"))]
   pub max_number_of_children: Option<MaxNumberOfChildren>,
-  ///Preferred Number of Children
+  /// Preferred Number of Children
   #[sdk(child(qname = "dgm:CT_ChildPref/dgm:chPref"))]
   pub preferred_number_of_children: Option<PreferredNumberOfChildren>,
-  ///Show Insert Bullet
+  /// Show Insert Bullet
   #[sdk(child(qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled"))]
   pub bullet_enabled: Option<BulletEnabled>,
-  ///Diagram Direction
+  /// Diagram Direction
   #[sdk(child(qname = "dgm:CT_Direction/dgm:dir"))]
   pub direction: Option<Direction>,
-  ///Organization Chart Branch Style
+  /// Organization Chart Branch Style
   #[sdk(child(qname = "dgm:CT_HierBranchStyle/dgm:hierBranch"))]
   pub hierarchy_branch: Option<HierarchyBranch>,
-  ///One by One Animation String
+  /// One by One Animation String
   #[sdk(child(qname = "dgm:CT_AnimOne/dgm:animOne"))]
   pub animate_one_by_one: Option<AnimateOneByOne>,
-  ///Level Animation
+  /// Level Animation
   #[sdk(child(qname = "dgm:CT_AnimLvl/dgm:animLvl"))]
   pub animation_level: Option<AnimationLevel>,
-  ///Shape Resize Style
+  /// Shape Resize Style
   #[sdk(child(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"))]
   pub resize_handles: Option<ResizeHandles>,
 }
@@ -2907,16 +2907,16 @@ pub struct DiagramChooseElse {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModel/dgm:dataModel")]
 pub struct DataModel {
-  ///Point List
+  /// Point List
   #[sdk(child(qname = "dgm:CT_PtList/dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
-  ///Connection List
+  /// Connection List
   #[sdk(child(qname = "dgm:CT_CxnList/dgm:cxnLst"))]
   pub connection_list: Option<ConnectionList>,
-  ///Background Formatting
+  /// Background Formatting
   #[sdk(child(qname = "a:CT_BackgroundFormatting/dgm:bg"))]
   pub background: Option<std::boxed::Box<Background>>,
-  ///Whole E2O Formatting
+  /// Whole E2O Formatting
   #[sdk(child(qname = "a:CT_WholeE2oFormatting/dgm:whole"))]
   pub whole: Option<std::boxed::Box<Whole>>,
   /// _
@@ -3026,7 +3026,7 @@ pub struct Style {
   pub effect_reference: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectReference,
   >,
-  ///Font Reference
+  /// Font Reference
   #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
   pub font_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
@@ -3214,15 +3214,15 @@ pub struct StyleDisplayCategory {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scene3D/dgm:scene3d")]
 pub struct Scene3D {
-  ///Camera
+  /// Camera
   #[sdk(child(qname = "a:CT_Camera/a:camera"))]
   pub camera:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Camera>,
-  ///Light Rig
+  /// Light Rig
   #[sdk(child(qname = "a:CT_LightRig/a:lightRig"))]
   pub light_rig:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LightRig>,
-  ///Backdrop Plane
+  /// Backdrop Plane
   #[sdk(child(qname = "a:CT_Backdrop/a:backdrop"))]
   pub backdrop: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Backdrop>,
@@ -3292,19 +3292,19 @@ pub struct Shape3D {
   pub preset_material: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetMaterialTypeValues,
   >,
-  ///Top Bevel
+  /// Top Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevelT"))]
   pub bevel_top: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BevelTop>,
-  ///Bottom Bevel
+  /// Bottom Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevelB"))]
   pub bevel_bottom:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BevelBottom>,
-  ///Extrusion Color
+  /// Extrusion Color
   #[sdk(child(qname = "a:CT_Color/a:extrusionClr"))]
   pub extrusion_color: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtrusionColor>,
   >,
-  ///Contour Color
+  /// Contour Color
   #[sdk(child(qname = "a:CT_Color/a:contourClr"))]
   pub contour_color: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ContourColor>,
@@ -3398,16 +3398,16 @@ pub struct StyleLabel {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  ///3-D Scene
+  /// 3-D Scene
   #[sdk(child(qname = "a:CT_Scene3D/dgm:scene3d"))]
   pub scene3_d: Option<std::boxed::Box<Scene3D>>,
-  ///3-D Shape Properties
+  /// 3-D Shape Properties
   #[sdk(child(qname = "a:CT_Shape3D/dgm:sp3d"))]
   pub shape3_d: Option<std::boxed::Box<Shape3D>>,
-  ///Text Properties
+  /// Text Properties
   #[sdk(child(qname = "dgm:CT_TextProps/dgm:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
-  ///Shape Style
+  /// Shape Style
   #[sdk(child(qname = "a:CT_ShapeStyle/dgm:style"))]
   pub style: Option<std::boxed::Box<Style>>,
   /// _
@@ -3469,7 +3469,7 @@ pub struct Background {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_WholeE2oFormatting/dgm:whole")]
 pub struct Whole {
-  ///Outline
+  /// Outline
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
@@ -3703,10 +3703,10 @@ pub struct PropertySet {
   /// Represents the following attribute in the schema: :custRadScaleInc
   #[sdk(attr(qname = ":custRadScaleInc"))]
   pub include_angle_scale: Option<crate::simple_type::Int32Value>,
-  ///Presentation Layout Variables
+  /// Presentation Layout Variables
   #[sdk(child(qname = "dgm:CT_LayoutVariablePropertySet/dgm:presLayoutVars"))]
   pub presentation_layout_variables: Option<std::boxed::Box<PresentationLayoutVariables>>,
-  ///Shape Style
+  /// Shape Style
   #[sdk(child(qname = "a:CT_ShapeStyle/dgm:style"))]
   pub style: Option<std::boxed::Box<Style>>,
 }
@@ -3727,7 +3727,7 @@ pub struct ShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
@@ -3780,11 +3780,11 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
-  ///Body Properties
+  /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
-  ///Text List Styles
+  /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
@@ -3850,7 +3850,7 @@ pub struct SampleData {
   /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
-  ///Data Model
+  /// Data Model
   #[sdk(child(qname = "dgm:CT_DataModel/dgm:dataModel"))]
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
@@ -3869,7 +3869,7 @@ pub struct StyleData {
   /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
-  ///Data Model
+  /// Data Model
   #[sdk(child(qname = "dgm:CT_DataModel/dgm:dataModel"))]
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
@@ -3888,7 +3888,7 @@ pub struct ColorData {
   /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
-  ///Data Model
+  /// Data Model
   #[sdk(child(qname = "dgm:CT_DataModel/dgm:dataModel"))]
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
@@ -3907,7 +3907,7 @@ pub struct SampleDataType {
   /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
-  ///Data Model
+  /// Data Model
   #[sdk(child(qname = "dgm:CT_DataModel/dgm:dataModel"))]
   pub data_model: Vec<DataModel>,
 }
@@ -4111,30 +4111,36 @@ pub enum TextEffectColorListChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorsTypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -4142,117 +4148,165 @@ pub enum ColorsTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutVariablePropertySetTypeChoice {
+  /// Show Organization Chart User Interface
   #[sdk(child(qname = "dgm:CT_OrgChart/dgm:orgChart"))]
   DgmOrgChart(std::boxed::Box<OrganizationChart>),
+  /// Maximum Children
   #[sdk(child(qname = "dgm:CT_ChildMax/dgm:chMax"))]
   DgmChMax(std::boxed::Box<MaxNumberOfChildren>),
+  /// Preferred Number of Children
   #[sdk(child(qname = "dgm:CT_ChildPref/dgm:chPref"))]
   DgmChPref(std::boxed::Box<PreferredNumberOfChildren>),
+  /// Show Insert Bullet
   #[sdk(child(qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled"))]
   DgmBulletEnabled(std::boxed::Box<BulletEnabled>),
+  /// Diagram Direction
   #[sdk(child(qname = "dgm:CT_Direction/dgm:dir"))]
   DgmDir(std::boxed::Box<Direction>),
+  /// Organization Chart Branch Style
   #[sdk(child(qname = "dgm:CT_HierBranchStyle/dgm:hierBranch"))]
   DgmHierBranch(std::boxed::Box<HierarchyBranch>),
+  /// One by One Animation String
   #[sdk(child(qname = "dgm:CT_AnimOne/dgm:animOne"))]
   DgmAnimOne(std::boxed::Box<AnimateOneByOne>),
+  /// Level Animation
   #[sdk(child(qname = "dgm:CT_AnimLvl/dgm:animLvl"))]
   DgmAnimLvl(std::boxed::Box<AnimationLevel>),
+  /// Shape Resize Style
   #[sdk(child(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"))]
   DgmResizeHandles(std::boxed::Box<ResizeHandles>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForEachChoice {
+  /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
+  /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
   DgmShape(std::boxed::Box<Shape>),
+  /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
   DgmPresOf(std::boxed::Box<PresentationOf>),
+  /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
   DgmConstrLst(std::boxed::Box<Constraints>),
+  /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
   DgmRuleLst(std::boxed::Box<RuleList>),
+  /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
   DgmForEach(std::boxed::Box<ForEach>),
+  /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
   DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
   DgmChoose(std::boxed::Box<Choose>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutNodeChoice {
+  /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
+  /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
   DgmShape(std::boxed::Box<Shape>),
+  /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
   DgmPresOf(std::boxed::Box<PresentationOf>),
+  /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
   DgmConstrLst(std::boxed::Box<Constraints>),
+  /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
   DgmRuleLst(std::boxed::Box<RuleList>),
+  /// Variable List.
   #[sdk(child(qname = "dgm:CT_LayoutVariablePropertySet/dgm:varLst"))]
   DgmVarLst(std::boxed::Box<VariableList>),
+  /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
   DgmForEach(std::boxed::Box<ForEach>),
+  /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
   DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
   DgmChoose(std::boxed::Box<Choose>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramChooseIfChoice {
+  /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
+  /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
   DgmShape(std::boxed::Box<Shape>),
+  /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
   DgmPresOf(std::boxed::Box<PresentationOf>),
+  /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
   DgmConstrLst(std::boxed::Box<Constraints>),
+  /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
   DgmRuleLst(std::boxed::Box<RuleList>),
+  /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
   DgmForEach(std::boxed::Box<ForEach>),
+  /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
   DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
   DgmChoose(std::boxed::Box<Choose>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramChooseElseChoice {
+  /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
   DgmAlg(std::boxed::Box<Algorithm>),
+  /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
   DgmShape(std::boxed::Box<Shape>),
+  /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
   DgmPresOf(std::boxed::Box<PresentationOf>),
+  /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
   DgmConstrLst(std::boxed::Box<Constraints>),
+  /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
   DgmRuleLst(std::boxed::Box<RuleList>),
+  /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
   DgmForEach(std::boxed::Box<ForEach>),
+  /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
   DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
   DgmChoose(std::boxed::Box<Choose>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   DgmExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextPropertiesChoice {
+  /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   ASp3d(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
   ),
+  /// No text in 3D scene.
   #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
   AFlatTx(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FlatText>,
@@ -4278,10 +4332,9 @@ pub enum BackgroundChoice {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice2 {
@@ -4336,10 +4389,9 @@ pub enum ShapePropertiesChoice2 {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {

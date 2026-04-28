@@ -83,22 +83,24 @@ pub struct NumberDiagramInfo {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramAutoBulletChoice {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoBullet>,
-  ),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
+  /// Auto-Numbered Bullet.
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AutoNumberedBullet,
     >,
   ),
+  /// Character Bullet.
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
   ABuChar(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CharacterBullet,
     >,
   ),
+  /// Picture Bullet.
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   ABuBlip(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PictureBullet>,

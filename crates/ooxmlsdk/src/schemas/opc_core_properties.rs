@@ -20,49 +20,49 @@ pub enum XsiTypeValue {
 pub struct CoreProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  ///cp:category
+  /// cp:category
   #[sdk(text_child(qname = "cp:CT_Category/cp:category"))]
   pub category: Option<crate::simple_type::StringValue>,
-  ///cp:contentStatus
+  /// cp:contentStatus
   #[sdk(text_child(qname = "cp:CT_ContentStatus/cp:contentStatus"))]
   pub content_status: Option<crate::simple_type::StringValue>,
-  ///dcterms:created
+  /// dcterms:created
   #[sdk(child(qname = "dcterms:CT_Created/dcterms:created"))]
   pub created: Option<Created>,
-  ///dc:creator
+  /// dc:creator
   #[sdk(text_child(qname = "dc:CT_Creator/dc:creator"))]
   pub creator: Option<crate::simple_type::StringValue>,
-  ///dc:description
+  /// dc:description
   #[sdk(text_child(qname = "dc:CT_Description/dc:description"))]
   pub description: Option<crate::simple_type::StringValue>,
-  ///dc:identifier
+  /// dc:identifier
   #[sdk(text_child(qname = "dc:CT_Identifier/dc:identifier"))]
   pub identifier: Option<crate::simple_type::StringValue>,
-  ///cp:keywords
+  /// cp:keywords
   #[sdk(child(qname = "cp:CT_Keywords/cp:keywords"))]
   pub keywords: Option<Keywords>,
-  ///dc:language
+  /// dc:language
   #[sdk(text_child(qname = "dc:CT_Language/dc:language"))]
   pub language: Option<crate::simple_type::StringValue>,
-  ///cp:lastModifiedBy
+  /// cp:lastModifiedBy
   #[sdk(text_child(qname = "cp:CT_LastModifiedBy/cp:lastModifiedBy"))]
   pub last_modified_by: Option<crate::simple_type::StringValue>,
-  ///cp:lastPrinted
+  /// cp:lastPrinted
   #[sdk(text_child(qname = "cp:CT_LastPrinted/cp:lastPrinted"))]
   pub last_printed: Option<crate::simple_type::StringValue>,
-  ///dcterms:modified
+  /// dcterms:modified
   #[sdk(child(qname = "dcterms:CT_Modified/dcterms:modified"))]
   pub modified: Option<Modified>,
-  ///cp:revision
+  /// cp:revision
   #[sdk(text_child(qname = "cp:CT_Revision/cp:revision"))]
   pub revision: Option<crate::simple_type::StringValue>,
-  ///dc:subject
+  /// dc:subject
   #[sdk(text_child(qname = "dc:CT_Subject/dc:subject"))]
   pub subject: Option<crate::simple_type::StringValue>,
-  ///dc:title
+  /// dc:title
   #[sdk(text_child(qname = "dc:CT_Title/dc:title"))]
   pub title: Option<crate::simple_type::StringValue>,
-  ///cp:version
+  /// cp:version
   #[sdk(text_child(qname = "cp:CT_Version/cp:version"))]
   pub version: Option<crate::simple_type::StringValue>,
 }
@@ -191,7 +191,7 @@ pub struct Keywords {
   pub lang: Option<crate::simple_type::StringValue>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
-  ///cp:value
+  /// cp:value
   #[sdk(child(qname = "cp:CT_Keyword/cp:value"))]
   pub value: Vec<Keyword>,
 }

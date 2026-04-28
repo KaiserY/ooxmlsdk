@@ -1532,7 +1532,7 @@ pub struct ConditionalFormattingRule {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/x14:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
@@ -2939,34 +2939,34 @@ pub struct IconSet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/x14:dxf")]
 pub struct DifferentialType {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
   >,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
   >,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
   >,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -3228,11 +3228,11 @@ pub struct PivotArea {
   /// Represents the following attribute in the schema: :fieldPosition
   #[sdk(attr(qname = ":fieldPosition"))]
   pub field_position: Option<crate::simple_type::UInt32Value>,
-  ///References
+  /// References
   #[sdk(child(qname = "x:CT_PivotAreaReferences/x:references"))]
   pub pivot_area_references:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotAreaReferences>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -4091,15 +4091,19 @@ pub struct SlicerCacheDefinitionExtensionList {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotUserEditChoice {
+  /// Defines the Formula Class.
   #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
   XneF(crate::simple_type::StringValue),
+  /// Defines the PivotEditValue Class.
   #[sdk(child(qname = "x14:CT_PivotEditValue/x14:editValue"))]
   X14EditValue(std::boxed::Box<PivotEditValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDataChoice {
+  /// Defines the OlapSlicerCache Class.
   #[sdk(child(qname = "x14:CT_OlapSlicerCache/x14:olap"))]
   X14Olap(std::boxed::Box<OlapSlicerCache>),
+  /// Defines the TabularSlicerCache Class.
   #[sdk(child(qname = "x14:CT_TabularSlicerCache/x14:tabular"))]
   X14Tabular(std::boxed::Box<TabularSlicerCache>),
 }

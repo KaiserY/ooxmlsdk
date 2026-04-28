@@ -60,7 +60,7 @@ pub struct CommentAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p1912:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:
     Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
@@ -148,30 +148,6 @@ pub struct TaskAnchor {
   #[sdk(child(qname = "p:CT_ExtensionList/p1912:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the AddEmpty Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p1912:add.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p1912:add")]
-pub struct AddEmpty {}
-/// Defines the UnasgnAllEmpty Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p1912:unasgnAll.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p1912:unasgnAll")]
-pub struct UnasgnAllEmpty {}
-/// Defines the EmptyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/")]
-pub struct EmptyType {}
 /// Defines the TaskTitleEventInfo Class.
 ///
 /// Available in Office2021 and above.
@@ -278,14 +254,6 @@ pub struct TaskUndo {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }
-/// Defines the TaskUnknownRecord Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p1912:unknown.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p1912:CT_TaskUnknownRecord/p1912:unknown")]
-pub struct TaskUnknownRecord {}
 /// Defines the TaskHistoryEvent Class.
 ///
 /// Available in Office2021 and above.
@@ -354,8 +322,9 @@ pub enum TaskHistoryEventChoice {
   P1912Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),
   #[sdk(child(qname = "p1912:CT_TaskAssignUnassignUser/p1912:unAsgn"))]
   P1912UnAsgn(std::boxed::Box<UnAsgnTaskAssignUnassignUser>),
-  #[sdk(child(qname = "p:CT_Empty/p1912:add"))]
-  P1912Add(std::boxed::Box<AddEmpty>),
+  /// Defines the AddEmpty Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p1912:add"))]
+  P1912Add,
   #[sdk(child(qname = "p1912:CT_TaskTitleEventInfo/p1912:title"))]
   P1912Title(std::boxed::Box<TaskTitleEventInfo>),
   #[sdk(child(qname = "p1912:CT_TaskScheduleEventInfo/p1912:date"))]
@@ -364,10 +333,12 @@ pub enum TaskHistoryEventChoice {
   P1912PcntCmplt(std::boxed::Box<TaskProgressEventInfo>),
   #[sdk(child(qname = "p1912:CT_TaskPriorityRecord/p1912:pri"))]
   P1912Pri(std::boxed::Box<TaskPriorityRecord>),
-  #[sdk(child(qname = "p:CT_Empty/p1912:unasgnAll"))]
-  P1912UnasgnAll(std::boxed::Box<UnasgnAllEmpty>),
+  /// Defines the UnasgnAllEmpty Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p1912:unasgnAll"))]
+  P1912UnasgnAll,
   #[sdk(child(qname = "p1912:CT_TaskUndo/p1912:undo"))]
   P1912Undo(std::boxed::Box<TaskUndo>),
-  #[sdk(child(qname = "p1912:CT_TaskUnknownRecord/p1912:unknown"))]
-  P1912Unknown(std::boxed::Box<TaskUnknownRecord>),
+  /// Defines the TaskUnknownRecord Class.
+  #[sdk(empty_child(qname = "p1912:CT_TaskUnknownRecord/p1912:unknown"))]
+  P1912Unknown,
 }

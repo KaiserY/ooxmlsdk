@@ -125,8 +125,10 @@ pub struct SharedComPicture {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ActiveXObjectPropertyChoice {
+  /// Defines the SharedComFont Class.
   #[sdk(child(qname = "ax:CT_Font/ax:font"))]
   AxFont(std::boxed::Box<SharedComFont>),
+  /// Defines the SharedComPicture Class.
   #[sdk(child(qname = "ax:CT_Picture/ax:picture"))]
   AxPicture(std::boxed::Box<SharedComPicture>),
 }

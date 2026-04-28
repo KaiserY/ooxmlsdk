@@ -5795,8 +5795,9 @@ pub enum ShapeChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -5811,10 +5812,9 @@ pub enum ShapeChoice {
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
   #[sdk(child(qname = "o:CT_Ink/o:ink"))]
   OInk(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Ink>),
-  #[sdk(child(qname = "pvml:CT_Empty/pvml:iscomment"))]
-  PvmlIscomment(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::InkAnnotationFlag>,
-  ),
+  /// Ink Annotation Flag.
+  #[sdk(empty_child(qname = "pvml:CT_Empty/pvml:iscomment"))]
+  PvmlIscomment,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapetypeChoice {
@@ -5852,8 +5852,9 @@ pub enum ShapetypeChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -5869,38 +5870,55 @@ pub enum ShapetypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
+  /// Shape Group.
   #[sdk(child(qname = "v:CT_Group/v:group"))]
   VGroup(std::boxed::Box<Group>),
+  /// Shape Definition.
   #[sdk(child(qname = "v:CT_Shape/v:shape"))]
   VShape(std::boxed::Box<Shape>),
+  /// Shape Template.
   #[sdk(child(qname = "v:CT_Shapetype/v:shapetype"))]
   VShapetype(std::boxed::Box<Shapetype>),
+  /// Arc Segment.
   #[sdk(child(qname = "v:CT_Arc/v:arc"))]
   VArc(std::boxed::Box<Arc>),
+  /// Bezier Curve.
   #[sdk(child(qname = "v:CT_Curve/v:curve"))]
   VCurve(std::boxed::Box<Curve>),
+  /// Image File.
   #[sdk(child(qname = "v:CT_Image/v:image"))]
   VImage(std::boxed::Box<ImageFile>),
+  /// Line.
   #[sdk(child(qname = "v:CT_Line/v:line"))]
   VLine(std::boxed::Box<Line>),
+  /// Oval.
   #[sdk(child(qname = "v:CT_Oval/v:oval"))]
   VOval(std::boxed::Box<Oval>),
+  /// Multiple Path Line.
   #[sdk(child(qname = "v:CT_PolyLine/v:polyline"))]
   VPolyline(std::boxed::Box<PolyLine>),
+  /// Rectangle.
   #[sdk(child(qname = "v:CT_Rect/v:rect"))]
   VRect(std::boxed::Box<Rectangle>),
+  /// Rounded Rectangle.
   #[sdk(child(qname = "v:CT_RoundRect/v:roundrect"))]
   VRoundrect(std::boxed::Box<RoundRectangle>),
+  /// VML Diagram.
   #[sdk(child(qname = "o:CT_Diagram/o:diagram"))]
   ODiagram(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Diagram>),
+  /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
   OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
   OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
+  /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
   XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
 }
@@ -5940,8 +5958,9 @@ pub enum ArcChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -5991,8 +6010,9 @@ pub enum CurveChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -6042,8 +6062,9 @@ pub enum ImageFileChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -6093,8 +6114,9 @@ pub enum LineChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -6144,8 +6166,9 @@ pub enum OvalChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -6195,8 +6218,9 @@ pub enum PolyLineChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -6248,8 +6272,9 @@ pub enum RectangleChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
@@ -6299,8 +6324,9 @@ pub enum RoundRectangleChoice {
   ),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
-  #[sdk(child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
-  W10Anchorlock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::AnchorLock>),
+  /// Anchor Location Is Locked.
+  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]

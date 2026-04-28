@@ -138,6 +138,14 @@ struct SdkChildField {
 }
 
 #[derive(Clone)]
+struct SdkEmptyChildField {
+  ident: Ident,
+  qname: String,
+  optional: bool,
+  repeated: bool,
+}
+
+#[derive(Clone)]
 struct SdkTextChildField {
   ident: Ident,
   qname: String,
@@ -175,6 +183,7 @@ struct SdkTextField {
 enum SdkTypeFieldKind {
   Attr { name: String },
   Child { qname: String },
+  EmptyChild { qname: String },
   TextChild { qname: String },
   Choice,
   Any,
@@ -271,6 +280,7 @@ impl Parse for StringSetValues {
 
 enum SdkChoiceVariantKind {
   Child { qnames: Vec<String> },
+  EmptyChild { qnames: Vec<String> },
   Choice,
   Sequence,
   TextChild { qnames: Vec<String> },
@@ -898,6 +908,21 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             qname: qname.unwrap_or_default(),
           });
         }
+        Meta::List(meta) if meta.path.is_ident("empty_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk empty_child attribute"))
+            }
+          })?;
+          kind = Some(SdkTypeFieldKind::EmptyChild {
+            qname: qname.unwrap_or_default(),
+          });
+        }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
           meta.parse_nested_meta(|nested| {
@@ -1236,6 +1261,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
 
 fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {
   let mut child_qnames = Vec::new();
+  let mut empty_child_qnames = Vec::new();
   let mut text_child_qnames = Vec::new();
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
@@ -1257,6 +1283,19 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
             }
           })?;
           child_qnames.push(qname.unwrap_or_default());
+        }
+        Meta::List(meta) if meta.path.is_ident("empty_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk choice empty_child attribute"))
+            }
+          })?;
+          empty_child_qnames.push(qname.unwrap_or_default());
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
@@ -1288,6 +1327,11 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
   if !child_qnames.is_empty() {
     return Ok(Some(SdkChoiceVariantKind::Child {
       qnames: child_qnames,
+    }));
+  }
+  if !empty_child_qnames.is_empty() {
+    return Ok(Some(SdkChoiceVariantKind::EmptyChild {
+      qnames: empty_child_qnames,
     }));
   }
   if !text_child_qnames.is_empty() {

@@ -300,11 +300,3 @@ pub struct TextWrap {
   #[sdk(attr(qname = ":anchory"))]
   pub anchor_y: Option<VerticalAnchorValues>,
 }
-/// Anchor Location Is Locked.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w10:anchorlock.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_AnchorLock/w10:anchorlock")]
-pub struct AnchorLock {}

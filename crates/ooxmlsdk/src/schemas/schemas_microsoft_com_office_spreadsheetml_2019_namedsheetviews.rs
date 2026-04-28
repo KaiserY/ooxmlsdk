@@ -64,7 +64,7 @@ pub struct NamedSheetView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xnsv:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
@@ -187,34 +187,34 @@ pub struct SortRules {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Dxf/xnsv:dxf")]
 pub struct DifferentialFormatType {
-  ///Font Properties
+  /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub font: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
   >,
-  ///Number Format
+  /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
-  ///Fill
+  /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub fill: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
   >,
-  ///Alignment
+  /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
-  ///Border Properties
+  /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub border: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
   >,
-  ///Protection Properties
+  /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
   pub protection:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
-  ///Future Feature Data Storage Area
+  /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -428,48 +428,57 @@ pub struct RichSortCondition {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FilterColumnChoice {
+  /// Filter Criteria.
   #[sdk(child(qname = "x:CT_Filters/x:filters"))]
   XFilters(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Filters>,
   ),
+  /// Top 10.
   #[sdk(child(qname = "x:CT_Top10/x:top10"))]
   XTop10(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Top10>,
   ),
+  /// Defines the CustomFilters Class.
   #[sdk(child(qname = "x14:CT_CustomFilters/x14:customFilters"))]
   X14CustomFilters(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CustomFilters,
     >,
   ),
+  /// Custom Filters.
   #[sdk(child(qname = "x:CT_CustomFilters/x:customFilters"))]
   XCustomFilters(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CustomFilters,
     >,
   ),
+  /// Dynamic Filter.
   #[sdk(child(qname = "x:CT_DynamicFilter/x:dynamicFilter"))]
   XDynamicFilter(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DynamicFilter,
     >,
   ),
+  /// Color Filter Criteria.
   #[sdk(child(qname = "x:CT_ColorFilter/x:colorFilter"))]
   XColorFilter(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColorFilter,
     >,
   ),
+  /// Defines the IconFilter Class.
   #[sdk(child(qname = "x14:CT_IconFilter/x14:iconFilter"))]
   X14IconFilter(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconFilter,
     >,
   ),
+  /// Icon Filter.
   #[sdk(child(qname = "x:CT_IconFilter/x:iconFilter"))]
   XIconFilter(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::IconFilter>,
   ),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   XExtLst(
     std::boxed::Box<

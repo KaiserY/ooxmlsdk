@@ -354,7 +354,7 @@ pub struct ColorStyleVariation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/cs:extLst")]
 pub struct OfficeArtExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
@@ -606,7 +606,7 @@ pub struct ShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
@@ -1049,7 +1049,7 @@ pub struct TextBodyProperties {
   /// Represents the following attribute in the schema: :compatLnSpc
   #[sdk(attr(qname = ":compatLnSpc"))]
   pub compatible_line_spacing: Option<crate::simple_type::BooleanValue>,
-  ///Preset Text Shape
+  /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetTextWarp>,
@@ -3083,14 +3083,15 @@ pub enum ColorStyleVariationChoice {
   ATint(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Complement>,
-  ),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -3173,12 +3174,12 @@ pub enum ColorStyleVariationChoice {
   ABlueMod(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlueModulation>,
   ),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::InverseGamma>,
-  ),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleColorChoice {
@@ -3186,14 +3187,15 @@ pub enum StyleColorChoice {
   ATint(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Complement>,
-  ),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -3276,12 +3278,12 @@ pub enum StyleColorChoice {
   ABlueMod(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlueModulation>,
   ),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::InverseGamma>,
-  ),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineReferenceChoice {
@@ -3378,34 +3380,41 @@ pub enum EffectReferenceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Defines the StyleColor Class.
   #[sdk(child(qname = "cs:CT_StyleColor/cs:styleClr"))]
   CsStyleClr(std::boxed::Box<StyleColor>),
 }
@@ -3471,10 +3480,9 @@ pub enum ShapePropertiesChoice2 {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
@@ -3507,10 +3515,9 @@ pub enum TextCharacterPropertiesTypeChoice {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice2 {
@@ -3525,23 +3532,17 @@ pub enum TextCharacterPropertiesTypeChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice3 {
-  #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::UnderlineFollowsText,
-    >,
-  ),
+  /// Underline Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
+  AULnTx,
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice4 {
-  #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::UnderlineFillText,
-    >,
-  ),
+  /// Underline Fill Properties Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
+  AUFillTx,
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::UnderlineFill>,
@@ -3549,10 +3550,9 @@ pub enum TextCharacterPropertiesTypeChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
-  ANoAutofit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoAutoFit>,
-  ),
+  /// No AutoFit.
+  #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
+  ANoAutofit,
   #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
   ANormAutofit(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NormalAutoFit>,

@@ -4,14 +4,6 @@
 // -----------------------------------------------------------------------------
 //
 
-/// Ink Annotation Flag.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pvml:iscomment.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "pvml:CT_Empty/pvml:iscomment")]
-pub struct InkAnnotationFlag {}
 /// VML Diagram Text.
 ///
 /// Available in Office2007 and above.

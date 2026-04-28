@@ -268,22 +268,6 @@ pub type VtStorage = crate::simple_type::Base64BinaryValue;
 ///
 /// When the object is serialized out as xml, it's qualified name is vt:ostorage.
 pub type VtoStorage = crate::simple_type::Base64BinaryValue;
-/// Empty.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is vt:empty.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Empty/vt:empty")]
-pub struct VtEmpty {}
-/// Null.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is vt:null.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Null/vt:null")]
-pub struct VtNull {}
 /// 1-Byte Signed Integer.
 ///
 /// Available in Office2007 and above.
@@ -466,156 +450,229 @@ pub struct VtClipboardData {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VariantChoice {
+  /// Variant.
   #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   VtVariant(std::boxed::Box<Variant>),
+  /// Vector.
   #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
   VtVector(std::boxed::Box<VtVector>),
+  /// Array.
   #[sdk(child(qname = "vt:CT_Array/vt:array"))]
   VtArray(std::boxed::Box<VtArray>),
+  /// Binary Blob.
   #[sdk(text_child(qname = "xsd:base64Binary/vt:blob"))]
   VtBlob(crate::simple_type::Base64BinaryValue),
+  /// Binary Blob Object.
   #[sdk(text_child(qname = "xsd:base64Binary/vt:oblob"))]
   VtOblob(crate::simple_type::Base64BinaryValue),
-  #[sdk(child(qname = "vt:CT_Empty/vt:empty"))]
-  VtEmpty(std::boxed::Box<VtEmpty>),
-  #[sdk(child(qname = "vt:CT_Null/vt:null"))]
-  VtNull(std::boxed::Box<VtNull>),
+  /// Empty.
+  #[sdk(empty_child(qname = "vt:CT_Empty/vt:empty"))]
+  VtEmpty,
+  /// Null.
+  #[sdk(empty_child(qname = "vt:CT_Null/vt:null"))]
+  VtNull,
+  /// 1-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:byte/vt:i1"))]
   VtI1(crate::simple_type::SByteValue),
+  /// 2-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:short/vt:i2"))]
   VtI2(crate::simple_type::Int16Value),
+  /// 4-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:int/vt:i4"))]
   VtI4(crate::simple_type::Int32Value),
+  /// 8-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:long/vt:i8"))]
   VtI8(crate::simple_type::Int64Value),
+  /// Integer.
   #[sdk(text_child(qname = "xsd:int/vt:int"))]
   VtInt(crate::simple_type::Int32Value),
+  /// 1-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedByte/vt:ui1"))]
   VtUi1(crate::simple_type::ByteValue),
+  /// 2-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedShort/vt:ui2"))]
   VtUi2(crate::simple_type::UInt16Value),
+  /// 4-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedInt/vt:ui4"))]
   VtUi4(crate::simple_type::UInt32Value),
+  /// 8-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedLong/vt:ui8"))]
   VtUi8(crate::simple_type::UInt64Value),
+  /// Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedInt/vt:uint"))]
   VtUint(crate::simple_type::UInt32Value),
+  /// 4-Byte Real Number.
   #[sdk(text_child(qname = "xsd:float/vt:r4"))]
   VtR4(crate::simple_type::SingleValue),
+  /// 8-Byte Real Number.
   #[sdk(text_child(qname = "xsd:double/vt:r8"))]
   VtR8(crate::simple_type::DoubleValue),
+  /// Decimal.
   #[sdk(text_child(qname = "xsd:decimal/vt:decimal"))]
   VtDecimal(crate::simple_type::DecimalValue),
+  /// LPSTR.
   #[sdk(text_child(qname = "xsd:string/vt:lpstr"))]
   VtLpstr(crate::simple_type::StringValue),
+  /// LPWSTR.
   #[sdk(text_child(qname = "xsd:string/vt:lpwstr"))]
   VtLpwstr(crate::simple_type::StringValue),
+  /// Basic String.
   #[sdk(text_child(qname = "xsd:string/vt:bstr"))]
   VtBstr(crate::simple_type::StringValue),
+  /// Date and Time.
   #[sdk(text_child(qname = "xsd:dateTime/vt:date"))]
   VtDate(crate::simple_type::DateTimeValue),
+  /// File Time.
   #[sdk(text_child(qname = "xsd:dateTime/vt:filetime"))]
   VtFiletime(crate::simple_type::DateTimeValue),
+  /// Boolean.
   #[sdk(text_child(qname = "xsd:boolean/vt:bool"))]
   VtBool(crate::simple_type::BooleanValue),
+  /// Currency.
   #[sdk(text_child(qname = "vt:ST_Cy/vt:cy"))]
   VtCy(crate::simple_type::StringValue),
+  /// Error Status Code.
   #[sdk(text_child(qname = "vt:ST_Error/vt:error"))]
   VtError(crate::simple_type::StringValue),
+  /// Binary Stream.
   #[sdk(text_child(qname = "xsd:base64Binary/vt:stream"))]
   VtStream(crate::simple_type::Base64BinaryValue),
+  /// Binary Stream Object.
   #[sdk(text_child(qname = "xsd:base64Binary/vt:ostream"))]
   VtOstream(crate::simple_type::Base64BinaryValue),
+  /// Binary Storage.
   #[sdk(text_child(qname = "xsd:base64Binary/vt:storage"))]
   VtStorage(crate::simple_type::Base64BinaryValue),
+  /// Binary Storage Object.
   #[sdk(text_child(qname = "xsd:base64Binary/vt:ostorage"))]
   VtOstorage(crate::simple_type::Base64BinaryValue),
+  /// Binary Versioned Stream.
   #[sdk(child(qname = "vt:CT_Vstream/vt:vstream"))]
   VtVstream(std::boxed::Box<VtvStreamData>),
+  /// Class ID.
   #[sdk(text_child(qname = "vt:ST_Clsid/vt:clsid"))]
   VtClsid(crate::simple_type::StringValue),
+  /// Clipboard Data.
   #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtCf(std::boxed::Box<VtClipboardData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VtVectorChoice {
+  /// Variant.
   #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   VtVariant(std::boxed::Box<Variant>),
+  /// 1-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:byte/vt:i1"))]
   VtI1(crate::simple_type::SByteValue),
+  /// 2-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:short/vt:i2"))]
   VtI2(crate::simple_type::Int16Value),
+  /// 4-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:int/vt:i4"))]
   VtI4(crate::simple_type::Int32Value),
+  /// 8-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:long/vt:i8"))]
   VtI8(crate::simple_type::Int64Value),
+  /// 1-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedByte/vt:ui1"))]
   VtUi1(crate::simple_type::ByteValue),
+  /// 2-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedShort/vt:ui2"))]
   VtUi2(crate::simple_type::UInt16Value),
+  /// 4-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedInt/vt:ui4"))]
   VtUi4(crate::simple_type::UInt32Value),
+  /// 8-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedLong/vt:ui8"))]
   VtUi8(crate::simple_type::UInt64Value),
+  /// 4-Byte Real Number.
   #[sdk(text_child(qname = "xsd:float/vt:r4"))]
   VtR4(crate::simple_type::SingleValue),
+  /// 8-Byte Real Number.
   #[sdk(text_child(qname = "xsd:double/vt:r8"))]
   VtR8(crate::simple_type::DoubleValue),
+  /// LPSTR.
   #[sdk(text_child(qname = "xsd:string/vt:lpstr"))]
   VtLpstr(crate::simple_type::StringValue),
+  /// LPWSTR.
   #[sdk(text_child(qname = "xsd:string/vt:lpwstr"))]
   VtLpwstr(crate::simple_type::StringValue),
+  /// Basic String.
   #[sdk(text_child(qname = "xsd:string/vt:bstr"))]
   VtBstr(crate::simple_type::StringValue),
+  /// Date and Time.
   #[sdk(text_child(qname = "xsd:dateTime/vt:date"))]
   VtDate(crate::simple_type::DateTimeValue),
+  /// File Time.
   #[sdk(text_child(qname = "xsd:dateTime/vt:filetime"))]
   VtFiletime(crate::simple_type::DateTimeValue),
+  /// Boolean.
   #[sdk(text_child(qname = "xsd:boolean/vt:bool"))]
   VtBool(crate::simple_type::BooleanValue),
+  /// Currency.
   #[sdk(text_child(qname = "vt:ST_Cy/vt:cy"))]
   VtCy(crate::simple_type::StringValue),
+  /// Error Status Code.
   #[sdk(text_child(qname = "vt:ST_Error/vt:error"))]
   VtError(crate::simple_type::StringValue),
+  /// Class ID.
   #[sdk(text_child(qname = "vt:ST_Clsid/vt:clsid"))]
   VtClsid(crate::simple_type::StringValue),
+  /// Clipboard Data.
   #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtCf(std::boxed::Box<VtClipboardData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VtArrayChoice {
+  /// Variant.
   #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   VtVariant(std::boxed::Box<Variant>),
+  /// 1-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:byte/vt:i1"))]
   VtI1(crate::simple_type::SByteValue),
+  /// 2-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:short/vt:i2"))]
   VtI2(crate::simple_type::Int16Value),
+  /// 4-Byte Signed Integer.
   #[sdk(text_child(qname = "xsd:int/vt:i4"))]
   VtI4(crate::simple_type::Int32Value),
+  /// Integer.
   #[sdk(text_child(qname = "xsd:int/vt:int"))]
   VtInt(crate::simple_type::Int32Value),
+  /// 1-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedByte/vt:ui1"))]
   VtUi1(crate::simple_type::ByteValue),
+  /// 2-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedShort/vt:ui2"))]
   VtUi2(crate::simple_type::UInt16Value),
+  /// 4-Byte Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedInt/vt:ui4"))]
   VtUi4(crate::simple_type::UInt32Value),
+  /// Unsigned Integer.
   #[sdk(text_child(qname = "xsd:unsignedInt/vt:uint"))]
   VtUint(crate::simple_type::UInt32Value),
+  /// 4-Byte Real Number.
   #[sdk(text_child(qname = "xsd:float/vt:r4"))]
   VtR4(crate::simple_type::SingleValue),
+  /// 8-Byte Real Number.
   #[sdk(text_child(qname = "xsd:double/vt:r8"))]
   VtR8(crate::simple_type::DoubleValue),
+  /// Decimal.
   #[sdk(text_child(qname = "xsd:decimal/vt:decimal"))]
   VtDecimal(crate::simple_type::DecimalValue),
+  /// Basic String.
   #[sdk(text_child(qname = "xsd:string/vt:bstr"))]
   VtBstr(crate::simple_type::StringValue),
+  /// Date and Time.
   #[sdk(text_child(qname = "xsd:dateTime/vt:date"))]
   VtDate(crate::simple_type::DateTimeValue),
+  /// Boolean.
   #[sdk(text_child(qname = "xsd:boolean/vt:bool"))]
   VtBool(crate::simple_type::BooleanValue),
+  /// Error Status Code.
   #[sdk(text_child(qname = "vt:ST_Error/vt:error"))]
   VtError(crate::simple_type::StringValue),
+  /// Currency.
   #[sdk(text_child(qname = "vt:ST_Cy/vt:cy"))]
   VtCy(crate::simple_type::StringValue),
 }

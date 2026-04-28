@@ -152,7 +152,7 @@ pub struct TimelineCachePivotCaches {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCaches/")]
 pub struct OpenXmlPivotCachesElement {
-  ///PivotCache.
+  /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
   pub pivot_cache:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
@@ -1224,7 +1224,7 @@ pub struct FieldListActiveTabTopLevelEntity {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/x15:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
@@ -2331,8 +2331,10 @@ pub struct PivotRow {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleDbPrpopertiesChoice {
+  /// Defines the DbTables Class.
   #[sdk(child(qname = "x15:CT_DbTables/x15:dbTables"))]
   X15DbTables(std::boxed::Box<DbTables>),
+  /// Defines the DbCommand Class.
   #[sdk(child(qname = "x15:CT_DbCommand/x15:dbCommand"))]
   X15DbCommand(std::boxed::Box<DbCommand>),
 }

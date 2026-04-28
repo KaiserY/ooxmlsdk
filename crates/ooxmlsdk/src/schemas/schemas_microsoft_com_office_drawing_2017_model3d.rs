@@ -35,13 +35,13 @@ pub struct Model3D {
   /// _
   #[sdk(child(qname = "am3d:CT_Model3DTransform/am3d:trans"))]
   pub model3_d_transform: std::boxed::Box<Model3DTransform>,
-  ///Optional source attribution URL describes from whence the 3D model came.
+  /// Optional source attribution URL describes from whence the 3D model came.
   #[sdk(child(qname = "a1611:CT_PictureAttributionSourceURL/am3d:attrSrcUrl"))]
-  pub picture_attribution_source_url: Option<std::boxed::Box<PictureAttributionSourceUrl>>,
+  pub picture_attribution_source_url: Option<PictureAttributionSourceUrl>,
   /// _
   #[sdk(child(qname = "am3d:CT_Model3DRaster/am3d:raster"))]
   pub model3_d_raster: Option<std::boxed::Box<Model3DRaster>>,
-  ///Future Model3D extensions
+  /// Future Model3D extensions
   #[sdk(child(qname = "am3d:CT_Model3DExtensionList/am3d:extLst"))]
   pub model3_d_extension_list: Option<Model3DExtensionList>,
   #[sdk(choice(
@@ -527,7 +527,7 @@ pub struct Rotate3D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/am3d:extLst")]
 pub struct OfficeArtExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
@@ -839,7 +839,7 @@ pub struct ShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
@@ -1200,14 +1200,6 @@ pub struct DirectionalLight {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
-/// Defines the UnknownLight Class.
-///
-/// Available in Office2019 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is am3d:unkLight.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "am3d:CT_UnknownLight/am3d:unkLight")]
-pub struct UnknownLight {}
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DChoice {
   #[sdk(child(qname = "am3d:CT_ObjectViewport/am3d:objViewport"))]
@@ -1223,8 +1215,9 @@ pub enum Model3DChoice2 {
   Am3dSpotLight(std::boxed::Box<SpotLight>),
   #[sdk(child(qname = "am3d:CT_DirectionalLight/am3d:dirLight"))]
   Am3dDirLight(std::boxed::Box<DirectionalLight>),
-  #[sdk(child(qname = "am3d:CT_UnknownLight/am3d:unkLight"))]
-  Am3dUnkLight(std::boxed::Box<UnknownLight>),
+  /// Defines the UnknownLight Class.
+  #[sdk(empty_child(qname = "am3d:CT_UnknownLight/am3d:unkLight"))]
+  Am3dUnkLight,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
@@ -1232,14 +1225,12 @@ pub enum BlipChoice {
   AAlphaBiLevel(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaBiLevel>,
   ),
-  #[sdk(child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaCeiling>,
-  ),
-  #[sdk(child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaFloor>,
-  ),
+  /// Alpha Ceiling Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
+  AAlphaCeiling,
+  /// Alpha Floor Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
+  AAlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaInverse>,
@@ -1284,10 +1275,9 @@ pub enum BlipChoice {
   AFillOverlay(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillOverlay>,
   ),
-  #[sdk(child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Grayscale>,
-  ),
+  /// Gray Scale Effect.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
+  AGrayscl,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
@@ -1303,30 +1293,36 @@ pub enum BlipChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -1380,10 +1376,9 @@ pub enum ShapePropertiesChoice2 {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {

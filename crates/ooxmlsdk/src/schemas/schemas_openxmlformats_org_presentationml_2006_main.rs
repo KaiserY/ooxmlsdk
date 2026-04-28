@@ -745,118 +745,6 @@ pub enum ConformanceClassValues {
   #[sdk(rename = "transitional")]
   Transitional,
 }
-/// All Slides.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:sldAll.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:sldAll")]
-pub struct SlideAll {}
-/// Presenter Slide Show Mode.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:present.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:present")]
-pub struct PresenterSlideMode {}
-/// Stop Sound Action.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:endSnd.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:endSnd")]
-pub struct EndSoundAction {}
-/// Build As One.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:bldAsOne.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:bldAsOne")]
-pub struct BuildAsOne {}
-/// Slide Target.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:sldTgt.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:sldTgt")]
-pub struct SlideTarget {}
-/// Background.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:bg.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:bg")]
-pub struct BackgroundAnimation {}
-/// Defines the CircleTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:circle.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:circle")]
-pub struct CircleTransition {}
-/// Defines the DissolveTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:dissolve.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:dissolve")]
-pub struct DissolveTransition {}
-/// Defines the DiamondTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:diamond.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:diamond")]
-pub struct DiamondTransition {}
-/// Defines the NewsflashTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:newsflash.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:newsflash")]
-pub struct NewsflashTransition {}
-/// Defines the PlusTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:plus.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:plus")]
-pub struct PlusTransition {}
-/// Defines the RandomTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:random.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:random")]
-pub struct RandomTransition {}
-/// Defines the WedgeTransition Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p:wedge.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p:wedge")]
-pub struct WedgeTransition {}
-/// Defines the EmptyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/")]
-pub struct EmptyType {}
 /// Slide Range.
 ///
 /// Available in Office2007 and above.
@@ -1498,10 +1386,10 @@ pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///HTML Publishing Properties
+  /// HTML Publishing Properties
   #[sdk(child(qname = "p:CT_HtmlPublishProperties/p:htmlPubPr"))]
   pub html_publish_properties: Option<std::boxed::Box<HtmlPublishProperties>>,
-  ///Web Properties
+  /// Web Properties
   #[sdk(child(qname = "p:CT_WebProperties/p:webPr"))]
   pub web_properties: Option<std::boxed::Box<WebProperties>>,
   /// _
@@ -1549,20 +1437,20 @@ pub struct Slide {
   /// Represents the following attribute in the schema: :show
   #[sdk(attr(qname = ":show"))]
   pub show: Option<crate::simple_type::BooleanValue>,
-  ///Common slide data for slides
+  /// Common slide data for slides
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  ///Color Scheme Map Override.
+  /// Color Scheme Map Override.
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Slide Transition
+  /// Slide Transition
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
-  ///Slide Timing Information for a Slide
+  /// Slide Timing Information for a Slide
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,
   /// _
@@ -1626,7 +1514,7 @@ pub struct SlideLayout {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  ///Color Scheme Map Override.
+  /// Color Scheme Map Override.
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// _
@@ -1667,7 +1555,7 @@ pub struct SlideMaster {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  ///Color Scheme Map.
+  /// Color Scheme Map.
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
   /// _
@@ -1707,7 +1595,7 @@ pub struct HandoutMaster {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  ///Color Scheme Map.
+  /// Color Scheme Map.
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
   /// _
@@ -1731,7 +1619,7 @@ pub struct NotesMaster {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  ///Color Scheme Map.
+  /// Color Scheme Map.
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
   /// _
@@ -1769,10 +1657,10 @@ pub struct NotesSlide {
   /// Represents the following attribute in the schema: :showMasterPhAnim
   #[sdk(attr(qname = ":showMasterPhAnim"))]
   pub show_master_placeholder_animations: Option<crate::simple_type::BooleanValue>,
-  ///Common slide data for notes slides
+  /// Common slide data for notes slides
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  ///Color Scheme Map Override.
+  /// Color Scheme Map Override.
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// _
@@ -1856,25 +1744,25 @@ pub struct ViewProperties {
   /// Represents the following attribute in the schema: :showComments
   #[sdk(attr(qname = ":showComments"))]
   pub show_comments: Option<crate::simple_type::BooleanValue>,
-  ///Normal View Properties
+  /// Normal View Properties
   #[sdk(child(qname = "p:CT_NormalViewProperties/p:normalViewPr"))]
   pub normal_view_properties: Option<std::boxed::Box<NormalViewProperties>>,
-  ///Slide View Properties
+  /// Slide View Properties
   #[sdk(child(qname = "p:CT_SlideViewProperties/p:slideViewPr"))]
   pub slide_view_properties: Option<std::boxed::Box<SlideViewProperties>>,
-  ///Outline View Properties
+  /// Outline View Properties
   #[sdk(child(qname = "p:CT_OutlineViewProperties/p:outlineViewPr"))]
   pub outline_view_properties: Option<std::boxed::Box<OutlineViewProperties>>,
-  ///Notes Text View Properties
+  /// Notes Text View Properties
   #[sdk(child(qname = "p:CT_NotesTextViewProperties/p:notesTextViewPr"))]
   pub notes_text_view_properties: Option<std::boxed::Box<NotesTextViewProperties>>,
-  ///Slide Sorter View Properties
+  /// Slide Sorter View Properties
   #[sdk(child(qname = "p:CT_SlideSorterViewProperties/p:sorterViewPr"))]
   pub sorter_view_properties: Option<std::boxed::Box<SorterViewProperties>>,
-  ///Notes View Properties
+  /// Notes View Properties
   #[sdk(child(qname = "p:CT_NotesViewProperties/p:notesViewPr"))]
   pub notes_view_properties: Option<std::boxed::Box<NotesViewProperties>>,
-  ///Grid Spacing
+  /// Grid Spacing
   #[sdk(child(qname = "a:CT_PositiveSize2D/p:gridSpacing"))]
   pub grid_spacing: Option<GridSpacing>,
   /// _
@@ -2031,7 +1919,7 @@ pub struct StartSoundAction {
   /// Represents the following attribute in the schema: :loop
   #[sdk(attr(qname = ":loop"))]
   pub r#loop: Option<crate::simple_type::BooleanValue>,
-  ///Sound
+  /// Sound
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/p:snd"))]
   pub sound: std::boxed::Box<Sound>,
 }
@@ -2243,7 +2131,7 @@ pub struct ParallelTimeNode {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Parallel TimeNode
+  /// Parallel TimeNode
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
 }
@@ -2282,13 +2170,13 @@ pub struct SequenceTimeNode {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Common TimeNode Properties
+  /// Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
-  ///Previous Conditions List
+  /// Previous Conditions List
   #[sdk(child(qname = "p:CT_TLTimeConditionList/p:prevCondLst"))]
   pub previous_condition_list: Option<PreviousConditionList>,
-  ///Next Conditions List
+  /// Next Conditions List
   #[sdk(child(qname = "p:CT_TLTimeConditionList/p:nextCondLst"))]
   pub next_condition_list: Option<NextConditionList>,
 }
@@ -2304,7 +2192,7 @@ pub struct ExclusiveTimeNode {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Common TimeNode Properties
+  /// Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
 }
@@ -2403,13 +2291,13 @@ pub struct AnimateColor {
   /// _
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
-  ///By
+  /// By
   #[sdk(child(qname = "p:CT_TLByAnimateColorTransform/p:by"))]
   pub by_color: Option<std::boxed::Box<ByColor>>,
-  ///From
+  /// From
   #[sdk(child(qname = "a:CT_Color3/p:from"))]
   pub from_color: Option<std::boxed::Box<FromColor>>,
-  ///To
+  /// To
   #[sdk(child(qname = "a:CT_Color3/p:to"))]
   pub to_color: Option<std::boxed::Box<ToColor>>,
 }
@@ -2446,7 +2334,7 @@ pub struct AnimateEffect {
   /// _
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
-  ///Progress
+  /// Progress
   #[sdk(child(qname = "p:CT_TLAnimFloat/p:progress"))]
   pub progress: Option<std::boxed::Box<Progress>>,
 }
@@ -2655,10 +2543,10 @@ pub struct Command {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLSetBehavior/p:set")]
 pub struct SetBehavior {
-  ///Common Behavior
+  /// Common Behavior
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
-  ///To
+  /// To
   #[sdk(child(qname = "p:CT_TLAnimVariant/p:to"))]
   pub to_variant_value: Option<std::boxed::Box<ToVariantValue>>,
 }
@@ -2677,7 +2565,7 @@ pub struct Audio {
   /// Represents the following attribute in the schema: :isNarration
   #[sdk(attr(qname = ":isNarration"))]
   pub is_narration: Option<crate::simple_type::BooleanValue>,
-  ///Common Media Node Properties
+  /// Common Media Node Properties
   #[sdk(child(qname = "p:CT_TLCommonMediaNodeData/p:cMediaNode"))]
   pub common_media_node: std::boxed::Box<CommonMediaNode>,
 }
@@ -2696,7 +2584,7 @@ pub struct Video {
   /// Represents the following attribute in the schema: :fullScrn
   #[sdk(attr(qname = ":fullScrn"))]
   pub full_screen: Option<crate::simple_type::BooleanValue>,
-  ///Common Media Node Properties
+  /// Common Media Node Properties
   #[sdk(child(qname = "p:CT_TLCommonMediaNodeData/p:cMediaNode"))]
   pub common_media_node: std::boxed::Box<CommonMediaNode>,
 }
@@ -2980,7 +2868,7 @@ pub struct EndConditionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeConditionList/")]
 pub struct TimeListTimeConditionalListType {
-  ///Condition.
+  /// Condition.
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
   pub condition: Vec<Condition>,
 }
@@ -3157,7 +3045,7 @@ pub struct TimeAnimateValue {
   /// Represents the following attribute in the schema: :fmla
   #[sdk(attr(qname = ":fmla"))]
   pub fomula: Option<crate::simple_type::StringValue>,
-  ///Value
+  /// Value
   #[sdk(child(qname = "p:CT_TLAnimVariant/p:val"))]
   pub variant_value: Option<std::boxed::Box<VariantValue>>,
 }
@@ -3331,10 +3219,10 @@ pub struct CommonBehavior {
   /// _
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
-  ///Target Element
+  /// Target Element
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
   pub target_element: std::boxed::Box<TargetElement>,
-  ///Attribute Name List
+  /// Attribute Name List
   #[sdk(child(qname = "p:CT_TLBehaviorAttributeNameList/p:attrNameLst"))]
   pub attribute_name_list: Option<AttributeNameList>,
 }
@@ -3346,7 +3234,7 @@ pub struct CommonBehavior {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimFloat/p:progress")]
 pub struct Progress {
-  ///Float Value.
+  /// Float Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
   pub float_variant_value: std::boxed::Box<FloatVariantValue>,
 }
@@ -3448,7 +3336,7 @@ pub struct CommonMediaNode {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Common Time Node Properties
+  /// Common Time Node Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// _
@@ -3482,7 +3370,7 @@ pub struct Template {
   /// Represents the following attribute in the schema: :lvl
   #[sdk(attr(qname = ":lvl"))]
   pub level: Option<crate::simple_type::UInt32Value>,
-  ///Time Node List
+  /// Time Node List
   #[sdk(child(qname = "p:CT_RootTimeNode/p:tnLst"))]
   pub time_node_list: std::boxed::Box<TimeNodeList>,
 }
@@ -3591,7 +3479,7 @@ pub struct BuildParagraph {
   #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
   #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
   pub auto_advance: Option<crate::simple_type::StringValue>,
-  ///Template effects
+  /// Template effects
   #[sdk(child(qname = "p:CT_TLTemplateList/p:tmplLst"))]
   pub template_list: Option<TemplateList>,
 }
@@ -3753,7 +3641,7 @@ pub struct ExtensionListWithModification {
   /// Represents the following attribute in the schema: :mod
   #[sdk(attr(qname = ":mod"))]
   pub modify: Option<crate::simple_type::BooleanValue>,
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension: Vec<Extension>,
 }
@@ -3975,7 +3863,7 @@ pub struct Comment {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension: Vec<Extension>,
 }
@@ -4268,19 +4156,19 @@ pub struct EmbeddedFontDataIdType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_EmbeddedFontListEntry/p:embeddedFont")]
 pub struct EmbeddedFont {
-  ///Embedded Font Name
+  /// Embedded Font Name
   #[sdk(child(qname = "a:CT_TextFont/p:font"))]
   pub font: std::boxed::Box<Font>,
-  ///Regular Embedded Font
+  /// Regular Embedded Font
   #[sdk(child(qname = "p:CT_EmbeddedFontDataId/p:regular"))]
   pub regular_font: Option<RegularFont>,
-  ///Bold Embedded Font
+  /// Bold Embedded Font
   #[sdk(child(qname = "p:CT_EmbeddedFontDataId/p:bold"))]
   pub bold_font: Option<BoldFont>,
-  ///Italic Embedded Font
+  /// Italic Embedded Font
   #[sdk(child(qname = "p:CT_EmbeddedFontDataId/p:italic"))]
   pub italic_font: Option<ItalicFont>,
-  ///Bold Italic Embedded Font
+  /// Bold Italic Embedded Font
   #[sdk(child(qname = "p:CT_EmbeddedFontDataId/p:boldItalic"))]
   pub bold_italic_font: Option<BoldItalicFont>,
 }
@@ -4318,7 +4206,7 @@ pub struct CustomShow {
   /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
-  ///List of Presentation Slides
+  /// List of Presentation Slides
   #[sdk(child(qname = "p:CT_SlideRelationshipList/p:sldLst"))]
   pub slide_list: std::boxed::Box<SlideList>,
   /// _
@@ -4368,21 +4256,21 @@ pub struct NonVisualDrawingProperties {
     /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
-    ///Hyperlink associated with clicking or selecting the element.
+    /// Hyperlink associated with clicking or selecting the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
     pub hyperlink_on_click: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
         >,
     >,
-    ///Hyperlink associated with hovering over the element.
+    /// Hyperlink associated with hovering over the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
     pub hyperlink_on_hover: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
         >,
     >,
-    ///Future extension
+    /// Future extension
     #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
     pub non_visual_drawing_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
@@ -4403,7 +4291,7 @@ pub struct NonVisualShapeDrawingProperties {
   /// Represents the following attribute in the schema: :txBox
   #[sdk(attr(qname = ":txBox"))]
   pub text_box: Option<crate::simple_type::BooleanValue>,
-  ///Shape Locks
+  /// Shape Locks
   #[sdk(child(qname = "a:CT_ShapeLocking/a:spLocks"))]
   pub shape_locks: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapeLocks>,
@@ -4435,7 +4323,7 @@ pub struct ApplicationNonVisualDrawingProperties {
   /// Represents the following attribute in the schema: :userDrawn
   #[sdk(attr(qname = ":userDrawn"))]
   pub user_drawn: Option<crate::simple_type::BooleanValue>,
-  ///Placeholder Shape
+  /// Placeholder Shape
   #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
   pub placeholder_shape: Option<std::boxed::Box<PlaceholderShape>>,
   #[sdk(choice(
@@ -4462,13 +4350,13 @@ pub struct ApplicationNonVisualDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ShapeNonVisual/p:nvSpPr")]
 pub struct NonVisualShapeProperties {
-  ///Non-Visual Drawing Properties
+  /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/p:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Drawing Properties for a Shape
+  /// Non-Visual Drawing Properties for a Shape
   #[sdk(child(qname = "a:CT_NonVisualDrawingShapeProps/p:cNvSpPr"))]
   pub non_visual_shape_drawing_properties: std::boxed::Box<NonVisualShapeDrawingProperties>,
-  ///Application Non-Visual Drawing Properties
+  /// Application Non-Visual Drawing Properties
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingProps/p:nvPr"))]
   pub application_non_visual_drawing_properties:
     std::boxed::Box<ApplicationNonVisualDrawingProperties>,
@@ -4490,7 +4378,7 @@ pub struct ShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
@@ -4556,7 +4444,7 @@ pub struct ShapeStyle {
   pub effect_reference: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectReference,
   >,
-  ///Font Reference
+  /// Font Reference
   #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
   pub font_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
@@ -4569,11 +4457,11 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/p:txBody")]
 pub struct TextBody {
-  ///Body Properties
+  /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
-  ///Text List Styles
+  /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
@@ -4590,18 +4478,18 @@ pub struct TextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualConnectorProperties/p:cNvCxnSpPr")]
 pub struct NonVisualConnectorShapeDrawingProperties {
-  ///Connection Shape Locks
+  /// Connection Shape Locks
   #[sdk(child(qname = "a:CT_ConnectorLocking/a:cxnSpLocks"))]
   pub connection_shape_locks: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ConnectionShapeLocks,
     >,
   >,
-  ///Connection Start
+  /// Connection Start
   #[sdk(child(qname = "a:CT_Connection/a:stCxn"))]
   pub start_connection:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::StartConnection>,
-  ///Connection End
+  /// Connection End
   #[sdk(child(qname = "a:CT_Connection/a:endCxn"))]
   pub end_connection:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EndConnection>,
@@ -4618,14 +4506,14 @@ pub struct NonVisualConnectorShapeDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ConnectorNonVisual/p:nvCxnSpPr")]
 pub struct NonVisualConnectionShapeProperties {
-  ///Non-Visual Drawing Properties
+  /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/p:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Connector Shape Drawing Properties
+  /// Non-Visual Connector Shape Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualConnectorProperties/p:cNvCxnSpPr"))]
   pub non_visual_connector_shape_drawing_properties:
     std::boxed::Box<NonVisualConnectorShapeDrawingProperties>,
-  ///Application Non-Visual Drawing Properties
+  /// Application Non-Visual Drawing Properties
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingProps/p:nvPr"))]
   pub application_non_visual_drawing_properties:
     std::boxed::Box<ApplicationNonVisualDrawingProperties>,
@@ -4669,7 +4557,7 @@ pub struct NonVisualPictureProperties {
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/p:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Picture Drawing Properties
+  /// Non-Visual Picture Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualPictureProperties/p:cNvPicPr"))]
   pub non_visual_picture_drawing_properties: std::boxed::Box<NonVisualPictureDrawingProperties>,
   /// _
@@ -4703,7 +4591,7 @@ pub struct BlipFill {
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
   pub blip:
     Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blip>>,
-  ///Source Rectangle
+  /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SourceRectangle>,
@@ -4721,7 +4609,7 @@ pub struct BlipFill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/p:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
-  ///Graphic Frame Locks
+  /// Graphic Frame Locks
   #[sdk(child(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks"))]
   pub graphic_frame_locks: Option<
     std::boxed::Box<
@@ -4741,14 +4629,14 @@ pub struct NonVisualGraphicFrameDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GraphicalObjectFrameNonVisual/p:nvGraphicFramePr")]
 pub struct NonVisualGraphicFrameProperties {
-  ///Non-Visual Drawing Properties
+  /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/p:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Graphic Frame Drawing Properties
+  /// Non-Visual Graphic Frame Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/p:cNvGraphicFramePr"))]
   pub non_visual_graphic_frame_drawing_properties:
     std::boxed::Box<NonVisualGraphicFrameDrawingProperties>,
-  ///Application Non-Visual Drawing Properties
+  /// Application Non-Visual Drawing Properties
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingProps/p:nvPr"))]
   pub application_non_visual_drawing_properties:
     std::boxed::Box<ApplicationNonVisualDrawingProperties>,
@@ -4782,10 +4670,10 @@ pub struct Transform {
   /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
-  ///Offset
+  /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
   pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
-  ///Extents
+  /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
@@ -4818,70 +4706,70 @@ pub struct NonVisualGroupShapeDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:titleStyle")]
 pub struct TitleStyle {
-  ///Default Paragraph Style
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
     >,
   >,
-  ///List Level 1 Text Style
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   pub level1_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
     >,
   >,
-  ///List Level 2 Text Style
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   pub level2_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
     >,
   >,
-  ///List Level 3 Text Style
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   pub level3_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
     >,
   >,
-  ///List Level 4 Text Style
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   pub level4_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
     >,
   >,
-  ///List Level 5 Text Style
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   pub level5_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
     >,
   >,
-  ///List Level 6 Text Style
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   pub level6_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
     >,
   >,
-  ///List Level 7 Text Style
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   pub level7_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
     >,
   >,
-  ///List Level 8 Text Style
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   pub level8_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
     >,
   >,
-  ///List Level 9 Text Style
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   pub level9_paragraph_properties: Option<
     std::boxed::Box<
@@ -4906,70 +4794,70 @@ pub struct TitleStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:bodyStyle")]
 pub struct BodyStyle {
-  ///Default Paragraph Style
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
     >,
   >,
-  ///List Level 1 Text Style
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   pub level1_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
     >,
   >,
-  ///List Level 2 Text Style
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   pub level2_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
     >,
   >,
-  ///List Level 3 Text Style
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   pub level3_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
     >,
   >,
-  ///List Level 4 Text Style
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   pub level4_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
     >,
   >,
-  ///List Level 5 Text Style
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   pub level5_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
     >,
   >,
-  ///List Level 6 Text Style
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   pub level6_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
     >,
   >,
-  ///List Level 7 Text Style
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   pub level7_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
     >,
   >,
-  ///List Level 8 Text Style
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   pub level8_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
     >,
   >,
-  ///List Level 9 Text Style
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   pub level9_paragraph_properties: Option<
     std::boxed::Box<
@@ -4994,70 +4882,70 @@ pub struct BodyStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:otherStyle")]
 pub struct OtherStyle {
-  ///Default Paragraph Style
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
     >,
   >,
-  ///List Level 1 Text Style
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   pub level1_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
     >,
   >,
-  ///List Level 2 Text Style
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   pub level2_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
     >,
   >,
-  ///List Level 3 Text Style
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   pub level3_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
     >,
   >,
-  ///List Level 4 Text Style
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   pub level4_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
     >,
   >,
-  ///List Level 5 Text Style
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   pub level5_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
     >,
   >,
-  ///List Level 6 Text Style
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   pub level6_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
     >,
   >,
-  ///List Level 7 Text Style
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   pub level7_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
     >,
   >,
-  ///List Level 8 Text Style
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   pub level8_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
     >,
   >,
-  ///List Level 9 Text Style
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   pub level9_paragraph_properties: Option<
     std::boxed::Box<
@@ -5082,70 +4970,70 @@ pub struct OtherStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:defaultTextStyle")]
 pub struct DefaultTextStyle {
-  ///Default Paragraph Style
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
     >,
   >,
-  ///List Level 1 Text Style
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   pub level1_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
     >,
   >,
-  ///List Level 2 Text Style
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   pub level2_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
     >,
   >,
-  ///List Level 3 Text Style
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   pub level3_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
     >,
   >,
-  ///List Level 4 Text Style
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   pub level4_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
     >,
   >,
-  ///List Level 5 Text Style
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   pub level5_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
     >,
   >,
-  ///List Level 6 Text Style
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   pub level6_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
     >,
   >,
-  ///List Level 7 Text Style
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   pub level7_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
     >,
   >,
-  ///List Level 8 Text Style
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   pub level8_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
     >,
   >,
-  ///List Level 9 Text Style
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   pub level9_paragraph_properties: Option<
     std::boxed::Box<
@@ -5170,70 +5058,70 @@ pub struct DefaultTextStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:notesStyle")]
 pub struct NotesStyle {
-  ///Default Paragraph Style
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
     >,
   >,
-  ///List Level 1 Text Style
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   pub level1_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
     >,
   >,
-  ///List Level 2 Text Style
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   pub level2_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
     >,
   >,
-  ///List Level 3 Text Style
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   pub level3_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
     >,
   >,
-  ///List Level 4 Text Style
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   pub level4_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
     >,
   >,
-  ///List Level 5 Text Style
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   pub level5_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
     >,
   >,
-  ///List Level 6 Text Style
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   pub level6_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
     >,
   >,
-  ///List Level 7 Text Style
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   pub level7_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
     >,
   >,
-  ///List Level 8 Text Style
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   pub level8_paragraph_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
     >,
   >,
-  ///List Level 9 Text Style
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   pub level9_paragraph_properties: Option<
     std::boxed::Box<
@@ -5320,16 +5208,16 @@ pub struct CommonSlideData {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  ///Slide Background
+  /// Slide Background
   #[sdk(child(qname = "p:CT_Background/p:bg"))]
   pub background: Option<std::boxed::Box<Background>>,
-  ///Shape Tree
+  /// Shape Tree
   #[sdk(child(qname = "p:CT_GroupShape/p:spTree"))]
   pub shape_tree: std::boxed::Box<ShapeTree>,
-  ///Customer Data List
+  /// Customer Data List
   #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
   pub customer_data_list: Option<std::boxed::Box<CustomerDataList>>,
-  ///List of controls
+  /// List of controls
   #[sdk(child(qname = "p:CT_ControlList/p:controls"))]
   pub control_list: Option<ControlList>,
   /// _
@@ -5457,11 +5345,11 @@ pub struct NormalViewPortionType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scale2D/p:scale")]
 pub struct ScaleFactor {
-  ///Horizontal Ratio
+  /// Horizontal Ratio
   #[sdk(child(qname = "a:CT_Ratio/a:sx"))]
   pub scale_x:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ScaleX>,
-  ///Vertical Ratio
+  /// Vertical Ratio
   #[sdk(child(qname = "a:CT_Ratio/a:sy"))]
   pub scale_y:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ScaleY>,
@@ -5592,10 +5480,10 @@ pub struct CommonViewProperties {
   /// Represents the following attribute in the schema: :varScale
   #[sdk(attr(qname = ":varScale"))]
   pub variable_scale: Option<crate::simple_type::BooleanValue>,
-  ///View Scale
+  /// View Scale
   #[sdk(child(qname = "a:CT_Scale2D/p:scale"))]
   pub scale_factor: std::boxed::Box<ScaleFactor>,
-  ///View Origin
+  /// View Origin
   #[sdk(child(qname = "a:CT_Point2D/p:origin"))]
   pub origin: std::boxed::Box<Origin>,
 }
@@ -5699,10 +5587,10 @@ pub struct CommonSlideViewProperties {
   /// Represents the following attribute in the schema: :showGuides
   #[sdk(attr(qname = ":showGuides"))]
   pub show_guides: Option<crate::simple_type::BooleanValue>,
-  ///Base properties for Slide View
+  /// Base properties for Slide View
   #[sdk(child(qname = "p:CT_CommonViewProperties/p:cViewPr"))]
   pub common_view_properties: std::boxed::Box<CommonViewProperties>,
-  ///List of Guides
+  /// List of Guides
   #[sdk(child(qname = "p:CT_GuideList/p:guideLst"))]
   pub guide_list: Option<GuideList>,
 }
@@ -5751,10 +5639,10 @@ pub struct NormalViewProperties {
   /// Represents the following attribute in the schema: :preferSingleView
   #[sdk(attr(qname = ":preferSingleView"))]
   pub prefer_single_view: Option<crate::simple_type::BooleanValue>,
-  ///Normal View Restored Left Properties
+  /// Normal View Restored Left Properties
   #[sdk(child(qname = "p:CT_NormalViewPortion/p:restoredLeft"))]
   pub restored_left: std::boxed::Box<RestoredLeft>,
-  ///Normal View Restored Top Properties
+  /// Normal View Restored Top Properties
   #[sdk(child(qname = "p:CT_NormalViewPortion/p:restoredTop"))]
   pub restored_top: std::boxed::Box<RestoredTop>,
   /// _
@@ -5784,10 +5672,10 @@ pub struct SlideViewProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_OutlineViewProperties/p:outlineViewPr")]
 pub struct OutlineViewProperties {
-  ///Common View Properties
+  /// Common View Properties
   #[sdk(child(qname = "p:CT_CommonViewProperties/p:cViewPr"))]
   pub common_view_properties: std::boxed::Box<CommonViewProperties>,
-  ///List of Presentation Slides
+  /// List of Presentation Slides
   #[sdk(child(qname = "p:CT_OutlineViewSlideList/p:sldLst"))]
   pub outline_view_slide_list: Option<OutlineViewSlideList>,
   /// _
@@ -5802,7 +5690,7 @@ pub struct OutlineViewProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_NotesTextViewProperties/p:notesTextViewPr")]
 pub struct NotesTextViewProperties {
-  ///Base properties for Notes View
+  /// Base properties for Notes View
   #[sdk(child(qname = "p:CT_CommonViewProperties/p:cViewPr"))]
   pub common_view_properties: std::boxed::Box<CommonViewProperties>,
   /// _
@@ -5824,7 +5712,7 @@ pub struct SorterViewProperties {
   /// Represents the following attribute in the schema: :showFormatting
   #[sdk(attr(qname = ":showFormatting"))]
   pub show_formatting: Option<crate::simple_type::BooleanValue>,
-  ///Base properties for Slide Sorter View
+  /// Base properties for Slide Sorter View
   #[sdk(child(qname = "p:CT_CommonViewProperties/p:cViewPr"))]
   pub common_view_properties: std::boxed::Box<CommonViewProperties>,
   /// _
@@ -5839,7 +5727,7 @@ pub struct SorterViewProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_NotesViewProperties/p:notesViewPr")]
 pub struct NotesViewProperties {
-  ///Common Slide View Properties
+  /// Common Slide View Properties
   #[sdk(child(qname = "p:CT_CommonSlideViewProperties/p:cSldViewPr"))]
   pub common_slide_view_properties: std::boxed::Box<CommonSlideViewProperties>,
   /// _
@@ -6054,10 +5942,10 @@ pub struct ShowPropertiesExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Picture/p:pic")]
 pub struct Picture {
-  ///Non-Visual Properties for a Picture
+  /// Non-Visual Properties for a Picture
   #[sdk(child(qname = "p:CT_PictureNonVisual/p:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
-  ///Picture Fill
+  /// Picture Fill
   #[sdk(child(qname = "a:CT_BlipFillProperties/p:blipFill"))]
   pub blip_fill: std::boxed::Box<BlipFill>,
   /// _
@@ -6221,7 +6109,7 @@ pub struct Timing {
   /// _
   #[sdk(child(qname = "p:CT_RootTimeNode/p:tnLst"))]
   pub time_node_list: Option<std::boxed::Box<TimeNodeList>>,
-  ///Build List
+  /// Build List
   #[sdk(child(qname = "p:CT_BuildList/p:bldLst"))]
   pub build_list: Option<BuildList>,
   /// _
@@ -6271,10 +6159,10 @@ pub struct Background {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:spTree")]
 pub struct ShapeTree {
-  ///Non-Visual Properties for a Group Shape
+  /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
-  ///Group Shape Properties
+  /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
@@ -6302,10 +6190,10 @@ pub struct ShapeTree {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:grpSp")]
 pub struct GroupShape {
-  ///Non-Visual Properties for a Group Shape
+  /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
-  ///Group Shape Properties
+  /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
@@ -6396,14 +6284,14 @@ pub struct CommonSlideDataExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr")]
 pub struct NonVisualGroupShapeProperties {
-  ///Non-visual Drawing Properties
+  /// Non-visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/p:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Group Shape Drawing Properties
+  /// Non-Visual Group Shape Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/p:cNvGrpSpPr"))]
   pub non_visual_group_shape_drawing_properties:
     std::boxed::Box<NonVisualGroupShapeDrawingProperties>,
-  ///Non-Visual Properties
+  /// Non-Visual Properties
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingProps/p:nvPr"))]
   pub application_non_visual_drawing_properties:
     std::boxed::Box<ApplicationNonVisualDrawingProperties>,
@@ -6425,7 +6313,7 @@ pub struct GroupShapeProperties {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  ///2D Transform for Grouped Objects
+  /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
@@ -6469,16 +6357,16 @@ pub struct Shape {
   /// Represents the following attribute in the schema: :useBgFill
   #[sdk(attr(qname = ":useBgFill"))]
   pub use_background_fill: Option<crate::simple_type::BooleanValue>,
-  ///Non-Visual Properties for a Shape
+  /// Non-Visual Properties for a Shape
   #[sdk(child(qname = "p:CT_ShapeNonVisual/p:nvSpPr"))]
   pub non_visual_shape_properties: std::boxed::Box<NonVisualShapeProperties>,
   /// _
   #[sdk(child(qname = "a:CT_ShapeProperties/p:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  ///Shape Style
+  /// Shape Style
   #[sdk(child(qname = "a:CT_ShapeStyle/p:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
-  ///Shape Text Body
+  /// Shape Text Body
   #[sdk(child(qname = "a:CT_TextBody/p:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
   /// _
@@ -6493,17 +6381,17 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame")]
 pub struct GraphicFrame {
-  ///Non-Visual Properties for a Graphic Frame
+  /// Non-Visual Properties for a Graphic Frame
   #[sdk(child(qname = "p:CT_GraphicalObjectFrameNonVisual/p:nvGraphicFramePr"))]
   pub non_visual_graphic_frame_properties: std::boxed::Box<NonVisualGraphicFrameProperties>,
-  ///2D Transform for Graphic Frame
+  /// 2D Transform for Graphic Frame
   #[sdk(child(qname = "a:CT_Transform2D/p:xfrm"))]
   pub transform: std::boxed::Box<Transform>,
   /// _
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
-  ///Extension List with Modification Flag
+  /// Extension List with Modification Flag
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -6515,13 +6403,13 @@ pub struct GraphicFrame {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Connector/p:cxnSp")]
 pub struct ConnectionShape {
-  ///Non-Visual Properties for a Connection Shape
+  /// Non-Visual Properties for a Connection Shape
   #[sdk(child(qname = "p:CT_ConnectorNonVisual/p:nvCxnSpPr"))]
   pub non_visual_connection_shape_properties: std::boxed::Box<NonVisualConnectionShapeProperties>,
-  ///Shape Properties
+  /// Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/p:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  ///Connector Shape Style
+  /// Connector Shape Style
   #[sdk(child(qname = "a:CT_ShapeStyle/p:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// _
@@ -7144,7 +7032,7 @@ pub struct SlideMasterIdList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_NotesMasterIdList/p:notesMasterIdLst")]
 pub struct NotesMasterIdList {
-  ///Notes Master ID
+  /// Notes Master ID
   #[sdk(child(qname = "p:CT_NotesMasterIdListEntry/p:notesMasterId"))]
   pub notes_master_id: Option<std::boxed::Box<NotesMasterId>>,
 }
@@ -7156,7 +7044,7 @@ pub struct NotesMasterIdList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_HandoutMasterIdList/p:handoutMasterIdLst")]
 pub struct HandoutMasterIdList {
-  ///Handout Master ID
+  /// Handout Master ID
   #[sdk(child(qname = "p:CT_HandoutMasterIdListEntry/p:handoutMasterId"))]
   pub handout_master_id: Option<std::boxed::Box<HandoutMasterId>>,
 }
@@ -7837,13 +7725,13 @@ pub struct SlideLayoutIdList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideMasterTextStyles/p:txStyles")]
 pub struct TextStyles {
-  ///Slide Master Title Text Style
+  /// Slide Master Title Text Style
   #[sdk(child(qname = "a:CT_TextListStyle/p:titleStyle"))]
   pub title_style: Option<std::boxed::Box<TitleStyle>>,
-  ///Slide Master Body Text Style
+  /// Slide Master Body Text Style
   #[sdk(child(qname = "a:CT_TextListStyle/p:bodyStyle"))]
   pub body_style: Option<std::boxed::Box<BodyStyle>>,
-  ///Slide Master Other Text Style
+  /// Slide Master Other Text Style
   #[sdk(child(qname = "a:CT_TextListStyle/p:otherStyle"))]
   pub other_style: Option<std::boxed::Box<OtherStyle>>,
   /// _
@@ -8281,12 +8169,10 @@ pub struct PlaceholderExtension {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorMapOverrideChoice {
-  #[sdk(child(qname = "a:CT_EmptyElement/a:masterClrMapping"))]
-  AMasterClrMapping(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::MasterColorMapping,
-    >,
-  ),
+  /// Master Color Mapping.
+  #[sdk(empty_child(qname = "a:CT_EmptyElement/a:masterClrMapping"))]
+  AMasterClrMapping,
+  /// Override Color Mapping.
   #[sdk(child(qname = "a:CT_ColorMapping/a:overrideClrMapping"))]
   AOverrideClrMapping(
     std::boxed::Box<
@@ -8328,30 +8214,36 @@ pub enum BackgroundPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundStyleReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8366,8 +8258,9 @@ pub enum OleObjectChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TargetElementChoice {
-  #[sdk(child(qname = "p:CT_Empty/p:sldTgt"))]
-  PSldTgt(std::boxed::Box<SlideTarget>),
+  /// Slide Target.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:sldTgt"))]
+  PSldTgt,
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt"))]
   PSndTgt(std::boxed::Box<SoundTarget>),
   #[sdk(child(qname = "p:CT_TLShapeTargetElement/p:spTgt"))]
@@ -8384,57 +8277,72 @@ pub enum TargetElementChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionChoice {
+  /// Target Element Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
   PTgtEl(std::boxed::Box<TargetElement>),
+  /// Time Node.
   #[sdk(child(qname = "p:CT_TLTriggerTimeNodeID/p:tn"))]
   PTn(std::boxed::Box<TimeNode>),
+  /// Runtime Node Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTriggerRuntimeNode/p:rtn"))]
   PRtn(std::boxed::Box<RuntimeNodeTrigger>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndSyncChoice {
+  /// Target Element Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
   PTgtEl(std::boxed::Box<TargetElement>),
+  /// Time Node.
   #[sdk(child(qname = "p:CT_TLTriggerTimeNodeID/p:tn"))]
   PTn(std::boxed::Box<TimeNode>),
+  /// Runtime Node Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTriggerRuntimeNode/p:rtn"))]
   PRtn(std::boxed::Box<RuntimeNodeTrigger>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TimeListConditionalTypeChoice {
+  /// Target Element Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
   PTgtEl(std::boxed::Box<TargetElement>),
+  /// Time Node.
   #[sdk(child(qname = "p:CT_TLTriggerTimeNodeID/p:tn"))]
   PTn(std::boxed::Box<TimeNode>),
+  /// Runtime Node Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTriggerRuntimeNode/p:rtn"))]
   PRtn(std::boxed::Box<RuntimeNodeTrigger>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorValueChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8442,30 +8350,36 @@ pub enum ColorValueChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PenColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8473,30 +8387,36 @@ pub enum PenColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8504,49 +8424,66 @@ pub enum ColorTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ToVariantValueChoice {
+  /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
   PBoolVal(std::boxed::Box<BooleanVariantValue>),
+  /// Integer.
   #[sdk(child(qname = "p:CT_TLAnimVariantIntegerVal/p:intVal"))]
   PIntVal(std::boxed::Box<IntegerVariantValue>),
+  /// Float Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
   PFltVal(std::boxed::Box<FloatVariantValue>),
+  /// String Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantStringVal/p:strVal"))]
   PStrVal(std::boxed::Box<StringVariantValue>),
+  /// Color Value.
   #[sdk(child(qname = "a:CT_Color/p:clrVal"))]
   PClrVal(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VariantValueChoice {
+  /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
   PBoolVal(std::boxed::Box<BooleanVariantValue>),
+  /// Integer.
   #[sdk(child(qname = "p:CT_TLAnimVariantIntegerVal/p:intVal"))]
   PIntVal(std::boxed::Box<IntegerVariantValue>),
+  /// Float Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
   PFltVal(std::boxed::Box<FloatVariantValue>),
+  /// String Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantStringVal/p:strVal"))]
   PStrVal(std::boxed::Box<StringVariantValue>),
+  /// Color Value.
   #[sdk(child(qname = "a:CT_Color/p:clrVal"))]
   PClrVal(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TimeListAnimationVariantTypeChoice {
+  /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
   PBoolVal(std::boxed::Box<BooleanVariantValue>),
+  /// Integer.
   #[sdk(child(qname = "p:CT_TLAnimVariantIntegerVal/p:intVal"))]
   PIntVal(std::boxed::Box<IntegerVariantValue>),
+  /// Float Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
   PFltVal(std::boxed::Box<FloatVariantValue>),
+  /// String Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantStringVal/p:strVal"))]
   PStrVal(std::boxed::Box<StringVariantValue>),
+  /// Color Value.
   #[sdk(child(qname = "a:CT_Color/p:clrVal"))]
   PClrVal(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BuildSubElementChoice {
+  /// Build Diagram.
   #[sdk(child(qname = "a:CT_AnimationDgmBuildProperties/a:bldDgm"))]
   ABldDgm(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BuildDiagram>,
   ),
+  /// Build Chart.
   #[sdk(child(qname = "a:CT_AnimationChartBuildProperties/a:bldChart"))]
   ABldChart(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BuildChart>,
@@ -8554,26 +8491,34 @@ pub enum BuildSubElementChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BuildGraphicsChoice {
-  #[sdk(child(qname = "p:CT_Empty/p:bldAsOne"))]
-  PBldAsOne(std::boxed::Box<BuildAsOne>),
+  /// Build As One.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:bldAsOne"))]
+  PBldAsOne,
+  /// Build Sub Elements.
   #[sdk(child(qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub"))]
   PBldSub(std::boxed::Box<BuildSubElement>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BuildListChoice {
+  /// Build Paragraph.
   #[sdk(child(qname = "p:CT_TLBuildParagraph/p:bldP"))]
   PBldP(std::boxed::Box<BuildParagraph>),
+  /// Build Diagram.
   #[sdk(child(qname = "p:CT_TLBuildDiagram/p:bldDgm"))]
   PBldDgm(std::boxed::Box<BuildDiagram>),
+  /// Build OLE Chart.
   #[sdk(child(qname = "p:CT_TLOleBuildChart/p:bldOleChart"))]
   PBldOleChart(std::boxed::Box<BuildOleChart>),
+  /// Build Graphics.
   #[sdk(child(qname = "p:CT_TLGraphicalObjectBuild/p:bldGraphic"))]
   PBldGraphic(std::boxed::Box<BuildGraphics>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ByColorChoice {
+  /// RGB.
   #[sdk(child(qname = "p:CT_TLByRgbColorTransform/p:rgb"))]
   PRgb(std::boxed::Box<RgbColor>),
+  /// HSL.
   #[sdk(child(qname = "p:CT_TLByHslColorTransform/p:hsl"))]
   PHsl(std::boxed::Box<HslColor>),
 }
@@ -8641,30 +8586,36 @@ pub enum ToColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Color3TypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8726,10 +8677,9 @@ pub enum ShapePropertiesChoice2 {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
@@ -8753,60 +8703,70 @@ pub enum BlipFillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextListStyleTypeChoice {
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   ADefPPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
     >,
   ),
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   ALvl1pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
     >,
   ),
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   ALvl2pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
     >,
   ),
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   ALvl3pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
     >,
   ),
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   ALvl4pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
     >,
   ),
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   ALvl5pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
     >,
   ),
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   ALvl6pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
     >,
   ),
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   ALvl7pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
     >,
   ),
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   ALvl8pPr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
     >,
   ),
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   ALvl9pPr(
     std::boxed::Box<
@@ -8882,38 +8842,45 @@ pub enum TransitionChoice {
   PBlinds(std::boxed::Box<BlindsTransition>),
   #[sdk(child(qname = "p:CT_OrientationTransition/p:checker"))]
   PChecker(std::boxed::Box<CheckerTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:circle"))]
-  PCircle(std::boxed::Box<CircleTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:dissolve"))]
-  PDissolve(std::boxed::Box<DissolveTransition>),
+  /// Defines the CircleTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:circle"))]
+  PCircle,
+  /// Defines the DissolveTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:dissolve"))]
+  PDissolve,
   #[sdk(child(qname = "p:CT_OrientationTransition/p:comb"))]
   PComb(std::boxed::Box<CombTransition>),
   #[sdk(child(qname = "p:CT_EightDirectionTransition/p:cover"))]
   PCover(std::boxed::Box<CoverTransition>),
   #[sdk(child(qname = "p:CT_OptionalBlackTransition/p:cut"))]
   PCut(std::boxed::Box<CutTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:diamond"))]
-  PDiamond(std::boxed::Box<DiamondTransition>),
+  /// Defines the DiamondTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:diamond"))]
+  PDiamond,
   #[sdk(child(qname = "p:CT_OptionalBlackTransition/p:fade"))]
   PFade(std::boxed::Box<FadeTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:newsflash"))]
-  PNewsflash(std::boxed::Box<NewsflashTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:plus"))]
-  PPlus(std::boxed::Box<PlusTransition>),
+  /// Defines the NewsflashTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:newsflash"))]
+  PNewsflash,
+  /// Defines the PlusTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:plus"))]
+  PPlus,
   #[sdk(child(qname = "p:CT_EightDirectionTransition/p:pull"))]
   PPull(std::boxed::Box<PullTransition>),
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p:push"))]
   PPush(std::boxed::Box<PushTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:random"))]
-  PRandom(std::boxed::Box<RandomTransition>),
+  /// Defines the RandomTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:random"))]
+  PRandom,
   #[sdk(child(qname = "p:CT_OrientationTransition/p:randomBar"))]
   PRandomBar(std::boxed::Box<RandomBarTransition>),
   #[sdk(child(qname = "p:CT_SplitTransition/p:split"))]
   PSplit(std::boxed::Box<SplitTransition>),
   #[sdk(child(qname = "p:CT_CornerDirectionTransition/p:strips"))]
   PStrips(std::boxed::Box<StripsTransition>),
-  #[sdk(child(qname = "p:CT_Empty/p:wedge"))]
-  PWedge(std::boxed::Box<WedgeTransition>),
+  /// Defines the WedgeTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:wedge"))]
+  PWedge,
   #[sdk(child(qname = "p:CT_WheelTransition/p:wheel"))]
   PWheel(std::boxed::Box<WheelTransition>),
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p:wipe"))]
@@ -8921,12 +8888,9 @@ pub enum TransitionChoice {
   #[sdk(child(qname = "p:CT_InOutTransition/p:zoom"))]
   PZoom(std::boxed::Box<ZoomTransition>),
   #[cfg(feature = "microsoft365")]
-  #[sdk(child(qname = "p:CT_Empty/p14:flash"))]
-  P14Flash(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::FlashTransition,
-    >,
-  ),
+  /// Defines the FlashTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p14:flash"))]
+  P14Flash,
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p14:vortex"))]
   P14Vortex(
@@ -8963,12 +8927,9 @@ pub enum TransitionChoice {
     >,
   ),
   #[cfg(feature = "microsoft365")]
-  #[sdk(child(qname = "p:CT_Empty/p14:honeycomb"))]
-  P14Honeycomb(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::HoneycombTransition,
-    >,
-  ),
+  /// Defines the HoneycombTransition Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p14:honeycomb"))]
+  P14Honeycomb,
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_PrismTransition/p14:prism"))]
   P14Prism(
@@ -9063,8 +9024,10 @@ pub enum TransitionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice {
+  /// Background Properties.
   #[sdk(child(qname = "p:CT_BackgroundProperties/p:bgPr"))]
   PBgPr(std::boxed::Box<BackgroundProperties>),
+  /// Background Style Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/p:bgRef"))]
   PBgRef(std::boxed::Box<BackgroundStyleReference>),
 }
@@ -9114,8 +9077,10 @@ pub enum GroupShapeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeTypeChoice {
+  /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   PNvGrpSpPr(std::boxed::Box<NonVisualGroupShapeProperties>),
+  /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   PGrpSpPr(std::boxed::Box<GroupShapeProperties>),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
@@ -9154,10 +9119,9 @@ pub enum GroupShapePropertiesChoice {
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
   ),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupFill>,
-  ),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
@@ -9172,14 +9136,19 @@ pub enum GroupShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTargetChoice {
-  #[sdk(child(qname = "p:CT_Empty/p:bg"))]
-  PBg(std::boxed::Box<BackgroundAnimation>),
+  /// Background.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:bg"))]
+  PBg,
+  /// Subshape.
   #[sdk(child(qname = "p:CT_TLSubShapeId/p:subSp"))]
   PSubSp(std::boxed::Box<SubShape>),
+  /// OLE Chart Element.
   #[sdk(child(qname = "p:CT_TLOleChartTargetElement/p:oleChartEl"))]
   POleChartEl(std::boxed::Box<OleChartElement>),
+  /// Text Element.
   #[sdk(child(qname = "p:CT_TLTextTargetElement/p:txEl"))]
   PTxEl(std::boxed::Box<TextElement>),
+  /// Graphic Element.
   #[sdk(child(qname = "a:CT_AnimationElementChoice/p:graphicEl"))]
   PGraphicEl(std::boxed::Box<GraphicElement>),
 }
@@ -9274,95 +9243,136 @@ pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum IterateChoice {
+  /// Time Absolute.
   #[sdk(child(qname = "p:CT_TLIterateIntervalTime/p:tmAbs"))]
   PTmAbs(std::boxed::Box<TimeAbsolute>),
+  /// Time Percentage.
   #[sdk(child(qname = "p:CT_TLIterateIntervalPercentage/p:tmPct"))]
   PTmPct(std::boxed::Box<TimePercentage>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChildTimeNodeListChoice {
+  /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
   PPar(std::boxed::Box<ParallelTimeNode>),
+  /// Sequence Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeSequence/p:seq"))]
   PSeq(std::boxed::Box<SequenceTimeNode>),
+  /// Exclusive.
   #[sdk(child(qname = "p:CT_TLTimeNodeExclusive/p:excl"))]
   PExcl(std::boxed::Box<ExclusiveTimeNode>),
+  /// Animate.
   #[sdk(child(qname = "p:CT_TLAnimateBehavior/p:anim"))]
   PAnim(std::boxed::Box<Animate>),
+  /// Animate Color Behavior.
   #[sdk(child(qname = "p:CT_TLAnimateColorBehavior/p:animClr"))]
   PAnimClr(std::boxed::Box<AnimateColor>),
+  /// Animate Effect.
   #[sdk(child(qname = "p:CT_TLAnimateEffectBehavior/p:animEffect"))]
   PAnimEffect(std::boxed::Box<AnimateEffect>),
+  /// Animate Motion.
   #[sdk(child(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion"))]
   PAnimMotion(std::boxed::Box<AnimateMotion>),
+  /// Animate Rotation.
   #[sdk(child(qname = "p:CT_TLAnimateRotationBehavior/p:animRot"))]
   PAnimRot(std::boxed::Box<AnimateRotation>),
+  /// Animate Scale.
   #[sdk(child(qname = "p:CT_TLAnimateScaleBehavior/p:animScale"))]
   PAnimScale(std::boxed::Box<AnimateScale>),
+  /// Command.
   #[sdk(child(qname = "p:CT_TLCommandBehavior/p:cmd"))]
   PCmd(std::boxed::Box<Command>),
+  /// Set Time Node Behavior.
   #[sdk(child(qname = "p:CT_TLSetBehavior/p:set"))]
   PSet(std::boxed::Box<SetBehavior>),
+  /// Audio.
   #[sdk(child(qname = "p:CT_TLMediaNodeAudio/p:audio"))]
   PAudio(std::boxed::Box<Audio>),
+  /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
   PVideo(std::boxed::Box<Video>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubTimeNodeListChoice {
+  /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
   PPar(std::boxed::Box<ParallelTimeNode>),
+  /// Sequence Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeSequence/p:seq"))]
   PSeq(std::boxed::Box<SequenceTimeNode>),
+  /// Exclusive.
   #[sdk(child(qname = "p:CT_TLTimeNodeExclusive/p:excl"))]
   PExcl(std::boxed::Box<ExclusiveTimeNode>),
+  /// Animate.
   #[sdk(child(qname = "p:CT_TLAnimateBehavior/p:anim"))]
   PAnim(std::boxed::Box<Animate>),
+  /// Animate Color Behavior.
   #[sdk(child(qname = "p:CT_TLAnimateColorBehavior/p:animClr"))]
   PAnimClr(std::boxed::Box<AnimateColor>),
+  /// Animate Effect.
   #[sdk(child(qname = "p:CT_TLAnimateEffectBehavior/p:animEffect"))]
   PAnimEffect(std::boxed::Box<AnimateEffect>),
+  /// Animate Motion.
   #[sdk(child(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion"))]
   PAnimMotion(std::boxed::Box<AnimateMotion>),
+  /// Animate Rotation.
   #[sdk(child(qname = "p:CT_TLAnimateRotationBehavior/p:animRot"))]
   PAnimRot(std::boxed::Box<AnimateRotation>),
+  /// Animate Scale.
   #[sdk(child(qname = "p:CT_TLAnimateScaleBehavior/p:animScale"))]
   PAnimScale(std::boxed::Box<AnimateScale>),
+  /// Command.
   #[sdk(child(qname = "p:CT_TLCommandBehavior/p:cmd"))]
   PCmd(std::boxed::Box<Command>),
+  /// Set Time Node Behavior.
   #[sdk(child(qname = "p:CT_TLSetBehavior/p:set"))]
   PSet(std::boxed::Box<SetBehavior>),
+  /// Audio.
   #[sdk(child(qname = "p:CT_TLMediaNodeAudio/p:audio"))]
   PAudio(std::boxed::Box<Audio>),
+  /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
   PVideo(std::boxed::Box<Video>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TimeTypeListTypeChoice {
+  /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
   PPar(std::boxed::Box<ParallelTimeNode>),
+  /// Sequence Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeSequence/p:seq"))]
   PSeq(std::boxed::Box<SequenceTimeNode>),
+  /// Exclusive.
   #[sdk(child(qname = "p:CT_TLTimeNodeExclusive/p:excl"))]
   PExcl(std::boxed::Box<ExclusiveTimeNode>),
+  /// Animate.
   #[sdk(child(qname = "p:CT_TLAnimateBehavior/p:anim"))]
   PAnim(std::boxed::Box<Animate>),
+  /// Animate Color Behavior.
   #[sdk(child(qname = "p:CT_TLAnimateColorBehavior/p:animClr"))]
   PAnimClr(std::boxed::Box<AnimateColor>),
+  /// Animate Effect.
   #[sdk(child(qname = "p:CT_TLAnimateEffectBehavior/p:animEffect"))]
   PAnimEffect(std::boxed::Box<AnimateEffect>),
+  /// Animate Motion.
   #[sdk(child(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion"))]
   PAnimMotion(std::boxed::Box<AnimateMotion>),
+  /// Animate Rotation.
   #[sdk(child(qname = "p:CT_TLAnimateRotationBehavior/p:animRot"))]
   PAnimRot(std::boxed::Box<AnimateRotation>),
+  /// Animate Scale.
   #[sdk(child(qname = "p:CT_TLAnimateScaleBehavior/p:animScale"))]
   PAnimScale(std::boxed::Box<AnimateScale>),
+  /// Command.
   #[sdk(child(qname = "p:CT_TLCommandBehavior/p:cmd"))]
   PCmd(std::boxed::Box<Command>),
+  /// Set Time Node Behavior.
   #[sdk(child(qname = "p:CT_TLSetBehavior/p:set"))]
   PSet(std::boxed::Box<SetBehavior>),
+  /// Audio.
   #[sdk(child(qname = "p:CT_TLMediaNodeAudio/p:audio"))]
   PAudio(std::boxed::Box<Audio>),
+  /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
   PVideo(std::boxed::Box<Video>),
 }
@@ -9399,8 +9409,9 @@ pub enum PresentationExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HtmlPublishPropertiesChoice {
-  #[sdk(child(qname = "p:CT_Empty/p:sldAll"))]
-  PSldAll(std::boxed::Box<SlideAll>),
+  /// All Slides.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:sldAll"))]
+  PSldAll,
   #[sdk(child(qname = "p:CT_IndexRange/p:sldRg"))]
   PSldRg(std::boxed::Box<SlideRange>),
   #[sdk(child(qname = "p:CT_CustomShowId/p:custShow"))]
@@ -9408,8 +9419,9 @@ pub enum HtmlPublishPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesChoice {
-  #[sdk(child(qname = "p:CT_Empty/p:present"))]
-  PPresent(std::boxed::Box<PresenterSlideMode>),
+  /// Presenter Slide Show Mode.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:present"))]
+  PPresent,
   #[sdk(child(qname = "p:CT_ShowInfoBrowse/p:browse"))]
   PBrowse(std::boxed::Box<BrowseSlideMode>),
   #[sdk(child(qname = "p:CT_ShowInfoKiosk/p:kiosk"))]
@@ -9417,8 +9429,9 @@ pub enum ShowPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesChoice2 {
-  #[sdk(child(qname = "p:CT_Empty/p:sldAll"))]
-  PSldAll(std::boxed::Box<SlideAll>),
+  /// All Slides.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:sldAll"))]
+  PSldAll,
   #[sdk(child(qname = "p:CT_IndexRange/p:sldRg"))]
   PSldRg(std::boxed::Box<SlideRange>),
   #[sdk(child(qname = "p:CT_CustomShowId/p:custShow"))]
@@ -9472,12 +9485,9 @@ pub enum PresentationPropertiesExtensionChoice {
         >,
     ),
     #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "a14:CT_TextMath/a14:m"))]
-    A14M(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2010_main::TextMath,
-        >,
-    ),
+    /// Defines the TextMath Class.
+    #[sdk(empty_child(qname = "a14:CT_TextMath/a14:m"))]
+    A14M,
     #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"))]
     P15ChartTrackingRefBased(
@@ -9490,22 +9500,28 @@ pub enum PresentationPropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextElementChoice {
+  /// Character Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:charRg"))]
   PCharRg(std::boxed::Box<CharRange>),
+  /// Paragraph Text Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:pRg"))]
   PPRg(std::boxed::Box<ParagraphIndexRange>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GraphicElementChoice {
+  /// Diagram to Animate.
   #[sdk(child(qname = "a:CT_AnimationDgmElement/a:dgm"))]
   ADgm(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Diagram>),
+  /// Chart to Animate.
   #[sdk(child(qname = "a:CT_AnimationChartElement/a:chart"))]
   AChart(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Chart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SoundActionChoice {
+  /// Start Sound Action.
   #[sdk(child(qname = "p:CT_TransitionStartSoundAction/p:stSnd"))]
   PStSnd(std::boxed::Box<StartSoundAction>),
-  #[sdk(child(qname = "p:CT_Empty/p:endSnd"))]
-  PEndSnd(std::boxed::Box<EndSoundAction>),
+  /// Stop Sound Action.
+  #[sdk(empty_child(qname = "p:CT_Empty/p:endSnd"))]
+  PEndSnd,
 }

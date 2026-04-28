@@ -15,18 +15,18 @@ pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Sheet Properties
+  /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetProperties,
     >,
   >,
-  ///Macro Sheet Dimensions
+  /// Macro Sheet Dimensions
   #[sdk(child(qname = "x:CT_SheetDimension/x:dimension"))]
   pub sheet_dimension:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetDimension>,
-  ///Macro Sheet Views
+  /// Macro Sheet Views
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetViews>,
@@ -35,7 +35,7 @@ pub struct Macrosheet {
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  ///Sheet Format Properties
+  /// Sheet Format Properties
   #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetFormatProperties,
@@ -153,10 +153,10 @@ pub struct WorksheetSortMap {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Row Sort Map
+  /// Row Sort Map
   #[sdk(child(qname = "xne:CT_RowSortMap/xne:rowSortMap"))]
   pub row_sort_map: Option<RowSortMap>,
-  ///Column Sort Map
+  /// Column Sort Map
   #[sdk(child(qname = "xne:CT_ColSortMap/xne:colSortMap"))]
   pub column_sort_map: Option<ColumnSortMap>,
 }

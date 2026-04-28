@@ -47,21 +47,21 @@ pub struct NonVisualDrawingProperties {
     /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
-    ///Hyperlink associated with clicking or selecting the element.
+    /// Hyperlink associated with clicking or selecting the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
     pub hyperlink_on_click: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
         >,
     >,
-    ///Hyperlink associated with hovering over the element.
+    /// Hyperlink associated with hovering over the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
     pub hyperlink_on_hover: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
         >,
     >,
-    ///Future extension
+    /// Future extension
     #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
     pub non_visual_drawing_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,

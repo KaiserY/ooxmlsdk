@@ -16,6 +16,7 @@ fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
 #[derive(Clone)]
 enum NamedSequenceVariantFieldKind {
   Child { qname: String },
+  EmptyChild { qname: String },
   TextChild { qname: String },
 }
 
@@ -50,6 +51,66 @@ fn choice_qname_patterns(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
   patterns
 }
 
+fn empty_child_skip_tokens(
+  ident: &Ident,
+  mode: DeserializeMode,
+  qnames: &[String],
+) -> proc_macro2::TokenStream {
+  let qname_patterns = choice_qname_patterns(qnames);
+  let first_qname = qnames.first().map(String::as_str).unwrap_or("");
+  let QNameInfo { tag_prefix, .. } = parse_qname_info(first_qname);
+  let skip_foreign_children = match mode {
+    DeserializeMode::Borrowed => quote! {
+      crate::common::skip_foreign_element_children_borrowed(
+        xml_reader,
+        next_empty,
+      )?;
+    },
+    DeserializeMode::Io => quote! {
+      crate::common::skip_foreign_element_children_io(
+        xml_reader,
+        next_empty,
+      )?;
+    },
+  };
+  let next_tag_event = match mode {
+    DeserializeMode::Borrowed => quote! { crate::common::SliceTagEvent },
+    DeserializeMode::Io => quote! { crate::common::IoTagEvent },
+  };
+
+  quote! {
+    if !empty_tag {
+      loop {
+        match xml_reader.next_tag_event()? {
+          #next_tag_event::Start(e, next_empty) => {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            if crate::common::is_foreign_prefixed_child(event_name, #tag_prefix) {
+              #skip_foreign_children
+            } else {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#ident),
+                "empty child",
+                event_name,
+              ));
+            }
+          }
+          #next_tag_event::End(e) => {
+            match e.name().as_ref() {
+              #( #qname_patterns )|* => break,
+              _ => {}
+            }
+          }
+          #next_tag_event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#ident)));
+          }
+          #next_tag_event::Decl(_) | #next_tag_event::Other => {}
+        }
+      }
+    }
+  }
+}
+
 fn named_sequence_helper_ident(enum_ident: &Ident, variant_ident: &Ident) -> syn::Result<Ident> {
   parse_str(&format!("__{}{}SequenceHelper", enum_ident, variant_ident))
 }
@@ -80,11 +141,12 @@ fn parse_named_sequence_variant_fields(
     };
     let kind = match field_kind {
       SdkTypeFieldKind::Child { qname } => NamedSequenceVariantFieldKind::Child { qname },
+      SdkTypeFieldKind::EmptyChild { qname } => NamedSequenceVariantFieldKind::EmptyChild { qname },
       SdkTypeFieldKind::TextChild { qname } => NamedSequenceVariantFieldKind::TextChild { qname },
       _ => {
         return Err(syn::Error::new_spanned(
           field,
-          "named #[sdk(sequence)] variants currently support only #[sdk(child(...))] or #[sdk(text_child(...))] fields",
+          "named #[sdk(sequence)] variants currently support only #[sdk(child(...))], #[sdk(empty_child(...))] or #[sdk(text_child(...))] fields",
         ));
       }
     };
@@ -124,6 +186,31 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
         quote! {
           #field_ident.write_xml(writer, xmlns_prefix)?;
         }
+      }
+    }
+    NamedSequenceVariantFieldKind::EmptyChild { qname } => {
+      let QNameInfo {
+        tag_prefix,
+        local_name,
+      } = parse_qname_info(qname);
+      let write_tokens = quote! {
+        crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+        writer.write_all(b" />")?;
+      };
+      if field.repeated {
+        quote! {
+          for _ in #field_ident {
+            #write_tokens
+          }
+        }
+      } else if field.optional {
+        quote! {
+          if #field_ident.is_some() {
+            #write_tokens
+          }
+        }
+      } else {
+        write_tokens
       }
     }
     NamedSequenceVariantFieldKind::TextChild { qname } => {
@@ -176,7 +263,11 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
 
 fn named_sequence_validate_tokens(field: &NamedSequenceVariantField) -> proc_macro2::TokenStream {
   let field_ident = &field.ident;
-  if matches!(field.kind, NamedSequenceVariantFieldKind::TextChild { .. }) {
+  if matches!(
+    field.kind,
+    NamedSequenceVariantFieldKind::TextChild { .. }
+      | NamedSequenceVariantFieldKind::EmptyChild { .. }
+  ) {
     return quote! {};
   }
   let validate_expr = if field.boxed {
@@ -240,7 +331,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     let kind = parse_sdk_choice_variant_kind(&variant.attrs)?.ok_or_else(|| {
       syn::Error::new_spanned(
         variant,
-        "missing #[sdk(child(...))], #[sdk(text_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
+        "missing #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
       )
     })?;
     match (&variant.fields, kind) {
@@ -338,6 +429,49 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         validate_arms.push(validate_arm);
       }
+      (Fields::Unit, SdkChoiceVariantKind::EmptyChild { qnames }) => {
+        let qname_patterns = choice_qname_patterns(&qnames);
+        let write_qname = qnames.first().ok_or_else(|| {
+          syn::Error::new_spanned(variant, "empty_child requires at least one qname")
+        })?;
+        let QNameInfo {
+          tag_prefix,
+          local_name,
+        } = parse_qname_info(write_qname);
+        let skip_tokens_borrowed =
+          empty_child_skip_tokens(ident, DeserializeMode::Borrowed, &qnames);
+        let skip_tokens_io = empty_child_skip_tokens(ident, DeserializeMode::Io, &qnames);
+        direct_matcher_arms.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => true,
+        });
+        direct_child_dispatch_arms_borrowed.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
+            #skip_tokens_borrowed
+            return Ok(Self::#variant_ident);
+          }
+        });
+        direct_child_dispatch_arms_io.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
+            #skip_tokens_io
+            return Ok(Self::#variant_ident);
+          }
+        });
+        write_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident => {
+            crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+            writer.write_all(b" />")?;
+            Ok(())
+          },
+        });
+        validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident => Ok(()),
+        });
+      }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Sequence) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         let inner_ty = choice_variant_inner_type(&payload_ty);
@@ -402,7 +536,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           .iter()
           .map(|field| {
             let ident = &field.ident;
-            if matches!(field.kind, NamedSequenceVariantFieldKind::TextChild { .. }) {
+            if matches!(
+              field.kind,
+              NamedSequenceVariantFieldKind::TextChild { .. }
+                | NamedSequenceVariantFieldKind::EmptyChild { .. }
+            ) {
               quote! { #ident: _ }
             } else {
               quote! { #ident }
@@ -428,6 +566,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
         let start_qname = match &named_fields[0].kind {
           NamedSequenceVariantFieldKind::Child { qname }
+          | NamedSequenceVariantFieldKind::EmptyChild { qname }
           | NamedSequenceVariantFieldKind::TextChild { qname } => qname,
         };
         let start_qname_patterns = choice_qname_patterns(std::slice::from_ref(start_qname));
@@ -696,7 +835,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       _ => {
         return Err(syn::Error::new_spanned(
           variant,
-          "SdkChoice supports single-field tuple variants, plus named #[sdk(sequence)] variants with 1 or 2 #[sdk(child(...))] or #[sdk(text_child(...))] fields",
+          "SdkChoice supports single-field tuple variants, unit #[sdk(empty_child(...))] variants, plus named #[sdk(sequence)] variants with 1 or 2 #[sdk(child(...))] or #[sdk(text_child(...))] fields",
         ));
       }
     }

@@ -1996,10 +1996,10 @@ pub enum PresetColorValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioCD/a:audioCd")]
 pub struct AudioFromCd {
-  ///Audio Start Time
+  /// Audio Start Time
   #[sdk(child(qname = "a:CT_AudioCDTime/a:st"))]
   pub start_time: std::boxed::Box<StartTime>,
-  ///Audio End Time
+  /// Audio End Time
   #[sdk(child(qname = "a:CT_AudioCDTime/a:end"))]
   pub end_time: std::boxed::Box<EndTime>,
   /// _
@@ -2245,30 +2245,6 @@ pub struct PositiveFixedPercentageType {
   ))]
   pub val: crate::simple_type::StringValue,
 }
-/// Complement.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:comp.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ComplementTransform/a:comp")]
-pub struct Complement {}
-/// Inverse.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:inv.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_InverseTransform/a:inv")]
-pub struct Inverse {}
-/// Gray.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:gray.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GrayscaleTransform/a:gray")]
-pub struct Gray {}
 /// Alpha Offset.
 ///
 /// Available in Office2007 and above.
@@ -2638,22 +2614,6 @@ pub struct PercentageType {
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
-/// Gamma.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:gamma.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GammaTransform/a:gamma")]
-pub struct Gamma {}
-/// Inverse Gamma.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:invGamma.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_InverseGammaTransform/a:invGamma")]
-pub struct InverseGamma {}
 /// Extension.
 ///
 /// Available in Office2007 and above.
@@ -3078,16 +3038,16 @@ pub struct Shape3DType {
   #[sdk(attr(qname = ":prstMaterial"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub preset_material: Option<PresetMaterialTypeValues>,
-  ///Top Bevel
+  /// Top Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevelT"))]
   pub bevel_top: Option<BevelTop>,
-  ///Bottom Bevel
+  /// Bottom Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevelB"))]
   pub bevel_bottom: Option<BevelBottom>,
-  ///Extrusion Color
+  /// Extrusion Color
   #[sdk(child(qname = "a:CT_Color/a:extrusionClr"))]
   pub extrusion_color: Option<std::boxed::Box<ExtrusionColor>>,
-  ///Contour Color
+  /// Contour Color
   #[sdk(child(qname = "a:CT_Color/a:contourClr"))]
   pub contour_color: Option<std::boxed::Box<ContourColor>>,
   /// _
@@ -3163,7 +3123,7 @@ pub struct PathGradientFill {
   #[sdk(attr(qname = ":path"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub path: Option<PathShadeValues>,
-  ///Fill To Rectangle
+  /// Fill To Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:fillToRect"))]
   pub fill_to_rectangle: Option<FillToRectangle>,
 }
@@ -3242,7 +3202,7 @@ pub struct Tile {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StretchInfoProperties/a:stretch")]
 pub struct Stretch {
-  ///Fill Rectangle
+  /// Fill Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:fillRect"))]
   pub fill_rectangle: Option<FillRectangle>,
 }
@@ -3297,7 +3257,7 @@ pub struct GradientFill {
   /// Represents the following attribute in the schema: :rotWithShape
   #[sdk(attr(qname = ":rotWithShape"))]
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
-  ///Gradient Stop List
+  /// Gradient Stop List
   #[sdk(child(qname = "a:CT_GradientStopList/a:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
   #[sdk(choice(
@@ -3334,7 +3294,7 @@ pub struct BlipFill {
   /// _
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
   pub blip: Option<std::boxed::Box<Blip>>,
-  ///Source Rectangle
+  /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle: Option<SourceRectangle>,
   #[sdk(choice(
@@ -3359,21 +3319,13 @@ pub struct PatternFill {
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub preset: Option<PresetPatternValues>,
-  ///Foreground color
+  /// Foreground color
   #[sdk(child(qname = "a:CT_Color/a:fgClr"))]
   pub foreground_color: Option<std::boxed::Box<ForegroundColor>>,
-  ///Background color
+  /// Background color
   #[sdk(child(qname = "a:CT_Color/a:bgClr"))]
   pub background_color: Option<std::boxed::Box<BackgroundColor>>,
 }
-/// Group Fill.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:grpFill.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GroupFillProperties/a:grpFill")]
-pub struct GroupFill {}
 /// Effect Container.
 ///
 /// Available in Office2007 and above.
@@ -3588,22 +3540,6 @@ pub struct AlphaBiLevel {
   ))]
   pub threshold: crate::simple_type::Int32Value,
 }
-/// Alpha Ceiling Effect.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:alphaCeiling.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling")]
-pub struct AlphaCeiling {}
-/// Alpha Floor Effect.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:alphaFloor.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_AlphaFloorEffect/a:alphaFloor")]
-pub struct AlphaFloor {}
 /// Alpha Inverse Effect.
 ///
 /// Available in Office2007 and above.
@@ -3736,7 +3672,7 @@ pub struct Blend {
   #[sdk(attr(qname = ":blend"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub blend_mode: BlendModeValues,
-  ///Effect to blend
+  /// Effect to blend
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   pub effect_container: std::boxed::Box<EffectContainer>,
 }
@@ -3785,10 +3721,10 @@ pub struct ColorChange {
   /// Represents the following attribute in the schema: :useA
   #[sdk(attr(qname = ":useA"))]
   pub use_alpha: Option<crate::simple_type::BooleanValue>,
-  ///Change Color From
+  /// Change Color From
   #[sdk(child(qname = "a:CT_Color/a:clrFrom"))]
   pub color_from: std::boxed::Box<ColorFrom>,
-  ///Change Color To
+  /// Change Color To
   #[sdk(child(qname = "a:CT_Color/a:clrTo"))]
   pub color_to: std::boxed::Box<ColorTo>,
 }
@@ -3904,14 +3840,6 @@ pub struct Glow {
   ))]
   pub xml_children: Option<GlowChoice>,
 }
-/// Gray Scale Effect.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:grayscl.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GrayscaleEffect/a:grayscl")]
-pub struct Grayscale {}
 /// Hue Saturation Luminance Effect.
 ///
 /// Available in Office2007 and above.
@@ -4580,7 +4508,7 @@ pub struct TransformEffect {
 #[sdk(qname = "a:CT_EffectList/a:effectLst")]
 pub struct EffectList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  ///Blur Effect
+  /// Blur Effect
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   pub blur: Option<Blur>,
   /// _
@@ -4613,22 +4541,22 @@ pub struct EffectList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_CustomGeometry2D/a:custGeom")]
 pub struct CustomGeometry {
-  ///Adjust Value List
+  /// Adjust Value List
   #[sdk(child(qname = "a:CT_GeomGuideList/a:avLst"))]
   pub adjust_value_list: Option<AdjustValueList>,
-  ///List of Shape Guides
+  /// List of Shape Guides
   #[sdk(child(qname = "a:CT_GeomGuideList/a:gdLst"))]
   pub shape_guide_list: Option<ShapeGuideList>,
-  ///List of Shape Adjust Handles
+  /// List of Shape Adjust Handles
   #[sdk(child(qname = "a:CT_AdjustHandleList/a:ahLst"))]
   pub adjust_handle_list: Option<AdjustHandleList>,
-  ///List of Shape Connection Sites
+  /// List of Shape Connection Sites
   #[sdk(child(qname = "a:CT_ConnectionSiteList/a:cxnLst"))]
   pub connection_site_list: Option<ConnectionSiteList>,
-  ///Shape Text Rectangle
+  /// Shape Text Rectangle
   #[sdk(child(qname = "a:CT_GeomRect/a:rect"))]
   pub rectangle: Option<Rectangle>,
-  ///List of Shape Paths
+  /// List of Shape Paths
   #[sdk(child(qname = "a:CT_Path2DList/a:pathLst"))]
   pub path_list: std::boxed::Box<PathList>,
 }
@@ -4649,7 +4577,7 @@ pub struct PresetGeometry {
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub preset: ShapeTypeValues,
-  ///List of Shape Adjust Values
+  /// List of Shape Adjust Values
   #[sdk(child(qname = "a:CT_GeomGuideList/a:avLst"))]
   pub adjust_value_list: Option<AdjustValueList>,
 }
@@ -4669,26 +4597,10 @@ pub struct PresetTextWarp {
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub preset: TextShapeValues,
-  ///Adjust Value List
+  /// Adjust Value List
   #[sdk(child(qname = "a:CT_GeomGuideList/a:avLst"))]
   pub adjust_value_list: Option<AdjustValueList>,
 }
-/// Round Line Join.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:round.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_LineJoinRound/a:round")]
-pub struct Round {}
-/// Line Join Bevel.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:bevel.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_LineJoinBevel/a:bevel")]
-pub struct LineJoinBevel {}
 /// Miter Line Join.
 ///
 /// Available in Office2007 and above.
@@ -4875,13 +4787,13 @@ pub struct EffectPropertiesType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/a:font")]
 pub struct Fonts {
-  ///Latin Font
+  /// Latin Font
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
   pub latin_font: std::boxed::Box<LatinFont>,
-  ///East Asian Font
+  /// East Asian Font
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
   pub east_asian_font: std::boxed::Box<EastAsianFont>,
-  ///Complex Script Font
+  /// Complex Script Font
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
   pub complex_script_font: std::boxed::Box<ComplexScriptFont>,
   /// _
@@ -4899,13 +4811,13 @@ pub struct Fonts {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/a:majorFont")]
 pub struct MajorFont {
-  ///Latin Font
+  /// Latin Font
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
   pub latin_font: std::boxed::Box<LatinFont>,
-  ///East Asian Font
+  /// East Asian Font
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
   pub east_asian_font: std::boxed::Box<EastAsianFont>,
-  ///Complex Script Font
+  /// Complex Script Font
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
   pub complex_script_font: std::boxed::Box<ComplexScriptFont>,
   /// _
@@ -4923,13 +4835,13 @@ pub struct MajorFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontCollection/a:minorFont")]
 pub struct MinorFont {
-  ///Latin Font
+  /// Latin Font
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
   pub latin_font: std::boxed::Box<LatinFont>,
-  ///East Asian Font
+  /// East Asian Font
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
   pub east_asian_font: std::boxed::Box<EastAsianFont>,
-  ///Complex Script Font
+  /// Complex Script Font
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
   pub complex_script_font: std::boxed::Box<ComplexScriptFont>,
   /// _
@@ -4982,14 +4894,6 @@ pub struct FontReference {
   ))]
   pub xml_children: Option<FontReferenceChoice>,
 }
-/// No AutoFit.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:noAutofit.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextNoAutofit/a:noAutofit")]
-pub struct NoAutoFit {}
 /// Normal AutoFit.
 ///
 /// Available in Office2007 and above.
@@ -5037,14 +4941,6 @@ pub struct NormalAutoFit {
 pub struct ShapeAutoFit {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
 }
-/// Follow Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:buClrTx.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBulletColorFollowText/a:buClrTx")]
-pub struct BulletColorText {}
 /// Color Specified.
 ///
 /// Available in Office2007 and above.
@@ -5207,14 +5103,6 @@ pub struct ColorType {
   ))]
   pub xml_children: Option<ColorTypeChoice>,
 }
-/// Bullet Size Follows Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:buSzTx.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx")]
-pub struct BulletSizeText {}
 /// Bullet Size Percentage.
 ///
 /// Available in Office2007 and above.
@@ -5261,14 +5149,6 @@ pub struct BulletSizePoints {
   ))]
   pub val: crate::simple_type::Int32Value,
 }
-/// Follow text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:buFontTx.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx")]
-pub struct BulletFontText {}
 /// Specified.
 ///
 /// Available in Office2007 and above.
@@ -5500,14 +5380,6 @@ pub struct TextFontType {
   #[sdk(attr(qname = ":charset"))]
   pub character_set: Option<crate::simple_type::SByteValue>,
 }
-/// No Bullet.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:buNone.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextNoBullet/a:buNone")]
-pub struct NoBullet {}
 /// Auto-Numbered Bullet.
 ///
 /// Available in Office2007 and above.
@@ -5563,18 +5435,10 @@ pub struct CharacterBullet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBlipBullet/a:buBlip")]
 pub struct PictureBullet {
-  ///Blip
+  /// Blip
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
   pub blip: std::boxed::Box<Blip>,
 }
-/// Underline Follows Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:uLnTx.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx")]
-pub struct UnderlineFollowsText {}
 /// Underline Stroke.
 ///
 /// Available in Office2007 and above.
@@ -6236,14 +6100,6 @@ pub struct LinePropertiesType {
   ))]
   pub xml_children: Vec<LinePropertiesTypeChoice>,
 }
-/// Underline Fill Properties Follow Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:uFillTx.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx")]
-pub struct UnderlineFillText {}
 /// Underline Fill.
 ///
 /// Available in Office2007 and above.
@@ -6271,10 +6127,10 @@ pub struct UnderlineFill {
 #[sdk(qname = "a:CT_RegularTextRun/a:r")]
 pub struct Run {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  ///Text Character Properties
+  /// Text Character Properties
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
-  ///Text String
+  /// Text String
   #[sdk(text_child(qname = "xsd:string/a:t"))]
   pub text: crate::simple_type::StringValue,
 }
@@ -6286,7 +6142,7 @@ pub struct Run {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextLineBreak/a:br")]
 pub struct Break {
-  ///Text Run Properties
+  /// Text Run Properties
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
 }
@@ -6317,10 +6173,10 @@ pub struct Field {
   /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<crate::simple_type::StringValue>,
-  ///Text Character Properties
+  /// Text Character Properties
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
-  ///Text Paragraph Properties
+  /// Text Paragraph Properties
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   /// _
@@ -6336,7 +6192,7 @@ pub struct Field {
 #[sdk(qname = "a:CT_GraphicalObject/a:graphic")]
 pub struct Graphic {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  ///Graphic Object Data
+  /// Graphic Object Data
   #[sdk(child(qname = "a:CT_GraphicalObjectData/a:graphicData"))]
   pub graphic_data: std::boxed::Box<GraphicData>,
 }
@@ -6453,7 +6309,7 @@ pub struct ThemeOverride {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  ///Color Scheme
+  /// Color Scheme
   #[sdk(child(qname = "a:CT_ColorScheme/a:clrScheme"))]
   pub color_scheme: Option<std::boxed::Box<ColorScheme>>,
   /// _
@@ -6463,30 +6319,6 @@ pub struct ThemeOverride {
   #[sdk(child(qname = "a:CT_StyleMatrix/a:fmtScheme"))]
   pub format_scheme: Option<std::boxed::Box<FormatScheme>>,
 }
-/// Theme Manager.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:themeManager.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_EmptyElement/a:themeManager")]
-pub struct ThemeManager {}
-/// Master Color Mapping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:masterClrMapping.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_EmptyElement/a:masterClrMapping")]
-pub struct MasterColorMapping {}
-/// Defines the EmptyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_EmptyElement/")]
-pub struct EmptyType {}
 /// Table.
 ///
 /// Available in Office2007 and above.
@@ -6495,10 +6327,10 @@ pub struct EmptyType {}
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Table/a:tbl")]
 pub struct Table {
-  ///Table Properties
+  /// Table Properties
   #[sdk(child(qname = "a:CT_TableProperties/a:tblPr"))]
   pub table_properties: Option<std::boxed::Box<TableProperties>>,
-  ///Table Grid
+  /// Table Grid
   #[sdk(child(qname = "a:CT_TableGrid/a:tblGrid"))]
   pub table_grid: std::boxed::Box<TableGrid>,
   /// _
@@ -6540,7 +6372,7 @@ pub struct TableStyleList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/a:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<Extension>,
 }
@@ -6669,13 +6501,13 @@ pub struct SupplementalFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scene3D/a:scene3d")]
 pub struct Scene3DType {
-  ///Camera
+  /// Camera
   #[sdk(child(qname = "a:CT_Camera/a:camera"))]
   pub camera: std::boxed::Box<Camera>,
-  ///Light Rig
+  /// Light Rig
   #[sdk(child(qname = "a:CT_LightRig/a:lightRig"))]
   pub light_rig: std::boxed::Box<LightRig>,
-  ///Backdrop Plane
+  /// Backdrop Plane
   #[sdk(child(qname = "a:CT_Backdrop/a:backdrop"))]
   pub backdrop: Option<std::boxed::Box<Backdrop>>,
   /// _
@@ -6777,40 +6609,40 @@ pub struct ColorScheme {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  ///Dark 1
+  /// Dark 1
   #[sdk(child(qname = "a:CT_Color2/a:dk1"))]
   pub dark1_color: std::boxed::Box<Dark1Color>,
-  ///Light 1
+  /// Light 1
   #[sdk(child(qname = "a:CT_Color2/a:lt1"))]
   pub light1_color: std::boxed::Box<Light1Color>,
-  ///Dark 2
+  /// Dark 2
   #[sdk(child(qname = "a:CT_Color2/a:dk2"))]
   pub dark2_color: std::boxed::Box<Dark2Color>,
-  ///Light 2
+  /// Light 2
   #[sdk(child(qname = "a:CT_Color2/a:lt2"))]
   pub light2_color: std::boxed::Box<Light2Color>,
-  ///Accent 1
+  /// Accent 1
   #[sdk(child(qname = "a:CT_Color2/a:accent1"))]
   pub accent1_color: std::boxed::Box<Accent1Color>,
-  ///Accent 2
+  /// Accent 2
   #[sdk(child(qname = "a:CT_Color2/a:accent2"))]
   pub accent2_color: std::boxed::Box<Accent2Color>,
-  ///Accent 3
+  /// Accent 3
   #[sdk(child(qname = "a:CT_Color2/a:accent3"))]
   pub accent3_color: std::boxed::Box<Accent3Color>,
-  ///Accent 4
+  /// Accent 4
   #[sdk(child(qname = "a:CT_Color2/a:accent4"))]
   pub accent4_color: std::boxed::Box<Accent4Color>,
-  ///Accent 5
+  /// Accent 5
   #[sdk(child(qname = "a:CT_Color2/a:accent5"))]
   pub accent5_color: std::boxed::Box<Accent5Color>,
-  ///Accent 6
+  /// Accent 6
   #[sdk(child(qname = "a:CT_Color2/a:accent6"))]
   pub accent6_color: std::boxed::Box<Accent6Color>,
-  ///Hyperlink
+  /// Hyperlink
   #[sdk(child(qname = "a:CT_Color2/a:hlink"))]
   pub hyperlink: std::boxed::Box<Hyperlink>,
-  ///Followed Hyperlink
+  /// Followed Hyperlink
   #[sdk(child(qname = "a:CT_Color2/a:folHlink"))]
   pub followed_hyperlink_color: std::boxed::Box<FollowedHyperlinkColor>,
   /// _
@@ -6832,10 +6664,10 @@ pub struct FontScheme {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  ///Major Font
+  /// Major Font
   #[sdk(child(qname = "a:CT_FontCollection/a:majorFont"))]
   pub major_font: std::boxed::Box<MajorFont>,
-  ///Minor fonts
+  /// Minor fonts
   #[sdk(child(qname = "a:CT_FontCollection/a:minorFont"))]
   pub minor_font: std::boxed::Box<MinorFont>,
   /// _
@@ -6857,16 +6689,16 @@ pub struct FormatScheme {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  ///Fill Style List
+  /// Fill Style List
   #[sdk(child(qname = "a:CT_FillStyleList/a:fillStyleLst"))]
   pub fill_style_list: std::boxed::Box<FillStyleList>,
-  ///Line Style List
+  /// Line Style List
   #[sdk(child(qname = "a:CT_LineStyleList/a:lnStyleLst"))]
   pub line_style_list: std::boxed::Box<LineStyleList>,
-  ///Effect Style List
+  /// Effect Style List
   #[sdk(child(qname = "a:CT_EffectStyleList/a:effectStyleLst"))]
   pub effect_style_list: std::boxed::Box<EffectStyleList>,
-  ///Background Fill Style List
+  /// Background Fill Style List
   #[sdk(child(qname = "a:CT_BackgroundFillStyleList/a:bgFillStyleLst"))]
   pub background_fill_style_list: std::boxed::Box<BackgroundFillStyleList>,
 }
@@ -7830,24 +7662,16 @@ pub struct BuildChart {
 #[sdk(qname = "a:CT_TextBody/a:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  ///Body Properties
+  /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<BodyProperties>,
-  ///Text List Styles
+  /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
   pub list_style: Option<std::boxed::Box<ListStyle>>,
   /// _
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<Paragraph>,
 }
-/// Use Shape Text Rectangle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:useSpRect.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect")]
-pub struct UseShapeRectangle {}
 /// Defines the Transform2D Class.
 ///
 /// Available in Office2007 and above.
@@ -7878,10 +7702,10 @@ pub struct Transform2D {
   /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
-  ///Offset
+  /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
   pub offset: Option<Offset>,
-  ///Extents
+  /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
   pub extents: Option<Extents>,
 }
@@ -7928,13 +7752,13 @@ pub struct NonVisualDrawingProperties {
   /// Represents the following attribute in the schema: :title
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
-  ///Hyperlink associated with clicking or selecting the element.
+  /// Hyperlink associated with clicking or selecting the element.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<HyperlinkOnClick>>,
-  ///Hyperlink associated with hovering over the element.
+  /// Hyperlink associated with hovering over the element.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<HyperlinkOnHover>>,
-  ///Future extension
+  /// Future extension
   #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
   pub non_visual_drawing_properties_extension_list: Option<NonVisualDrawingPropertiesExtensionList>,
 }
@@ -7953,7 +7777,7 @@ pub struct NonVisualShapeDrawingProperties {
   /// Represents the following attribute in the schema: :txBox
   #[sdk(attr(qname = ":txBox"))]
   pub text_box: Option<crate::simple_type::BooleanValue>,
-  ///Shape Locks
+  /// Shape Locks
   #[sdk(child(qname = "a:CT_ShapeLocking/a:spLocks"))]
   pub shape_locks: Option<std::boxed::Box<ShapeLocks>>,
   /// _
@@ -7971,7 +7795,7 @@ pub struct NonVisualShapeProperties {
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/a:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Shape Drawing Properties
+  /// Non-Visual Shape Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingShapeProps/a:cNvSpPr"))]
   pub non_visual_shape_drawing_properties: std::boxed::Box<NonVisualShapeDrawingProperties>,
 }
@@ -7991,7 +7815,7 @@ pub struct ShapeProperties {
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode: Option<BlackWhiteModeValues>,
-  ///2D Transform for Individual Objects
+  /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   #[sdk(choice(
@@ -8034,7 +7858,7 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlTextShape/a:txSp")]
 pub struct TextShape {
-  ///Shape Text Body
+  /// Shape Text Body
   #[sdk(child(qname = "a:CT_TextBody/a:txBody"))]
   pub text_body: std::boxed::Box<TextBody>,
   #[sdk(choice(
@@ -8063,7 +7887,7 @@ pub struct ShapeStyle {
   /// _
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
-  ///Font Reference
+  /// Font Reference
   #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
 }
@@ -8075,13 +7899,13 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualConnectorProperties/a:cNvCxnSpPr")]
 pub struct NonVisualConnectorShapeDrawingProperties {
-  ///Connection Shape Locks
+  /// Connection Shape Locks
   #[sdk(child(qname = "a:CT_ConnectorLocking/a:cxnSpLocks"))]
   pub connection_shape_locks: Option<std::boxed::Box<ConnectionShapeLocks>>,
-  ///Connection Start
+  /// Connection Start
   #[sdk(child(qname = "a:CT_Connection/a:stCxn"))]
   pub start_connection: Option<StartConnection>,
-  ///Connection End
+  /// Connection End
   #[sdk(child(qname = "a:CT_Connection/a:endCxn"))]
   pub end_connection: Option<EndConnection>,
   /// _
@@ -8096,10 +7920,10 @@ pub struct NonVisualConnectorShapeDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlConnectorNonVisual/a:nvCxnSpPr")]
 pub struct NonVisualConnectionShapeProperties {
-  ///Non-Visual Drawing Properties
+  /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/a:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Connector Shape Drawing Properties
+  /// Non-Visual Connector Shape Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualConnectorProperties/a:cNvCxnSpPr"))]
   pub non_visual_connector_shape_drawing_properties:
     std::boxed::Box<NonVisualConnectorShapeDrawingProperties>,
@@ -8137,7 +7961,7 @@ pub struct NonVisualPictureProperties {
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/a:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Picture Drawing Properties
+  /// Non-Visual Picture Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualPictureProperties/a:cNvPicPr"))]
   pub non_visual_picture_drawing_properties: std::boxed::Box<NonVisualPictureDrawingProperties>,
 }
@@ -8149,7 +7973,7 @@ pub struct NonVisualPictureProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/a:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
-  ///Graphic Frame Locks
+  /// Graphic Frame Locks
   #[sdk(child(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks"))]
   pub graphic_frame_locks: Option<std::boxed::Box<GraphicFrameLocks>>,
   /// _
@@ -8167,7 +7991,7 @@ pub struct NonVisualGraphicFrameProperties {
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/a:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Graphic Frame Drawing Properties
+  /// Non-Visual Graphic Frame Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/a:cNvGraphicFramePr"))]
   pub non_visual_graphic_frame_drawing_properties:
     std::boxed::Box<NonVisualGraphicFrameDrawingProperties>,
@@ -8277,7 +8101,7 @@ pub struct Camera {
   #[sdk(attr(qname = ":zoom"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub zoom: Option<crate::simple_type::Int32Value>,
-  ///Rotation
+  /// Rotation
   #[sdk(child(qname = "a:CT_SphereCoords/a:rot"))]
   pub rotation: Option<Rotation>,
 }
@@ -8305,7 +8129,7 @@ pub struct LightRig {
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub direction: LightRigDirectionValues,
-  ///Rotation
+  /// Rotation
   #[sdk(child(qname = "a:CT_SphereCoords/a:rot"))]
   pub rotation: Option<Rotation>,
 }
@@ -8317,13 +8141,13 @@ pub struct LightRig {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Backdrop/a:backdrop")]
 pub struct Backdrop {
-  ///Anchor Point
+  /// Anchor Point
   #[sdk(child(qname = "a:CT_Point3D/a:anchor"))]
   pub anchor: std::boxed::Box<Anchor>,
-  ///Normal
+  /// Normal
   #[sdk(child(qname = "a:CT_Vector3D/a:norm"))]
   pub normal: std::boxed::Box<Normal>,
-  ///Up Vector
+  /// Up Vector
   #[sdk(child(qname = "a:CT_Vector3D/a:up"))]
   pub up_vector: std::boxed::Box<UpVector>,
   /// _
@@ -9178,7 +9002,7 @@ pub struct AdjustHandleXy {
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub max_y: Option<crate::simple_type::StringValue>,
-  ///Position
+  /// Position
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pos"))]
   pub position: std::boxed::Box<Position>,
 }
@@ -9256,7 +9080,7 @@ pub struct AdjustHandlePolar {
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "a:ST_Angle"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub max_angle: Option<crate::simple_type::StringValue>,
-  ///Shape Position Coordinate
+  /// Shape Position Coordinate
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pos"))]
   pub position: std::boxed::Box<Position>,
 }
@@ -9277,18 +9101,10 @@ pub struct ConnectionSite {
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "a:ST_Angle"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub angle: crate::simple_type::StringValue,
-  ///Position
+  /// Position
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pos"))]
   pub position: std::boxed::Box<Position>,
 }
-/// Close Shape Path.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a:close.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Path2DClose/a:close")]
-pub struct CloseShapePath {}
 /// Move Path To.
 ///
 /// Available in Office2007 and above.
@@ -9297,7 +9113,7 @@ pub struct CloseShapePath {}
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DMoveTo/a:moveTo")]
 pub struct MoveTo {
-  ///Move end point
+  /// Move end point
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pt"))]
   pub point: std::boxed::Box<Point>,
 }
@@ -9309,7 +9125,7 @@ pub struct MoveTo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Path2DLineTo/a:lnTo")]
 pub struct LineTo {
-  ///Line end point
+  /// Line end point
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pt"))]
   pub point: std::boxed::Box<Point>,
 }
@@ -9497,7 +9313,7 @@ pub struct ShapeGuideList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GeomGuideList/")]
 pub struct GeometryGuideListType {
-  ///Shape Guide.
+  /// Shape Guide.
   #[sdk(child(qname = "a:CT_GeomGuide/a:gd"))]
   pub shape_guide: Vec<ShapeGuide>,
 }
@@ -9666,16 +9482,16 @@ pub struct TransformGroup {
   /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
-  ///Offset
+  /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
   pub offset: Option<Offset>,
-  ///Extents
+  /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
   pub extents: Option<Extents>,
-  ///Child Offset
+  /// Child Offset
   #[sdk(child(qname = "a:CT_Point2D/a:chOff"))]
   pub child_offset: Option<ChildOffset>,
-  ///Child Extents
+  /// Child Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:chExt"))]
   pub child_extents: Option<ChildExtents>,
 }
@@ -9834,7 +9650,7 @@ pub struct BodyProperties {
   /// Represents the following attribute in the schema: :compatLnSpc
   #[sdk(attr(qname = ":compatLnSpc"))]
   pub compatible_line_spacing: Option<crate::simple_type::BooleanValue>,
-  ///Preset Text Shape
+  /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<std::boxed::Box<PresetTextWarp>>,
   #[sdk(choice(
@@ -9861,34 +9677,34 @@ pub struct BodyProperties {
 #[sdk(qname = "a:CT_TextListStyle/a:lstStyle")]
 pub struct ListStyle {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  ///Default Paragraph Style
+  /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<std::boxed::Box<DefaultParagraphProperties>>,
-  ///List Level 1 Text Style
+  /// List Level 1 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
   pub level1_paragraph_properties: Option<std::boxed::Box<Level1ParagraphProperties>>,
-  ///List Level 2 Text Style
+  /// List Level 2 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
   pub level2_paragraph_properties: Option<std::boxed::Box<Level2ParagraphProperties>>,
-  ///List Level 3 Text Style
+  /// List Level 3 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
   pub level3_paragraph_properties: Option<std::boxed::Box<Level3ParagraphProperties>>,
-  ///List Level 4 Text Style
+  /// List Level 4 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
   pub level4_paragraph_properties: Option<std::boxed::Box<Level4ParagraphProperties>>,
-  ///List Level 5 Text Style
+  /// List Level 5 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
   pub level5_paragraph_properties: Option<std::boxed::Box<Level5ParagraphProperties>>,
-  ///List Level 6 Text Style
+  /// List Level 6 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
   pub level6_paragraph_properties: Option<std::boxed::Box<Level6ParagraphProperties>>,
-  ///List Level 7 Text Style
+  /// List Level 7 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
   pub level7_paragraph_properties: Option<std::boxed::Box<Level7ParagraphProperties>>,
-  ///List Level 8 Text Style
+  /// List Level 8 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
   pub level8_paragraph_properties: Option<std::boxed::Box<Level8ParagraphProperties>>,
-  ///List Level 9 Text Style
+  /// List Level 9 Text Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
   pub level9_paragraph_properties: Option<std::boxed::Box<Level9ParagraphProperties>>,
   /// _
@@ -9903,7 +9719,7 @@ pub struct ListStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/a:spDef")]
 pub struct ShapeDefault {
-  ///Visual Properties
+  /// Visual Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
@@ -9927,7 +9743,7 @@ pub struct ShapeDefault {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/a:lnDef")]
 pub struct LineDefault {
-  ///Visual Properties
+  /// Visual Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
@@ -9951,7 +9767,7 @@ pub struct LineDefault {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DefaultShapeDefinition/a:txDef")]
 pub struct TextDefault {
-  ///Visual Properties
+  /// Visual Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
@@ -10334,10 +10150,10 @@ pub struct ThemeElements {
   /// _
   #[sdk(child(qname = "a:CT_ColorScheme/a:clrScheme"))]
   pub color_scheme: std::boxed::Box<ColorScheme>,
-  ///Font Scheme
+  /// Font Scheme
   #[sdk(child(qname = "a:CT_FontScheme/a:fontScheme"))]
   pub font_scheme: std::boxed::Box<FontScheme>,
-  ///Format Scheme
+  /// Format Scheme
   #[sdk(child(qname = "a:CT_StyleMatrix/a:fmtScheme"))]
   pub format_scheme: std::boxed::Box<FormatScheme>,
   /// _
@@ -10360,10 +10176,10 @@ pub struct Cell3DProperties {
   #[sdk(attr(qname = ":prstMaterial"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub preset_material: Option<PresetMaterialTypeValues>,
-  ///Bevel
+  /// Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevel"))]
   pub bevel: std::boxed::Box<Bevel>,
-  ///Light Rig
+  /// Light Rig
   #[sdk(child(qname = "a:CT_LightRig/a:lightRig"))]
   pub light_rig: Option<std::boxed::Box<LightRig>>,
   /// _
@@ -10437,27 +10253,27 @@ pub struct TableCellProperties {
   #[sdk(attr(qname = ":horzOverflow"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub horizontal_overflow: Option<TextHorizontalOverflowValues>,
-  ///Left Border Line Properties
+  /// Left Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnL"))]
   pub left_border_line_properties: Option<std::boxed::Box<LeftBorderLineProperties>>,
-  ///Right Border Line Properties
+  /// Right Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnR"))]
   pub right_border_line_properties: Option<std::boxed::Box<RightBorderLineProperties>>,
-  ///Top Border Line Properties
+  /// Top Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnT"))]
   pub top_border_line_properties: Option<std::boxed::Box<TopBorderLineProperties>>,
-  ///Bottom Border Line Properties
+  /// Bottom Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnB"))]
   pub bottom_border_line_properties: Option<std::boxed::Box<BottomBorderLineProperties>>,
-  ///Top-Left to Bottom-Right Border Line Properties
+  /// Top-Left to Bottom-Right Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnTlToBr"))]
   pub top_left_to_bottom_right_border_line_properties:
     Option<std::boxed::Box<TopLeftToBottomRightBorderLineProperties>>,
-  ///Bottom-Left to Top-Right Border Line Properties
+  /// Bottom-Left to Top-Right Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnBlToTr"))]
   pub bottom_left_to_top_right_border_line_properties:
     Option<std::boxed::Box<BottomLeftToTopRightBorderLineProperties>>,
-  ///Cell 3-D
+  /// Cell 3-D
   #[sdk(child(qname = "a:CT_Cell3D/a:cell3D"))]
   pub cell3_d_properties: Option<std::boxed::Box<Cell3DProperties>>,
   #[sdk(choice(
@@ -10509,10 +10325,10 @@ pub struct TableCell {
   /// Represents the following attribute in the schema: :vMerge
   #[sdk(attr(qname = ":vMerge"))]
   pub vertical_merge: Option<crate::simple_type::BooleanValue>,
-  ///Text Body
+  /// Text Body
   #[sdk(child(qname = "a:CT_TextBody/a:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
-  ///Table Cell Properties
+  /// Table Cell Properties
   #[sdk(child(qname = "a:CT_TableCellProperties/a:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
   /// _
@@ -10546,46 +10362,46 @@ pub struct TableStyle {
   /// Represents the following attribute in the schema: :styleName
   #[sdk(attr(qname = ":styleName"))]
   pub style_name: crate::simple_type::StringValue,
-  ///Table Background
+  /// Table Background
   #[sdk(child(qname = "a:CT_TableBackgroundStyle/a:tblBg"))]
   pub table_background: Option<std::boxed::Box<TableBackground>>,
-  ///Whole Table
+  /// Whole Table
   #[sdk(child(qname = "a:CT_TablePartStyle/a:wholeTbl"))]
   pub whole_table: Option<std::boxed::Box<WholeTable>>,
-  ///Band 1 Horizontal
+  /// Band 1 Horizontal
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band1H"))]
   pub band1_horizontal: Option<std::boxed::Box<Band1Horizontal>>,
-  ///Band 2 Horizontal
+  /// Band 2 Horizontal
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band2H"))]
   pub band2_horizontal: Option<std::boxed::Box<Band2Horizontal>>,
-  ///Band 1 Vertical
+  /// Band 1 Vertical
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band1V"))]
   pub band1_vertical: Option<std::boxed::Box<Band1Vertical>>,
-  ///Band 2 Vertical
+  /// Band 2 Vertical
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band2V"))]
   pub band2_vertical: Option<std::boxed::Box<Band2Vertical>>,
-  ///Last Column
+  /// Last Column
   #[sdk(child(qname = "a:CT_TablePartStyle/a:lastCol"))]
   pub last_column: Option<std::boxed::Box<LastColumn>>,
-  ///First Column
+  /// First Column
   #[sdk(child(qname = "a:CT_TablePartStyle/a:firstCol"))]
   pub first_column: Option<std::boxed::Box<FirstColumn>>,
-  ///Last Row
+  /// Last Row
   #[sdk(child(qname = "a:CT_TablePartStyle/a:lastRow"))]
   pub last_row: Option<std::boxed::Box<LastRow>>,
-  ///Southeast Cell
+  /// Southeast Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:seCell"))]
   pub southeast_cell: Option<std::boxed::Box<SoutheastCell>>,
-  ///Southwest Cell
+  /// Southwest Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:swCell"))]
   pub southwest_cell: Option<std::boxed::Box<SouthwestCell>>,
-  ///First Row
+  /// First Row
   #[sdk(child(qname = "a:CT_TablePartStyle/a:firstRow"))]
   pub first_row: Option<std::boxed::Box<FirstRow>>,
-  ///Northeast Cell
+  /// Northeast Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:neCell"))]
   pub northeast_cell: Option<std::boxed::Box<NortheastCell>>,
-  ///Northwest Cell
+  /// Northwest Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:nwCell"))]
   pub northwest_cell: Option<std::boxed::Box<NorthwestCell>>,
   /// _
@@ -10619,46 +10435,46 @@ pub struct TableStyleEntry {
   /// Represents the following attribute in the schema: :styleName
   #[sdk(attr(qname = ":styleName"))]
   pub style_name: crate::simple_type::StringValue,
-  ///Table Background
+  /// Table Background
   #[sdk(child(qname = "a:CT_TableBackgroundStyle/a:tblBg"))]
   pub table_background: Option<std::boxed::Box<TableBackground>>,
-  ///Whole Table
+  /// Whole Table
   #[sdk(child(qname = "a:CT_TablePartStyle/a:wholeTbl"))]
   pub whole_table: Option<std::boxed::Box<WholeTable>>,
-  ///Band 1 Horizontal
+  /// Band 1 Horizontal
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band1H"))]
   pub band1_horizontal: Option<std::boxed::Box<Band1Horizontal>>,
-  ///Band 2 Horizontal
+  /// Band 2 Horizontal
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band2H"))]
   pub band2_horizontal: Option<std::boxed::Box<Band2Horizontal>>,
-  ///Band 1 Vertical
+  /// Band 1 Vertical
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band1V"))]
   pub band1_vertical: Option<std::boxed::Box<Band1Vertical>>,
-  ///Band 2 Vertical
+  /// Band 2 Vertical
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band2V"))]
   pub band2_vertical: Option<std::boxed::Box<Band2Vertical>>,
-  ///Last Column
+  /// Last Column
   #[sdk(child(qname = "a:CT_TablePartStyle/a:lastCol"))]
   pub last_column: Option<std::boxed::Box<LastColumn>>,
-  ///First Column
+  /// First Column
   #[sdk(child(qname = "a:CT_TablePartStyle/a:firstCol"))]
   pub first_column: Option<std::boxed::Box<FirstColumn>>,
-  ///Last Row
+  /// Last Row
   #[sdk(child(qname = "a:CT_TablePartStyle/a:lastRow"))]
   pub last_row: Option<std::boxed::Box<LastRow>>,
-  ///Southeast Cell
+  /// Southeast Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:seCell"))]
   pub southeast_cell: Option<std::boxed::Box<SoutheastCell>>,
-  ///Southwest Cell
+  /// Southwest Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:swCell"))]
   pub southwest_cell: Option<std::boxed::Box<SouthwestCell>>,
-  ///First Row
+  /// First Row
   #[sdk(child(qname = "a:CT_TablePartStyle/a:firstRow"))]
   pub first_row: Option<std::boxed::Box<FirstRow>>,
-  ///Northeast Cell
+  /// Northeast Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:neCell"))]
   pub northeast_cell: Option<std::boxed::Box<NortheastCell>>,
-  ///Northwest Cell
+  /// Northwest Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:nwCell"))]
   pub northwest_cell: Option<std::boxed::Box<NorthwestCell>>,
   /// _
@@ -10998,28 +10814,28 @@ pub struct ThemeableLineStyleType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableCellBorderStyle/a:tcBdr")]
 pub struct TableCellBorders {
-  ///Left Border
+  /// Left Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:left"))]
   pub left_border: Option<std::boxed::Box<LeftBorder>>,
-  ///Right Border
+  /// Right Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:right"))]
   pub right_border: Option<std::boxed::Box<RightBorder>>,
-  ///Top Border
+  /// Top Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:top"))]
   pub top_border: Option<std::boxed::Box<TopBorder>>,
-  ///Bottom Border
+  /// Bottom Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:bottom"))]
   pub bottom_border: Option<std::boxed::Box<BottomBorder>>,
-  ///Inside Horizontal Border
+  /// Inside Horizontal Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:insideH"))]
   pub inside_horizontal_border: Option<std::boxed::Box<InsideHorizontalBorder>>,
-  ///Inside Vertical Border
+  /// Inside Vertical Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:insideV"))]
   pub inside_vertical_border: Option<std::boxed::Box<InsideVerticalBorder>>,
-  ///Top Left to Bottom Right Border
+  /// Top Left to Bottom Right Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:tl2br"))]
   pub top_left_to_bottom_right_border: Option<std::boxed::Box<TopLeftToBottomRightBorder>>,
-  ///Top Right to Bottom Left Border
+  /// Top Right to Bottom Left Border
   #[sdk(child(qname = "a:CT_ThemeableLineStyle/a:tr2bl"))]
   pub top_right_to_bottom_left_border: Option<std::boxed::Box<TopRightToBottomLeftBorder>>,
   /// _
@@ -11076,7 +10892,7 @@ pub struct TableCellTextStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyleCellStyle/a:tcStyle")]
 pub struct TableCellStyle {
-  ///Table Cell Borders
+  /// Table Cell Borders
   #[sdk(child(qname = "a:CT_TableCellBorderStyle/a:tcBdr"))]
   pub table_cell_borders: Option<std::boxed::Box<TableCellBorders>>,
   #[sdk(choice(
@@ -11115,10 +10931,10 @@ pub struct TableBackground {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:wholeTbl")]
 pub struct WholeTable {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11130,10 +10946,10 @@ pub struct WholeTable {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band1H")]
 pub struct Band1Horizontal {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11145,10 +10961,10 @@ pub struct Band1Horizontal {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band2H")]
 pub struct Band2Horizontal {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11160,10 +10976,10 @@ pub struct Band2Horizontal {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band1V")]
 pub struct Band1Vertical {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11175,10 +10991,10 @@ pub struct Band1Vertical {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:band2V")]
 pub struct Band2Vertical {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11190,10 +11006,10 @@ pub struct Band2Vertical {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:lastCol")]
 pub struct LastColumn {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11205,10 +11021,10 @@ pub struct LastColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:firstCol")]
 pub struct FirstColumn {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11220,10 +11036,10 @@ pub struct FirstColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:lastRow")]
 pub struct LastRow {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11235,10 +11051,10 @@ pub struct LastRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:seCell")]
 pub struct SoutheastCell {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11250,10 +11066,10 @@ pub struct SoutheastCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:swCell")]
 pub struct SouthwestCell {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11265,10 +11081,10 @@ pub struct SouthwestCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:firstRow")]
 pub struct FirstRow {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11280,10 +11096,10 @@ pub struct FirstRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:neCell")]
 pub struct NortheastCell {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11295,10 +11111,10 @@ pub struct NortheastCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TablePartStyle/a:nwCell")]
 pub struct NorthwestCell {
-  ///Table Cell Text Style
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   pub table_cell_text_style: Option<std::boxed::Box<TableCellTextStyle>>,
-  ///Table Cell Style
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
 }
@@ -11439,13 +11255,13 @@ pub struct ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -11603,13 +11419,13 @@ pub struct DefaultParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -11767,13 +11583,13 @@ pub struct Level1ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -11931,13 +11747,13 @@ pub struct Level2ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -12095,13 +11911,13 @@ pub struct Level3ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -12259,13 +12075,13 @@ pub struct Level4ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -12423,13 +12239,13 @@ pub struct Level5ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -12587,13 +12403,13 @@ pub struct Level6ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -12751,13 +12567,13 @@ pub struct Level7ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -12915,13 +12731,13 @@ pub struct Level8ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -13079,13 +12895,13 @@ pub struct Level9ParagraphProperties {
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   pub baseline: Option<crate::simple_type::StringValue>,
-  ///Line Spacing
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
-  ///Space Before
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   pub space_before: Option<std::boxed::Box<SpaceBefore>>,
-  ///Space After
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
   #[sdk(choice(
@@ -14129,7 +13945,7 @@ pub struct TextCharacterPropertiesType {
 #[sdk(qname = "a:CT_TextParagraph/a:p")]
 pub struct Paragraph {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  ///Text Paragraph Properties
+  /// Text Paragraph Properties
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(choice(
@@ -14372,7 +14188,7 @@ pub struct NonVisualGroupShapeProperties {
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/a:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  ///Non-Visual Group Shape Drawing Properties
+  /// Non-Visual Group Shape Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/a:cNvGrpSpPr"))]
   pub non_visual_group_shape_drawing_properties:
     std::boxed::Box<NonVisualGroupShapeDrawingProperties>,
@@ -14393,7 +14209,7 @@ pub struct VisualGroupShapeProperties {
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode: Option<BlackWhiteModeValues>,
-  ///2D Transform for Grouped Objects
+  /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<TransformGroup>>,
   #[sdk(choice(
@@ -14425,16 +14241,16 @@ pub struct VisualGroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlShape/a:sp")]
 pub struct Shape {
-  ///Non-Visual Properties for a Shape
+  /// Non-Visual Properties for a Shape
   #[sdk(child(qname = "a:CT_GvmlShapeNonVisual/a:nvSpPr"))]
   pub non_visual_shape_properties: std::boxed::Box<NonVisualShapeProperties>,
-  ///Visual Properties
+  /// Visual Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  ///Text Shape
+  /// Text Shape
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   pub text_shape: Option<std::boxed::Box<TextShape>>,
-  ///Style
+  /// Style
   #[sdk(child(qname = "a:CT_ShapeStyle/a:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// _
@@ -14449,13 +14265,13 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlConnector/a:cxnSp")]
 pub struct ConnectionShape {
-  ///Non-Visual Properties for a Connection Shape
+  /// Non-Visual Properties for a Connection Shape
   #[sdk(child(qname = "a:CT_GvmlConnectorNonVisual/a:nvCxnSpPr"))]
   pub non_visual_connection_shape_properties: std::boxed::Box<NonVisualConnectionShapeProperties>,
-  ///Visual Properties
+  /// Visual Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  ///Shape Style
+  /// Shape Style
   #[sdk(child(qname = "a:CT_ShapeStyle/a:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// _
@@ -14470,13 +14286,13 @@ pub struct ConnectionShape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlPicture/a:pic")]
 pub struct Picture {
-  ///Non-Visual Properties for a Picture
+  /// Non-Visual Properties for a Picture
   #[sdk(child(qname = "a:CT_GvmlPictureNonVisual/a:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
-  ///Picture Fill
+  /// Picture Fill
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   pub blip_fill: std::boxed::Box<BlipFill>,
-  ///Shape Properties
+  /// Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
@@ -14494,7 +14310,7 @@ pub struct Picture {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame")]
 pub struct GraphicFrame {
-  ///Non-Visual Properties for a Graphic Frame
+  /// Non-Visual Properties for a Graphic Frame
   #[sdk(child(qname = "a:CT_GvmlGraphicFrameNonVisual/a:nvGraphicFramePr"))]
   pub non_visual_graphic_frame_properties: std::boxed::Box<NonVisualGraphicFrameProperties>,
   /// _
@@ -14515,10 +14331,10 @@ pub struct GraphicFrame {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShape/a:grpSp")]
 pub struct GroupShape {
-  ///Non-Visual Properties for a Group Shape
+  /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
-  ///Visual Group Shape Properties
+  /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
   pub visual_group_shape_properties: std::boxed::Box<VisualGroupShapeProperties>,
   #[sdk(choice(
@@ -14709,13 +14525,13 @@ pub struct NonVisualGroupDrawingShapePropsExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ObjectStyleDefaults/a:objectDefaults")]
 pub struct ObjectDefaults {
-  ///Shape Default
+  /// Shape Default
   #[sdk(child(qname = "a:CT_DefaultShapeDefinition/a:spDef"))]
   pub shape_default: Option<std::boxed::Box<ShapeDefault>>,
-  ///Line Default
+  /// Line Default
   #[sdk(child(qname = "a:CT_DefaultShapeDefinition/a:lnDef"))]
   pub line_default: Option<std::boxed::Box<LineDefault>>,
-  ///Text Default
+  /// Text Default
   #[sdk(child(qname = "a:CT_DefaultShapeDefinition/a:txDef"))]
   pub text_default: Option<std::boxed::Box<TextDefault>>,
   /// _
@@ -14823,10 +14639,10 @@ pub struct HyperlinkOnClick {
   /// Represents the following attribute in the schema: :endSnd
   #[sdk(attr(qname = ":endSnd"))]
   pub end_sound: Option<crate::simple_type::BooleanValue>,
-  ///Sound to play.
+  /// Sound to play.
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:snd"))]
   pub hyperlink_sound: Option<HyperlinkSound>,
-  ///Future extensions.
+  /// Future extensions.
   #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
   pub hyperlink_extension_list: Option<HyperlinkExtensionList>,
 }
@@ -14894,10 +14710,10 @@ pub struct HyperlinkOnMouseOver {
   /// Represents the following attribute in the schema: :endSnd
   #[sdk(attr(qname = ":endSnd"))]
   pub end_sound: Option<crate::simple_type::BooleanValue>,
-  ///Sound to play.
+  /// Sound to play.
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:snd"))]
   pub hyperlink_sound: Option<HyperlinkSound>,
-  ///Future extensions.
+  /// Future extensions.
   #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
   pub hyperlink_extension_list: Option<HyperlinkExtensionList>,
 }
@@ -14965,10 +14781,10 @@ pub struct HyperlinkOnHover {
   /// Represents the following attribute in the schema: :endSnd
   #[sdk(attr(qname = ":endSnd"))]
   pub end_sound: Option<crate::simple_type::BooleanValue>,
-  ///Sound to play.
+  /// Sound to play.
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:snd"))]
   pub hyperlink_sound: Option<HyperlinkSound>,
-  ///Future extensions.
+  /// Future extensions.
   #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
   pub hyperlink_extension_list: Option<HyperlinkExtensionList>,
 }
@@ -15540,12 +15356,15 @@ pub enum RgbColorModelPercentageChoice {
   ATint(std::boxed::Box<Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(std::boxed::Box<Complement>),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -15588,10 +15407,12 @@ pub enum RgbColorModelPercentageChoice {
   ABlueOff(std::boxed::Box<BlueOffset>),
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   ABlueMod(std::boxed::Box<BlueModulation>),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(std::boxed::Box<InverseGamma>),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RgbColorModelHexChoice {
@@ -15599,12 +15420,15 @@ pub enum RgbColorModelHexChoice {
   ATint(std::boxed::Box<Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(std::boxed::Box<Complement>),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -15647,10 +15471,12 @@ pub enum RgbColorModelHexChoice {
   ABlueOff(std::boxed::Box<BlueOffset>),
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   ABlueMod(std::boxed::Box<BlueModulation>),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(std::boxed::Box<InverseGamma>),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HslColorChoice {
@@ -15658,12 +15484,15 @@ pub enum HslColorChoice {
   ATint(std::boxed::Box<Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(std::boxed::Box<Complement>),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -15706,10 +15535,12 @@ pub enum HslColorChoice {
   ABlueOff(std::boxed::Box<BlueOffset>),
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   ABlueMod(std::boxed::Box<BlueModulation>),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(std::boxed::Box<InverseGamma>),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SystemColorChoice {
@@ -15717,12 +15548,15 @@ pub enum SystemColorChoice {
   ATint(std::boxed::Box<Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(std::boxed::Box<Complement>),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -15765,10 +15599,12 @@ pub enum SystemColorChoice {
   ABlueOff(std::boxed::Box<BlueOffset>),
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   ABlueMod(std::boxed::Box<BlueModulation>),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(std::boxed::Box<InverseGamma>),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SchemeColorChoice {
@@ -15776,12 +15612,15 @@ pub enum SchemeColorChoice {
   ATint(std::boxed::Box<Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(std::boxed::Box<Complement>),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -15824,10 +15663,12 @@ pub enum SchemeColorChoice {
   ABlueOff(std::boxed::Box<BlueOffset>),
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   ABlueMod(std::boxed::Box<BlueModulation>),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(std::boxed::Box<InverseGamma>),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresetColorChoice {
@@ -15835,12 +15676,15 @@ pub enum PresetColorChoice {
   ATint(std::boxed::Box<Tint>),
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   AShade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "a:CT_ComplementTransform/a:comp"))]
-  AComp(std::boxed::Box<Complement>),
-  #[sdk(child(qname = "a:CT_InverseTransform/a:inv"))]
-  AInv(std::boxed::Box<Inverse>),
-  #[sdk(child(qname = "a:CT_GrayscaleTransform/a:gray"))]
-  AGray(std::boxed::Box<Gray>),
+  /// Complement.
+  #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
+  AComp,
+  /// Inverse.
+  #[sdk(empty_child(qname = "a:CT_InverseTransform/a:inv"))]
+  AInv,
+  /// Gray.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
+  AGray,
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   AAlpha(std::boxed::Box<Alpha>),
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
@@ -15883,23 +15727,31 @@ pub enum PresetColorChoice {
   ABlueOff(std::boxed::Box<BlueOffset>),
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   ABlueMod(std::boxed::Box<BlueModulation>),
-  #[sdk(child(qname = "a:CT_GammaTransform/a:gamma"))]
-  AGamma(std::boxed::Box<Gamma>),
-  #[sdk(child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
-  AInvGamma(std::boxed::Box<InverseGamma>),
+  /// Gamma.
+  #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
+  AGamma,
+  /// Inverse Gamma.
+  #[sdk(empty_child(qname = "a:CT_InverseGammaTransform/a:invGamma"))]
+  AInvGamma,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SolidFillChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
@@ -15919,220 +15771,322 @@ pub enum BlipFillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectContainerChoice {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   ACont(std::boxed::Box<EffectContainer>),
+  /// Effect.
   #[sdk(child(qname = "a:CT_EffectReference/a:effect"))]
   AEffect(std::boxed::Box<Effect>),
+  /// Defines the AlphaBiLevel Class.
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
-  #[sdk(child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling(std::boxed::Box<AlphaCeiling>),
-  #[sdk(child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor(std::boxed::Box<AlphaFloor>),
+  /// Alpha Ceiling Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
+  AAlphaCeiling,
+  /// Alpha Floor Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
+  AAlphaFloor,
+  /// Alpha Inverse Effect.
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(std::boxed::Box<AlphaInverse>),
+  /// Alpha Modulate Effect.
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
   AAlphaMod(std::boxed::Box<AlphaModulationEffect>),
+  /// Defines the AlphaModulationFixed Class.
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
   AAlphaModFix(std::boxed::Box<AlphaModulationFixed>),
+  /// Alpha Inset/Outset Effect.
   #[sdk(child(qname = "a:CT_AlphaOutsetEffect/a:alphaOutset"))]
   AAlphaOutset(std::boxed::Box<AlphaOutset>),
+  /// Alpha Replace Effect.
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
   AAlphaRepl(std::boxed::Box<AlphaReplace>),
+  /// Defines the BiLevel Class.
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
   ABiLevel(std::boxed::Box<BiLevel>),
+  /// Blend Effect.
   #[sdk(child(qname = "a:CT_BlendEffect/a:blend"))]
   ABlend(std::boxed::Box<Blend>),
+  /// Defines the Blur Class.
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   ABlur(std::boxed::Box<Blur>),
+  /// Color Change Effect.
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
   AClrChange(std::boxed::Box<ColorChange>),
+  /// Defines the ColorReplacement Class.
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
   AClrRepl(std::boxed::Box<ColorReplacement>),
+  /// Duotone Effect.
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
   ADuotone(std::boxed::Box<Duotone>),
+  /// Fill.
   #[sdk(child(qname = "a:CT_FillEffect/a:fill"))]
   AFill(std::boxed::Box<Fill>),
+  /// Fill Overlay Effect.
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
   AFillOverlay(std::boxed::Box<FillOverlay>),
+  /// Glow Effect.
   #[sdk(child(qname = "a:CT_GlowEffect/a:glow"))]
   AGlow(std::boxed::Box<Glow>),
-  #[sdk(child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl(std::boxed::Box<Grayscale>),
+  /// Gray Scale Effect.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
+  AGrayscl,
+  /// Hue Saturation Luminance Effect.
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<Hsl>),
+  /// Inner Shadow Effect.
   #[sdk(child(qname = "a:CT_InnerShadowEffect/a:innerShdw"))]
   AInnerShdw(std::boxed::Box<InnerShadow>),
+  /// Luminance.
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
   ALum(std::boxed::Box<LuminanceEffect>),
+  /// Outer Shadow Effect.
   #[sdk(child(qname = "a:CT_OuterShadowEffect/a:outerShdw"))]
   AOuterShdw(std::boxed::Box<OuterShadow>),
+  /// Preset Shadow.
   #[sdk(child(qname = "a:CT_PresetShadowEffect/a:prstShdw"))]
   APrstShdw(std::boxed::Box<PresetShadow>),
+  /// Reflection Effect.
   #[sdk(child(qname = "a:CT_ReflectionEffect/a:reflection"))]
   AReflection(std::boxed::Box<Reflection>),
+  /// Relative Offset Effect.
   #[sdk(child(qname = "a:CT_RelativeOffsetEffect/a:relOff"))]
   ARelOff(std::boxed::Box<RelativeOffset>),
+  /// Soft Edge Effect.
   #[sdk(child(qname = "a:CT_SoftEdgesEffect/a:softEdge"))]
   ASoftEdge(std::boxed::Box<SoftEdge>),
+  /// Defines the TintEffect Class.
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
   ATint(std::boxed::Box<TintEffect>),
+  /// Transform Effect.
   #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
   AXfrm(std::boxed::Box<TransformEffect>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectDagChoice {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   ACont(std::boxed::Box<EffectContainer>),
+  /// Effect.
   #[sdk(child(qname = "a:CT_EffectReference/a:effect"))]
   AEffect(std::boxed::Box<Effect>),
+  /// Defines the AlphaBiLevel Class.
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
-  #[sdk(child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling(std::boxed::Box<AlphaCeiling>),
-  #[sdk(child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor(std::boxed::Box<AlphaFloor>),
+  /// Alpha Ceiling Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
+  AAlphaCeiling,
+  /// Alpha Floor Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
+  AAlphaFloor,
+  /// Alpha Inverse Effect.
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(std::boxed::Box<AlphaInverse>),
+  /// Alpha Modulate Effect.
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
   AAlphaMod(std::boxed::Box<AlphaModulationEffect>),
+  /// Defines the AlphaModulationFixed Class.
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
   AAlphaModFix(std::boxed::Box<AlphaModulationFixed>),
+  /// Alpha Inset/Outset Effect.
   #[sdk(child(qname = "a:CT_AlphaOutsetEffect/a:alphaOutset"))]
   AAlphaOutset(std::boxed::Box<AlphaOutset>),
+  /// Alpha Replace Effect.
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
   AAlphaRepl(std::boxed::Box<AlphaReplace>),
+  /// Defines the BiLevel Class.
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
   ABiLevel(std::boxed::Box<BiLevel>),
+  /// Blend Effect.
   #[sdk(child(qname = "a:CT_BlendEffect/a:blend"))]
   ABlend(std::boxed::Box<Blend>),
+  /// Defines the Blur Class.
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   ABlur(std::boxed::Box<Blur>),
+  /// Color Change Effect.
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
   AClrChange(std::boxed::Box<ColorChange>),
+  /// Defines the ColorReplacement Class.
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
   AClrRepl(std::boxed::Box<ColorReplacement>),
+  /// Duotone Effect.
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
   ADuotone(std::boxed::Box<Duotone>),
+  /// Fill.
   #[sdk(child(qname = "a:CT_FillEffect/a:fill"))]
   AFill(std::boxed::Box<Fill>),
+  /// Fill Overlay Effect.
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
   AFillOverlay(std::boxed::Box<FillOverlay>),
+  /// Glow Effect.
   #[sdk(child(qname = "a:CT_GlowEffect/a:glow"))]
   AGlow(std::boxed::Box<Glow>),
-  #[sdk(child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl(std::boxed::Box<Grayscale>),
+  /// Gray Scale Effect.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
+  AGrayscl,
+  /// Hue Saturation Luminance Effect.
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<Hsl>),
+  /// Inner Shadow Effect.
   #[sdk(child(qname = "a:CT_InnerShadowEffect/a:innerShdw"))]
   AInnerShdw(std::boxed::Box<InnerShadow>),
+  /// Luminance.
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
   ALum(std::boxed::Box<LuminanceEffect>),
+  /// Outer Shadow Effect.
   #[sdk(child(qname = "a:CT_OuterShadowEffect/a:outerShdw"))]
   AOuterShdw(std::boxed::Box<OuterShadow>),
+  /// Preset Shadow.
   #[sdk(child(qname = "a:CT_PresetShadowEffect/a:prstShdw"))]
   APrstShdw(std::boxed::Box<PresetShadow>),
+  /// Reflection Effect.
   #[sdk(child(qname = "a:CT_ReflectionEffect/a:reflection"))]
   AReflection(std::boxed::Box<Reflection>),
+  /// Relative Offset Effect.
   #[sdk(child(qname = "a:CT_RelativeOffsetEffect/a:relOff"))]
   ARelOff(std::boxed::Box<RelativeOffset>),
+  /// Soft Edge Effect.
   #[sdk(child(qname = "a:CT_SoftEdgesEffect/a:softEdge"))]
   ASoftEdge(std::boxed::Box<SoftEdge>),
+  /// Defines the TintEffect Class.
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
   ATint(std::boxed::Box<TintEffect>),
+  /// Transform Effect.
   #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
   AXfrm(std::boxed::Box<TransformEffect>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectContainerTypeChoice {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
   ACont(std::boxed::Box<EffectContainer>),
+  /// Effect.
   #[sdk(child(qname = "a:CT_EffectReference/a:effect"))]
   AEffect(std::boxed::Box<Effect>),
+  /// Defines the AlphaBiLevel Class.
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
-  #[sdk(child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling(std::boxed::Box<AlphaCeiling>),
-  #[sdk(child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor(std::boxed::Box<AlphaFloor>),
+  /// Alpha Ceiling Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
+  AAlphaCeiling,
+  /// Alpha Floor Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
+  AAlphaFloor,
+  /// Alpha Inverse Effect.
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(std::boxed::Box<AlphaInverse>),
+  /// Alpha Modulate Effect.
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
   AAlphaMod(std::boxed::Box<AlphaModulationEffect>),
+  /// Defines the AlphaModulationFixed Class.
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
   AAlphaModFix(std::boxed::Box<AlphaModulationFixed>),
+  /// Alpha Inset/Outset Effect.
   #[sdk(child(qname = "a:CT_AlphaOutsetEffect/a:alphaOutset"))]
   AAlphaOutset(std::boxed::Box<AlphaOutset>),
+  /// Alpha Replace Effect.
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
   AAlphaRepl(std::boxed::Box<AlphaReplace>),
+  /// Defines the BiLevel Class.
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
   ABiLevel(std::boxed::Box<BiLevel>),
+  /// Blend Effect.
   #[sdk(child(qname = "a:CT_BlendEffect/a:blend"))]
   ABlend(std::boxed::Box<Blend>),
+  /// Defines the Blur Class.
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   ABlur(std::boxed::Box<Blur>),
+  /// Color Change Effect.
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
   AClrChange(std::boxed::Box<ColorChange>),
+  /// Defines the ColorReplacement Class.
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
   AClrRepl(std::boxed::Box<ColorReplacement>),
+  /// Duotone Effect.
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
   ADuotone(std::boxed::Box<Duotone>),
+  /// Fill.
   #[sdk(child(qname = "a:CT_FillEffect/a:fill"))]
   AFill(std::boxed::Box<Fill>),
+  /// Fill Overlay Effect.
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
   AFillOverlay(std::boxed::Box<FillOverlay>),
+  /// Glow Effect.
   #[sdk(child(qname = "a:CT_GlowEffect/a:glow"))]
   AGlow(std::boxed::Box<Glow>),
-  #[sdk(child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl(std::boxed::Box<Grayscale>),
+  /// Gray Scale Effect.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
+  AGrayscl,
+  /// Hue Saturation Luminance Effect.
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<Hsl>),
+  /// Inner Shadow Effect.
   #[sdk(child(qname = "a:CT_InnerShadowEffect/a:innerShdw"))]
   AInnerShdw(std::boxed::Box<InnerShadow>),
+  /// Luminance.
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
   ALum(std::boxed::Box<LuminanceEffect>),
+  /// Outer Shadow Effect.
   #[sdk(child(qname = "a:CT_OuterShadowEffect/a:outerShdw"))]
   AOuterShdw(std::boxed::Box<OuterShadow>),
+  /// Preset Shadow.
   #[sdk(child(qname = "a:CT_PresetShadowEffect/a:prstShdw"))]
   APrstShdw(std::boxed::Box<PresetShadow>),
+  /// Reflection Effect.
   #[sdk(child(qname = "a:CT_ReflectionEffect/a:reflection"))]
   AReflection(std::boxed::Box<Reflection>),
+  /// Relative Offset Effect.
   #[sdk(child(qname = "a:CT_RelativeOffsetEffect/a:relOff"))]
   ARelOff(std::boxed::Box<RelativeOffset>),
+  /// Soft Edge Effect.
   #[sdk(child(qname = "a:CT_SoftEdgesEffect/a:softEdge"))]
   ASoftEdge(std::boxed::Box<SoftEdge>),
+  /// Defines the TintEffect Class.
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
   ATint(std::boxed::Box<TintEffect>),
+  /// Transform Effect.
   #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
   AXfrm(std::boxed::Box<TransformEffect>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AlphaInverseChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorReplacementChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
@@ -16153,182 +16107,253 @@ pub enum DuotoneChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(std::boxed::Box<SolidFill>),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(std::boxed::Box<GradientFill>),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(std::boxed::Box<BlipFill>),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillOverlayChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(std::boxed::Box<SolidFill>),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(std::boxed::Box<GradientFill>),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(std::boxed::Box<BlipFill>),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GlowChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InnerShadowChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OuterShadowChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresetShadowChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillPropertiesChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(std::boxed::Box<SolidFill>),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(std::boxed::Box<GradientFill>),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(std::boxed::Box<BlipFill>),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleMatrixReferenceTypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectPropertiesTypeChoice {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontCollectionTypeChoice {
+  /// Latin Font
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
   ALatin(std::boxed::Box<LatinFont>),
+  /// East Asian Font
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
   AEa(std::boxed::Box<EastAsianFont>),
+  /// Complex Script Font
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
   ACs(std::boxed::Box<ComplexScriptFont>),
   #[sdk(child(qname = "a:CT_SupplementalFont/a:font"))]
@@ -16338,151 +16363,211 @@ pub enum FontCollectionTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BulletColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ExtrusionColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ContourColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorFromChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorToChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForegroundColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HighlightChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
@@ -16506,10 +16591,12 @@ pub enum UnderlineChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16533,10 +16620,12 @@ pub enum OutlineChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OutlineChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16560,10 +16649,12 @@ pub enum LeftBorderLinePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderLinePropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16587,10 +16678,12 @@ pub enum RightBorderLinePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RightBorderLinePropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16614,10 +16707,12 @@ pub enum TopBorderLinePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopBorderLinePropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16641,10 +16736,12 @@ pub enum BottomBorderLinePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomBorderLinePropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16668,10 +16765,12 @@ pub enum TopLeftToBottomRightBorderLinePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
@@ -16695,63 +16794,85 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesTypeChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(std::boxed::Box<SolidFill>),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(std::boxed::Box<GradientFill>),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
+  /// Preset Dash.
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(std::boxed::Box<PresetDash>),
+  /// Custom Dash.
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(std::boxed::Box<CustomDash>),
-  #[sdk(child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound(std::boxed::Box<Round>),
-  #[sdk(child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel(std::boxed::Box<LineJoinBevel>),
+  /// Round Line Join.
+  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  ARound,
+  /// Line Join Bevel.
+  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  ABevel,
+  /// Miter Line Join.
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
+  /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
   AHeadEnd(std::boxed::Box<HeadEnd>),
+  /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
   ATailEnd(std::boxed::Box<TailEnd>),
+  /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<LinePropertiesExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineFillChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(std::boxed::Box<SolidFill>),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(std::boxed::Box<GradientFill>),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(std::boxed::Box<BlipFill>),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
-  #[sdk(child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling(std::boxed::Box<AlphaCeiling>),
-  #[sdk(child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor(std::boxed::Box<AlphaFloor>),
+  /// Alpha Ceiling Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
+  AAlphaCeiling,
+  /// Alpha Floor Effect.
+  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
+  AAlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(std::boxed::Box<AlphaInverse>),
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
@@ -16772,8 +16893,9 @@ pub enum BlipChoice {
   ADuotone(std::boxed::Box<Duotone>),
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
   AFillOverlay(std::boxed::Box<FillOverlay>),
-  #[sdk(child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl(std::boxed::Box<Grayscale>),
+  /// Gray Scale Effect.
+  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
+  AGrayscl,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
@@ -16783,16 +16905,22 @@ pub enum BlipChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
@@ -16815,8 +16943,9 @@ pub enum FillStyleListChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFillStyleListChoice {
@@ -16830,175 +16959,241 @@ pub enum BackgroundFillStyleListChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Dark1ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Light1ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Dark2ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Light2ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent1ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent2ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent3ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent4ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent5ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Accent6ColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FollowedHyperlinkColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Color2TypeChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
@@ -17021,8 +17216,9 @@ pub enum ShapePropertiesChoice2 {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
@@ -17033,52 +17229,68 @@ pub enum ShapePropertiesChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextShapeChoice {
-  #[sdk(child(qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect"))]
-  AUseSpRect(std::boxed::Box<UseShapeRectangle>),
+  /// Use Shape Text Rectangle.
+  #[sdk(empty_child(qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect"))]
+  AUseSpRect,
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   AXfrm(std::boxed::Box<Transform2D>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientStopChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(std::boxed::Box<RgbColorModelHex>),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(std::boxed::Box<HslColor>),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(std::boxed::Box<SystemColor>),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(std::boxed::Box<SchemeColor>),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PathChoice {
-  #[sdk(child(qname = "a:CT_Path2DClose/a:close"))]
-  AClose(std::boxed::Box<CloseShapePath>),
+  /// Close Shape Path.
+  #[sdk(empty_child(qname = "a:CT_Path2DClose/a:close"))]
+  AClose,
+  /// Move Path To.
   #[sdk(child(qname = "a:CT_Path2DMoveTo/a:moveTo"))]
   AMoveTo(std::boxed::Box<MoveTo>),
+  /// Draw Line To.
   #[sdk(child(qname = "a:CT_Path2DLineTo/a:lnTo"))]
   ALnTo(std::boxed::Box<LineTo>),
+  /// Draw Arc To.
   #[sdk(child(qname = "a:CT_Path2DArcTo/a:arcTo"))]
   AArcTo(std::boxed::Box<ArcTo>),
+  /// Draw Quadratic Bezier Curve To.
   #[sdk(child(qname = "a:CT_Path2DQuadBezierTo/a:quadBezTo"))]
   AQuadBezTo(std::boxed::Box<QuadraticBezierCurveTo>),
+  /// Draw Cubic Bezier Curve To.
   #[sdk(child(qname = "a:CT_Path2DCubicBezierTo/a:cubicBezTo"))]
   ACubicBezTo(std::boxed::Box<CubicBezierCurveTo>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AdjustHandleListChoice {
+  /// XY Adjust Handle.
   #[sdk(child(qname = "a:CT_XYAdjustHandle/a:ahXY"))]
   AAhXy(std::boxed::Box<AdjustHandleXy>),
+  /// Polar Adjust Handle.
   #[sdk(child(qname = "a:CT_PolarAdjustHandle/a:ahPolar"))]
   AAhPolar(std::boxed::Box<AdjustHandlePolar>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
-  ANoAutofit(std::boxed::Box<NoAutoFit>),
+  /// No AutoFit.
+  #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
+  ANoAutofit,
   #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
   ANormAutofit(std::boxed::Box<NormalAutoFit>),
   #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
@@ -17093,6 +17305,7 @@ pub enum BodyPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultShapeDefinitionTypeChoice {
+  /// Visual Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
   ASpPr(std::boxed::Box<ShapeProperties>),
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
@@ -17116,37 +17329,52 @@ pub enum TableCellPropertiesChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableStyleTypeChoice {
+  /// Table Background
   #[sdk(child(qname = "a:CT_TableBackgroundStyle/a:tblBg"))]
   ATblBg(std::boxed::Box<TableBackground>),
+  /// Whole Table
   #[sdk(child(qname = "a:CT_TablePartStyle/a:wholeTbl"))]
   AWholeTbl(std::boxed::Box<WholeTable>),
+  /// Band 1 Horizontal
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band1H"))]
   ABand1H(std::boxed::Box<Band1Horizontal>),
+  /// Band 2 Horizontal
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band2H"))]
   ABand2H(std::boxed::Box<Band2Horizontal>),
+  /// Band 1 Vertical
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band1V"))]
   ABand1V(std::boxed::Box<Band1Vertical>),
+  /// Band 2 Vertical
   #[sdk(child(qname = "a:CT_TablePartStyle/a:band2V"))]
   ABand2V(std::boxed::Box<Band2Vertical>),
+  /// Last Column
   #[sdk(child(qname = "a:CT_TablePartStyle/a:lastCol"))]
   ALastCol(std::boxed::Box<LastColumn>),
+  /// First Column
   #[sdk(child(qname = "a:CT_TablePartStyle/a:firstCol"))]
   AFirstCol(std::boxed::Box<FirstColumn>),
+  /// Last Row
   #[sdk(child(qname = "a:CT_TablePartStyle/a:lastRow"))]
   ALastRow(std::boxed::Box<LastRow>),
+  /// Southeast Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:seCell"))]
   ASeCell(std::boxed::Box<SoutheastCell>),
+  /// Southwest Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:swCell"))]
   ASwCell(std::boxed::Box<SouthwestCell>),
+  /// First Row
   #[sdk(child(qname = "a:CT_TablePartStyle/a:firstRow"))]
   AFirstRow(std::boxed::Box<FirstRow>),
+  /// Northeast Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:neCell"))]
   ANeCell(std::boxed::Box<NortheastCell>),
+  /// Northwest Cell
   #[sdk(child(qname = "a:CT_TablePartStyle/a:nwCell"))]
   ANwCell(std::boxed::Box<NorthwestCell>),
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -17164,8 +17392,9 @@ pub enum TablePropertiesChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePropertiesChoice2 {
@@ -17183,64 +17412,82 @@ pub enum TablePropertiesChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RightBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsideHorizontalBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsideVerticalBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopLeftToBottomRightBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopRightToBottomLeftBorderChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ThemeableLineStyleTypeChoice {
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   ALn(std::boxed::Box<Outline>),
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   ALnRef(std::boxed::Box<LineReference>),
 }
@@ -17289,22 +17536,26 @@ pub enum TableBackgroundChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePartStyleTypeChoice {
+  /// Table Cell Text Style
   #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
   ATcTxStyle(std::boxed::Box<TableCellTextStyle>),
+  /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   ATcStyle(std::boxed::Box<TableCellStyle>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17312,15 +17563,17 @@ pub enum ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17330,15 +17583,17 @@ pub enum ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17346,15 +17601,17 @@ pub enum DefaultParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17364,15 +17621,17 @@ pub enum DefaultParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17380,15 +17639,17 @@ pub enum Level1ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level1ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17398,15 +17659,17 @@ pub enum Level1ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17414,15 +17677,17 @@ pub enum Level2ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level2ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17432,15 +17697,17 @@ pub enum Level2ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17448,15 +17715,17 @@ pub enum Level3ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level3ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17466,15 +17735,17 @@ pub enum Level3ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17482,15 +17753,17 @@ pub enum Level4ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level4ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17500,15 +17773,17 @@ pub enum Level4ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17516,15 +17791,17 @@ pub enum Level5ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level5ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17534,15 +17811,17 @@ pub enum Level5ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17550,15 +17829,17 @@ pub enum Level6ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level6ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17568,15 +17849,17 @@ pub enum Level6ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17584,15 +17867,17 @@ pub enum Level7ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level7ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17602,15 +17887,17 @@ pub enum Level7ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17618,15 +17905,17 @@ pub enum Level8ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level8ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17636,15 +17925,17 @@ pub enum Level8ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice {
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice2 {
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
@@ -17652,15 +17943,17 @@ pub enum Level9ParagraphPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Level9ParagraphPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17670,28 +17963,35 @@ pub enum Level9ParagraphPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextParagraphPropertiesTypeChoice {
+  /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   ALnSpc(std::boxed::Box<LineSpacing>),
+  /// Space Before
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
   ASpcBef(std::boxed::Box<SpaceBefore>),
+  /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   ASpcAft(std::boxed::Box<SpaceAfter>),
-  #[sdk(child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx(std::boxed::Box<BulletColorText>),
+  /// Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
+  ABuClrTx,
   #[sdk(child(qname = "a:CT_Color/a:buClr"))]
   ABuClr(std::boxed::Box<BulletColor>),
-  #[sdk(child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx(std::boxed::Box<BulletSizeText>),
+  /// Bullet Size Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
+  ABuSzTx,
   #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
   ABuSzPct(std::boxed::Box<BulletSizePercentage>),
   #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
   ABuSzPts(std::boxed::Box<BulletSizePoints>),
-  #[sdk(child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx(std::boxed::Box<BulletFontText>),
+  /// Follow text.
+  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
+  ABuFontTx,
   #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
   ABuFont(std::boxed::Box<BulletFont>),
-  #[sdk(child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone(std::boxed::Box<NoBullet>),
+  /// No Bullet.
+  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  ABuNone,
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
@@ -17717,8 +18017,9 @@ pub enum EndParagraphRunPropertiesChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice2 {
@@ -17729,15 +18030,17 @@ pub enum EndParagraphRunPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx(std::boxed::Box<UnderlineFollowsText>),
+  /// Underline Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
+  AULnTx,
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx(std::boxed::Box<UnderlineFillText>),
+  /// Underline Fill Properties Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
+  AUFillTx,
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
 }
@@ -17753,8 +18056,9 @@ pub enum RunPropertiesChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice2 {
@@ -17765,15 +18069,17 @@ pub enum RunPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx(std::boxed::Box<UnderlineFollowsText>),
+  /// Underline Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
+  AULnTx,
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx(std::boxed::Box<UnderlineFillText>),
+  /// Underline Fill Properties Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
+  AUFillTx,
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
 }
@@ -17789,8 +18095,9 @@ pub enum DefaultRunPropertiesChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice2 {
@@ -17801,15 +18108,17 @@ pub enum DefaultRunPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice3 {
-  #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx(std::boxed::Box<UnderlineFollowsText>),
+  /// Underline Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
+  AULnTx,
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefaultRunPropertiesChoice4 {
-  #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx(std::boxed::Box<UnderlineFillText>),
+  /// Underline Fill Properties Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
+  AUFillTx,
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
 }
@@ -17827,20 +18136,23 @@ pub enum TextCharacterPropertiesTypeChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   AHighlight(std::boxed::Box<Highlight>),
-  #[sdk(child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx(std::boxed::Box<UnderlineFollowsText>),
+  /// Underline Follows Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
+  AULnTx,
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   AULn(std::boxed::Box<Underline>),
-  #[sdk(child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx(std::boxed::Box<UnderlineFillText>),
+  /// Underline Fill Properties Follow Text.
+  #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
+  AUFillTx,
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   AUFill(std::boxed::Box<UnderlineFill>),
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
@@ -17875,34 +18187,43 @@ pub enum ParagraphChoice {
   #[sdk(child(qname = "a:CT_TextField/a:fld"))]
   AFld(std::boxed::Box<Field>),
   #[cfg(feature = "microsoft365")]
-  #[sdk(child(qname = "a14:CT_TextMath/a14:m"))]
-  A14M(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::TextMath>),
+  /// Defines the TextMath Class.
+  #[sdk(empty_child(qname = "a14:CT_TextMath/a14:m"))]
+  A14M,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSpacingChoice {
+  /// Spacing Percent.
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
+  /// Spacing Points.
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SpaceBeforeChoice {
+  /// Spacing Percent.
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
+  /// Spacing Points.
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SpaceAfterChoice {
+  /// Spacing Percent.
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
+  /// Spacing Points.
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextSpacingTypeChoice {
+  /// Spacing Percent.
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
+  /// Spacing Points.
   #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
   ASpcPts(std::boxed::Box<SpacingPoints>),
 }
@@ -17969,8 +18290,9 @@ pub enum VisualGroupShapePropertiesChoice {
   ABlipFill(std::boxed::Box<BlipFill>),
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
-  #[sdk(child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill(std::boxed::Box<GroupFill>),
+  /// Group Fill.
+  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VisualGroupShapePropertiesChoice2 {
@@ -18038,8 +18360,10 @@ pub enum ConnectorLockingExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkTypeChoice {
+  /// Sound to play.
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:snd"))]
   ASnd(std::boxed::Box<HyperlinkSound>),
+  /// Future extensions.
   #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
   AExtLst(std::boxed::Box<HyperlinkExtensionList>),
 }

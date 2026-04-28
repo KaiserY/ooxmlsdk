@@ -60,7 +60,7 @@ pub struct CommentAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p216:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:
     Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
@@ -148,30 +148,6 @@ pub struct TaskAnchor {
   #[sdk(child(qname = "p:CT_ExtensionList/p216:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the AddEmpty Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p216:add.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p216:add")]
-pub struct AddEmpty {}
-/// Defines the UnasgnAllEmpty Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p216:unasgnAll.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p216:unasgnAll")]
-pub struct UnasgnAllEmpty {}
-/// Defines the EmptyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/")]
-pub struct EmptyType {}
 /// Defines the TaskTitleEventInfo Class.
 ///
 /// Available in Microsoft365 and above.
@@ -278,14 +254,6 @@ pub struct TaskUndo {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }
-/// Defines the TaskUnknownRecord Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p216:unknown.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p216:CT_TaskUnknownRecord/p216:unknown")]
-pub struct TaskUnknownRecord {}
 /// Defines the TaskHistoryEvent Class.
 ///
 /// Available in Microsoft365 and above.
@@ -354,8 +322,9 @@ pub enum TaskHistoryEventChoice {
   P216Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),
   #[sdk(child(qname = "p216:CT_TaskAssignUnassignUser/p216:unAsgn"))]
   P216UnAsgn(std::boxed::Box<UnAsgnTaskAssignUnassignUser>),
-  #[sdk(child(qname = "p:CT_Empty/p216:add"))]
-  P216Add(std::boxed::Box<AddEmpty>),
+  /// Defines the AddEmpty Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p216:add"))]
+  P216Add,
   #[sdk(child(qname = "p216:CT_TaskTitleEventInfo/p216:title"))]
   P216Title(std::boxed::Box<TaskTitleEventInfo>),
   #[sdk(child(qname = "p216:CT_TaskScheduleEventInfo/p216:date"))]
@@ -364,10 +333,12 @@ pub enum TaskHistoryEventChoice {
   P216PcntCmplt(std::boxed::Box<TaskProgressEventInfo>),
   #[sdk(child(qname = "p216:CT_TaskPriorityRecord/p216:pri"))]
   P216Pri(std::boxed::Box<TaskPriorityRecord>),
-  #[sdk(child(qname = "p:CT_Empty/p216:unasgnAll"))]
-  P216UnasgnAll(std::boxed::Box<UnasgnAllEmpty>),
+  /// Defines the UnasgnAllEmpty Class.
+  #[sdk(empty_child(qname = "p:CT_Empty/p216:unasgnAll"))]
+  P216UnasgnAll,
   #[sdk(child(qname = "p216:CT_TaskUndo/p216:undo"))]
   P216Undo(std::boxed::Box<TaskUndo>),
-  #[sdk(child(qname = "p216:CT_TaskUnknownRecord/p216:unknown"))]
-  P216Unknown(std::boxed::Box<TaskUnknownRecord>),
+  /// Defines the TaskUnknownRecord Class.
+  #[sdk(empty_child(qname = "p216:CT_TaskUnknownRecord/p216:unknown"))]
+  P216Unknown,
 }

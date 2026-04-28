@@ -1153,10 +1153,10 @@ pub struct UnsizedGallery {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  ///Defines the Item Class.
+  /// Defines the Item Class.
   #[sdk(child(qname = "mso:CT_Item/mso:item"))]
   pub item: Vec<Item>,
-  ///Defines the UnsizedButton Class.
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   pub unsized_button: Vec<UnsizedButton>,
 }
@@ -1662,7 +1662,7 @@ pub struct UnsizedSplitButton {
     qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
   ))]
   pub unsized_split_button_choice: Option<UnsizedSplitButtonChoice>,
-  ///Defines the UnsizedMenu Class.
+  /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
   pub unsized_menu: Option<UnsizedMenu>,
 }
@@ -2355,7 +2355,7 @@ pub struct SplitButtonWithTitle {
     qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
   ))]
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
-  ///Defines the MenuWithTitle Class.
+  /// Defines the MenuWithTitle Class.
   #[sdk(child(qname = "mso:CT_MenuWithTitle/mso:menu"))]
   pub menu_with_title: Option<MenuWithTitle>,
 }
@@ -4233,7 +4233,7 @@ pub struct ComboBox {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  ///Defines the Item Class.
+  /// Defines the Item Class.
   #[sdk(child(qname = "mso:CT_Item/mso:item"))]
   pub item: Vec<Item>,
 }
@@ -4566,10 +4566,10 @@ pub struct DropDown {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  ///Defines the Item Class.
+  /// Defines the Item Class.
   #[sdk(child(qname = "mso:CT_Item/mso:item"))]
   pub item: Vec<Item>,
-  ///Defines the UnsizedButton Class.
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   pub unsized_button: Vec<UnsizedButton>,
 }
@@ -5016,10 +5016,10 @@ pub struct Gallery {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  ///Defines the Item Class.
+  /// Defines the Item Class.
   #[sdk(child(qname = "mso:CT_Item/mso:item"))]
   pub item: Vec<Item>,
-  ///Defines the UnsizedButton Class.
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   pub unsized_button: Vec<UnsizedButton>,
 }
@@ -5757,7 +5757,7 @@ pub struct SplitButton {
     qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
   ))]
   pub split_button_choice: Option<SplitButtonChoice>,
-  ///Defines the UnsizedMenu Class.
+  /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
   pub unsized_menu: Option<UnsizedMenu>,
 }
@@ -7532,22 +7532,31 @@ pub enum UnsizedSplitButtonChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnsizedMenuChoice {
+  /// Defines the UnsizedControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlCloneRegular/mso:control"))]
   MsoControl(std::boxed::Box<UnsizedControlClone>),
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the UnsizedGallery Class.
   #[sdk(child(qname = "mso:CT_GalleryRegular/mso:gallery"))]
   MsoGallery(std::boxed::Box<UnsizedGallery>),
+  /// Defines the UnsizedToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<UnsizedToggleButton>),
+  /// Defines the MenuSeparator Class.
   #[sdk(child(qname = "mso:CT_MenuSeparator/mso:menuSeparator"))]
   MsoMenuSeparator(std::boxed::Box<MenuSeparator>),
+  /// Defines the UnsizedSplitButton Class.
   #[sdk(child(qname = "mso:CT_SplitButtonRegular/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<UnsizedSplitButton>),
+  /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
   MsoMenu(std::boxed::Box<UnsizedMenu>),
+  /// Defines the UnsizedDynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
@@ -7560,43 +7569,61 @@ pub enum SplitButtonWithTitleChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuWithTitleChoice {
+  /// Defines the UnsizedControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlCloneRegular/mso:control"))]
   MsoControl(std::boxed::Box<UnsizedControlClone>),
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the UnsizedGallery Class.
   #[sdk(child(qname = "mso:CT_GalleryRegular/mso:gallery"))]
   MsoGallery(std::boxed::Box<UnsizedGallery>),
+  /// Defines the UnsizedToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<UnsizedToggleButton>),
+  /// Defines the MenuSeparator Class.
   #[sdk(child(qname = "mso:CT_MenuSeparator/mso:menuSeparator"))]
   MsoMenuSeparator(std::boxed::Box<MenuSeparator>),
+  /// Defines the SplitButtonWithTitle Class.
   #[sdk(child(qname = "mso:CT_SplitButtonWithTitle/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<SplitButtonWithTitle>),
+  /// Defines the MenuWithTitle Class.
   #[sdk(child(qname = "mso:CT_MenuWithTitle/mso:menu"))]
   MsoMenu(std::boxed::Box<MenuWithTitle>),
+  /// Defines the UnsizedDynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuChoice {
+  /// Defines the UnsizedControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlCloneRegular/mso:control"))]
   MsoControl(std::boxed::Box<UnsizedControlClone>),
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the UnsizedGallery Class.
   #[sdk(child(qname = "mso:CT_GalleryRegular/mso:gallery"))]
   MsoGallery(std::boxed::Box<UnsizedGallery>),
+  /// Defines the UnsizedToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<UnsizedToggleButton>),
+  /// Defines the MenuSeparator Class.
   #[sdk(child(qname = "mso:CT_MenuSeparator/mso:menuSeparator"))]
   MsoMenuSeparator(std::boxed::Box<MenuSeparator>),
+  /// Defines the UnsizedSplitButton Class.
   #[sdk(child(qname = "mso:CT_SplitButtonRegular/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<UnsizedSplitButton>),
+  /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
   MsoMenu(std::boxed::Box<UnsizedMenu>),
+  /// Defines the UnsizedDynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
@@ -7609,32 +7636,46 @@ pub enum SplitButtonChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BoxChoice {
+  /// Defines the ControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlClone/mso:control"))]
   MsoControl(std::boxed::Box<ControlClone>),
+  /// Defines the TextLabel Class.
   #[sdk(child(qname = "mso:CT_LabelControl/mso:labelControl"))]
   MsoLabelControl(std::boxed::Box<TextLabel>),
+  /// Defines the Button Class.
   #[sdk(child(qname = "mso:CT_Button/mso:button"))]
   MsoButton(std::boxed::Box<Button>),
+  /// Defines the ToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButton/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<ToggleButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the EditBox Class.
   #[sdk(child(qname = "mso:CT_EditBox/mso:editBox"))]
   MsoEditBox(std::boxed::Box<EditBox>),
+  /// Defines the ComboBox Class.
   #[sdk(child(qname = "mso:CT_ComboBox/mso:comboBox"))]
   MsoComboBox(std::boxed::Box<ComboBox>),
+  /// Defines the DropDown Class.
   #[sdk(child(qname = "mso:CT_DropDownRegular/mso:dropDown"))]
   MsoDropDown(std::boxed::Box<DropDown>),
+  /// Defines the Gallery Class.
   #[sdk(child(qname = "mso:CT_Gallery/mso:gallery"))]
   MsoGallery(std::boxed::Box<Gallery>),
+  /// Defines the Menu Class.
   #[sdk(child(qname = "mso:CT_Menu/mso:menu"))]
   MsoMenu(std::boxed::Box<Menu>),
+  /// Defines the DynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenu/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<DynamicMenu>),
+  /// Defines the SplitButton Class.
   #[sdk(child(qname = "mso:CT_SplitButton/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<SplitButton>),
+  /// Defines the Box Class.
   #[sdk(child(qname = "mso:CT_Box/mso:box"))]
   MsoBox(std::boxed::Box<Box>),
+  /// Defines the ButtonGroup Class.
   #[sdk(child(qname = "mso:CT_ButtonGroup/mso:buttonGroup"))]
   MsoButtonGroup(std::boxed::Box<ButtonGroup>),
 }
@@ -7657,55 +7698,79 @@ pub enum ButtonGroupChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MenuRootChoice {
+  /// Defines the UnsizedControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlCloneRegular/mso:control"))]
   MsoControl(std::boxed::Box<UnsizedControlClone>),
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the UnsizedGallery Class.
   #[sdk(child(qname = "mso:CT_GalleryRegular/mso:gallery"))]
   MsoGallery(std::boxed::Box<UnsizedGallery>),
+  /// Defines the UnsizedToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<UnsizedToggleButton>),
+  /// Defines the MenuSeparator Class.
   #[sdk(child(qname = "mso:CT_MenuSeparator/mso:menuSeparator"))]
   MsoMenuSeparator(std::boxed::Box<MenuSeparator>),
+  /// Defines the UnsizedSplitButton Class.
   #[sdk(child(qname = "mso:CT_SplitButtonRegular/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<UnsizedSplitButton>),
+  /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
   MsoMenu(std::boxed::Box<UnsizedMenu>),
+  /// Defines the UnsizedDynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
+  /// Defines the ControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlClone/mso:control"))]
   MsoControl(std::boxed::Box<ControlClone>),
+  /// Defines the TextLabel Class.
   #[sdk(child(qname = "mso:CT_LabelControl/mso:labelControl"))]
   MsoLabelControl(std::boxed::Box<TextLabel>),
+  /// Defines the Button Class.
   #[sdk(child(qname = "mso:CT_Button/mso:button"))]
   MsoButton(std::boxed::Box<Button>),
+  /// Defines the ToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButton/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<ToggleButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the EditBox Class.
   #[sdk(child(qname = "mso:CT_EditBox/mso:editBox"))]
   MsoEditBox(std::boxed::Box<EditBox>),
+  /// Defines the ComboBox Class.
   #[sdk(child(qname = "mso:CT_ComboBox/mso:comboBox"))]
   MsoComboBox(std::boxed::Box<ComboBox>),
+  /// Defines the DropDown Class.
   #[sdk(child(qname = "mso:CT_DropDownRegular/mso:dropDown"))]
   MsoDropDown(std::boxed::Box<DropDown>),
+  /// Defines the Gallery Class.
   #[sdk(child(qname = "mso:CT_Gallery/mso:gallery"))]
   MsoGallery(std::boxed::Box<Gallery>),
+  /// Defines the Menu Class.
   #[sdk(child(qname = "mso:CT_Menu/mso:menu"))]
   MsoMenu(std::boxed::Box<Menu>),
+  /// Defines the DynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenu/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<DynamicMenu>),
+  /// Defines the SplitButton Class.
   #[sdk(child(qname = "mso:CT_SplitButton/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<SplitButton>),
+  /// Defines the Box Class.
   #[sdk(child(qname = "mso:CT_Box/mso:box"))]
   MsoBox(std::boxed::Box<Box>),
+  /// Defines the ButtonGroup Class.
   #[sdk(child(qname = "mso:CT_ButtonGroup/mso:buttonGroup"))]
   MsoButtonGroup(std::boxed::Box<ButtonGroup>),
+  /// Defines the VerticalSeparator Class.
   #[sdk(child(qname = "mso:CT_Separator/mso:separator"))]
   MsoSeparator(std::boxed::Box<VerticalSeparator>),
 }
@@ -7729,31 +7794,43 @@ pub enum DocumentSpecificQuickAccessToolbarControlsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum QatItemsTypeChoice {
+  /// Defines the QuickAccessToolbarControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlCloneQat/mso:control"))]
   MsoControl(std::boxed::Box<QuickAccessToolbarControlClone>),
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
+  /// Defines the VerticalSeparator Class.
   #[sdk(child(qname = "mso:CT_Separator/mso:separator"))]
   MsoSeparator(std::boxed::Box<VerticalSeparator>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMenuChoice {
+  /// Defines the UnsizedControlClone Class.
   #[sdk(child(qname = "mso:CT_ControlCloneRegular/mso:control"))]
   MsoControl(std::boxed::Box<UnsizedControlClone>),
+  /// Defines the UnsizedButton Class.
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
+  /// Defines the CheckBox Class.
   #[sdk(child(qname = "mso:CT_CheckBox/mso:checkBox"))]
   MsoCheckBox(std::boxed::Box<CheckBox>),
+  /// Defines the UnsizedGallery Class.
   #[sdk(child(qname = "mso:CT_GalleryRegular/mso:gallery"))]
   MsoGallery(std::boxed::Box<UnsizedGallery>),
+  /// Defines the UnsizedToggleButton Class.
   #[sdk(child(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<UnsizedToggleButton>),
+  /// Defines the MenuSeparator Class.
   #[sdk(child(qname = "mso:CT_MenuSeparator/mso:menuSeparator"))]
   MsoMenuSeparator(std::boxed::Box<MenuSeparator>),
+  /// Defines the SplitButtonWithTitle Class.
   #[sdk(child(qname = "mso:CT_SplitButtonWithTitle/mso:splitButton"))]
   MsoSplitButton(std::boxed::Box<SplitButtonWithTitle>),
+  /// Defines the MenuWithTitle Class.
   #[sdk(child(qname = "mso:CT_MenuWithTitle/mso:menu"))]
   MsoMenu(std::boxed::Box<MenuWithTitle>),
+  /// Defines the UnsizedDynamicMenu Class.
   #[sdk(child(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"))]
   MsoDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }

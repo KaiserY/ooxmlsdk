@@ -84,14 +84,6 @@ pub enum VerticalRelativePositionValues {
   #[sdk(rename = "outsideMargin")]
   OutsideMargin,
 }
-/// No Text Wrapping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wp:wrapNone.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wp:CT_WrapNone/wp:wrapNone")]
-pub struct WrapNone {}
 /// Square Wrapping.
 ///
 /// Available in Office2007 and above.
@@ -136,7 +128,7 @@ pub struct WrapSquare {
   /// Represents the following attribute in the schema: :distR
   #[sdk(attr(qname = ":distR"))]
   pub distance_from_right: Option<crate::simple_type::UInt32Value>,
-  ///Object Extents Including Effects
+  /// Object Extents Including Effects
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
 }
@@ -170,7 +162,7 @@ pub struct WrapTight {
   /// Represents the following attribute in the schema: :distR
   #[sdk(attr(qname = ":distR"))]
   pub distance_from_right: Option<crate::simple_type::UInt32Value>,
-  ///Tight Wrapping Extents Polygon
+  /// Tight Wrapping Extents Polygon
   #[sdk(child(qname = "wp:CT_WrapPath/wp:wrapPolygon"))]
   pub wrap_polygon: std::boxed::Box<WrapPolygon>,
 }
@@ -204,7 +196,7 @@ pub struct WrapThrough {
   /// Represents the following attribute in the schema: :distR
   #[sdk(attr(qname = ":distR"))]
   pub distance_from_right: Option<crate::simple_type::UInt32Value>,
-  ///Wrapping Polygon
+  /// Wrapping Polygon
   #[sdk(child(qname = "wp:CT_WrapPath/wp:wrapPolygon"))]
   pub wrap_polygon: std::boxed::Box<WrapPolygon>,
 }
@@ -230,7 +222,7 @@ pub struct WrapTopBottom {
   /// Represents the following attribute in the schema: :distB
   #[sdk(attr(qname = ":distB"))]
   pub distance_from_bottom: Option<crate::simple_type::UInt32Value>,
-  ///Wrapping Boundaries
+  /// Wrapping Boundaries
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
 }
@@ -288,16 +280,16 @@ pub struct Inline {
   #[sdk(attr(qname = "wp14:editId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub edit_id: Option<crate::simple_type::HexBinaryValue>,
-  ///Drawing Object Size
+  /// Drawing Object Size
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
   pub extent: std::boxed::Box<Extent>,
-  ///Inline Wrapping Extent
+  /// Inline Wrapping Extent
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
-  ///Drawing Object Non-Visual Properties
+  /// Drawing Object Non-Visual Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wp:docPr"))]
   pub doc_properties: std::boxed::Box<DocProperties>,
-  ///Common DrawingML Non-Visual Properties
+  /// Common DrawingML Non-Visual Properties
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr"))]
   pub non_visual_graphic_frame_drawing_properties:
     Option<std::boxed::Box<NonVisualGraphicFrameDrawingProperties>>,
@@ -409,16 +401,16 @@ pub struct Anchor {
   #[sdk(attr(qname = "wp14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
-  ///Simple Positioning Coordinates
+  /// Simple Positioning Coordinates
   #[sdk(child(qname = "a:CT_Point2D/wp:simplePos"))]
   pub simple_position: std::boxed::Box<SimplePosition>,
-  ///Horizontal Positioning
+  /// Horizontal Positioning
   #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
   pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
-  ///Vertical Positioning
+  /// Vertical Positioning
   #[sdk(child(qname = "wp:CT_PosV/wp:positionV"))]
   pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
-  ///Inline Drawing Object Extents
+  /// Inline Drawing Object Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
   pub extent: std::boxed::Box<Extent>,
   /// _
@@ -687,7 +679,7 @@ pub struct WrapPolygon {
   /// Represents the following attribute in the schema: :edited
   #[sdk(attr(qname = ":edited"))]
   pub edited: Option<crate::simple_type::BooleanValue>,
-  ///Wrapping Polygon Start
+  /// Wrapping Polygon Start
   #[sdk(child(qname = "a:CT_Point2D/wp:start"))]
   pub start_point: std::boxed::Box<StartPoint>,
   /// _
@@ -834,21 +826,21 @@ pub struct DocProperties {
     /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
-    ///Hyperlink associated with clicking or selecting the element.
+    /// Hyperlink associated with clicking or selecting the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
     pub hyperlink_on_click: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
         >,
     >,
-    ///Hyperlink associated with hovering over the element.
+    /// Hyperlink associated with hovering over the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
     pub hyperlink_on_hover: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
         >,
     >,
-    ///Future extension
+    /// Future extension
     #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
     pub non_visual_drawing_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
@@ -862,7 +854,7 @@ pub struct DocProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
-  ///Graphic Frame Locks
+  /// Graphic Frame Locks
   #[sdk(child(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks"))]
   pub graphic_frame_locks: Option<
     std::boxed::Box<
@@ -894,8 +886,9 @@ pub type PositionOffset = crate::simple_type::Int32Value;
 pub type HorizontalAlignment = HorizontalAlignmentValues;
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AnchorChoice {
-  #[sdk(child(qname = "wp:CT_WrapNone/wp:wrapNone"))]
-  WpWrapNone(std::boxed::Box<WrapNone>),
+  /// No Text Wrapping.
+  #[sdk(empty_child(qname = "wp:CT_WrapNone/wp:wrapNone"))]
+  WpWrapNone,
   #[sdk(child(qname = "wp:CT_WrapSquare/wp:wrapSquare"))]
   WpWrapSquare(std::boxed::Box<WrapSquare>),
   #[sdk(child(qname = "wp:CT_WrapTight/wp:wrapTight"))]

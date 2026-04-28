@@ -509,7 +509,7 @@ pub struct Mapping {
   #[sdk(attr(qname = ":mappingRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub mapping_ref: Option<crate::simple_type::StringValue>,
-  ///Defines the Bind Class.
+  /// Defines the Bind Class.
   #[sdk(child(qname = "inkml:CT_Bind/inkml:bind"))]
   pub bind: Vec<Bind>,
   #[sdk(choice(
@@ -517,7 +517,7 @@ pub struct Mapping {
     qname = "inkml:CT_Matrix/inkml:matrix"
   ))]
   pub mapping_choice: Option<MappingChoice>,
-  ///Defines the Mapping Class.
+  /// Defines the Mapping Class.
   #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
   pub mapping: Vec<Mapping>,
 }
@@ -1754,18 +1754,25 @@ pub struct Definitions {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InkChoice {
+  /// Defines the Annotation Class.
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
   InkmlAnnotation(std::boxed::Box<Annotation>),
+  /// Defines the AnnotationXml Class.
   #[sdk(child(qname = "inkml:CT_AnnotationXML/inkml:annotationXML"))]
   InkmlAnnotationXml(std::boxed::Box<AnnotationXml>),
+  /// Defines the Definitions Class.
   #[sdk(child(qname = "inkml:CT_Definitions/inkml:definitions"))]
   InkmlDefinitions(std::boxed::Box<Definitions>),
+  /// Defines the Context Class.
   #[sdk(child(qname = "inkml:CT_Context/inkml:context"))]
   InkmlContext(std::boxed::Box<Context>),
+  /// Defines the Trace Class.
   #[sdk(child(qname = "inkml:CT_Trace/inkml:trace"))]
   InkmlTrace(std::boxed::Box<Trace>),
+  /// Defines the TraceGroup Class.
   #[sdk(child(qname = "inkml:CT_TraceGroup/inkml:traceGroup"))]
   InkmlTraceGroup(std::boxed::Box<TraceGroup>),
+  /// Defines the TraceView Class.
   #[sdk(child(qname = "inkml:CT_TraceView/inkml:traceView"))]
   InkmlTraceView(std::boxed::Box<TraceView>),
 }
@@ -1778,46 +1785,64 @@ pub enum MappingChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TraceGroupChoice {
+  /// Defines the Annotation Class.
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
   InkmlAnnotation(std::boxed::Box<Annotation>),
+  /// Defines the AnnotationXml Class.
   #[sdk(child(qname = "inkml:CT_AnnotationXML/inkml:annotationXML"))]
   InkmlAnnotationXml(std::boxed::Box<AnnotationXml>),
+  /// Defines the Trace Class.
   #[sdk(child(qname = "inkml:CT_Trace/inkml:trace"))]
   InkmlTrace(std::boxed::Box<Trace>),
+  /// Defines the TraceGroup Class.
   #[sdk(child(qname = "inkml:CT_TraceGroup/inkml:traceGroup"))]
   InkmlTraceGroup(std::boxed::Box<TraceGroup>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TraceViewChoice {
+  /// Defines the Annotation Class.
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
   InkmlAnnotation(std::boxed::Box<Annotation>),
+  /// Defines the AnnotationXml Class.
   #[sdk(child(qname = "inkml:CT_AnnotationXML/inkml:annotationXML"))]
   InkmlAnnotationXml(std::boxed::Box<AnnotationXml>),
+  /// Defines the TraceView Class.
   #[sdk(child(qname = "inkml:CT_TraceView/inkml:traceView"))]
   InkmlTraceView(std::boxed::Box<TraceView>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DefinitionsChoice {
+  /// Defines the Brush Class.
   #[sdk(child(qname = "inkml:CT_Brush/inkml:brush"))]
   InkmlBrush(std::boxed::Box<Brush>),
+  /// Defines the Canvas Class.
   #[sdk(child(qname = "inkml:CT_Canvas/inkml:canvas"))]
   InkmlCanvas(std::boxed::Box<Canvas>),
+  /// Defines the CanvasTransform Class.
   #[sdk(child(qname = "inkml:CT_CanvasTransform/inkml:canvasTransform"))]
   InkmlCanvasTransform(std::boxed::Box<CanvasTransform>),
+  /// Defines the Context Class.
   #[sdk(child(qname = "inkml:CT_Context/inkml:context"))]
   InkmlContext(std::boxed::Box<Context>),
+  /// Defines the InkSource Class.
   #[sdk(child(qname = "inkml:CT_InkSource/inkml:inkSource"))]
   InkmlInkSource(std::boxed::Box<InkSource>),
+  /// Defines the Mapping Class.
   #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
   InkmlMapping(std::boxed::Box<Mapping>),
+  /// Defines the Timestamp Class.
   #[sdk(child(qname = "inkml:CT_Timestamp/inkml:timestamp"))]
   InkmlTimestamp(std::boxed::Box<Timestamp>),
+  /// Defines the Trace Class.
   #[sdk(child(qname = "inkml:CT_Trace/inkml:trace"))]
   InkmlTrace(std::boxed::Box<Trace>),
+  /// Defines the TraceFormat Class.
   #[sdk(child(qname = "inkml:CT_TraceFormat/inkml:traceFormat"))]
   InkmlTraceFormat(std::boxed::Box<TraceFormat>),
+  /// Defines the TraceGroup Class.
   #[sdk(child(qname = "inkml:CT_TraceGroup/inkml:traceGroup"))]
   InkmlTraceGroup(std::boxed::Box<TraceGroup>),
+  /// Defines the TraceView Class.
   #[sdk(child(qname = "inkml:CT_TraceView/inkml:traceView"))]
   InkmlTraceView(std::boxed::Box<TraceView>),
 }

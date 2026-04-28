@@ -405,7 +405,7 @@ pub struct DynamicRichFilter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xlrd2:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
@@ -938,14 +938,19 @@ pub struct RichValueTypeReservedKeyFlag {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RichFilterColumnChoice {
+  /// Defines the RichFilters Class.
   #[sdk(child(qname = "xlrd2:CT_RichFilters/xlrd2:filters"))]
   Xlrd2Filters(std::boxed::Box<RichFilters>),
+  /// Defines the RichTop10 Class.
   #[sdk(child(qname = "xlrd2:CT_RichTop10/xlrd2:top10"))]
   Xlrd2Top10(std::boxed::Box<RichTop10>),
+  /// Defines the CustomRichFilters Class.
   #[sdk(child(qname = "xlrd2:CT_CustomRichFilters/xlrd2:customFilters"))]
   Xlrd2CustomFilters(std::boxed::Box<CustomRichFilters>),
+  /// Defines the DynamicRichFilter Class.
   #[sdk(child(qname = "xlrd2:CT_DynamicRichFilter/xlrd2:dynamicFilter"))]
   Xlrd2DynamicFilter(std::boxed::Box<DynamicRichFilter>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   Xlrd2ExtLst(std::boxed::Box<ExtensionList>),
 }

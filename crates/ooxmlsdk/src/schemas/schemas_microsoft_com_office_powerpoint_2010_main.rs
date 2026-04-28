@@ -83,10 +83,10 @@ pub struct Transform2D {
   /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
-  ///Offset
+  /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
   pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
-  ///Extents
+  /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
@@ -105,7 +105,7 @@ pub struct ExtensionListModify {
   /// Represents the following attribute in the schema: :mod
   #[sdk(attr(qname = ":mod"))]
   pub modify: Option<crate::simple_type::BooleanValue>,
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:
     Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
@@ -323,30 +323,6 @@ pub struct RippleTransition {
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["center"]))]
   pub direction: Option<crate::simple_type::StringValue>,
 }
-/// Defines the HoneycombTransition Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p14:honeycomb.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p14:honeycomb")]
-pub struct HoneycombTransition {}
-/// Defines the FlashTransition Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is p14:flash.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/p14:flash")]
-pub struct FlashTransition {}
-/// Defines the EmptyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_Empty/")]
-pub struct EmptyType {}
 /// Defines the PrismTransition Class.
 ///
 /// Available in Office2010 and above.
@@ -828,21 +804,21 @@ pub struct NonVisualDrawingProperties {
     /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
-    ///Hyperlink associated with clicking or selecting the element.
+    /// Hyperlink associated with clicking or selecting the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
     pub hyperlink_on_click: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
         >,
     >,
-    ///Hyperlink associated with hovering over the element.
+    /// Hyperlink associated with hovering over the element.
     #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
     pub hyperlink_on_hover: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
         >,
     >,
-    ///Future extension
+    /// Future extension
     #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
     pub non_visual_drawing_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
@@ -897,7 +873,7 @@ pub struct ApplicationNonVisualDrawingProperties {
     /// Represents the following attribute in the schema: :userDrawn
     #[sdk(attr(qname = ":userDrawn"))]
     pub user_drawn: Option<crate::simple_type::BooleanValue>,
-    ///Placeholder Shape
+    /// Placeholder Shape
     #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
     pub placeholder_shape: Option<
         std::boxed::Box<
@@ -1018,7 +994,7 @@ pub struct MediaBookmarkList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p14:extLst")]
 pub struct ExtensionList {
-  ///Extension.
+  /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:
     Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
@@ -1395,30 +1371,36 @@ pub struct NullEventRecord {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LaserColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -1426,18 +1408,25 @@ pub enum LaserColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowEventRecordListChoice {
+  /// Defines the TriggerEventRecord Class.
   #[sdk(child(qname = "p14:CT_TriggerEventRecord/p14:triggerEvt"))]
   P14TriggerEvt(std::boxed::Box<TriggerEventRecord>),
+  /// Defines the PlayEventRecord Class.
   #[sdk(child(qname = "p14:CT_MediaPlaybackEventRecord/p14:playEvt"))]
   P14PlayEvt(std::boxed::Box<PlayEventRecord>),
+  /// Defines the StopEventRecord Class.
   #[sdk(child(qname = "p14:CT_MediaPlaybackEventRecord/p14:stopEvt"))]
   P14StopEvt(std::boxed::Box<StopEventRecord>),
+  /// Defines the PauseEventRecord Class.
   #[sdk(child(qname = "p14:CT_MediaPlaybackEventRecord/p14:pauseEvt"))]
   P14PauseEvt(std::boxed::Box<PauseEventRecord>),
+  /// Defines the ResumeEventRecord Class.
   #[sdk(child(qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt"))]
   P14ResumeEvt(std::boxed::Box<ResumeEventRecord>),
+  /// Defines the SeekEventRecord Class.
   #[sdk(child(qname = "p14:CT_MediaSeekEventRecord/p14:seekEvt"))]
   P14SeekEvt(std::boxed::Box<SeekEventRecord>),
+  /// Defines the NullEventRecord Class.
   #[sdk(child(qname = "p14:CT_NullEventRecord/p14:nullEvt"))]
   P14NullEvt(std::boxed::Box<NullEventRecord>),
 }

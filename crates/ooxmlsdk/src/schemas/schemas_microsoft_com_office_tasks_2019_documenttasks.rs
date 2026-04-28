@@ -262,14 +262,6 @@ pub struct OpenXmlTaskUserElement {
   #[sdk(attr(qname = ":userProvider"))]
   pub user_provider: crate::simple_type::StringValue,
 }
-/// Defines the TaskCreateEventInfo Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is t:Create.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "t:CT_TaskCreateEventInfo/t:Create")]
-pub struct TaskCreateEventInfo {}
 /// Defines the TaskTitleEventInfo Class.
 ///
 /// Available in Office2021 and above.
@@ -355,30 +347,6 @@ pub struct TaskPriorityEventInfo {
   ))]
   pub value: crate::simple_type::Int32Value,
 }
-/// Defines the TaskDeleteEventInfo Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is t:Delete.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "t:CT_TaskDeleteEventInfo/t:Delete")]
-pub struct TaskDeleteEventInfo {}
-/// Defines the TaskUndeleteEventInfo Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is t:Undelete.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "t:CT_TaskUndeleteEventInfo/t:Undelete")]
-pub struct TaskUndeleteEventInfo {}
-/// Defines the TaskUnassignAll Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is t:UnassignAll.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "t:CT_TaskUnassignAll/t:UnassignAll")]
-pub struct TaskUnassignAll {}
 /// Defines the TaskUndo Class.
 ///
 /// Available in Office2021 and above.
@@ -422,8 +390,9 @@ pub enum TaskHistoryEventChoice {
   TAssign(std::boxed::Box<AssignTaskUser>),
   #[sdk(child(qname = "t:CT_TaskUser/t:Unassign"))]
   TUnassign(std::boxed::Box<UnassignTaskUser>),
-  #[sdk(child(qname = "t:CT_TaskCreateEventInfo/t:Create"))]
-  TCreate(std::boxed::Box<TaskCreateEventInfo>),
+  /// Defines the TaskCreateEventInfo Class.
+  #[sdk(empty_child(qname = "t:CT_TaskCreateEventInfo/t:Create"))]
+  TCreate,
   #[sdk(child(qname = "t:CT_TaskTitleEventInfo/t:SetTitle"))]
   TSetTitle(std::boxed::Box<TaskTitleEventInfo>),
   #[sdk(child(qname = "t:CT_TaskScheduleEventInfo/t:Schedule"))]
@@ -432,12 +401,15 @@ pub enum TaskHistoryEventChoice {
   TProgress(std::boxed::Box<TaskProgressEventInfo>),
   #[sdk(child(qname = "t:CT_TaskPriorityEventInfo/t:Priority"))]
   TPriority(std::boxed::Box<TaskPriorityEventInfo>),
-  #[sdk(child(qname = "t:CT_TaskDeleteEventInfo/t:Delete"))]
-  TDelete(std::boxed::Box<TaskDeleteEventInfo>),
-  #[sdk(child(qname = "t:CT_TaskUndeleteEventInfo/t:Undelete"))]
-  TUndelete(std::boxed::Box<TaskUndeleteEventInfo>),
-  #[sdk(child(qname = "t:CT_TaskUnassignAll/t:UnassignAll"))]
-  TUnassignAll(std::boxed::Box<TaskUnassignAll>),
+  /// Defines the TaskDeleteEventInfo Class.
+  #[sdk(empty_child(qname = "t:CT_TaskDeleteEventInfo/t:Delete"))]
+  TDelete,
+  /// Defines the TaskUndeleteEventInfo Class.
+  #[sdk(empty_child(qname = "t:CT_TaskUndeleteEventInfo/t:Undelete"))]
+  TUndelete,
+  /// Defines the TaskUnassignAll Class.
+  #[sdk(empty_child(qname = "t:CT_TaskUnassignAll/t:UnassignAll"))]
+  TUnassignAll,
   #[sdk(child(qname = "t:CT_TaskUndo/t:Undo"))]
   TUndo(std::boxed::Box<TaskUndo>),
 }

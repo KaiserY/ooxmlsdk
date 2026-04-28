@@ -111,9 +111,9 @@ pub struct MainMasterMonikerList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pc:CT_SlideMonikerList/pc:sldMkLst")]
 pub struct SlideMonikerList {
-  /// _
-  #[sdk(child(qname = "pc:CT_DocumentMoniker/pc:docMk"))]
-  pub document_moniker: std::boxed::Box<DocumentMoniker>,
+  /// Defines the DocumentMoniker Class.
+  #[sdk(empty_child(qname = "pc:CT_DocumentMoniker/pc:docMk"))]
+  pub document_moniker: (),
   /// _
   #[sdk(child(qname = "pc:CT_SlideMoniker/pc:sldMk"))]
   pub slide_moniker: std::boxed::Box<SlideMoniker>,
@@ -198,14 +198,6 @@ pub struct AnimEffectParentMkLstAnimationEffectMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
-/// Defines the OpenXmlAnimationEffectMonikerListElement Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "pc:CT_AnimationEffectMonikerList/")]
-pub struct OpenXmlAnimationEffectMonikerListElement {}
 /// Defines the OsfTaskPaneAppMonikerList Class.
 ///
 /// Available in Office2016 and above.
@@ -261,14 +253,6 @@ pub struct CustomXmlPartMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
-/// Defines the DocumentMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pc:docMk.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "pc:CT_DocumentMoniker/pc:docMk")]
-pub struct DocumentMoniker {}
 /// Defines the SlideMoniker Class.
 ///
 /// Available in Office2016 and above.

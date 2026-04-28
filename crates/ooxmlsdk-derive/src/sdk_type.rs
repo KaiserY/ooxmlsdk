@@ -583,6 +583,106 @@ fn build_text_child_write_tokens(
   }
 }
 
+fn build_empty_child_write_tokens(
+  field_ident: &Ident,
+  qname: &str,
+  repeated: bool,
+  optional: bool,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let write_tokens = quote! {
+    crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+    writer.write_all(b" />")?;
+  };
+
+  if repeated {
+    quote! {
+      for _ in &self.#field_ident {
+        #write_tokens
+      }
+    }
+  } else if optional {
+    quote! {
+      if self.#field_ident.is_some() {
+        #write_tokens
+      }
+    }
+  } else {
+    quote! {
+      #write_tokens
+    }
+  }
+}
+
+fn build_empty_child_skip_tokens(
+  owner_ident: &Ident,
+  qname: &str,
+  mode: DeserializeMode,
+  reader_ident: &Ident,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let tag_qname_lit = LitByteStr::new(
+    format!("{tag_prefix}:{local_name}").as_bytes(),
+    Span::call_site(),
+  );
+  let next_tag_event = match mode {
+    DeserializeMode::Borrowed => quote! { crate::common::SliceTagEvent },
+    DeserializeMode::Io => quote! { crate::common::IoTagEvent },
+  };
+  let skip_foreign_children = match mode {
+    DeserializeMode::Borrowed => quote! {
+      crate::common::skip_foreign_element_children_borrowed(
+        #reader_ident,
+        next_empty,
+      )?;
+    },
+    DeserializeMode::Io => quote! {
+      crate::common::skip_foreign_element_children_io(
+        #reader_ident,
+        next_empty,
+      )?;
+    },
+  };
+
+  quote! {
+    if !next_empty {
+      loop {
+        match #reader_ident.next_tag_event()? {
+          #next_tag_event::Start(e, next_empty) => {
+            let event_name = e.name();
+            let event_name = event_name.as_ref();
+            if crate::common::is_foreign_prefixed_child(event_name, #tag_prefix) {
+              #skip_foreign_children
+            } else {
+              return Err(crate::common::unexpected_tag(
+                stringify!(#owner_ident),
+                "empty child",
+                event_name,
+              ));
+            }
+          }
+          #next_tag_event::End(e) => {
+            if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          #next_tag_event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
+          }
+          #next_tag_event::Decl(_) | #next_tag_event::Other => {}
+        }
+      }
+    }
+  }
+}
+
 fn expand_sequence_helper_struct(
   input: &DeriveInput,
   fields: &syn::FieldsNamed,
@@ -743,6 +843,78 @@ fn expand_sequence_helper_struct(
             }
           });
         }
+      }
+      Some(SdkTypeFieldKind::EmptyChild { qname }) => {
+        let QNameInfo {
+          tag_prefix,
+          local_name,
+        } = parse_qname_info(&qname);
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        let match_target = if tag_prefix.is_empty() {
+          quote! { #local_name_lit }
+        } else {
+          let tag_qname_lit = LitByteStr::new(
+            format!("{tag_prefix}:{local_name}").as_bytes(),
+            Span::call_site(),
+          );
+          quote! { #tag_qname_lit | #local_name_lit }
+        };
+        matcher_checks.push(quote! {
+          if matches!(name, #match_target) {
+            return true;
+          }
+        });
+
+        if contains_vec_type(&field.ty) {
+          child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
+          child_init_tokens.push(quote! { #field_ident });
+        } else {
+          child_decl_tokens.push(quote! { let mut #field_ident = None; });
+          if is_option_type(&field.ty) {
+            child_init_tokens.push(quote! { #field_ident });
+          } else {
+            child_init_tokens.push(quote! {
+              #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
+                stringify!(#ident),
+                stringify!(#field_ident),
+              ))?
+            });
+          }
+        }
+        child_write_tokens.push(build_empty_child_write_tokens(
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          is_option_type(&field.ty),
+        ));
+
+        let skip_tokens_borrowed = build_empty_child_skip_tokens(
+          ident,
+          &qname,
+          DeserializeMode::Borrowed,
+          &xml_reader_ident,
+        );
+        let skip_tokens_io =
+          build_empty_child_skip_tokens(ident, &qname, DeserializeMode::Io, &xml_reader_ident);
+        let assign_tokens = if contains_vec_type(&field.ty) {
+          quote! { #field_ident.push(()); }
+        } else {
+          quote! { #field_ident = Some(()); }
+        };
+        child_dispatch_tokens_borrowed.push(quote! {
+          if matches!(event_name, #match_target) {
+            #skip_tokens_borrowed
+            #assign_tokens
+            continue;
+          }
+        });
+        child_dispatch_tokens_io.push(quote! {
+          if matches!(event_name, #match_target) {
+            #skip_tokens_io
+            #assign_tokens
+            continue;
+          }
+        });
       }
       Some(SdkTypeFieldKind::TextChild { qname }) => {
         if contains_vec_type(&field.ty) {
@@ -918,6 +1090,7 @@ fn expand_helper_struct(
   let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   let mut child_fields = Vec::new();
+  let mut empty_child_fields = Vec::new();
   let mut text_child_fields = Vec::new();
   let mut choice_fields = Vec::new();
   for field in &fields.named {
@@ -931,6 +1104,12 @@ fn expand_helper_struct(
         ident: field_ident.clone(),
         qname,
         ty: field.ty.clone(),
+        optional: is_option_type(&field.ty),
+        repeated: contains_vec_type(&field.ty),
+      }),
+      Some(SdkTypeFieldKind::EmptyChild { qname }) => empty_child_fields.push(SdkEmptyChildField {
+        ident: field_ident.clone(),
+        qname,
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
@@ -965,7 +1144,7 @@ fn expand_helper_struct(
       Some(SdkTypeFieldKind::Attr { .. }) | None => {
         return Err(syn::Error::new_spanned(
           field,
-          "helper structs require #[sdk(child(...))], #[sdk(text_child(...))] or #[sdk(choice)] fields",
+          "helper structs require #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))] or #[sdk(choice)] fields",
         ));
       }
     }
@@ -1811,11 +1990,12 @@ fn expand_helper_struct(
     ));
   }
 
-  if child_fields.len() + text_child_fields.len() == fields.named.len() {
+  if child_fields.len() + empty_child_fields.len() + text_child_fields.len() == fields.named.len() {
     return expand_sequence_helper_struct(input, fields);
   }
 
-  let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
+  let has_child_dispatch =
+    !child_fields.is_empty() || !empty_child_fields.is_empty() || !text_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let visit_foreign_child_tokens_borrowed = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
@@ -2196,6 +2376,7 @@ fn expand_named_struct(
 
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
+  let mut empty_child_fields = Vec::new();
   let mut text_child_fields = Vec::new();
   let mut choice_fields = Vec::new();
   let mut any_fields = Vec::new();
@@ -2244,6 +2425,12 @@ fn expand_named_struct(
         ident: field_ident.clone(),
         qname,
         ty: field.ty.clone(),
+        optional: is_option_type(&field.ty),
+        repeated: contains_vec_type(&field.ty),
+      }),
+      SdkTypeFieldKind::EmptyChild { qname } => empty_child_fields.push(SdkEmptyChildField {
+        ident: field_ident.clone(),
+        qname,
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
@@ -2854,6 +3041,135 @@ fn expand_named_struct(
     }
   }
 
+  for field in &empty_child_fields {
+    let field_ident = &field.ident;
+    let QNameInfo {
+      tag_prefix,
+      local_name,
+    } = parse_qname_info(&field.qname);
+    let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+    let target = if tag_prefix.is_empty() {
+      quote! { #local_name_lit }
+    } else {
+      let tag_qname_lit = LitByteStr::new(
+        format!("{tag_prefix}:{local_name}").as_bytes(),
+        Span::call_site(),
+      );
+      quote! { #tag_qname_lit | #local_name_lit }
+    };
+    let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
+    let build_dispatch = |reader_ident: &Ident, as_result: bool, mode: DeserializeMode| {
+      let skip_tokens = build_empty_child_skip_tokens(ident, &field.qname, mode, reader_ident);
+      let assign_tokens = if field.repeated {
+        quote! { #field_ident.push(()); }
+      } else {
+        quote! { #field_ident = Some(()); }
+      };
+      if as_result {
+        quote! {
+          #case_index => {
+            #skip_tokens
+            #assign_tokens
+            return Ok(true);
+          },
+        }
+      } else {
+        quote! {
+          #case_index => {
+            #skip_tokens
+            #assign_tokens
+            continue;
+          },
+        }
+      }
+    };
+    let build_match = |reader_ident: &Ident, as_result: bool, mode: DeserializeMode| {
+      let skip_tokens = build_empty_child_skip_tokens(ident, &field.qname, mode, reader_ident);
+      let assign_tokens = if field.repeated {
+        quote! { #field_ident.push(()); }
+      } else {
+        quote! { #field_ident = Some(()); }
+      };
+      if as_result {
+        quote! {
+          #target => {
+            #skip_tokens
+            #assign_tokens
+            return Ok(true);
+          },
+        }
+      } else {
+        quote! {
+          #target => {
+            #skip_tokens
+            #assign_tokens
+            continue;
+          },
+        }
+      }
+    };
+    direct_child_case_arms.push(quote! { #target => #case_index, });
+
+    if field.repeated {
+      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
+      child_init_tokens.push(quote! { #field_ident });
+    } else {
+      child_decl_tokens.push(quote! { let mut #field_ident = None; });
+      if field.optional {
+        child_init_tokens.push(quote! { #field_ident });
+      } else {
+        child_init_tokens.push(quote! {
+          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
+            stringify!(#ident),
+            stringify!(#field_ident),
+          ))?
+        });
+      }
+    }
+    child_write_tokens.push(build_empty_child_write_tokens(
+      field_ident,
+      &field.qname,
+      field.repeated,
+      field.optional,
+    ));
+    direct_child_dispatch_tokens_borrowed.push(build_dispatch(
+      &xml_reader_ident,
+      false,
+      DeserializeMode::Borrowed,
+    ));
+    direct_child_dispatch_tokens_io.push(build_dispatch(
+      &xml_reader_ident,
+      false,
+      DeserializeMode::Io,
+    ));
+    direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
+      &visitor_reader_ident,
+      true,
+      DeserializeMode::Borrowed,
+    ));
+    direct_child_visit_dispatch_tokens_io.push(build_dispatch(
+      &visitor_reader_ident,
+      true,
+      DeserializeMode::Io,
+    ));
+    direct_child_match_tokens_borrowed.push(build_match(
+      &xml_reader_ident,
+      false,
+      DeserializeMode::Borrowed,
+    ));
+    direct_child_match_tokens_io.push(build_match(&xml_reader_ident, false, DeserializeMode::Io));
+    direct_child_visit_match_tokens_borrowed.push(build_match(
+      &visitor_reader_ident,
+      true,
+      DeserializeMode::Borrowed,
+    ));
+    direct_child_visit_match_tokens_io.push(build_match(
+      &visitor_reader_ident,
+      true,
+      DeserializeMode::Io,
+    ));
+  }
+
   for field in &text_child_fields {
     let field_ident = &field.ident;
     if field.repeated {
@@ -3454,7 +3770,8 @@ fn expand_named_struct(
     }
   };
 
-  let has_child_dispatch = !child_fields.is_empty() || !text_child_fields.is_empty();
+  let has_child_dispatch =
+    !child_fields.is_empty() || !empty_child_fields.is_empty() || !text_child_fields.is_empty();
   let has_text_child_dispatch = !text_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let has_any_dispatch = !any_fields.is_empty();
@@ -4250,6 +4567,14 @@ fn expand_named_struct(
           is_option_type(field_ty),
         ));
       }
+      SdkTypeFieldKind::EmptyChild { qname } => {
+        ordered_write_tokens.push(build_empty_child_write_tokens(
+          field_ident,
+          qname,
+          contains_vec_type(field_ty),
+          is_option_type(field_ty),
+        ));
+      }
       SdkTypeFieldKind::Choice => {
         let repeated = contains_vec_type(field_ty);
         let optional = is_option_type(field_ty);
@@ -4703,6 +5028,7 @@ fn expand_named_struct(
   };
 
   let has_body = !child_fields.is_empty()
+    || !empty_child_fields.is_empty()
     || !text_child_fields.is_empty()
     || !choice_fields.is_empty()
     || !any_fields.is_empty()

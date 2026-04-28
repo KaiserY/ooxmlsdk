@@ -22,7 +22,7 @@ pub enum TargetMode {
 pub struct Relationships {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  ///Relationship
+  /// Relationship
   #[sdk(child(qname = "CT_Relationship/Relationship"))]
   pub relationship: Vec<Relationship>,
 }

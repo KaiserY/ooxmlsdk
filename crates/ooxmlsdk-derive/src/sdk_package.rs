@@ -896,7 +896,10 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       }
 
       pub fn to_owned_package(&self) -> Result<Self, crate::common::SdkError> {
-        Self::new(std::io::Cursor::new(self.to_package_bytes()?))
+        Self::new_with_settings(
+          std::io::Cursor::new(self.to_package_bytes()?),
+          *self.open_settings(),
+        )
       }
 
       pub fn save_as_file<P: AsRef<std::path::Path>>(

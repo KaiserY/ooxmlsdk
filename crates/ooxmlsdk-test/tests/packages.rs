@@ -30,6 +30,9 @@ use ooxmlsdk::sdk::{
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
   MediaDataPartType, OpenSettings, SdkPackage, SdkPart, ThumbnailPartType,
 };
+use ooxmlsdk::sdk::{
+  FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
+};
 use ooxmlsdk_test::fixtures;
 
 macro_rules! part_ref_variant {
@@ -171,6 +174,90 @@ fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
     let reopened_main = reopened.main_document_part().unwrap();
     assert!(reopened_main.root_element(&mut reopened).is_ok());
   }
+}
+
+#[test]
+fn open_settings_default_markup_compatibility_matches_upstream() {
+  let settings = OpenSettings::default();
+
+  assert_eq!(
+    settings.markup_compatibility_process_settings,
+    MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::NoProcess,
+      target_file_format_version: FileFormatVersion::Office2007,
+    }
+  );
+
+  let implicit = WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  assert_eq!(implicit.open_settings(), &settings);
+
+  let explicit =
+    WordprocessingDocument::new_from_file_lazy_with_settings(doc_sample("Document.docx"), settings)
+      .unwrap();
+  assert_eq!(explicit.open_settings(), &settings);
+
+  let spreadsheet =
+    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  assert_eq!(spreadsheet.open_settings(), &settings);
+
+  let presentation =
+    PresentationDocument::new_from_file_lazy(doc_sample("Presentation.pptx")).unwrap();
+  assert_eq!(presentation.open_settings(), &settings);
+}
+
+#[test]
+fn open_settings_no_process_accepts_all_supported_target_versions() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/OpenSettingsTestClass.cs
+  //   OpenWithFileFormatVersionsDefaultValue
+  // Rust exposes FileFormatVersion as a closed enum, so invalid integer values
+  // from the .NET test cannot be represented here.
+  for target_file_format_version in [
+    FileFormatVersion::Office2007,
+    FileFormatVersion::Office2010,
+    FileFormatVersion::Office2013,
+    FileFormatVersion::Office2016,
+    FileFormatVersion::Office2019,
+    FileFormatVersion::Office2021,
+    FileFormatVersion::Microsoft365,
+  ] {
+    let settings = OpenSettings {
+      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+        process_mode: MarkupCompatibilityProcessMode::NoProcess,
+        target_file_format_version,
+      },
+      ..Default::default()
+    };
+    let package = WordprocessingDocument::new_from_file_lazy_with_settings(
+      doc_sample("Document.docx"),
+      settings,
+    )
+    .unwrap();
+
+    assert_eq!(package.open_settings(), &settings);
+  }
+}
+
+#[test]
+fn package_to_owned_package_preserves_open_settings() {
+  // Source: test/DocumentFormat.OpenXml.Tests/Documents/FlatOpcAndCloningTests.cs
+  //   CanCloneDocxDocument
+  // and src/DocumentFormat.OpenXml.Framework/Packaging/CloneableExtensions.cs
+  //   clone overloads preserve OpenSettings.
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::NoProcess,
+      target_file_format_version: FileFormatVersion::Office2013,
+    },
+    ignore_calculation_chain_part_relationship: true,
+  };
+  let package =
+    WordprocessingDocument::new_from_file_lazy_with_settings(doc_sample("Document.docx"), settings)
+      .unwrap();
+
+  let cloned = package.to_owned_package().unwrap();
+
+  assert_eq!(cloned.open_settings(), &settings);
+  assert!(cloned.main_document_part().is_ok());
 }
 
 #[test]
@@ -2091,6 +2178,52 @@ fn generic_add_new_part_with_content_type_and_extension_saves_custom_extension()
   );
   assert_eq!(reopened_part.data(&reopened), Some(custom_xml.as_slice()));
   assert_eq!(reopened_part.path(&reopened), Some(path.as_str()));
+}
+
+#[test]
+fn part_extension_selection_matches_openxml_part_tests() {
+  // Source: test/DocumentFormat.OpenXml.Framework.Tests/OpenXmlPartTests.cs
+  //   ExtensionTest
+  //   ExtensionTestUndefinedExtension
+  //   ExtensionTestFixedContentType
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+
+  let jpg = package
+    .add_extended_part_with_id(
+      "http://example.com/relationships/jpg",
+      "test/mimetype",
+      ".jpg",
+      "rIdJpg",
+    )
+    .unwrap();
+  assert_eq!(jpg.path(&package), Some("extendedPart1.jpg"));
+  assert_eq!(jpg.content_type(&package), Some("test/mimetype"));
+
+  let no_dot = package
+    .add_extended_part_with_id(
+      "http://example.com/relationships/no-dot",
+      "test/mimetype",
+      "jpeg",
+      "rIdNoDot",
+    )
+    .unwrap();
+  assert_eq!(no_dot.path(&package), Some("extendedPart1.jpeg"));
+
+  let default_extension = package
+    .add_extended_part_with_id(
+      "http://example.com/relationships/default-extension",
+      "test/mimetype",
+      "",
+      "rIdDefaultExtension",
+    )
+    .unwrap();
+  assert_eq!(default_extension.path(&package), Some("extendedPart1.xml"));
+
+  let fixed_type = package
+    .add_thumbnail_part_with_id("image/jpeg", "rIdThumbnail")
+    .unwrap();
+  assert_eq!(fixed_type.path(&package), Some("docProps/thumbnail1.bin"));
+  assert_eq!(fixed_type.content_type(&package), Some("image/jpeg"));
 }
 
 #[test]

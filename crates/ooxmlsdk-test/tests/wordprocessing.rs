@@ -442,7 +442,7 @@ fn document_round_trip_with_trailing_whitespace_after_last_element() {
   let paragraph = first_paragraph(first_body(&parsed));
   assert_eq!(paragraph_run_count(paragraph), 0);
   assert!(
-    serialized.contains("<w:p/>")
+    serialized.contains("<w:p />")
       || serialized.contains("<w:p></w:p>")
       || serialized.contains("<w:p ")
   );
@@ -493,7 +493,7 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
   assert_eq!(text.xml_content.as_deref(), Some("EricWhite.com"));
   assert!(serialized.contains("<w:hyperlink"));
   assert!(serialized.contains("r:id=\"rId4\""));
-  assert!(serialized.contains("w:history=\"true\"") || serialized.contains("w:history=\"1\""));
+  assert!(serialized.contains("w:history=\"true\""));
   assert!(serialized.contains("EricWhite.com"));
 
   let reparsed_body = first_body(&reparsed);
@@ -1049,7 +1049,7 @@ fn paragraph_round_trip_from_different_amount_of_children_test() {
 
   assert_eq!(paragraph_run_count(&parsed), 1);
   assert!(
-    trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r/></w:p>"
+    trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r /></w:p>"
       || trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r></w:r></w:p>"
       || trim_xml_declaration(&serialized).contains("<w:r ")
   );

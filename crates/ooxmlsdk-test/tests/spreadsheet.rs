@@ -295,7 +295,7 @@ fn empty_shared_string_table_round_trip_from_openxml_part_test() {
     serialized
       == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
       || serialized
-        == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>"
+        == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" />"
   );
   assert_eq!(shared_string_items(&reparsed).len(), 0);
 }
@@ -308,7 +308,7 @@ fn empty_shared_string_table_serialization_matches_get_stream_write_no_updates_t
 
   let serialized = trim_xml_declaration(&serialized);
   assert!(
-    serialized == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>"
+    serialized == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" />"
       || serialized
         == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
   );

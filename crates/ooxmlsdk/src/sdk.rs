@@ -690,7 +690,7 @@ impl Default for MarkupCompatibilityProcessSettings {
   fn default() -> Self {
     Self {
       process_mode: MarkupCompatibilityProcessMode::NoProcess,
-      target_file_format_version: FileFormatVersion::Microsoft365,
+      target_file_format_version: FileFormatVersion::Office2007,
     }
   }
 }
@@ -713,7 +713,7 @@ pub(crate) trait SdkPackageInternal {
     static DEFAULT_SETTINGS: OpenSettings = OpenSettings {
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
         process_mode: MarkupCompatibilityProcessMode::NoProcess,
-        target_file_format_version: FileFormatVersion::Microsoft365,
+        target_file_format_version: FileFormatVersion::Office2007,
       },
       ignore_calculation_chain_part_relationship: false,
     };

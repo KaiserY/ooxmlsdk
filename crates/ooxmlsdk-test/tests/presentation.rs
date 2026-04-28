@@ -1,5 +1,5 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
-  NonVisualDrawingProperties, Presentation,
+  NonVisualDrawingProperties, Presentation, SlideSize,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures};
 
@@ -31,6 +31,39 @@ fn non_visual_drawing_properties_round_trip_with_embedded_xml() {
 }
 
 #[test]
+fn boolean_value_attribute_accepts_upstream_lexical_forms_and_writes_canonical_form() {
+  for (raw, expected, canonical) in [
+    ("true", true, "1"),
+    ("1", true, "1"),
+    ("false", false, "0"),
+    ("0", false, "0"),
+  ] {
+    let xml = format!(
+      r#"<p:cNvPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" id="+4" name="shape" hidden="{raw}"/>"#
+    );
+    let parsed = xml.parse::<NonVisualDrawingProperties>().unwrap();
+    assert_eq!(parsed.id, 4);
+    assert_eq!(parsed.hidden, Some(expected));
+
+    let serialized = parsed.to_xml().unwrap();
+    assert!(serialized.contains(r#"id="4""#));
+    assert!(serialized.contains(&format!(r#"hidden="{canonical}""#)));
+  }
+}
+
+#[test]
+fn static_empty_element_serialization_uses_upstream_slash_spacing() {
+  let parsed = r#"<p:sldSz xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" cx="12192000" cy="6858000"/>"#
+    .parse::<SlideSize>()
+    .unwrap();
+
+  assert_eq!(
+    parsed.to_xml().unwrap(),
+    r#"<p:sldSz cx="12192000" cy="6858000" />"#
+  );
+}
+
+#[test]
 fn presentation_round_trip_from_openxml_part_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Presentation>(fixtures::PRESENTATION_PRESENTATION_XML);
@@ -50,10 +83,8 @@ fn presentation_round_trip_from_openxml_part_test() {
     Some(2)
   );
   assert_eq!(parsed.auto_compress_pictures, Some(false));
-  assert!(
-    serialized.contains("autoCompressPictures=\"false\"")
-      || serialized.contains("autoCompressPictures=\"0\"")
-  );
+  assert!(serialized.contains("autoCompressPictures=\"0\""));
+  assert!(serialized.contains(r#"<p:sldSz cx="12192000" cy="6858000" />"#));
   assert_eq!(
     reparsed
       .slide_id_list

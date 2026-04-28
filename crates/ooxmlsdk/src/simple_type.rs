@@ -58,3 +58,57 @@ pub type TrueFalseValue = bool;
 pub type UInt16Value = u16;
 pub type UInt32Value = u32;
 pub type UInt64Value = u64;
+
+pub trait HexBinaryValueExt {
+  fn is_valid_hex_binary(&self) -> bool;
+  fn try_get_bytes(&self) -> Option<Vec<u8>>;
+}
+
+impl<T> HexBinaryValueExt for T
+where
+  T: AsRef<str> + ?Sized,
+{
+  fn is_valid_hex_binary(&self) -> bool {
+    is_valid_hex_binary(self.as_ref())
+  }
+
+  fn try_get_bytes(&self) -> Option<Vec<u8>> {
+    hex_binary_to_bytes(self.as_ref())
+  }
+}
+
+pub fn is_valid_hex_binary(value: &str) -> bool {
+  value.len().is_multiple_of(2) && value.as_bytes().iter().all(|byte| byte.is_ascii_hexdigit())
+}
+
+pub fn hex_binary_to_bytes(value: &str) -> Option<Vec<u8>> {
+  if !is_valid_hex_binary(value) {
+    return None;
+  }
+
+  value
+    .as_bytes()
+    .chunks_exact(2)
+    .map(|pair| Some((hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?))
+    .collect()
+}
+
+pub fn hex_binary_from_bytes(bytes: impl AsRef<[u8]>) -> HexBinaryValue {
+  const HEX: &[u8; 16] = b"0123456789ABCDEF";
+  let bytes = bytes.as_ref();
+  let mut value = String::with_capacity(bytes.len() * 2);
+  for byte in bytes {
+    value.push(HEX[(byte >> 4) as usize] as char);
+    value.push(HEX[(byte & 0x0F) as usize] as char);
+  }
+  value
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+  match byte {
+    b'0'..=b'9' => Some(byte - b'0'),
+    b'a'..=b'f' => Some(byte - b'a' + 10),
+    b'A'..=b'F' => Some(byte - b'A' + 10),
+    _ => None,
+  }
+}

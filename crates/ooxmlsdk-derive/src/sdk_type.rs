@@ -4888,7 +4888,7 @@ fn expand_named_struct(
           #( #ordered_write_tokens )*
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {
-          writer.write_all(b"/>")?;
+          writer.write_all(b" />")?;
         }
         Ok(())
       }

@@ -24,6 +24,34 @@ pub enum PersistenceValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_Ocx/ax:ocx")]
 pub struct ActiveXControlData {
+  /// Markup compatibility attribute mc:Ignorable.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:Ignorable
+  #[sdk(attr(qname = "mc:Ignorable"))]
+  pub mc_ignorable: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:MustUnderstand.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:MustUnderstand
+  #[sdk(attr(qname = "mc:MustUnderstand"))]
+  pub mc_must_understand: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:ProcessContent.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:ProcessContent
+  #[sdk(attr(qname = "mc:ProcessContent"))]
+  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:PreserveAttributes.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:PreserveAttributes
+  #[sdk(attr(qname = "mc:PreserveAttributes"))]
+  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// classid
   ///
   /// Available in Office2007 and above.
@@ -64,6 +92,34 @@ pub struct ActiveXControlData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_OcxPr/ax:ocxPr")]
 pub struct ActiveXObjectProperty {
+  /// Markup compatibility attribute mc:Ignorable.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:Ignorable
+  #[sdk(attr(qname = "mc:Ignorable"))]
+  pub mc_ignorable: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:MustUnderstand.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:MustUnderstand
+  #[sdk(attr(qname = "mc:MustUnderstand"))]
+  pub mc_must_understand: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:ProcessContent.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:ProcessContent
+  #[sdk(attr(qname = "mc:ProcessContent"))]
+  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:PreserveAttributes.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:PreserveAttributes
+  #[sdk(attr(qname = "mc:PreserveAttributes"))]
+  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -89,6 +145,34 @@ pub struct ActiveXObjectProperty {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_Font/ax:font")]
 pub struct SharedComFont {
+  /// Markup compatibility attribute mc:Ignorable.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:Ignorable
+  #[sdk(attr(qname = "mc:Ignorable"))]
+  pub mc_ignorable: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:MustUnderstand.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:MustUnderstand
+  #[sdk(attr(qname = "mc:MustUnderstand"))]
+  pub mc_must_understand: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:ProcessContent.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:ProcessContent
+  #[sdk(attr(qname = "mc:ProcessContent"))]
+  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:PreserveAttributes.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:PreserveAttributes
+  #[sdk(attr(qname = "mc:PreserveAttributes"))]
+  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// persistence
   ///
   /// Available in Office2007 and above.
@@ -115,6 +199,34 @@ pub struct SharedComFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ax:CT_Picture/ax:picture")]
 pub struct SharedComPicture {
+  /// Markup compatibility attribute mc:Ignorable.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:Ignorable
+  #[sdk(attr(qname = "mc:Ignorable"))]
+  pub mc_ignorable: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:MustUnderstand.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:MustUnderstand
+  #[sdk(attr(qname = "mc:MustUnderstand"))]
+  pub mc_must_understand: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:ProcessContent.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:ProcessContent
+  #[sdk(attr(qname = "mc:ProcessContent"))]
+  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  /// Markup compatibility attribute mc:PreserveAttributes.
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: mc:PreserveAttributes
+  #[sdk(attr(qname = "mc:PreserveAttributes"))]
+  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.

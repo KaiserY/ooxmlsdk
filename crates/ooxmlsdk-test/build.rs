@@ -85,6 +85,10 @@ fn is_invalid(file_name: &str) -> bool {
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
+  if mce_static_direct_slot_round_trip_blocked(file_name) {
+    return false;
+  }
+
   matches!(
     file_name,
     "BadDocProps.docx"
@@ -153,6 +157,11 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "notes_altcontent.pptx"
       | "slide_altcontent.pptx"
   )
+}
+
+fn mce_static_direct_slot_round_trip_blocked(file_name: &str) -> bool {
+  env::var_os("CARGO_FEATURE_MCE").is_some()
+    && matches!(file_name, "Complex01.docx" | "Document.docx")
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {

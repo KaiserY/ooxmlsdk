@@ -64,7 +64,7 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  pub fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
+  pub(crate) fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
     self.current = None;
     if let Some(event) = self.pending.take() {
       return Ok(Self::tag_event_from_owned(event));

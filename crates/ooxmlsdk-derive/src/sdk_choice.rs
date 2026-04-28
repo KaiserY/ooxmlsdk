@@ -339,6 +339,7 @@ fn named_sequence_validate_tokens(field: &NamedSequenceVariantField) -> proc_mac
 
 pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
+  let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
   let Data::Enum(DataEnum { variants, .. }) = &input.data else {
     return Err(syn::Error::new_spanned(
       input,
@@ -390,14 +391,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
         direct_child_dispatch_arms_io.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty>::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
@@ -437,14 +438,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(event_name) {
-            let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
           if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(event_name) {
-            let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty>::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
@@ -526,14 +527,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_specific_start_qname(event_name) {
-            let parsed_child = #inner_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_specific_start_qname(event_name) {
-            let parsed_child = #inner_ty::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty>::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
@@ -989,28 +990,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   Ok(quote! {
     #( #helper_items )*
 
-    impl crate::sdk::SdkChoice for #ident {
-      #[inline]
-      fn matches_specific_start_qname(name: &[u8]) -> bool {
-        #matches_specific_start_qname_tokens
-      }
-
-      #choice_trait_matches_start_tokens
-      #choice_trait_accepts_any_tokens
-      #choice_trait_accepts_text_tokens
-      #choice_trait_from_text_tokens
-    }
-    #[cfg(feature = "validators")]
-    impl crate::validator::SdkValidator for #ident {
-      fn validate(&self) -> Result<(), crate::common::SdkError> {
-        match self {
-          #( #validate_arms )*
-        }
-      }
-    }
-
-    impl #ident {
-      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
+    impl #impl_generics crate::sdk::SdkChoice for #ident #type_generics #where_clause {
+      fn #deserialize_borrowed_inner_ident<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
@@ -1032,7 +1013,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         #read_tokens_borrowed
       }
 
-      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+      fn #deserialize_io_inner_ident<R: std::io::BufRead>(
         xml_reader: &mut crate::common::IoReader<R>,
         xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
@@ -1054,7 +1035,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         #read_tokens_io
       }
 
-      pub(crate) fn write_xml<W: std::io::Write>(
+      fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
         xmlns_prefix: &str,
@@ -1062,6 +1043,48 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         match self {
           #( #write_arms )*
         }
+      }
+
+      #[inline]
+      fn matches_specific_start_qname(name: &[u8]) -> bool {
+        #matches_specific_start_qname_tokens
+      }
+
+      #choice_trait_matches_start_tokens
+      #choice_trait_accepts_any_tokens
+      #choice_trait_accepts_text_tokens
+      #choice_trait_from_text_tokens
+    }
+    #[cfg(feature = "validators")]
+    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
+      fn validate(&self) -> Result<(), crate::common::SdkError> {
+        match self {
+          #( #validate_arms )*
+        }
+      }
+    }
+
+    impl #impl_generics #ident #type_generics #where_clause {
+      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
+        xml_reader: &mut crate::common::SliceReader<'de>,
+        xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        <Self as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, xml_event)
+      }
+
+      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+        xml_reader: &mut crate::common::IoReader<R>,
+        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        <Self as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, xml_event)
+      }
+
+      pub(crate) fn write_xml<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+        xmlns_prefix: &str,
+      ) -> Result<(), std::io::Error> {
+        <Self as crate::sdk::SdkChoice>::write_xml(self, writer, xmlns_prefix)
       }
     }
   })

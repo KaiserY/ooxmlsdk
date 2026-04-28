@@ -1,0 +1,40 @@
+{
+  "Types": [
+    {
+      "ClassName": "Shape",
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "w14:anchorId",
+          "Type": "HexBinaryValue",
+          "PropertyComments": "Word 2010 drawing anchor identifier.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Shapetype",
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "w14:anchorId",
+          "Type": "HexBinaryValue",
+          "PropertyComments": "Word 2010 drawing anchor identifier.",
+          "Version": "Office2007"
+        }
+      ]
+    },
+    {
+      "ClassName": "Rectangle",
+      "Attributes": [
+        {
+          "QName": "w14:anchorId",
+          "PropertyName": "w14:anchorId",
+          "Type": "HexBinaryValue",
+          "PropertyComments": "Word 2010 drawing anchor identifier.",
+          "Version": "Office2007"
+        }
+      ]
+    }
+  ]
+}

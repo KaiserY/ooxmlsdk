@@ -1,5 +1,12 @@
 use ooxmlsdk::common::XmlHeaderType;
-use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContentChoice;
+#[cfg(not(feature = "mce"))]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::{
+  AlternateContent, AlternateContentChoice,
+};
+#[cfg(feature = "mce")]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::{
+  AlternateContentChoiceOf, AlternateContentOf,
+};
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
@@ -8,6 +15,19 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   SdtPropertiesChoice, TabStop, TableJustification, Text, TextDirection,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
+
+#[cfg(not(feature = "mce"))]
+type BodyAlternateContent = AlternateContent;
+#[cfg(feature = "mce")]
+type BodyAlternateContent = AlternateContentOf<BodyChoice>;
+
+#[cfg(not(feature = "mce"))]
+type BodyAlternateContentChoice = AlternateContentChoice;
+#[cfg(feature = "mce")]
+type BodyAlternateContentChoice = AlternateContentChoiceOf<BodyChoice>;
+
+#[cfg(feature = "mce")]
+type RunAlternateContentChoice = AlternateContentChoiceOf<RunChoice>;
 
 fn first_body(document: &Document) -> &Body {
   document.body.as_ref().expect("expected document body")
@@ -209,11 +229,7 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
   }
 }
 
-fn body_choice_alternate_content(
-  choice: &BodyChoice,
-) -> Option<
-  &ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-> {
+fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&BodyAlternateContent> {
   match choice {
     BodyChoice::McAlternateContent(alternate_content) => Some(alternate_content.as_ref()),
     _ => None,
@@ -634,6 +650,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
   //   LoadAttributeTest
@@ -669,7 +686,7 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -683,7 +700,7 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      BodyAlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
       _ => None,
     })
     .expect("expected mc:Fallback");
@@ -736,6 +753,7 @@ fn paragraph_properties_preserve_known_extension_attribute_from_markup_compatibi
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn alternate_content_preserves_ignored_unknown_process_content_and_must_understand_metadata() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   Ignored_UnknownElement_FullMode
@@ -765,7 +783,7 @@ fn alternate_content_preserves_ignored_unknown_process_content_and_must_understa
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -795,6 +813,7 @@ fn alternate_content_preserves_ignored_unknown_process_content_and_must_understa
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   ProcessContent_xmlSpace_FullMode
@@ -817,7 +836,7 @@ fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -836,6 +855,7 @@ fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn alternate_content_preserves_ignored_known_process_content_metadata() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   Ignored_KnownElement_FullMode
@@ -856,7 +876,7 @@ fn alternate_content_preserves_ignored_known_process_content_metadata() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -873,6 +893,7 @@ fn alternate_content_preserves_ignored_known_process_content_metadata() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn body_alternate_content_without_selected_content_round_trips() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   NoChoice_NoFallback_FullMode
@@ -910,14 +931,16 @@ fn body_alternate_content_without_selected_content_round_trips() {
   );
   let choice_only = alternate_content.next().unwrap();
   assert_eq!(choice_only.alternate_content_choice.len(), 1);
-  let AlternateContentChoice::McChoice(choice) = &choice_only.alternate_content_choice[0] else {
+  let BodyAlternateContentChoice::McChoice(choice) = &choice_only.alternate_content_choice[0]
+  else {
     panic!("expected mc:Choice");
   };
   assert_eq!(choice.requires.as_deref(), Some("w13"));
   assert!(choice.xml_children.is_empty());
   let multi_choice = alternate_content.next().unwrap();
   assert_eq!(multi_choice.alternate_content_choice.len(), 2);
-  let AlternateContentChoice::McChoice(second_choice) = &multi_choice.alternate_content_choice[1]
+  let BodyAlternateContentChoice::McChoice(second_choice) =
+    &multi_choice.alternate_content_choice[1]
   else {
     panic!("expected second mc:Choice");
   };
@@ -938,6 +961,7 @@ fn body_alternate_content_without_selected_content_round_trips() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn body_alternate_content_fallback_preserves_multiple_known_children() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   MultipleChoice_NoMatches_OneFallback_FullMode
@@ -962,7 +986,7 @@ fn body_alternate_content_fallback_preserves_multiple_known_children() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      BodyAlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
       _ => None,
     })
     .expect("expected mc:Fallback");
@@ -979,6 +1003,122 @@ fn body_alternate_content_fallback_preserves_multiple_known_children() {
   assert!(serialized.contains(r#"mc:Ignorable="w14""#));
   assert!(serialized.contains(r#"<w:t>fallback1</w:t>"#));
   assert!(serialized.contains(r#"<w:t>fallback2</w:t>"#));
+}
+
+#[test]
+#[cfg(feature = "mce")]
+fn mce_body_alternate_content_parses_known_children_statically() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   MultipleChoice_OneFallback_FullMode
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadACB
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w13="http://example.com/w13" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:body><mc:AlternateContent mc:Ignorable="w14"><mc:Choice Requires="w13"><w:p><w:r><w:t>choice1</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w14"><w:p><w:r><w:t>choice2</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback1</w:t></w:r></w:p><w:p><w:r><w:t>fallback2</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+
+  let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
+
+  let alternate_content = first_body(&document)
+    .body_choice
+    .iter()
+    .find_map(body_choice_alternate_content)
+    .expect("expected body alternate content");
+  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(alternate_content.alternate_content_choice.len(), 3);
+
+  let second_choice = alternate_content
+    .alternate_content_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+    .nth(1)
+    .expect("expected second mc:Choice");
+  assert_eq!(second_choice.requires.as_deref(), Some("w14"));
+  assert_eq!(second_choice.children.len(), 1);
+  let BodyChoice::WP(choice_paragraph) = &second_choice.children[0] else {
+    panic!("expected typed paragraph choice");
+  };
+  assert_eq!(paragraph_text(choice_paragraph), "choice2");
+
+  let fallback = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      BodyAlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Fallback");
+  assert_eq!(fallback.children.len(), 2);
+  let fallback_text: Vec<_> = fallback
+    .children
+    .iter()
+    .map(|child| match child {
+      BodyChoice::WP(paragraph) => paragraph_text(paragraph),
+      _ => panic!("expected typed paragraph fallback child"),
+    })
+    .collect();
+  assert_eq!(fallback_text, vec!["fallback1", "fallback2"]);
+
+  assert!(serialized.contains(r#"<w:t>choice2</w:t>"#));
+  assert!(serialized.contains(r#"<w:t>fallback1</w:t>"#));
+  assert!(serialized.contains(r#"<w:t>fallback2</w:t>"#));
+}
+
+#[test]
+#[cfg(feature = "mce")]
+fn mce_run_alternate_content_parses_known_children_statically() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadAttributeTest
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   ProcessContent_Ignored_KnownElement_FullMode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:body><w:p><w:r><mc:AlternateContent mc:MustUnderstand="w14" mc:ProcessContent="w:t"><mc:Choice Requires="w14"><w:t>choice</w:t></mc:Choice><mc:Fallback><w:t>fallback</w:t></mc:Fallback></mc:AlternateContent><w:t>after</w:t></w:r></w:p></w:body></w:document>"#;
+
+  let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
+
+  let run = first_run(first_paragraph(first_body(&document)));
+  let alternate_content = run
+    .run_choice
+    .iter()
+    .find_map(|choice| match choice {
+      RunChoice::McAlternateContent(alternate_content) => Some(alternate_content.as_ref()),
+      _ => None,
+    })
+    .expect("expected alternate content in run");
+  assert_eq!(alternate_content.mc_must_understand.as_deref(), Some("w14"));
+  assert_eq!(alternate_content.mc_process_content.as_deref(), Some("w:t"));
+
+  let choice = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      RunAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Choice");
+  assert_eq!(choice.requires.as_deref(), Some("w14"));
+  assert_eq!(choice.children.len(), 1);
+  let RunChoice::WT(choice_text) = &choice.children[0] else {
+    panic!("expected typed run text choice");
+  };
+  assert_eq!(choice_text.xml_content.as_deref(), Some("choice"));
+
+  let fallback = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      RunAlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Fallback");
+  assert_eq!(fallback.children.len(), 1);
+  let RunChoice::WT(fallback_text) = &fallback.children[0] else {
+    panic!("expected typed run text fallback");
+  };
+  assert_eq!(fallback_text.xml_content.as_deref(), Some("fallback"));
+
+  assert!(serialized.contains(r#"mc:MustUnderstand="w14""#));
+  assert!(serialized.contains(r#"<w:t>choice</w:t>"#));
+  assert!(serialized.contains(r#"<w:t>fallback</w:t>"#));
 }
 
 #[test]

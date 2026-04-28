@@ -96,7 +96,7 @@ When benchmarking, evaluate `cargo bench -p ooxmlsdk-test --bench perf` as a who
 ## Commit Guidelines
 Keep commit subjects short, imperative, and scoped, for example `Regenerate spreadsheet serializer output` or `Tighten XML attribute decoding errors`.
 
-When generating a commit message, base it on repository state, not the latest chat turn. Inspect `git status --short`, `git diff --stat`, and relevant `git diff` hunks. If changes are staged, also inspect `git diff --cached --stat` and `git diff --cached`, and state whether the message covers staged changes, unstaged changes, or both.
+When generating a commit message, base it on repository state, not the latest chat turn. Inspect `git status --short`, `git diff --stat`, and relevant `git diff` hunks. If changes are staged, also inspect `git diff --cached --stat` and `git diff --cached`. Do not prefix the copyable commit message with explanatory text such as whether it covers staged or unstaged changes; if that context is useful, place it after the commit message under a separate non-copyable note.
 
 Summarize the coherent change set visible in the diff. Distinguish documentation-only edits from code, metadata, generated output, fixtures, and tests. Mention generated churn only when intended. Do not fold unrelated worktree edits into the message unless the user asks for a message covering all changes.
 

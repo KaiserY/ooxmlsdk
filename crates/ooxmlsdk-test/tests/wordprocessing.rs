@@ -4,8 +4,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::Alt
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChoice, Justification,
-  Paragraph, ParagraphChoice, ParagraphChoice2, Run, RunChoice, SdtBlock, SdtPropertiesChoice,
-  TabStop, TableJustification, Text, TextDirection,
+  Paragraph, ParagraphChoice, ParagraphChoice2, ParagraphProperties, Run, RunChoice, SdtBlock,
+  SdtPropertiesChoice, TabStop, TableJustification, Text, TextDirection,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -693,6 +693,183 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
   assert!(serialized.contains(r#"mc:MustUnderstand="w14""#));
   assert!(serialized.contains(r#"mc:ProcessContent="w14:unknown""#));
   assert!(serialized.contains(r#"<w14:unknown attr="1">choice</w14:unknown>"#));
+}
+
+#[test]
+fn text_round_trip_preserves_ignorable_whitespace_list_from_markup_compatibility_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   Ignore_Whitespaces_FullMode
+  let xml = r#"<w:t xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="  &#x9;&#xA;&#xD; ">text</w:t>"#;
+
+  let (text, serialized, reparsed) = assert_stable_roundtrip::<Text>(xml);
+
+  assert_eq!(text.mc_ignorable.as_deref(), Some("  \t\n\r "));
+  assert_eq!(reparsed.mc_ignorable.as_deref(), Some("  \t\n\r "));
+  assert_eq!(text.xml_content.as_deref(), Some("text"));
+  assert!(serialized.contains("mc:Ignorable=\"  \t\n\r \""));
+}
+
+#[test]
+fn paragraph_properties_preserve_known_extension_attribute_from_markup_compatibility_test() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   Ignored_KnownAttribute_FullMode
+  //   Preserve_NonIgnored_UnknownAttribute_FullMode
+  let xml = r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:PreserveAttributes="w14:myattr" w14:myattr="attribute1 from unknown namespace1."><w:keepNext/></w:pPr>"#;
+
+  let (properties, serialized, reparsed) = assert_stable_roundtrip::<ParagraphProperties>(xml);
+
+  assert_eq!(
+    properties.mc_preserve_attributes.as_deref(),
+    Some("w14:myattr")
+  );
+  assert_eq!(
+    properties.w14_myattr.as_deref(),
+    Some("attribute1 from unknown namespace1.")
+  );
+  assert_eq!(
+    reparsed.w14_myattr.as_deref(),
+    Some("attribute1 from unknown namespace1.")
+  );
+  assert!(properties.keep_next.is_some());
+  assert!(serialized.contains(r#"mc:PreserveAttributes="w14:myattr""#));
+  assert!(serialized.contains(r#"w14:myattr="attribute1 from unknown namespace1.""#));
+}
+
+#[test]
+fn alternate_content_preserves_ignored_unknown_process_content_and_must_understand_metadata() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   Ignored_UnknownElement_FullMode
+  //   ProcessContent_Ignored_UnknownElement_FullMode
+  //   ProcessContent_Ignored_UnknownElement_Wildcard_FullMode
+  //   MustUnderstand_Ignored_UnknownElement_FullMode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:uns1="http://test.openxmlsdk.microsoft.com/unknownns1"><w:body><mc:AlternateContent mc:Ignorable="uns1" mc:ProcessContent="uns1:e1uk1" mc:MustUnderstand="uns1"><mc:Choice Requires="uns1" mc:ProcessContent="*" mc:MustUnderstand="uns1"><uns1:e1uk1 uns1:a1uk1="attribute1 from unknown namespace1."><w:p><w:r><w:t>wrapped</w:t></w:r></w:p></uns1:e1uk1></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+
+  let (document, serialized, reparsed) = assert_stable_roundtrip::<Document>(xml);
+
+  let alternate_content = first_body(&document)
+    .body_choice
+    .iter()
+    .find_map(body_choice_alternate_content)
+    .expect("expected body alternate content");
+  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("uns1"));
+  assert_eq!(
+    alternate_content.mc_process_content.as_deref(),
+    Some("uns1:e1uk1")
+  );
+  assert_eq!(
+    alternate_content.mc_must_understand.as_deref(),
+    Some("uns1")
+  );
+
+  let choice = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Choice");
+  assert_eq!(choice.requires.as_deref(), Some("uns1"));
+  assert_eq!(choice.mc_process_content.as_deref(), Some("*"));
+  assert_eq!(choice.mc_must_understand.as_deref(), Some("uns1"));
+  assert_eq!(
+    choice.xml_children,
+    vec![
+      r#"<uns1:e1uk1 uns1:a1uk1="attribute1 from unknown namespace1."><w:p><w:r><w:t>wrapped</w:t></w:r></w:p></uns1:e1uk1>"#.to_string()
+    ]
+  );
+
+  assert_eq!(
+    first_body(&reparsed)
+      .body_choice
+      .iter()
+      .filter_map(body_choice_alternate_content)
+      .count(),
+    1
+  );
+  assert!(serialized.contains(r#"mc:Ignorable="uns1""#));
+  assert!(serialized.contains(r#"mc:ProcessContent="uns1:e1uk1""#));
+  assert!(serialized.contains(r#"mc:ProcessContent="*""#));
+  assert!(serialized.contains(r#"mc:MustUnderstand="uns1""#));
+  assert!(serialized.contains(r#"<uns1:e1uk1 uns1:a1uk1="attribute1 from unknown namespace1.">"#));
+}
+
+#[test]
+fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   ProcessContent_xmlSpace_FullMode
+  //   ProcessContent_xmlLang_FullMode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:uns1="http://test.openxmlsdk.microsoft.com/unknownns1" xmlns:xml="http://www.w3.org/XML/1998/namespace"><w:body><mc:AlternateContent mc:Ignorable="uns1" mc:ProcessContent="xml:space xml:lang"><mc:Choice Requires="uns1" mc:ProcessContent="xml:space xml:lang"><uns1:e1uk1 xml:space="preserve" xml:lang="en-US"> spaced </uns1:e1uk1></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+
+  let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
+
+  let alternate_content = first_body(&document)
+    .body_choice
+    .iter()
+    .find_map(body_choice_alternate_content)
+    .expect("expected body alternate content");
+  assert_eq!(
+    alternate_content.mc_process_content.as_deref(),
+    Some("xml:space xml:lang")
+  );
+
+  let choice = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Choice");
+  assert_eq!(
+    choice.mc_process_content.as_deref(),
+    Some("xml:space xml:lang")
+  );
+  assert_eq!(
+    choice.xml_children,
+    vec![r#"<uns1:e1uk1 xml:space="preserve" xml:lang="en-US"> spaced </uns1:e1uk1>"#.to_string()]
+  );
+
+  assert!(serialized.contains(r#"mc:ProcessContent="xml:space xml:lang""#));
+  assert!(serialized.contains(r#"xml:space="preserve""#));
+  assert!(serialized.contains(r#"xml:lang="en-US""#));
+}
+
+#[test]
+fn alternate_content_preserves_ignored_known_process_content_metadata() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   Ignored_KnownElement_FullMode
+  //   ProcessContent_Ignored_KnownElement_FullMode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><w:body><mc:AlternateContent mc:Ignorable="w" mc:ProcessContent="w:p"><mc:Choice Requires="w" mc:ProcessContent="w:p"><w:p><w:r><w:t>known</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+
+  let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
+
+  let alternate_content = first_body(&document)
+    .body_choice
+    .iter()
+    .find_map(body_choice_alternate_content)
+    .expect("expected body alternate content");
+  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("w"));
+  assert_eq!(alternate_content.mc_process_content.as_deref(), Some("w:p"));
+
+  let choice = alternate_content
+    .alternate_content_choice
+    .iter()
+    .find_map(|choice| match choice {
+      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      _ => None,
+    })
+    .expect("expected mc:Choice");
+  assert_eq!(choice.requires.as_deref(), Some("w"));
+  assert_eq!(choice.mc_process_content.as_deref(), Some("w:p"));
+  assert_eq!(
+    choice.xml_children,
+    vec![r#"<w:p><w:r><w:t>known</w:t></w:r></w:p>"#.to_string()]
+  );
+
+  assert!(serialized.contains(r#"mc:Ignorable="w""#));
+  assert!(serialized.contains(r#"mc:ProcessContent="w:p""#));
+  assert!(serialized.contains(r#"<w:t>known</w:t>"#));
 }
 
 #[test]

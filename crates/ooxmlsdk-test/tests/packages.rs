@@ -1,7 +1,7 @@
 #![cfg(feature = "parts")]
 
 use std::collections::HashSet;
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 
 use ooxmlsdk::common::{
   MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipRef, RelationshipTargetKind,
@@ -22,7 +22,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
   Presentation as PmlPresentation, Slide,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, Document, Header, SdtPropertiesChoice,
+  Body, BodyChoice, Document, Header, Paragraph, ParagraphChoice, Run, RunChoice,
+  SdtPropertiesChoice, Text,
 };
 use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
@@ -106,6 +107,24 @@ where
 fn package_entry_exists(bytes: Vec<u8>, path: &str) -> bool {
   let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
   archive.by_name(path).is_ok()
+}
+
+fn package_entry_names(bytes: Vec<u8>) -> Vec<String> {
+  let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+  let mut names = Vec::new();
+  for index in 0..archive.len() {
+    names.push(archive.by_index(index).unwrap().name().to_string());
+  }
+  names.sort();
+  names
+}
+
+fn package_entry_data(bytes: Vec<u8>, path: &str) -> Vec<u8> {
+  let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+  let mut entry = archive.by_name(path).unwrap();
+  let mut data = Vec::new();
+  entry.read_to_end(&mut data).unwrap();
+  data
 }
 
 #[test]
@@ -3623,6 +3642,168 @@ fn package_copy_helpers_include_unsaved_root_changes() {
       .and_then(|part| part_ref_variant!(part, HeaderPart))
       .is_some()
   );
+}
+
+#[test]
+fn wordprocessing_clone_mutation_is_saved_without_changing_source_package() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs
+  //   CanCloneDocument
+  //   CanDoFileBasedClone
+  //   CanDoPackageBasedCloningWord
+  //   CanDoStreamBasedCloningWord
+  //   CanSave
+  let source = WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let source_bytes = source.to_package_bytes().unwrap();
+  let source_document_xml = package_entry_data(source_bytes.clone(), "word/document.xml");
+  assert!(!String::from_utf8_lossy(&source_document_xml).contains("Hello World from clone"));
+
+  let mut clone = source.to_owned_package().unwrap();
+  let clone_main = clone.main_document_part().unwrap();
+  let root = clone_main.root_element_mut(&mut clone).unwrap();
+  let body = root.body.as_mut().unwrap();
+  body.body_choice.insert(
+    0,
+    BodyChoice::WP(Box::new(Paragraph {
+      paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
+        run_choice: vec![RunChoice::WT(Box::new(Text {
+          xml_content: Some("Hello World from clone".to_string()),
+          ..Default::default()
+        }))],
+        ..Default::default()
+      }))],
+      ..Default::default()
+    })),
+  );
+
+  let clone_bytes = clone.to_package_bytes().unwrap();
+  let clone_document_xml = package_entry_data(clone_bytes.clone(), "word/document.xml");
+  assert!(String::from_utf8_lossy(&clone_document_xml).contains("Hello World from clone"));
+
+  let reopened_source = WordprocessingDocument::new(Cursor::new(source_bytes)).unwrap();
+  let reopened_clone = WordprocessingDocument::new(Cursor::new(clone_bytes)).unwrap();
+  assert!(reopened_source.main_document_part().is_ok());
+  assert!(reopened_clone.main_document_part().is_ok());
+}
+
+#[test]
+fn package_copy_helpers_round_trip_spreadsheet_and_presentation_documents() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs
+  //   CanDoFileBasedCloneSpreadsheet
+  //   CanDoFileBasedClonePresentation
+  //   CanDoPackageBasedCloningSpreadsheet
+  //   CanDoPackageBasedCloningPowerpoint
+  //   CanDoStreamBasedCloningExcel
+  //   CanDoStreamBasedCloningPowerpoint
+  let spreadsheet =
+    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let spreadsheet_bytes = spreadsheet.to_package_bytes().unwrap();
+  let mut spreadsheet_stream = Cursor::new(Vec::new());
+  spreadsheet.copy_to(&mut spreadsheet_stream).unwrap();
+  assert_eq!(spreadsheet_stream.into_inner(), spreadsheet_bytes);
+
+  let mut spreadsheet_copy = spreadsheet.to_owned_package().unwrap();
+  assert_eq!(
+    package_entry_names(spreadsheet_bytes.clone()),
+    package_entry_names(spreadsheet_copy.to_package_bytes().unwrap())
+  );
+  let workbook_part = spreadsheet_copy.workbook_part().unwrap();
+  assert!(
+    workbook_part
+      .root_element(&mut spreadsheet_copy)
+      .unwrap()
+      .sheets
+      .x_sheet
+      .len()
+      > 0
+  );
+  let mut reopened_spreadsheet = SpreadsheetDocument::new(Cursor::new(spreadsheet_bytes)).unwrap();
+  assert!(
+    reopened_spreadsheet
+      .workbook_part()
+      .unwrap()
+      .root_element(&mut reopened_spreadsheet)
+      .is_ok()
+  );
+
+  let presentation =
+    PresentationDocument::new_from_file_lazy(doc_sample("Presentation.pptx")).unwrap();
+  let presentation_bytes = presentation.to_package_bytes().unwrap();
+  let mut presentation_stream = Cursor::new(Vec::new());
+  presentation.copy_to(&mut presentation_stream).unwrap();
+  assert_eq!(presentation_stream.into_inner(), presentation_bytes);
+
+  let mut presentation_copy = presentation.to_owned_package().unwrap();
+  assert_eq!(
+    package_entry_names(presentation_bytes.clone()),
+    package_entry_names(presentation_copy.to_package_bytes().unwrap())
+  );
+  let presentation_part = presentation_copy.presentation_part().unwrap();
+  assert!(
+    presentation_part
+      .root_element(&mut presentation_copy)
+      .is_ok()
+  );
+  let mut reopened_presentation =
+    PresentationDocument::new(Cursor::new(presentation_bytes)).unwrap();
+  assert!(
+    reopened_presentation
+      .presentation_part()
+      .unwrap()
+      .root_element(&mut reopened_presentation)
+      .is_ok()
+  );
+}
+
+#[test]
+fn package_save_as_file_round_trips_office_document_types() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs
+  //   CanSaveAsWord
+  //   CanSaveAsExcel
+  //   CanSaveAsPowerpoint
+  let mut word = WordprocessingDocument::new_from_file_lazy(doc_sample("Document.docx")).unwrap();
+  let word_main = word.main_document_part().unwrap();
+  assert!(word_main.root_element(&mut word).is_ok());
+  let word_bytes = word.to_package_bytes().unwrap();
+  let word_path =
+    std::env::temp_dir().join(format!("ooxmlsdk-save-as-word-{}.docx", std::process::id()));
+  word.save_as_file(&word_path).unwrap();
+  assert_eq!(
+    package_entry_names(word_bytes),
+    package_entry_names(std::fs::read(&word_path).unwrap())
+  );
+  std::fs::remove_file(&word_path).unwrap();
+
+  let mut spreadsheet =
+    SpreadsheetDocument::new_from_file_lazy(doc_sample("basicspreadsheet.xlsx")).unwrap();
+  let workbook_part = spreadsheet.workbook_part().unwrap();
+  assert!(workbook_part.root_element(&mut spreadsheet).is_ok());
+  let spreadsheet_bytes = spreadsheet.to_package_bytes().unwrap();
+  let spreadsheet_path = std::env::temp_dir().join(format!(
+    "ooxmlsdk-save-as-spreadsheet-{}.xlsx",
+    std::process::id()
+  ));
+  spreadsheet.save_as_file(&spreadsheet_path).unwrap();
+  assert_eq!(
+    package_entry_names(spreadsheet_bytes),
+    package_entry_names(std::fs::read(&spreadsheet_path).unwrap())
+  );
+  std::fs::remove_file(&spreadsheet_path).unwrap();
+
+  let mut presentation =
+    PresentationDocument::new_from_file_lazy(doc_sample("Presentation.pptx")).unwrap();
+  let presentation_part = presentation.presentation_part().unwrap();
+  assert!(presentation_part.root_element(&mut presentation).is_ok());
+  let presentation_bytes = presentation.to_package_bytes().unwrap();
+  let presentation_path = std::env::temp_dir().join(format!(
+    "ooxmlsdk-save-as-presentation-{}.pptx",
+    std::process::id()
+  ));
+  presentation.save_as_file(&presentation_path).unwrap();
+  assert_eq!(
+    package_entry_names(presentation_bytes),
+    package_entry_names(std::fs::read(&presentation_path).unwrap())
+  );
+  std::fs::remove_file(&presentation_path).unwrap();
 }
 
 #[test]

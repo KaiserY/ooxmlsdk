@@ -28,6 +28,10 @@
     },
     {
       "ClassName": "ParagraphProperties",
+      "HasMcIgnorableField": true,
+      "HasMcMustUnderstandField": true,
+      "HasMcProcessContentField": true,
+      "HasMcPreserveElementsField": true,
       "Attributes": [
         {
           "QName": "mc:PreserveAttributes",

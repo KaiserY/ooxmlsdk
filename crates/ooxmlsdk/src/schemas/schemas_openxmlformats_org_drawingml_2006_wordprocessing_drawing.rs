@@ -404,11 +404,21 @@ pub struct Anchor {
   /// Simple Positioning Coordinates
   #[sdk(child(qname = "a:CT_Point2D/wp:simplePos"))]
   pub simple_position: std::boxed::Box<SimplePosition>,
+  #[cfg(not(feature = "mce"))]
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Horizontal Positioning
-  #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
+  #[sdk(mce_child(qname = "wp:CT_PosH/wp:positionH"))]
   pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
+  #[cfg(not(feature = "mce"))]
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content2:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Vertical Positioning
-  #[sdk(child(qname = "wp:CT_PosV/wp:positionV"))]
+  #[sdk(mce_child(qname = "wp:CT_PosV/wp:positionV"))]
   pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
   /// Inline Drawing Object Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
@@ -434,19 +444,25 @@ pub struct Anchor {
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub a_graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
+  pub mc_alternate_content3:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]
+  #[sdk(mce_child(qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]
   pub wp14_size_rel_h: Option<
     crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_drawing::RelativeWidth,
   >,
+  #[cfg(not(feature = "mce"))]
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content4:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "wp14:CT_SizeRelV/wp14:sizeRelV"))]
+  #[sdk(mce_child(qname = "wp14:CT_SizeRelV/wp14:sizeRelV"))]
   pub wp14_size_rel_v: Option<
     crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_drawing::RelativeHeight,
   >,
@@ -702,10 +718,6 @@ pub struct HorizontalPosition {
   #[sdk(attr(qname = ":relativeFrom"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub relative_from: HorizontalRelativePositionValues,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "wp:ST_AlignH/wp:align",
     qname = "wp:ST_PositionOffset/wp:posOffset"
@@ -732,10 +744,6 @@ pub struct VerticalPosition {
   #[sdk(attr(qname = ":relativeFrom"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub relative_from: VerticalRelativePositionValues,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "wp:ST_AlignV/wp:align",
     qname = "wp:ST_PositionOffset/wp:posOffset"
@@ -900,21 +908,27 @@ pub enum AnchorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HorizontalPositionChoice {
+  /// Relative Horizontal Alignment.
   #[sdk(text_child(qname = "wp:ST_AlignH/wp:align"))]
   WpAlign(HorizontalAlignmentValues),
+  /// Defines the PositionOffset Class.
   #[sdk(text_child(qname = "wp:ST_PositionOffset/wp:posOffset"))]
   WpPosOffset(crate::simple_type::Int32Value),
   #[cfg(feature = "microsoft365")]
+  /// Defines the PercentagePositionHeightOffset Class.
   #[sdk(text_child(qname = "a:ST_Percentage/wp14:pctPosHOffset"))]
   Wp14PctPosHOffset(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VerticalPositionChoice {
+  /// Relative Vertical Alignment.
   #[sdk(text_child(qname = "wp:ST_AlignV/wp:align"))]
   WpAlign(VerticalAlignmentValues),
+  /// Defines the PositionOffset Class.
   #[sdk(text_child(qname = "wp:ST_PositionOffset/wp:posOffset"))]
   WpPosOffset(crate::simple_type::Int32Value),
   #[cfg(feature = "microsoft365")]
+  /// Defines the PercentagePositionVerticalOffset Class.
   #[sdk(text_child(qname = "a:ST_Percentage/wp14:pctPosVOffset"))]
   Wp14PctPosVOffset(crate::simple_type::StringValue),
 }

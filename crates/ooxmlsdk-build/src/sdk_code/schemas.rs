@@ -1034,6 +1034,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       let mut fields: Vec<TokenStream> = vec![];
 
       fields.extend(gen_support_fields(&type_decl.support));
+      fields.extend(gen_mce_global_attr_fields(type_decl, &attr_fields)?);
 
       for attr in &attr_fields {
         fields.push(gen_attr_from_decl(attr, field_version_cfg).map_err(|err| {
@@ -1070,6 +1071,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     let items: Vec<TokenStream> = vec![];
 
     fields.extend(gen_support_fields(&type_decl.support));
+    fields.extend(gen_mce_global_attr_fields(type_decl, &attr_fields)?);
 
     if type_decl.element_kind == Some(ElementKind::LeafText) {
       for attr in &attr_fields {
@@ -1630,7 +1632,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       .into_iter()
       .map(|(_, _, tokens)| rename_token_stream_idents(tokens, &anonymous_type_rename_map)),
   );
-
   Ok(quote! {
     #( #token_stream_list )*
   })
@@ -1885,7 +1886,7 @@ fn is_empty_leaf_marker_type(type_decl: &TypeDecl) -> bool {
     && type_decl.members.is_empty()
     && type_decl.support.xmlns_mode == XmlnsMode::None
     && type_decl.support.xml_header == XmlHeaderMode::None
-    && !type_decl.support.has_mce
+    && !type_decl.support.has_mc_global_attrs()
 }
 
 fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
@@ -1899,7 +1900,7 @@ fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
     && type_decl.members.is_empty()
     && type_decl.support.xmlns_mode == XmlnsMode::None
     && type_decl.support.xml_header == XmlHeaderMode::None
-    && !type_decl.support.has_mce
+    && !type_decl.support.has_mc_global_attrs()
 }
 
 fn empty_leaf_marker_doc_for_ref<'a>(
@@ -2173,6 +2174,22 @@ fn gen_choice_variant_tokens(
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
+      if is_mce_alternate_content_variant(variant) && !qnames.is_empty() {
+        let qname_attrs = qnames
+          .iter()
+          .map(|qname| quote! { #[sdk(child(qname = #qname))] })
+          .collect::<Vec<_>>();
+        let payload_type = type_from_decl_ref(&variant.payload)?;
+        return Ok(vec![quote! {
+          #prefix_attrs
+          #[cfg(not(feature = "mce"))]
+          #( #variant_attrs )*
+          #variant_doc_attrs
+          #( #qname_attrs )*
+          #variant_ident(std::boxed::Box<#payload_type>),
+        }]);
+      }
+
       if flatten_anonymous_choice_wrappers
         && let Some(helper_type_decl) =
           anonymous_choice_wrapper_helper_type_decl(variant, render_context.module)
@@ -2298,6 +2315,25 @@ fn gen_choice_variant_tokens(
       }])
     }
   }
+}
+
+fn is_mce_alternate_content_variant(variant: &VariantDecl) -> bool {
+  variant.rust_name == "McAlternateContent"
+    && matches!(
+      variant.payload.module_path.as_deref(),
+      Some("crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006")
+    )
+    && variant.payload.rust_type == "AlternateContent"
+}
+
+fn is_mce_alternate_content_field(field: &FieldDecl) -> bool {
+  matches!(
+    &field.wire,
+    FieldWireDecl::Child { qname } if qname == "mc:CT_AlternateContent/mc:AlternateContent"
+  ) && matches!(
+    field.type_ref.module_path.as_deref(),
+    Some("crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006")
+  ) && field.type_ref.rust_type == "AlternateContent"
 }
 
 fn inline_sequence_helper_type_decl<'a>(
@@ -3238,13 +3274,74 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
     });
   }
 
-  if support.has_mce {
+  if support.has_mc_ignorable {
     fields.push(quote! {
       pub mc_ignorable: Option<String>,
     });
   }
 
   fields
+}
+
+fn gen_mce_global_attr_fields(
+  type_decl: &TypeDecl,
+  attr_fields: &[&FieldDecl],
+) -> Result<Vec<TokenStream>> {
+  const MCE_GLOBAL_ATTRS: [(&str, &str, &str); 4] = [
+    ("mc:MustUnderstand", "mc_must_understand", "StringValue"),
+    ("mc:ProcessContent", "mc_process_content", "StringValue"),
+    (
+      "mc:PreserveAttributes",
+      "mc_preserve_attributes",
+      "StringValue",
+    ),
+    ("mc:PreserveElements", "mc_preserve_elements", "StringValue"),
+  ];
+
+  let mut fields = Vec::new();
+  for (qname, rust_name, rust_type) in MCE_GLOBAL_ATTRS {
+    let should_generate = match qname {
+      "mc:MustUnderstand" => type_decl.support.has_mc_must_understand,
+      "mc:ProcessContent" => type_decl.support.has_mc_process_content,
+      "mc:PreserveAttributes" => type_decl.support.has_mc_preserve_attributes,
+      "mc:PreserveElements" => type_decl.support.has_mc_preserve_elements,
+      _ => false,
+    };
+    if !should_generate {
+      continue;
+    }
+
+    if attr_fields.iter().any(|attr| {
+      matches!(
+        &attr.wire,
+        FieldWireDecl::Attribute {
+          qname: attr_qname,
+          ..
+        } if attr_qname == qname
+      )
+    }) {
+      continue;
+    }
+
+    let attr = FieldDecl {
+      rust_name: rust_name.to_string(),
+      docs: format!("Markup compatibility attribute {qname}."),
+      version: "Office2007".to_string(),
+      type_ref: TypeRefDecl {
+        module_path: Some("crate::simple_type".to_string()),
+        rust_type: rust_type.to_string(),
+      },
+      cardinality: Cardinality::Optional,
+      wire: FieldWireDecl::Attribute {
+        qname: qname.to_string(),
+        bit: None,
+      },
+      validators: vec![],
+    };
+    fields.push(gen_attr_from_decl(&attr, VersionCfgContext::default())?);
+  }
+
+  Ok(fields)
 }
 
 fn choice_type_accepts_text(module: &SchemaModuleDecl, rust_type: &str) -> bool {
@@ -3382,13 +3479,35 @@ fn gen_direct_child_fields_from_decl(
   field_cfg: VersionCfgContext,
   force_optional_when_not_repeated: bool,
 ) -> Result<Vec<TokenStream>> {
+  gen_direct_child_fields_from_decl_with_context(
+    fields,
+    fields,
+    owner_rust_name,
+    module,
+    type_graph,
+    field_cfg,
+    force_optional_when_not_repeated,
+  )
+}
+
+fn gen_direct_child_fields_from_decl_with_context(
+  fields: &[&FieldDecl],
+  mce_context_fields: &[&FieldDecl],
+  owner_rust_name: &str,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+  field_cfg: VersionCfgContext,
+  force_optional_when_not_repeated: bool,
+) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
+  let mce_payload_field_ptrs = mce_payload_field_ptrs(mce_context_fields);
 
   for field in fields {
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
     let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
     let field_type = type_from_decl_ref(&field.type_ref)?;
+    let is_mce_payload_field = mce_payload_field_ptrs.contains(&(*field as *const FieldDecl));
     let property_comments_owned = empty_leaf_marker_doc
       .and_then(meaningful_doc_text)
       .or_else(|| meaningful_doc_text(&field.docs))
@@ -3398,10 +3517,33 @@ fn gen_direct_child_fields_from_decl(
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
         quote! { #[sdk(empty_child(qname = #qname))] }
       }
+      FieldWireDecl::Child { qname } if is_mce_payload_field => {
+        quote! { #[sdk(mce_child(qname = #qname))] }
+      }
       FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
       FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
+
+    if is_mce_alternate_content_field(field) {
+      let effective_cardinality =
+        if force_optional_when_not_repeated && !matches!(field.cardinality, Cardinality::Many) {
+          Cardinality::Optional
+        } else {
+          field.cardinality
+        };
+      tokens.push(field_decl_tokens_for_type(
+        &field_name_ident,
+        &attr,
+        quote! { #[cfg(not(feature = "mce"))] },
+        sdk_field_attrs,
+        property_comments,
+        &field_type,
+        effective_cardinality,
+      ));
+      continue;
+    }
+
     let field_type = if empty_leaf_marker_doc.is_some() {
       parse_str("()")?
     } else {
@@ -3460,6 +3602,55 @@ fn gen_direct_child_fields_from_decl(
   }
 
   Ok(tokens)
+}
+
+fn mce_payload_field_ptrs(fields: &[&FieldDecl]) -> HashSet<*const FieldDecl> {
+  fields
+    .iter()
+    .enumerate()
+    .filter(|(_, field)| is_mce_alternate_content_field(field))
+    .filter_map(|(index, _)| {
+      fields
+        .iter()
+        .skip(index + 1)
+        .find(|field| !is_mce_alternate_content_field(field))
+        .map(|field| *field as *const FieldDecl)
+    })
+    .collect()
+}
+
+fn field_decl_tokens_for_type(
+  field_name_ident: &Ident,
+  attr: &[Attribute],
+  cfg_attr: TokenStream,
+  sdk_field_attrs: TokenStream,
+  property_comments: &str,
+  field_type: &Type,
+  cardinality: Cardinality,
+) -> TokenStream {
+  match cardinality {
+    Cardinality::Many => quote! {
+      #( #attr )*
+      #cfg_attr
+      #[doc = #property_comments]
+      #sdk_field_attrs
+      pub #field_name_ident: Vec<#field_type>,
+    },
+    Cardinality::Optional => quote! {
+      #( #attr )*
+      #cfg_attr
+      #[doc = #property_comments]
+      #sdk_field_attrs
+      pub #field_name_ident: Option<#field_type>,
+    },
+    Cardinality::One => quote! {
+      #( #attr )*
+      #cfg_attr
+      #[doc = #property_comments]
+      #sdk_field_attrs
+      pub #field_name_ident: #field_type,
+    },
+  }
 }
 
 fn gen_inline_sequence_variant_fields_from_decl(
@@ -3592,8 +3783,9 @@ fn gen_flatten_one_sequence_fields_from_decl(
         });
       }
       FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } => {
-        tokens.extend(gen_direct_child_fields_from_decl(
+        tokens.extend(gen_direct_child_fields_from_decl_with_context(
           std::slice::from_ref(field),
+          fields,
           owner_rust_name,
           module,
           type_graph,
@@ -3692,7 +3884,7 @@ fn can_alias_leaf_text_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
   type_decl.kind == TypeKind::LeafTextAlias
     && attr_fields.is_empty()
     && type_decl.support.xmlns_mode == crate::sdk_code::codegen_ir::XmlnsMode::None
-    && !type_decl.support.has_mce
+    && !type_decl.support.has_mc_global_attrs()
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
 }
 

@@ -1364,12 +1364,13 @@ pub struct Presentation {
   /// _
   #[sdk(child(qname = "a:CT_TextListStyle/p:defaultTextStyle"))]
   pub default_text_style: Option<std::boxed::Box<DefaultTextStyle>>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "p:CT_ModifyVerifier/p:modifyVerifier"))]
+  #[sdk(mce_child(qname = "p:CT_ModifyVerifier/p:modifyVerifier"))]
   pub modification_verifier: Option<ModificationVerifier>,
   /// _
   #[sdk(child(qname = "p:CT_PresentationExtensionList/p:extLst"))]
@@ -1440,15 +1441,16 @@ pub struct Slide {
   /// Common slide data for slides
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// Color Scheme Map Override.
+  /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Slide Transition
-  #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
+  #[sdk(mce_child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// Slide Timing Information for a Slide
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
@@ -1514,15 +1516,16 @@ pub struct SlideLayout {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// Color Scheme Map Override.
+  /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
+  #[sdk(mce_child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// _
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
@@ -1555,18 +1558,19 @@ pub struct SlideMaster {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// Color Scheme Map.
+  /// Color Scheme Map
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
   /// _
   #[sdk(child(qname = "p:CT_SlideLayoutIdList/p:sldLayoutIdLst"))]
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
+  #[sdk(mce_child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// _
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
@@ -1595,7 +1599,7 @@ pub struct HandoutMaster {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// Color Scheme Map.
+  /// Color Scheme Map
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
   /// _
@@ -1619,7 +1623,7 @@ pub struct NotesMaster {
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// Color Scheme Map.
+  /// Color Scheme Map
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
   /// _
@@ -1660,7 +1664,7 @@ pub struct NotesSlide {
   /// Common slide data for notes slides
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// Color Scheme Map Override.
+  /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// _
@@ -1968,6 +1972,7 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -2127,12 +2132,13 @@ pub struct TimeListConditionalType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeParallel/p:par")]
 pub struct ParallelTimeNode {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Parallel TimeNode
-  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
 }
 /// Sequence Time Node.
@@ -2166,12 +2172,13 @@ pub struct SequenceTimeNode {
   #[sdk(attr(qname = ":nextAc"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub next_action: Option<NextActionValues>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Common TimeNode Properties
-  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// Previous Conditions List
   #[sdk(child(qname = "p:CT_TLTimeConditionList/p:prevCondLst"))]
@@ -2188,12 +2195,13 @@ pub struct SequenceTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeExclusive/p:excl")]
 pub struct ExclusiveTimeNode {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Common TimeNode Properties
-  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
 }
 /// Animate.
@@ -3212,12 +3220,13 @@ pub struct CommonBehavior {
   #[sdk(attr(qname = ":override"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#override: Option<BehaviorOverrideValues>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// Target Element
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
@@ -3332,12 +3341,13 @@ pub struct CommonMediaNode {
   /// Represents the following attribute in the schema: :showWhenStopped
   #[sdk(attr(qname = ":showWhenStopped"))]
   pub show_when_stopped: Option<crate::simple_type::BooleanValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Common Time Node Properties
-  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// _
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
@@ -3667,6 +3677,7 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -3689,6 +3700,7 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -5861,10 +5873,6 @@ pub struct SlideExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5892,10 +5900,6 @@ pub struct CommonSlideDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5919,10 +5923,6 @@ pub struct ShowPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6038,6 +6038,7 @@ pub struct Transition {
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub advance_after_time: Option<crate::simple_type::StringValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -6522,10 +6523,6 @@ pub struct CommentAuthorExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6549,10 +6546,6 @@ pub struct CommentExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6576,10 +6569,6 @@ pub struct SlideLayoutExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6603,10 +6592,6 @@ pub struct SlideMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6630,10 +6615,6 @@ pub struct HandoutMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6657,10 +6638,6 @@ pub struct NotesMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6746,10 +6723,6 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -7354,10 +7327,6 @@ pub struct PresentationExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -7637,10 +7606,6 @@ pub struct PresentationPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -9033,6 +8998,7 @@ pub enum BackgroundChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
+  #[cfg(not(feature = "mce"))]
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
     std::boxed::Box<
@@ -9055,6 +9021,7 @@ pub enum ShapeTreeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  #[cfg(not(feature = "mce"))]
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
     std::boxed::Box<

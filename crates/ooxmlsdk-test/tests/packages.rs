@@ -3899,13 +3899,12 @@ fn package_copy_helpers_round_trip_spreadsheet_and_presentation_documents() {
   );
   let workbook_part = spreadsheet_copy.workbook_part().unwrap();
   assert!(
-    workbook_part
+    !workbook_part
       .root_element(&mut spreadsheet_copy)
       .unwrap()
       .sheets
       .x_sheet
-      .len()
-      > 0
+      .is_empty()
   );
   let mut reopened_spreadsheet = SpreadsheetDocument::new(Cursor::new(spreadsheet_bytes)).unwrap();
   assert!(

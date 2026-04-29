@@ -1487,13 +1487,13 @@ pub struct Grouping {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSer/c:ser")]
 pub struct LineChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -1602,13 +1602,13 @@ pub struct BarGrouping {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSer/c:ser")]
 pub struct BarChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -1653,13 +1653,13 @@ pub struct BarChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSer/c:ser")]
 pub struct AreaChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -1698,13 +1698,13 @@ pub struct AreaChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSer/c:ser")]
 pub struct PieChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -1740,13 +1740,13 @@ pub struct PieChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSer/c:ser")]
 pub struct SurfaceChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -2192,6 +2192,7 @@ pub struct ChartSpace {
   /// _
   #[sdk(child(qname = "c:CT_Boolean/c:roundedCorners"))]
   pub rounded_corners: Option<RoundedCorners>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -3758,7 +3759,7 @@ pub struct DataLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChart/c:areaChart")]
 pub struct AreaChart {
-  /// Grouping.
+  /// Grouping
   #[sdk(child(qname = "c:CT_Grouping/c:grouping"))]
   pub grouping: Option<Grouping>,
   /// Defines the VaryColors Class.
@@ -3788,7 +3789,7 @@ pub struct AreaChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChart/c:area3DChart")]
 pub struct Area3DChart {
-  /// Grouping.
+  /// Grouping
   #[sdk(child(qname = "c:CT_Grouping/c:grouping"))]
   pub grouping: Option<Grouping>,
   /// Defines the VaryColors Class.
@@ -3821,7 +3822,7 @@ pub struct Area3DChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChart/c:lineChart")]
 pub struct LineChart {
-  /// Grouping.
+  /// Grouping
   #[sdk(child(qname = "c:CT_Grouping/c:grouping"))]
   pub grouping: std::boxed::Box<Grouping>,
   /// Defines the VaryColors Class.
@@ -3863,7 +3864,7 @@ pub struct LineChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChart/c:line3DChart")]
 pub struct Line3DChart {
-  /// Grouping.
+  /// Grouping
   #[sdk(child(qname = "c:CT_Grouping/c:grouping"))]
   pub grouping: std::boxed::Box<Grouping>,
   /// Defines the VaryColors Class.
@@ -4052,10 +4053,10 @@ pub struct DoughnutChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChart/c:barChart")]
 pub struct BarChart {
-  /// Bar Direction.
+  /// Bar Direction
   #[sdk(child(qname = "c:CT_BarDir/c:barDir"))]
   pub bar_direction: std::boxed::Box<BarDirection>,
-  /// Bar Grouping.
+  /// Bar Grouping
   #[sdk(child(qname = "c:CT_BarGrouping/c:grouping"))]
   pub bar_grouping: Option<BarGrouping>,
   /// Defines the VaryColors Class.
@@ -4091,10 +4092,10 @@ pub struct BarChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChart/c:bar3DChart")]
 pub struct Bar3DChart {
-  /// Bar Direction.
+  /// Bar Direction
   #[sdk(child(qname = "c:CT_BarDir/c:barDir"))]
   pub bar_direction: std::boxed::Box<BarDirection>,
-  /// Bar Grouping.
+  /// Bar Grouping
   #[sdk(child(qname = "c:CT_BarGrouping/c:grouping"))]
   pub bar_grouping: Option<BarGrouping>,
   /// Defines the VaryColors Class.
@@ -4172,7 +4173,7 @@ pub struct OfPieChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChart/c:surfaceChart")]
 pub struct SurfaceChart {
-  /// Wireframe.
+  /// Wireframe
   #[sdk(child(qname = "c:CT_Boolean/c:wireframe"))]
   pub wireframe: Option<Wireframe>,
   /// Surface Chart Series.
@@ -4259,37 +4260,37 @@ pub struct BubbleChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAx/c:valAx")]
 pub struct ValueAxis {
-  /// Axis ID.
+  /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub axis_id: std::boxed::Box<AxisId>,
-  /// Scaling.
+  /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
-  /// Delete.
+  /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
-  /// Axis Position.
+  /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
   pub axis_position: std::boxed::Box<AxisPosition>,
-  /// Major Gridlines.
+  /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
-  /// Minor Gridlines.
+  /// Minor Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:minorGridlines"))]
   pub minor_gridlines: Option<std::boxed::Box<MinorGridlines>>,
-  /// Title.
+  /// Title
   #[sdk(child(qname = "c:CT_Title/c:title"))]
   pub title: Option<std::boxed::Box<Title>>,
-  /// Number Format.
+  /// Number Format
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  /// Major Tick Mark.
+  /// Major Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:majorTickMark"))]
   pub major_tick_mark: Option<MajorTickMark>,
-  /// Minor Tick Mark.
+  /// Minor Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:minorTickMark"))]
   pub minor_tick_mark: Option<MinorTickMark>,
-  /// Tick Label Position.
+  /// Tick Label Position
   #[sdk(child(qname = "c:CT_TickLblPos/c:tickLblPos"))]
   pub tick_label_position: Option<TickLabelPosition>,
   /// Defines the ChartShapeProperties Class.
@@ -4298,7 +4299,7 @@ pub struct ValueAxis {
   /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
-  /// Crossing Axis ID.
+  /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
@@ -4327,37 +4328,37 @@ pub struct ValueAxis {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAx/c:catAx")]
 pub struct CategoryAxis {
-  /// Axis ID.
+  /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub axis_id: std::boxed::Box<AxisId>,
-  /// Scaling.
+  /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
-  /// Delete.
+  /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
-  /// Axis Position.
+  /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
   pub axis_position: std::boxed::Box<AxisPosition>,
-  /// Major Gridlines.
+  /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
-  /// Minor Gridlines.
+  /// Minor Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:minorGridlines"))]
   pub minor_gridlines: Option<std::boxed::Box<MinorGridlines>>,
-  /// Title.
+  /// Title
   #[sdk(child(qname = "c:CT_Title/c:title"))]
   pub title: Option<std::boxed::Box<Title>>,
-  /// Number Format.
+  /// Number Format
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  /// Major Tick Mark.
+  /// Major Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:majorTickMark"))]
   pub major_tick_mark: Option<MajorTickMark>,
-  /// Minor Tick Mark.
+  /// Minor Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:minorTickMark"))]
   pub minor_tick_mark: Option<MinorTickMark>,
-  /// Tick Label Position.
+  /// Tick Label Position
   #[sdk(child(qname = "c:CT_TickLblPos/c:tickLblPos"))]
   pub tick_label_position: Option<TickLabelPosition>,
   /// Defines the ChartShapeProperties Class.
@@ -4366,7 +4367,7 @@ pub struct CategoryAxis {
   /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
-  /// Crossing Axis ID.
+  /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
@@ -4401,37 +4402,37 @@ pub struct CategoryAxis {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAx/c:dateAx")]
 pub struct DateAxis {
-  /// Axis ID.
+  /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub axis_id: std::boxed::Box<AxisId>,
-  /// Scaling.
+  /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
-  /// Delete.
+  /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
-  /// Axis Position.
+  /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
   pub axis_position: std::boxed::Box<AxisPosition>,
-  /// Major Gridlines.
+  /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
-  /// Minor Gridlines.
+  /// Minor Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:minorGridlines"))]
   pub minor_gridlines: Option<std::boxed::Box<MinorGridlines>>,
-  /// Title.
+  /// Title
   #[sdk(child(qname = "c:CT_Title/c:title"))]
   pub title: Option<std::boxed::Box<Title>>,
-  /// Number Format.
+  /// Number Format
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  /// Major Tick Mark.
+  /// Major Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:majorTickMark"))]
   pub major_tick_mark: Option<MajorTickMark>,
-  /// Minor Tick Mark.
+  /// Minor Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:minorTickMark"))]
   pub minor_tick_mark: Option<MinorTickMark>,
-  /// Tick Label Position.
+  /// Tick Label Position
   #[sdk(child(qname = "c:CT_TickLblPos/c:tickLblPos"))]
   pub tick_label_position: Option<TickLabelPosition>,
   /// Defines the ChartShapeProperties Class.
@@ -4440,7 +4441,7 @@ pub struct DateAxis {
   /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
-  /// Crossing Axis ID.
+  /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
@@ -4478,37 +4479,37 @@ pub struct DateAxis {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAx/c:serAx")]
 pub struct SeriesAxis {
-  /// Axis ID.
+  /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub axis_id: std::boxed::Box<AxisId>,
-  /// Scaling.
+  /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
   pub scaling: std::boxed::Box<Scaling>,
-  /// Delete.
+  /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
-  /// Axis Position.
+  /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
   pub axis_position: std::boxed::Box<AxisPosition>,
-  /// Major Gridlines.
+  /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
-  /// Minor Gridlines.
+  /// Minor Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:minorGridlines"))]
   pub minor_gridlines: Option<std::boxed::Box<MinorGridlines>>,
-  /// Title.
+  /// Title
   #[sdk(child(qname = "c:CT_Title/c:title"))]
   pub title: Option<std::boxed::Box<Title>>,
-  /// Number Format.
+  /// Number Format
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  /// Major Tick Mark.
+  /// Major Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:majorTickMark"))]
   pub major_tick_mark: Option<MajorTickMark>,
-  /// Minor Tick Mark.
+  /// Minor Tick Mark
   #[sdk(child(qname = "c:CT_TickMark/c:minorTickMark"))]
   pub minor_tick_mark: Option<MinorTickMark>,
-  /// Tick Label Position.
+  /// Tick Label Position
   #[sdk(child(qname = "c:CT_TickLblPos/c:tickLblPos"))]
   pub tick_label_position: Option<TickLabelPosition>,
   /// Defines the ChartShapeProperties Class.
@@ -4517,7 +4518,7 @@ pub struct SeriesAxis {
   /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
-  /// Crossing Axis ID.
+  /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
@@ -4666,10 +4667,6 @@ pub struct StockChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4693,10 +4690,6 @@ pub struct PieChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4720,10 +4713,6 @@ pub struct Pie3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4747,10 +4736,6 @@ pub struct NumRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4778,10 +4763,6 @@ pub struct StrDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4805,10 +4786,6 @@ pub struct StrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4836,10 +4813,6 @@ pub struct MultiLvlStrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4867,10 +4840,6 @@ pub struct DLblsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4902,10 +4871,6 @@ pub struct LineChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4929,10 +4894,6 @@ pub struct Line3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4956,10 +4917,6 @@ pub struct ScatterChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -4983,10 +4940,6 @@ pub struct RadarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5010,10 +4963,6 @@ pub struct BarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5037,10 +4986,6 @@ pub struct Bar3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5064,10 +5009,6 @@ pub struct AreaChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5091,10 +5032,6 @@ pub struct Area3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5118,10 +5055,6 @@ pub struct BubbleChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5145,10 +5078,6 @@ pub struct SurfaceChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5172,10 +5101,6 @@ pub struct Surface3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5199,10 +5124,6 @@ pub struct CatAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5226,10 +5147,6 @@ pub struct DateAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5253,10 +5170,6 @@ pub struct SerAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5280,10 +5193,6 @@ pub struct ValAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -5474,13 +5383,13 @@ pub struct ScatterStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSer/c:ser")]
 pub struct ScatterChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -5550,13 +5459,13 @@ pub struct RadarStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSer/c:ser")]
 pub struct RadarChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -5691,13 +5600,13 @@ pub struct Area3DChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSer/c:ser")]
 pub struct BubbleChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order: std::boxed::Box<Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<std::boxed::Box<SeriesText>>,
   /// Defines the ChartShapeProperties Class.
@@ -6129,10 +6038,6 @@ pub struct DLblExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6340,10 +6245,6 @@ pub struct LineSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6387,10 +6288,6 @@ pub struct ScatterSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6435,10 +6332,6 @@ pub struct RadarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6482,10 +6375,6 @@ pub struct BarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6530,10 +6419,6 @@ pub struct AreaSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6577,10 +6462,6 @@ pub struct PieSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6624,10 +6505,6 @@ pub struct BubbleSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6671,10 +6548,6 @@ pub struct SurfaceSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6925,13 +6798,14 @@ pub struct DisplayBlanksAs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
+  #[sdk(mce_child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub c_ext: Vec<DataDisplayOptions16>,
 }
 /// Defines the EditingLanguage Class.
@@ -7251,10 +7125,6 @@ pub struct ChartSpaceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",

@@ -508,15 +508,15 @@ pub struct AxisDataSourceType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSer/c15:ser")]
 pub struct BarChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -583,15 +583,15 @@ pub struct BarChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSer/c15:ser")]
 pub struct LineChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -659,15 +659,15 @@ pub struct LineChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSer/c15:ser")]
 pub struct ScatterChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -725,15 +725,15 @@ pub struct ScatterChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSer/c15:ser")]
 pub struct AreaChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -791,15 +791,15 @@ pub struct AreaChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSer/c15:ser")]
 pub struct PieChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -854,15 +854,15 @@ pub struct PieChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSer/c15:ser")]
 pub struct BubbleChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -931,15 +931,15 @@ pub struct BubbleChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSer/c15:ser")]
 pub struct RadarChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
@@ -996,15 +996,15 @@ pub struct RadarChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSer/c15:ser")]
 pub struct SurfaceChartSeries {
-  /// Index.
+  /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
-  /// Order.
+  /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
   pub order:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
-  /// Series Text.
+  /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
   pub series_text: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,

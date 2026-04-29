@@ -36,6 +36,7 @@ pub struct TwoCellAnchor {
   /// Ending Anchor Point
   #[sdk(child(qname = "xdr:CT_Marker/xdr:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -70,6 +71,7 @@ pub struct OneCellAnchor {
   /// _
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -104,6 +106,7 @@ pub struct AbsoluteAnchor {
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -1082,6 +1085,7 @@ pub enum AbsoluteAnchorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  #[cfg(not(feature = "mce"))]
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
     std::boxed::Box<

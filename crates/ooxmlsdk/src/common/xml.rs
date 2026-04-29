@@ -64,7 +64,7 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  pub fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
+  pub(crate) fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
     self.current = None;
     if let Some(event) = self.pending.take() {
       return Ok(Self::tag_event_from_owned(event));
@@ -692,6 +692,70 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 
   String::from_utf8(writer.into_inner().into_inner())
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+#[cfg(feature = "mce")]
+pub(crate) fn xml_fragment_find_start_qname_outer_xml(
+  xml: &[u8],
+  qnames: &[&[u8]],
+) -> Result<Option<Vec<u8>>, SdkError> {
+  xml_fragment_find_start_outer_xml_by(xml, |name| qnames.contains(&name))
+}
+
+#[cfg(feature = "mce")]
+pub(crate) fn xml_fragment_find_start_outer_xml_by(
+  xml: &[u8],
+  mut matches: impl FnMut(&[u8]) -> bool,
+) -> Result<Option<Vec<u8>>, SdkError> {
+  let mut reader = Reader::from_reader(xml);
+  reader.config_mut().check_end_names = false;
+
+  loop {
+    match reader.read_event()? {
+      Event::Start(e) => {
+        let name = e.name();
+        let name = name.as_ref();
+        if matches(name) {
+          let mut writer = Writer::new(Cursor::new(Vec::new()));
+          writer.write_event(Event::Start(e))?;
+
+          let mut depth = 1usize;
+          loop {
+            let event = reader.read_event()?;
+            match &event {
+              Event::Start(_) => {
+                depth += 1;
+              }
+              Event::End(_) => {
+                depth -= 1;
+              }
+              Event::Eof => return Err(unexpected_eof("xml_fragment_find_start_qname_outer_xml")),
+              _ => {}
+            }
+
+            writer.write_event(event)?;
+
+            if depth == 0 {
+              break;
+            }
+          }
+
+          return Ok(Some(writer.into_inner().into_inner()));
+        }
+      }
+      Event::Empty(e) => {
+        let name = e.name();
+        let name = name.as_ref();
+        if matches(name) {
+          let mut writer = Writer::new(Cursor::new(Vec::new()));
+          writer.write_event(Event::Empty(e))?;
+          return Ok(Some(writer.into_inner().into_inner()));
+        }
+      }
+      Event::Eof => return Ok(None),
+      _ => {}
+    }
+  }
 }
 
 #[inline(always)]

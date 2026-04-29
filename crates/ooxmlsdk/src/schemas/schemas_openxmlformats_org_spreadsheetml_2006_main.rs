@@ -2789,12 +2789,13 @@ pub struct Worksheet {
   /// _
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<std::boxed::Box<SheetViews>>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
+  #[sdk(mce_child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<SheetFormatProperties>,
   /// _
   #[sdk(child(qname = "x:CT_Cols/x:cols"))]
@@ -2820,8 +2821,13 @@ pub struct Worksheet {
   /// _
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub x_sort_state: Option<std::boxed::Box<SortState>>,
+  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content2:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
+  #[sdk(mce_child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
   pub x_data_consolidate: Option<std::boxed::Box<DataConsolidate>>,
   /// _
   #[sdk(child(qname = "x:CT_CustomSheetViews/x:customSheetViews"))]
@@ -2940,13 +2946,14 @@ pub struct Chartsheet {
   /// Legacy Drawing Reference in  Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
+  #[sdk(mce_child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// _
   #[sdk(child(qname = "x:CT_SheetBackgroundPicture/x:picture"))]
@@ -2975,12 +2982,13 @@ pub struct DialogSheet {
   /// Dialog Sheet Views
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<std::boxed::Box<SheetViews>>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Dialog Sheet Format Properties
-  #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
+  #[sdk(mce_child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<SheetFormatProperties>,
   /// Sheet Protection
   #[sdk(child(qname = "x:CT_SheetProtection/x:sheetProtection"))]
@@ -3009,16 +3017,26 @@ pub struct DialogSheet {
   /// Legacy Drawing Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
+  #[cfg(not(feature = "mce"))]
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content2:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
+  #[sdk(mce_child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// _
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub ole_objects: Option<OleObjects>,
+  #[cfg(not(feature = "mce"))]
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content3:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_Controls/x:controls"))]
+  #[sdk(mce_child(qname = "x:CT_Controls/x:controls"))]
   pub controls: Option<Controls>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -3086,12 +3104,13 @@ pub struct Stylesheet {
   /// _
   #[sdk(child(qname = "x:CT_NumFmts/x:numFmts"))]
   pub numbering_formats: Option<NumberingFormats>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "x:CT_Fonts/x:fonts"))]
+  #[sdk(mce_child(qname = "x:CT_Fonts/x:fonts"))]
   pub fonts: Option<Fonts>,
   /// _
   #[sdk(child(qname = "x:CT_Fills/x:fills"))]
@@ -3375,13 +3394,14 @@ pub struct Workbook {
   /// _
   #[sdk(child(qname = "x:CT_WorkbookPr/x:workbookPr"))]
   pub workbook_properties: Option<WorkbookProperties>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
+  #[sdk(mce_child(qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
   pub absolute_path:
     Option<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_ac::AbsolutePath>,
   /// _
@@ -3461,6 +3481,7 @@ pub struct FilterColumn {
   /// Represents the following attribute in the schema: :showButton
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -3519,6 +3540,7 @@ pub struct SortState {
   /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -3639,12 +3661,13 @@ pub struct Authors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CommentList/x:commentList")]
 pub struct CommentList {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "x:CT_Comment/x:comment"))]
+  #[sdk(mce_child(qname = "x:CT_Comment/x:comment"))]
   pub x_comment: Vec<Comment>,
 }
 /// Comment.
@@ -3692,13 +3715,14 @@ pub struct Comment {
   /// Comment Text
   #[sdk(child(qname = "x:CT_Rst/x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_CommentPr/x:commentPr"))]
+  #[sdk(mce_child(qname = "x:CT_CommentPr/x:commentPr"))]
   pub comment_properties: Option<std::boxed::Box<CommentProperties>>,
 }
 /// Author.
@@ -11618,13 +11642,14 @@ pub struct Control {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_ControlPr/x:controlPr"))]
+  #[sdk(mce_child(qname = "x:CT_ControlPr/x:controlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Ignored Error.
@@ -11828,6 +11853,7 @@ pub struct DataValidation {
   /// Represents the following attribute in the schema: xr:uid
   #[sdk(attr(qname = "xr:uid"))]
   pub xr_uid: Option<crate::simple_type::StringValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -12238,13 +12264,14 @@ pub struct OleObject {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_ObjectPr/x:objectPr"))]
+  #[sdk(mce_child(qname = "x:CT_ObjectPr/x:objectPr"))]
   pub embedded_object_properties: Option<std::boxed::Box<EmbeddedObjectProperties>>,
 }
 /// Metadata Types Collection.
@@ -13280,17 +13307,23 @@ pub struct Border {
   /// Represents the following attribute in the schema: :outline
   #[sdk(attr(qname = ":outline"))]
   pub outline: Option<crate::simple_type::BooleanValue>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_BorderPr/x:start"))]
+  #[sdk(mce_child(qname = "x:CT_BorderPr/x:start"))]
   pub start_border: Option<std::boxed::Box<StartBorder>>,
+  #[cfg(not(feature = "mce"))]
+  /// _
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content2:
+    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(child(qname = "x:CT_BorderPr/x:end"))]
+  #[sdk(mce_child(qname = "x:CT_BorderPr/x:end"))]
   pub end_border: Option<std::boxed::Box<EndBorder>>,
   /// Left Border
   #[sdk(child(qname = "x:CT_BorderPr/x:left"))]
@@ -13889,6 +13922,7 @@ pub struct ExternalBook {
     /// Represents the following attribute in the schema: r:id
     #[sdk(attr(qname = "r:id"))]
     pub id: crate::simple_type::StringValue,
+    #[cfg(not(feature = "mce"))]
     /// _
     #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
     pub mc_alternate_content: Option<
@@ -13896,7 +13930,7 @@ pub struct ExternalBook {
     >,
     #[cfg(feature = "microsoft365")]
     /// Alternate URLs and identifiers of the external book
-    #[sdk(child(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"))]
+    #[sdk(mce_child(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"))]
     pub external_book_alternate_urls: Option<
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2021_extlinks2021::ExternalBookAlternateUrls,
@@ -14966,10 +15000,6 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(feature = "microsoft365", sdk(choice(qname = "x:ST_Guid/x14:id")))]
   pub xml_children: Option<ConditionalFormattingRuleExtensionChoice>,
@@ -14990,10 +15020,6 @@ pub struct PivotHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15017,10 +15043,6 @@ pub struct PivotFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15044,10 +15066,6 @@ pub struct CacheSourceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15951,8 +15969,13 @@ pub struct IconSet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRuleExtensionList/x:extLst")]
 pub struct ConditionalFormattingRuleExtensionList {
+  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "x:CT_CfRuleExtension/x:ext"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
+  #[sdk(mce_child(qname = "x:CT_CfRuleExtension/x:ext"))]
   pub x_ext: Vec<ConditionalFormattingRuleExtension>,
 }
 /// Data Consolidation References.
@@ -16379,12 +16402,13 @@ pub struct Columns {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetData/x:sheetData")]
 pub struct SheetData {
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
     Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// _
-  #[sdk(child(qname = "x:CT_Row/x:row"))]
+  #[sdk(mce_child(qname = "x:CT_Row/x:row"))]
   pub x_row: Vec<Row>,
 }
 /// Data Consolidation.
@@ -16920,6 +16944,7 @@ pub struct Filters {
   /// Represents the following attribute in the schema: :calendarType
   #[sdk(attr(qname = ":calendarType"))]
   pub calendar_type: Option<CalendarValues>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -17098,10 +17123,6 @@ pub struct SlicerCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17129,10 +17150,6 @@ pub struct PivotFilterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17159,10 +17176,6 @@ pub struct QueryTableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17553,10 +17566,6 @@ pub struct ConnectionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17761,10 +17770,6 @@ pub struct CacheFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17841,10 +17846,6 @@ pub struct CacheHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17883,10 +17884,6 @@ pub struct CalculatedMemberExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -17925,10 +17922,6 @@ pub struct DataFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18240,10 +18233,6 @@ pub struct WorksheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18497,10 +18486,6 @@ pub struct StylesheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18910,10 +18895,6 @@ pub struct PivotTableDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -19139,8 +19120,13 @@ pub struct Maps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCacheDefinitionExtensionList/x:extLst")]
 pub struct PivotCacheDefinitionExtensionList {
+  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "x:CT_PivotCacheDefinitionExtension/x:ext"))]
+  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
+  pub mc_alternate_content:
+    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  /// _
+  #[sdk(mce_child(qname = "x:CT_PivotCacheDefinitionExtension/x:ext"))]
   pub x_ext: Vec<PivotCacheDefinitionExtension>,
 }
 /// Defines the PivotCacheDefinitionExtension Class.
@@ -19160,10 +19146,6 @@ pub struct PivotCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -19309,10 +19291,6 @@ pub struct TableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -20041,10 +20019,6 @@ pub struct WorkbookExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(any))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -20331,6 +20305,7 @@ pub enum FillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleItemsChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(

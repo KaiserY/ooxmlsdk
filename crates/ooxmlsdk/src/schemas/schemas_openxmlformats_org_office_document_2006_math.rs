@@ -181,7 +181,7 @@ pub struct Run {
   /// Run Properties
   #[sdk(child(qname = "m:CT_RPR/m:rPr"))]
   pub math_run_properties: Option<std::boxed::Box<RunProperties>>,
-  /// Run Properties.
+  /// Run Properties
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   pub run_properties: Option<
     std::boxed::Box<
@@ -3311,7 +3311,8 @@ pub enum RunChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
-  /// Defines the AlternateContent Class.
+  #[cfg(not(feature = "mce"))]
+    /// Defines the AlternateContent Class.
     #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
     McAlternateContent(
         std::boxed::Box<
@@ -3843,6 +3844,7 @@ pub enum OfficeMathChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -4293,6 +4295,7 @@ pub enum BaseChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -4681,6 +4684,7 @@ pub enum NumeratorChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -5069,6 +5073,7 @@ pub enum DenominatorChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -5457,6 +5462,7 @@ pub enum FunctionNameChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -5845,6 +5851,7 @@ pub enum LimitChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -6233,6 +6240,7 @@ pub enum SubArgumentChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -6621,6 +6629,7 @@ pub enum SuperArgumentChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
@@ -7009,6 +7018,7 @@ pub enum DegreeChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice {
+  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(

@@ -132,6 +132,7 @@ struct SdkAttrField {
 struct SdkChildField {
   ident: Ident,
   qname: String,
+  mce_child_qname: Option<String>,
   ty: Type,
   optional: bool,
   repeated: bool,
@@ -181,10 +182,19 @@ struct SdkTextField {
 
 #[derive(Clone)]
 enum SdkTypeFieldKind {
-  Attr { name: String },
-  Child { qname: String },
-  EmptyChild { qname: String },
-  TextChild { qname: String },
+  Attr {
+    name: String,
+  },
+  Child {
+    qname: String,
+    mce_child_qname: Option<String>,
+  },
+  EmptyChild {
+    qname: String,
+  },
+  TextChild {
+    qname: String,
+  },
   Choice,
   Any,
   Text,
@@ -895,10 +905,15 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::List(meta) if meta.path.is_ident("child") => {
           let mut qname = None;
+          let mut mce_child_qname = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("mce_child_qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              mce_child_qname = Some(value.value());
               Ok(())
             } else {
               Err(nested.error("unsupported sdk child attribute"))
@@ -906,6 +921,30 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::Child {
             qname: qname.unwrap_or_default(),
+            mce_child_qname,
+          });
+        }
+        Meta::List(meta) if meta.path.is_ident("mce_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk mce_child attribute"))
+            }
+          })?;
+          let qname = qname.unwrap_or_default();
+          kind = Some(SdkTypeFieldKind::Child {
+            qname: qname.clone(),
+            mce_child_qname: Some(qname),
+          });
+        }
+        Meta::Path(path) if path.is_ident("child") => {
+          kind = Some(SdkTypeFieldKind::Child {
+            qname: String::new(),
+            mce_child_qname: None,
           });
         }
         Meta::List(meta) if meta.path.is_ident("empty_child") => {
@@ -1865,11 +1904,15 @@ mod tests {
   fn extract_derive_item(source: &str, kind: &str, target: &str) -> Option<String> {
     let syntax_markers = [
       format!("pub struct {target} {{"),
+      format!("pub struct {target}<"),
       format!("pub struct {target}("),
       format!("struct {target} {{"),
+      format!("struct {target}<"),
       format!("struct {target}("),
       format!("pub enum {target} {{"),
+      format!("pub enum {target}<"),
       format!("enum {target} {{"),
+      format!("enum {target}<"),
     ];
     let target_pos = syntax_markers
       .iter()
@@ -1893,22 +1936,22 @@ mod tests {
         let trimmed = line.trim_start();
         if let Some(rest) = trimmed.strip_prefix("pub struct ") {
           item_name = rest
-            .split(['{', '('])
+            .split(['{', '(', '<'])
             .next()
             .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
         } else if let Some(rest) = trimmed.strip_prefix("struct ") {
           item_name = rest
-            .split(['{', '('])
+            .split(['{', '(', '<'])
             .next()
             .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
         } else if let Some(rest) = trimmed.strip_prefix("pub enum ") {
           item_name = rest
-            .split('{')
+            .split(['{', '<'])
             .next()
             .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
         } else if let Some(rest) = trimmed.strip_prefix("enum ") {
           item_name = rest
-            .split('{')
+            .split(['{', '<'])
             .next()
             .map(|s| s.split_whitespace().next().unwrap_or_default().to_string());
         }

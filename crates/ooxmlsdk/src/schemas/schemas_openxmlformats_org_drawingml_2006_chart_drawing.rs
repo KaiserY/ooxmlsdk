@@ -19,6 +19,7 @@ pub struct RelativeAnchorSize {
   /// Ending Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:to"))]
   pub to_anchor: std::boxed::Box<ToAnchor>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -50,6 +51,7 @@ pub struct AbsoluteAnchorSize {
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/cdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
+  #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   pub mc_alternate_content:
@@ -877,6 +879,7 @@ pub enum AbsoluteAnchorSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  #[cfg(not(feature = "mce"))]
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
   McAlternateContent(
     std::boxed::Box<

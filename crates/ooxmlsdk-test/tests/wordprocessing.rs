@@ -1,13 +1,26 @@
 use ooxmlsdk::common::XmlHeaderType;
-use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContentChoice;
+#[cfg(not(feature = "mce"))]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::{
+  AlternateContent, AlternateContentChoice,
+};
 #[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::LevelJustification;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChoice, Justification,
-  Paragraph, ParagraphChoice, ParagraphChoice2, ParagraphProperties, Run, RunChoice, SdtBlock,
-  SdtPropertiesChoice, TabStop, TableJustification, Text, TextDirection,
+  Paragraph, ParagraphChoice, ParagraphChoice2, ParagraphProperties, Run, RunChoice, TabStop,
+  TableJustification, Text, TextDirection,
+};
+#[cfg(not(feature = "mce"))]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
+  SdtBlock, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
+
+#[cfg(not(feature = "mce"))]
+type BodyAlternateContent = AlternateContent;
+
+#[cfg(not(feature = "mce"))]
+type BodyAlternateContentChoice = AlternateContentChoice;
 
 fn first_body(document: &Document) -> &Body {
   document.body.as_ref().expect("expected document body")
@@ -48,6 +61,7 @@ fn first_hyperlink_run(hyperlink: &Hyperlink) -> &Run {
     .expect("expected hyperlink run")
 }
 
+#[cfg(not(feature = "mce"))]
 fn first_sdt_block(body: &Body) -> &SdtBlock {
   body
     .body_choice
@@ -86,6 +100,7 @@ fn append_run_text(run: &Run, out: &mut String) {
   }
 }
 
+#[cfg(not(feature = "mce"))]
 fn paragraph_text(paragraph: &Paragraph) -> String {
   let mut text = String::new();
 
@@ -202,6 +217,7 @@ fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
   }
 }
 
+#[cfg(not(feature = "mce"))]
 fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
   match choice {
     BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
@@ -209,21 +225,20 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
   }
 }
 
-fn body_choice_alternate_content(
-  choice: &BodyChoice,
-) -> Option<
-  &ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-> {
+#[cfg(not(feature = "mce"))]
+fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&BodyAlternateContent> {
   match choice {
     BodyChoice::McAlternateContent(alternate_content) => Some(alternate_content.as_ref()),
     _ => None,
   }
 }
 
+#[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
   matches!(choice, BodyChoice::WBookmarkStart(_))
 }
 
+#[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
   matches!(choice, BodyChoice::WBookmarkEnd(_))
 }
@@ -603,6 +618,7 @@ fn document_round_trip_preserves_hello_world_text_from_openxml_asset() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_HELLO_O14_XML);
@@ -634,6 +650,7 @@ fn document_round_trip_preserves_hello_o14_structure_from_openxml_asset() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
   //   LoadAttributeTest
@@ -669,7 +686,7 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -683,7 +700,7 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      BodyAlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
       _ => None,
     })
     .expect("expected mc:Fallback");
@@ -736,6 +753,7 @@ fn paragraph_properties_preserve_known_extension_attribute_from_markup_compatibi
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn alternate_content_preserves_ignored_unknown_process_content_and_must_understand_metadata() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   Ignored_UnknownElement_FullMode
@@ -765,7 +783,7 @@ fn alternate_content_preserves_ignored_unknown_process_content_and_must_understa
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -795,6 +813,7 @@ fn alternate_content_preserves_ignored_unknown_process_content_and_must_understa
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   ProcessContent_xmlSpace_FullMode
@@ -817,7 +836,7 @@ fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -836,6 +855,7 @@ fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn alternate_content_preserves_ignored_known_process_content_metadata() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   Ignored_KnownElement_FullMode
@@ -856,7 +876,7 @@ fn alternate_content_preserves_ignored_known_process_content_metadata() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
+      BodyAlternateContentChoice::McChoice(choice) => Some(choice.as_ref()),
       _ => None,
     })
     .expect("expected mc:Choice");
@@ -873,6 +893,7 @@ fn alternate_content_preserves_ignored_known_process_content_metadata() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn body_alternate_content_without_selected_content_round_trips() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   NoChoice_NoFallback_FullMode
@@ -910,14 +931,16 @@ fn body_alternate_content_without_selected_content_round_trips() {
   );
   let choice_only = alternate_content.next().unwrap();
   assert_eq!(choice_only.alternate_content_choice.len(), 1);
-  let AlternateContentChoice::McChoice(choice) = &choice_only.alternate_content_choice[0] else {
+  let BodyAlternateContentChoice::McChoice(choice) = &choice_only.alternate_content_choice[0]
+  else {
     panic!("expected mc:Choice");
   };
   assert_eq!(choice.requires.as_deref(), Some("w13"));
   assert!(choice.xml_children.is_empty());
   let multi_choice = alternate_content.next().unwrap();
   assert_eq!(multi_choice.alternate_content_choice.len(), 2);
-  let AlternateContentChoice::McChoice(second_choice) = &multi_choice.alternate_content_choice[1]
+  let BodyAlternateContentChoice::McChoice(second_choice) =
+    &multi_choice.alternate_content_choice[1]
   else {
     panic!("expected second mc:Choice");
   };
@@ -938,6 +961,7 @@ fn body_alternate_content_without_selected_content_round_trips() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn body_alternate_content_fallback_preserves_multiple_known_children() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   MultipleChoice_NoMatches_OneFallback_FullMode
@@ -962,7 +986,7 @@ fn body_alternate_content_fallback_preserves_multiple_known_children() {
     .alternate_content_choice
     .iter()
     .find_map(|choice| match choice {
-      AlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
+      BodyAlternateContentChoice::McFallback(fallback) => Some(fallback.as_ref()),
       _ => None,
     })
     .expect("expected mc:Fallback");
@@ -1032,6 +1056,7 @@ fn comments_round_trip_from_openxml_part_test() {
 }
 
 #[test]
+#[cfg(not(feature = "mce"))]
 fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Document>(fixtures::WORDPROCESSING_DOCUMENT_DOCUMENT_XML);

@@ -25,6 +25,10 @@ pub struct SchemaTypeExtension {
   pub name: String,
   pub has_xmlns_fields: Option<bool>,
   pub has_mc_ignorable_field: Option<bool>,
+  pub has_mc_must_understand_field: Option<bool>,
+  pub has_mc_process_content_field: Option<bool>,
+  pub has_mc_preserve_attributes_field: Option<bool>,
+  pub has_mc_preserve_elements_field: Option<bool>,
   pub text_value_type: Option<String>,
   #[serde(default)]
   pub mc_alternate_content_insert_before: Vec<String>,
@@ -144,6 +148,22 @@ pub fn apply_schema_extensions(
 
       if let Some(has_mc_ignorable_field) = extension.has_mc_ignorable_field {
         schema_type.has_mc_ignorable_field = has_mc_ignorable_field;
+      }
+
+      if let Some(has_mc_must_understand_field) = extension.has_mc_must_understand_field {
+        schema_type.has_mc_must_understand_field = has_mc_must_understand_field;
+      }
+
+      if let Some(has_mc_process_content_field) = extension.has_mc_process_content_field {
+        schema_type.has_mc_process_content_field = has_mc_process_content_field;
+      }
+
+      if let Some(has_mc_preserve_attributes_field) = extension.has_mc_preserve_attributes_field {
+        schema_type.has_mc_preserve_attributes_field = has_mc_preserve_attributes_field;
+      }
+
+      if let Some(has_mc_preserve_elements_field) = extension.has_mc_preserve_elements_field {
+        schema_type.has_mc_preserve_elements_field = has_mc_preserve_elements_field;
       }
 
       if let Some(text_value_type) = &extension.text_value_type {

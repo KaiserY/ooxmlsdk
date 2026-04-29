@@ -603,7 +603,11 @@ fn build_type_decl(
           SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
-        has_mce: schema_type.has_mc_ignorable_field,
+        has_mc_ignorable: schema_type.has_mc_ignorable_field,
+        has_mc_must_understand: schema_type.has_mc_must_understand_field,
+        has_mc_process_content: schema_type.has_mc_process_content_field,
+        has_mc_preserve_attributes: schema_type.has_mc_preserve_attributes_field,
+        has_mc_preserve_elements: schema_type.has_mc_preserve_elements_field,
       },
       content_structure: None,
       members,
@@ -721,7 +725,7 @@ fn build_recursive_one_sequence_choice_members(
         }
       }
       SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
-        let resolved_child = if child.kind == SchemaTypeChildKind::Any {
+        let mut resolved_child = if child.kind == SchemaTypeChildKind::Any {
           ResolvedOneSequenceChild {
             name: "",
             field_name: if child.property_name.is_empty() {
@@ -740,6 +744,15 @@ fn build_recursive_one_sequence_choice_members(
         } else {
           context.resolve_one_sequence_child(schema_type, child.name.as_str())?
         };
+
+        if !child.property_name.is_empty() {
+          resolved_child.field_name =
+            std::borrow::Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()));
+        }
+        if !child.property_comments.is_empty() {
+          resolved_child.property_comments =
+            std::borrow::Cow::Borrowed(child.property_comments.as_str());
+        }
 
         if !field_name_set.insert(resolved_child.field_name.to_string()) {
           continue;
@@ -1951,8 +1964,9 @@ fn build_flatten_one_sequence_members(
   for flat_particle in flat_particles {
     match flat_particle.kind {
       FlatParticleKind::Leaf(child_particle) => {
-        let child =
+        let mut child =
           context.resolve_one_sequence_child(schema_type, child_particle.name.as_str())?;
+        apply_sequence_child_overrides(&mut child, child_particle);
         if !field_name_set.insert(child.field_name.to_string()) {
           continue;
         }
@@ -2146,7 +2160,8 @@ fn build_structured_one_sequence_members(
   for particle in structured_particles {
     match particle.kind {
       StructuredParticleKind::Leaf(leaf) => {
-        let child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
+        let mut child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
+        apply_sequence_child_overrides(&mut child, leaf);
         if !field_name_set.insert(child.field_name.to_string()) {
           continue;
         }
@@ -2345,6 +2360,22 @@ fn build_single_structured_choice_field_decl(
       )?))
     }
     _ => Ok(None),
+  }
+}
+
+fn apply_sequence_child_overrides<'a>(
+  resolved_child: &mut crate::sdk_code::schemas::ResolvedOneSequenceChild<'a>,
+  schema_child: &'a SchemaTypeChild,
+) {
+  if !schema_child.property_name.is_empty() {
+    resolved_child.field_name = std::borrow::Cow::Owned(schema_child_field_rust_name(
+      schema_child.property_name.as_str(),
+    ));
+  }
+
+  if !schema_child.property_comments.is_empty() {
+    resolved_child.property_comments =
+      std::borrow::Cow::Borrowed(schema_child.property_comments.as_str());
   }
 }
 
@@ -3587,6 +3618,10 @@ mod tests {
           version: Some("Office2007".to_string()),
           has_xmlns_fields: true,
           has_mc_ignorable_field: true,
+          has_mc_must_understand_field: false,
+          has_mc_process_content_field: false,
+          has_mc_preserve_attributes_field: false,
+          has_mc_preserve_elements_field: false,
           xml_header: SchemaTypeXmlHeader::Standalone,
           ..Default::default()
         },
@@ -3610,7 +3645,7 @@ mod tests {
     assert_eq!(ir.types[0].xml_qname.as_deref(), Some("t:CT_P/t:p"));
     assert_eq!(ir.types[0].support.xmlns_mode, XmlnsMode::MapOnly);
     assert_eq!(ir.types[0].support.xml_header, XmlHeaderMode::Standalone);
-    assert!(ir.types[0].support.has_mce);
+    assert!(ir.types[0].support.has_mc_ignorable);
 
     assert_eq!(ir.types[1].rust_name, "TextValue");
     assert_eq!(ir.types[1].kind, TypeKind::LeafTextAlias);

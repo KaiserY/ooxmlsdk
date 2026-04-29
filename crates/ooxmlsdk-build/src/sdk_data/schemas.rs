@@ -194,6 +194,10 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             has_mc_ignorable_field: ty.has_mc_ignorable_field
               || !ty.part.is_empty()
               || ty.base_class == "OpenXmlPartRootElement",
+            has_mc_must_understand_field: false,
+            has_mc_process_content_field: false,
+            has_mc_preserve_attributes_field: false,
+            has_mc_preserve_elements_field: false,
             text_value_type: String::new(),
             api_kind: resolve_api_kind(ty, &type_map),
             attributes: ty
@@ -1083,8 +1087,9 @@ fn should_insert_mce_alternate_content_before_child(
   type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
 ) -> bool {
   let child = &children[index];
-  is_mixed_version_choice(child, "")
+  is_mixed_version_direct_element_choice(child)
     || child_has_later_initial_version(child)
+    || child_type_has_mixed_version_content(child, type_map)
     || (child_type_has_later_version_attributes(child, type_map)
       && !next_child_has_later_initial_version(children, index))
 }
@@ -1121,6 +1126,49 @@ fn child_type_has_later_version_attributes(
       .any(|attribute| !is_office2007_or_default(Some(attribute.version.as_str())))
 }
 
+fn child_type_has_mixed_version_content(
+  child: &SchemaTypeChild,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> bool {
+  if !matches!(
+    child.kind,
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+  ) {
+    return false;
+  }
+
+  let Some(schema_type) = type_map.get(child.name.as_str()) else {
+    return false;
+  };
+
+  is_office2007_or_default(schema_type.version.as_deref())
+    && particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, "")
+}
+
+fn particle_has_mixed_version_non_element_choice(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  inherited_initial_version: &str,
+) -> bool {
+  if particle.kind == "Choice" {
+    let mut versions = ChoiceVersionCoverage::default();
+    collect_particle_choice_version_coverage(particle, inherited_initial_version, &mut versions);
+    if versions.has_default
+      && versions.has_later
+      && !particle_choice_leafs_are_all_element_children(particle, type_map)
+    {
+      return true;
+    }
+  }
+
+  let initial_version =
+    effective_version(inherited_initial_version, particle.initial_version.as_str());
+  particle
+    .items
+    .iter()
+    .any(|item| particle_has_mixed_version_non_element_choice(item, type_map, initial_version))
+}
+
 fn insert_mce_alternate_content_choice_variant(choice: &mut SchemaTypeChild) {
   if choice.children.iter().any(is_mce_alternate_content_child) {
     return;
@@ -1149,14 +1197,66 @@ fn is_mce_alternate_content_child(child: &SchemaTypeChild) -> bool {
   child.name == MCE_ALTERNATE_CONTENT_NAME
 }
 
-fn is_mixed_version_choice(child: &SchemaTypeChild, inherited_initial_version: &str) -> bool {
-  if child.kind != SchemaTypeChildKind::Choice {
+fn is_mixed_version_direct_element_choice(child: &SchemaTypeChild) -> bool {
+  if child.kind != SchemaTypeChildKind::Choice || !choice_leafs_are_all_element_children(child) {
     return false;
   }
 
   let mut versions = ChoiceVersionCoverage::default();
-  collect_choice_version_coverage(child, inherited_initial_version, &mut versions);
+  collect_choice_version_coverage(child, "", &mut versions);
   versions.has_default && versions.has_later
+}
+
+fn choice_leafs_are_all_element_children(child: &SchemaTypeChild) -> bool {
+  let mut leaf_kinds = ChoiceLeafKinds::default();
+  collect_choice_leaf_kinds(child, &mut leaf_kinds);
+  leaf_kinds.has_child && !leaf_kinds.has_non_child
+}
+
+fn particle_choice_leafs_are_all_element_children(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> bool {
+  let mut leaf_kinds = ChoiceLeafKinds::default();
+  collect_particle_choice_leaf_kinds(particle, type_map, &mut leaf_kinds);
+  leaf_kinds.has_child && !leaf_kinds.has_non_child
+}
+
+#[derive(Default)]
+struct ChoiceLeafKinds {
+  has_child: bool,
+  has_non_child: bool,
+}
+
+fn collect_choice_leaf_kinds(child: &SchemaTypeChild, out: &mut ChoiceLeafKinds) {
+  match child.kind {
+    SchemaTypeChildKind::Child => out.has_child = true,
+    SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => out.has_non_child = true,
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      for nested in &child.children {
+        collect_choice_leaf_kinds(nested, out);
+      }
+    }
+  }
+}
+
+fn collect_particle_choice_leaf_kinds(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  out: &mut ChoiceLeafKinds,
+) {
+  if particle.items.is_empty() {
+    match resolve_child_kind(particle.name.as_str(), type_map) {
+      SchemaTypeChildKind::Child => out.has_child = true,
+      SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => out.has_non_child = true,
+      SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {}
+    }
+    return;
+  }
+
+  for item in &particle.items {
+    collect_particle_choice_leaf_kinds(item, type_map, out);
+  }
 }
 
 #[derive(Default)]
@@ -1186,6 +1286,28 @@ fn collect_choice_version_coverage(
         collect_choice_version_coverage(nested, initial_version, out);
       }
     }
+  }
+}
+
+fn collect_particle_choice_version_coverage(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+  inherited_initial_version: &str,
+  out: &mut ChoiceVersionCoverage,
+) {
+  let initial_version =
+    effective_version(inherited_initial_version, particle.initial_version.as_str());
+
+  if particle.items.is_empty() {
+    if is_office2007_or_default(Some(initial_version)) {
+      out.has_default = true;
+    } else {
+      out.has_later = true;
+    }
+    return;
+  }
+
+  for item in &particle.items {
+    collect_particle_choice_version_coverage(item, initial_version, out);
   }
 }
 

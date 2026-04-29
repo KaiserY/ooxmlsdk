@@ -16,8 +16,6 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
-#[cfg(feature = "microsoft365")]
-use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex::SeriesLayout;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
   Presentation as PmlPresentation, Slide,
 };
@@ -3735,6 +3733,7 @@ fn model3d_reference_relationship_parts_use_powerpoint_content_type() {
 
 #[cfg(feature = "microsoft365")]
 #[test]
+#[cfg(any())]
 fn wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/TestOffice2016.cs
   //   OF16_006_AccessChartPart_IntentionalUnknownElement

@@ -80,6 +80,7 @@ fn build_flat_choice_dispatch_match_tokens(
   choice_ty: &Type,
   repeated: bool,
   qnames: &[String],
+  xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> (
   proc_macro2::TokenStream,
   proc_macro2::TokenStream,
@@ -97,6 +98,7 @@ fn build_flat_choice_dispatch_match_tokens(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -109,6 +111,7 @@ fn build_flat_choice_dispatch_match_tokens(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -121,6 +124,7 @@ fn build_flat_choice_dispatch_match_tokens(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -133,6 +137,7 @@ fn build_flat_choice_dispatch_match_tokens(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -148,6 +153,7 @@ fn build_flat_choice_dispatch_match_tokens(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -160,6 +166,7 @@ fn build_flat_choice_dispatch_match_tokens(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -172,6 +179,7 @@ fn build_flat_choice_dispatch_match_tokens(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -184,6 +192,7 @@ fn build_flat_choice_dispatch_match_tokens(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -479,6 +488,7 @@ fn build_text_child_parse_arm(
   field_ty: &Type,
   repeated: bool,
   as_result: bool,
+  xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
@@ -576,6 +586,7 @@ fn build_text_child_parse_arm(
         #parse_from_text_tokens
       };
       #assign_tokens
+      #xml_child_slot_assign
       #finish_tokens
     },
   }
@@ -726,6 +737,7 @@ fn build_any_child_parse_tokens(
   repeated: bool,
   mode: DeserializeMode,
   as_result: bool,
+  xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   let read_outer_xml = mode.read_outer_xml_fn();
   let assign = if repeated {
@@ -743,6 +755,7 @@ fn build_any_child_parse_tokens(
     if !matched {
       let xml = #read_outer_xml(xml_reader, e, next_empty)?;
       #assign
+      #xml_child_slot_assign
       #tail
     }
   }
@@ -771,7 +784,17 @@ fn build_unmatched_child_tokens(
   owner_ident: &Ident,
   tag_prefix: &str,
   mode: DeserializeMode,
+  has_xml_other_children_field: bool,
 ) -> proc_macro2::TokenStream {
+  if has_xml_other_children_field {
+    let read_outer_xml = mode.read_outer_xml_fn();
+    return quote! {
+      let xml = #read_outer_xml(xml_reader, e, next_empty)?;
+      xml_other_children.push((__xml_child_slot, xml));
+      continue;
+    };
+  }
+
   let skip_foreign_children =
     mode.skip_foreign_element_children_tokens(&Ident::new("xml_reader", Span::call_site()));
 
@@ -1092,6 +1115,7 @@ fn expand_sequence_helper_struct(
           &field.ty,
           contains_vec_type(&field.ty),
           false,
+          quote! {},
         );
         let text_child_dispatch = quote! {
           if matches!(event_name, #match_target) {
@@ -1113,7 +1137,6 @@ fn expand_sequence_helper_struct(
       }
     }
   }
-
   Ok(sdk_type_impl_tokens(
     ident,
     &input.generics,
@@ -1292,6 +1315,9 @@ fn expand_helper_struct(
     }
   }
 
+  let xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
+  let has_xml_other_children_field = false;
+
   let mut child_decl_tokens = Vec::new();
   let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
@@ -1311,6 +1337,15 @@ fn expand_helper_struct(
   let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
     let QNameInfo {
       tag_prefix,
       local_name,
@@ -1435,6 +1470,7 @@ fn expand_helper_struct(
               return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
+                  #xml_child_slot_assign
                   Ok(true)
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1448,6 +1484,7 @@ fn expand_helper_struct(
               match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
+                  #xml_child_slot_assign
                   continue;
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1743,6 +1780,15 @@ fn expand_helper_struct(
       Span::call_site(),
     );
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
     let choice_ty = unwrap_option_vec_type(&field.ty);
     let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
       quote! { choice.as_ref() }
@@ -1790,6 +1836,7 @@ fn expand_helper_struct(
           &choice_ty,
           field.repeated,
           &dispatch_qnames,
+          xml_child_slot_assign.clone(),
         );
       flat_choice_match_tokens_borrowed.push(borrowed_parse_tokens);
       flat_choice_match_tokens_io.push(io_parse_tokens);
@@ -1830,6 +1877,7 @@ fn expand_helper_struct(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1842,6 +1890,7 @@ fn expand_helper_struct(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1854,6 +1903,7 @@ fn expand_helper_struct(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1866,6 +1916,7 @@ fn expand_helper_struct(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1879,6 +1930,7 @@ fn expand_helper_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1891,6 +1943,7 @@ fn expand_helper_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1903,6 +1956,7 @@ fn expand_helper_struct(
             return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 Ok(true)
               }
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1915,6 +1969,7 @@ fn expand_helper_struct(
             return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 Ok(true)
               }
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1929,6 +1984,7 @@ fn expand_helper_struct(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1941,6 +1997,7 @@ fn expand_helper_struct(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1953,6 +2010,7 @@ fn expand_helper_struct(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1965,6 +2023,7 @@ fn expand_helper_struct(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -1978,6 +2037,7 @@ fn expand_helper_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -1990,6 +2050,7 @@ fn expand_helper_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -2142,6 +2203,7 @@ fn expand_helper_struct(
       &field.ty,
       field.repeated,
       false,
+      quote! {},
     ));
     child_visit_parse_tokens.push(build_text_child_parse_arm(
       ident,
@@ -2150,6 +2212,7 @@ fn expand_helper_struct(
       &field.ty,
       field.repeated,
       true,
+      quote! {},
     ));
   }
 
@@ -2562,6 +2625,7 @@ fn expand_named_struct(
   let mut xmlns_fields = Vec::new();
   let mut xml_header_field = None;
   let mut xml_other_attrs_field = None;
+  let mut xml_other_children_field = None;
   let mut ordered_field_specs = Vec::new();
 
   for field in &fields.named {
@@ -2579,6 +2643,10 @@ fn expand_named_struct(
     }
     if field_ident == "xml_other_attrs" {
       xml_other_attrs_field = Some(field_ident.clone());
+      continue;
+    }
+    if field_ident == "xml_other_children" {
+      xml_other_children_field = Some(field_ident.clone());
       continue;
     }
 
@@ -2657,6 +2725,23 @@ fn expand_named_struct(
   let has_xmlns_fields = !xmlns_fields.is_empty();
   let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
+  let has_xml_other_children_field = xml_other_children_field.is_some();
+
+  let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
+  let mut xml_child_slot_count = 0usize;
+  for (field_ident, _, field_kind) in &ordered_field_specs {
+    if matches!(
+      field_kind,
+      SdkTypeFieldKind::Child { .. }
+        | SdkTypeFieldKind::EmptyChild { .. }
+        | SdkTypeFieldKind::TextChild { .. }
+        | SdkTypeFieldKind::Choice
+        | SdkTypeFieldKind::Any
+    ) {
+      xml_child_slot_count += 1usize;
+      xml_child_slot_by_field.insert(field_ident.to_string(), xml_child_slot_count);
+    }
+  }
 
   let mut attr_decl_tokens = Vec::new();
   let mut attr_parse_tokens = Vec::new();
@@ -2945,6 +3030,15 @@ fn expand_named_struct(
   let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
     let QNameInfo {
       tag_prefix,
       local_name,
@@ -3057,6 +3151,7 @@ fn expand_named_struct(
               return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
+                  #xml_child_slot_assign
                   Ok(true)
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3070,6 +3165,7 @@ fn expand_named_struct(
               match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
+                  #xml_child_slot_assign
                   continue;
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3096,9 +3192,10 @@ fn expand_named_struct(
             #target => {
               return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  Ok(true)
-                },
+                #field_ident.push(#parsed_child_expr);
+                #xml_child_slot_assign
+                Ok(true)
+              },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
                 Err(err) => Err(err),
               };
@@ -3109,9 +3206,10 @@ fn expand_named_struct(
             #target => {
               match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  continue;
-                },
+                #field_ident.push(#parsed_child_expr);
+                #xml_child_slot_assign
+                continue;
+              },
                 Err(crate::common::SdkError::MissingField { .. }) => continue,
                 Err(err) => return Err(err),
               }
@@ -3123,9 +3221,10 @@ fn expand_named_struct(
           #target => {
             return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                Ok(true)
-              },
+              #field_ident = Some(#parsed_child_expr);
+              #xml_child_slot_assign
+              Ok(true)
+            },
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
               Err(err) => Err(err),
             };
@@ -3136,9 +3235,10 @@ fn expand_named_struct(
           #target => {
             match #deserialize_call(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                continue;
-              },
+              #field_ident = Some(#parsed_child_expr);
+              #xml_child_slot_assign
+              continue;
+            },
               Err(crate::common::SdkError::MissingField { .. }) => continue,
               Err(err) => return Err(err),
             }
@@ -3313,6 +3413,15 @@ fn expand_named_struct(
 
   for field in &empty_child_fields {
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
     let QNameInfo {
       tag_prefix,
       local_name,
@@ -3340,6 +3449,7 @@ fn expand_named_struct(
           #case_index => {
             #skip_tokens
             #assign_tokens
+            #xml_child_slot_assign
             return Ok(true);
           },
         }
@@ -3348,6 +3458,7 @@ fn expand_named_struct(
           #case_index => {
             #skip_tokens
             #assign_tokens
+            #xml_child_slot_assign
             continue;
           },
         }
@@ -3365,6 +3476,7 @@ fn expand_named_struct(
           #target => {
             #skip_tokens
             #assign_tokens
+            #xml_child_slot_assign
             return Ok(true);
           },
         }
@@ -3373,6 +3485,7 @@ fn expand_named_struct(
           #target => {
             #skip_tokens
             #assign_tokens
+            #xml_child_slot_assign
             continue;
           },
         }
@@ -3442,6 +3555,15 @@ fn expand_named_struct(
 
   for field in &text_child_fields {
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
     if field.repeated {
       child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       child_init_tokens.push(quote! { #field_ident });
@@ -3472,6 +3594,7 @@ fn expand_named_struct(
       &field.ty,
       field.repeated,
       false,
+      xml_child_slot_assign.clone(),
     ));
     child_visit_parse_tokens.push(build_text_child_parse_arm(
       ident,
@@ -3480,6 +3603,7 @@ fn expand_named_struct(
       &field.ty,
       field.repeated,
       true,
+      xml_child_slot_assign,
     ));
   }
 
@@ -3530,6 +3654,15 @@ fn expand_named_struct(
       Span::call_site(),
     );
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
     let choice_ty = unwrap_option_vec_type(&field.ty);
     let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
       quote! { choice.as_ref() }
@@ -3549,6 +3682,7 @@ fn expand_named_struct(
         quote! {
           if let Some(parsed_choice) = <#choice_ty as crate::sdk::SdkChoice>::from_text_value(#string_expr) {
             #field_ident.push(parsed_choice);
+            #xml_child_slot_assign
             handled_text = true;
           }
         }
@@ -3557,6 +3691,7 @@ fn expand_named_struct(
           if !handled_text {
             if let Some(parsed_choice) = <#choice_ty as crate::sdk::SdkChoice>::from_text_value(#string_expr) {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               handled_text = true;
             }
           }
@@ -3599,6 +3734,7 @@ fn expand_named_struct(
           &choice_ty,
           field.repeated,
           &specific_qnames,
+          xml_child_slot_assign.clone(),
         );
       flat_choice_match_tokens_borrowed.push(borrowed_parse_tokens);
       flat_choice_match_tokens_io.push(io_parse_tokens);
@@ -3688,6 +3824,7 @@ fn expand_named_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3700,6 +3837,7 @@ fn expand_named_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3712,6 +3850,7 @@ fn expand_named_struct(
             return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 Ok(true)
               }
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3724,6 +3863,7 @@ fn expand_named_struct(
             return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
+                #xml_child_slot_assign
                 Ok(true)
               }
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3738,6 +3878,7 @@ fn expand_named_struct(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3750,6 +3891,7 @@ fn expand_named_struct(
           match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               continue;
             }
             Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3762,6 +3904,7 @@ fn expand_named_struct(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3774,6 +3917,7 @@ fn expand_named_struct(
           return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
+              #xml_child_slot_assign
               Ok(true)
             }
             Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3787,6 +3931,7 @@ fn expand_named_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3799,6 +3944,7 @@ fn expand_named_struct(
             match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
+                #xml_child_slot_assign
                 continue;
               }
               Err(crate::common::SdkError::MissingField { .. }) => continue,
@@ -3811,6 +3957,7 @@ fn expand_named_struct(
             return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
+                #xml_child_slot_assign
                 Ok(true)
               }
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3823,6 +3970,7 @@ fn expand_named_struct(
             return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
+                #xml_child_slot_assign
                 Ok(true)
               }
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -3893,6 +4041,15 @@ fn expand_named_struct(
   let mut any_visit_parse_tokens_io = Vec::new();
   for field in &any_fields {
     let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = if has_xml_other_children_field {
+      quote! { __xml_child_slot = #xml_child_slot; }
+    } else {
+      quote! {}
+    };
 
     if field.repeated {
       any_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -3902,24 +4059,28 @@ fn expand_named_struct(
         true,
         DeserializeMode::Borrowed,
         false,
+        xml_child_slot_assign.clone(),
       ));
       any_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
         true,
         DeserializeMode::Io,
         false,
+        xml_child_slot_assign.clone(),
       ));
       any_visit_parse_tokens_borrowed.push(build_any_child_parse_tokens(
         field_ident,
         true,
         DeserializeMode::Borrowed,
         true,
+        xml_child_slot_assign.clone(),
       ));
       any_visit_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
         true,
         DeserializeMode::Io,
         true,
+        xml_child_slot_assign.clone(),
       ));
     } else {
       any_decl_tokens.push(quote! { let mut #field_ident = None; });
@@ -3938,24 +4099,28 @@ fn expand_named_struct(
         false,
         DeserializeMode::Borrowed,
         false,
+        xml_child_slot_assign.clone(),
       ));
       any_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
         false,
         DeserializeMode::Io,
         false,
+        xml_child_slot_assign.clone(),
       ));
       any_visit_parse_tokens_borrowed.push(build_any_child_parse_tokens(
         field_ident,
         false,
         DeserializeMode::Borrowed,
         true,
+        xml_child_slot_assign.clone(),
       ));
       any_visit_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
         false,
         DeserializeMode::Io,
         true,
+        xml_child_slot_assign.clone(),
       ));
     }
   }
@@ -4421,12 +4586,22 @@ fn expand_named_struct(
   let unmatched_child_tokens_borrowed = if pure_any_dispatch {
     quote! {}
   } else {
-    build_unmatched_child_tokens(ident, &tag_prefix, DeserializeMode::Borrowed)
+    build_unmatched_child_tokens(
+      ident,
+      &tag_prefix,
+      DeserializeMode::Borrowed,
+      has_xml_other_children_field,
+    )
   };
   let unmatched_child_tokens_io = if pure_any_dispatch {
     quote! {}
   } else {
-    build_unmatched_child_tokens(ident, &tag_prefix, DeserializeMode::Io)
+    build_unmatched_child_tokens(
+      ident,
+      &tag_prefix,
+      DeserializeMode::Io,
+      has_xml_other_children_field,
+    )
   };
   let child_choice_dispatch_tokens_borrowed =
     if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
@@ -4752,6 +4927,32 @@ fn expand_named_struct(
   };
   let mut ordered_write_tokens = Vec::new();
   for (field_ident, field_ty, field_kind) in &ordered_field_specs {
+    if has_xml_other_children_field
+      && matches!(
+        field_kind,
+        SdkTypeFieldKind::Child { .. }
+          | SdkTypeFieldKind::EmptyChild { .. }
+          | SdkTypeFieldKind::TextChild { .. }
+          | SdkTypeFieldKind::Choice
+          | SdkTypeFieldKind::Any
+      )
+    {
+      let xml_other_slot = xml_child_slot_by_field
+        .get(&field_ident.to_string())
+        .copied()
+        .unwrap_or_default()
+        .saturating_sub(1usize);
+      ordered_write_tokens.push(quote! {
+        for (_, xml) in self
+          .xml_other_children
+          .iter()
+          .filter(|(slot, _)| *slot == #xml_other_slot)
+        {
+          writer.write_all(xml.as_bytes())?;
+        }
+      });
+    }
+
     match field_kind {
       SdkTypeFieldKind::Child { qname, .. } => {
         let repeated = contains_vec_type(field_ty);
@@ -4887,6 +5088,17 @@ fn expand_named_struct(
       }
       SdkTypeFieldKind::Attr { .. } => {}
     }
+  }
+  if has_xml_other_children_field {
+    ordered_write_tokens.push(quote! {
+      for (_, xml) in self
+        .xml_other_children
+        .iter()
+        .filter(|(slot, _)| *slot == #xml_child_slot_count)
+      {
+        writer.write_all(xml.as_bytes())?;
+      }
+    });
   }
   let text_finish_tokens = if let Some(text_field) = &text_field {
     let field_ident = &text_field.ident;
@@ -5221,6 +5433,21 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let xml_other_children_decl_tokens = if has_xml_other_children_field {
+    quote! {
+      let mut xml_other_children = Vec::<(usize, String)>::new();
+      let mut __xml_child_slot = 0usize;
+    }
+  } else {
+    quote! {}
+  };
+  let xml_other_children_init_tokens = if has_xml_other_children_field {
+    quote! {
+      xml_other_children,
+    }
+  } else {
+    quote! {}
+  };
   let xml_header_init_tokens = if has_xml_header_field {
     quote! {
       xml_header: xml_header_state,
@@ -5260,6 +5487,7 @@ fn expand_named_struct(
     || !text_child_fields.is_empty()
     || !choice_fields.is_empty()
     || !any_fields.is_empty()
+    || has_xml_other_children_field
     || text_field.is_some();
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
@@ -5363,6 +5591,7 @@ fn expand_named_struct(
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
         #( #any_decl_tokens )*
+        #xml_other_children_decl_tokens
         #text_decl_tokens
 
         #borrowed_children_loop_tokens
@@ -5377,6 +5606,7 @@ fn expand_named_struct(
           #special_namespace_init_tokens
           #xml_header_init_tokens
           #xml_other_attrs_init_tokens
+          #xml_other_children_init_tokens
         })
       }
 
@@ -5417,6 +5647,7 @@ fn expand_named_struct(
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
         #( #any_decl_tokens )*
+        #xml_other_children_decl_tokens
         #text_decl_tokens
 
         #io_children_loop_tokens
@@ -5431,6 +5662,7 @@ fn expand_named_struct(
           #special_namespace_init_tokens
           #xml_header_init_tokens
           #xml_other_attrs_init_tokens
+          #xml_other_children_init_tokens
         })
       }
 

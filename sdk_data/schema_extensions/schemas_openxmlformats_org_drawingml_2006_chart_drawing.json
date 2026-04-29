@@ -2,39 +2,39 @@
   "Types": [
     {
       "ClassName": "RelativeAnchorSize",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Shape",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "NonVisualDrawingProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "NonVisualShapeDrawingProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "NonVisualShapeProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ShapeProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "TextBody",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "FromAnchor",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ToAnchor",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

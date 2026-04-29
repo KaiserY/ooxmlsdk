@@ -4417,5 +4417,5 @@ pub enum DiagramDefinitionExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }

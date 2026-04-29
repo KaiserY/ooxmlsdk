@@ -2,23 +2,23 @@
   "Types": [
     {
       "ClassName": "DefaultImageDpi",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "DiscardImageEditData",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Media",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "CreationId",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ModificationId",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

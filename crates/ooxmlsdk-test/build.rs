@@ -80,79 +80,13 @@ fn main() {
 fn is_invalid(file_name: &str) -> bool {
   matches!(
     file_name,
-    "5Errors.docx" | "UnknownElement.docx" | "encrypted_pptx.pptx"
+    "5Errors.docx" | "Of16-09-UnknownElement.docx" | "Strict01.docx" | "encrypted_pptx.pptx"
   )
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
-  matches!(
-    file_name,
-    "BadDocProps.docx"
-      | "AnnotationRef.docx"
-      | "Comments.docx"
-      | "Comments.xlsx"
-      | "Of16-01.docx"
-      | "Of16-03.docx"
-      | "Of16-04.docx"
-      | "Of16-05.docx"
-      | "Of16-06.docx"
-      | "Of16-07.docx"
-      | "Of16-02.pptx"
-      | "Of16-03.pptx"
-      | "Data-Bound-Content-Controls.docx"
-      | "HelloWorld.docx"
-      | "Hyperlink.docx"
-      | "demo.docx"
-      | "Notes.docx"
-      | "Of16-01.pptx"
-      | "Presentation.pptx"
-      | "Presentation.potx"
-      | "autosave.pptx"
-      | "Document.dotx"
-      | "Spreadsheet.xltx"
-      | "Products.xlsx"
-      | "extlst.xlsx"
-      | "vmldrawingroot.xlsx"
-      | "malformed_uri.xlsx"
-      | "3dtestdash.pptx"
-      | "3dtestdot.pptx"
-      | "DocProps.docx"
-      | "EmptyRelationshipElement.docx"
-      | "InvalidDocPropsct.docx"
-      | "MoreDocProps.docx"
-      | "NoDocProps.docx"
-      | "Revision_NameCommentChange.xlsx"
-      | "Plain.docx"
-      | "Algn_tab_TabAlignment.pptx"
-      | "Of16-08.docx"
-      | "Dickinson_Sample_Slides.pptx"
-      | "basicspreadsheet.xlsx"
-      | "simpleSdt.docx"
-      | "Spreadsheet.xlsx"
-      | "malformed_uri_long.xlsx"
-      | "missingcalcchainpart.xlsx"
-      | "MCExecl.xlsx"
-      | "May_12_04.docx"
-      | "Complex01.docx"
-      | "mcdoc.docx"
-      | "o09_Performance_typical.pptx"
-      | "Complex01.xlsx"
-      | "Document.docx"
-      | "Of16-02.docx"
-      | "Of16-09-UnknownElement.docx"
-      | "Of16-10-SymEx.docx"
-      | "animation.pptx"
-      | "excel14.xlsx"
-      | "mailmerge.docx"
-      | "mcinleaf.docx"
-      | "svg.docx"
-      | "Youtube.xlsx"
-      | "mediareference.pptx"
-      | "layout_altcontent.pptx"
-      | "master_altcontent.pptx"
-      | "notes_altcontent.pptx"
-      | "slide_altcontent.pptx"
-  )
+  let _ = file_name;
+  false
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {

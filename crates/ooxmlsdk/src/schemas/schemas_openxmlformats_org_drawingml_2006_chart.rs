@@ -2162,6 +2162,7 @@ pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Version number of the file, as determined by the features used by this chart
   ///
   /// Available in Office2007 and above.
@@ -2192,11 +2193,6 @@ pub struct ChartSpace {
   /// _
   #[sdk(child(qname = "c:CT_Boolean/c:roundedCorners"))]
   pub rounded_corners: Option<RoundedCorners>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(qname = "c:CT_Style/c:style"))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6798,14 +6794,10 @@ pub struct DisplayBlanksAs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
+  #[sdk(child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub c_ext: Vec<DataDisplayOptions16>,
 }
 /// Defines the EditingLanguage Class.
@@ -7511,7 +7503,7 @@ pub enum StockChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieChartExtensionChoice {
@@ -7523,7 +7515,7 @@ pub enum PieChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Pie3DChartExtensionChoice {
@@ -7535,7 +7527,7 @@ pub enum Pie3DChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumRefExtensionChoice {
@@ -7559,7 +7551,7 @@ pub enum NumRefExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrDataExtensionChoice {
@@ -7571,7 +7563,7 @@ pub enum StrDataExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrRefExtensionChoice {
@@ -7595,7 +7587,7 @@ pub enum StrRefExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MultiLvlStrRefExtensionChoice {
@@ -7619,7 +7611,7 @@ pub enum MultiLvlStrRefExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblsExtensionChoice {
@@ -7667,7 +7659,7 @@ pub enum DLblsExtensionChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LeaderLines>,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChartExtensionChoice {
@@ -7679,7 +7671,7 @@ pub enum LineChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Line3DChartExtensionChoice {
@@ -7691,7 +7683,7 @@ pub enum Line3DChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterChartExtensionChoice {
@@ -7703,7 +7695,7 @@ pub enum ScatterChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarChartExtensionChoice {
@@ -7715,7 +7707,7 @@ pub enum RadarChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarChartExtensionChoice {
@@ -7727,7 +7719,7 @@ pub enum BarChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Bar3DChartExtensionChoice {
@@ -7739,7 +7731,7 @@ pub enum Bar3DChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaChartExtensionChoice {
@@ -7751,7 +7743,7 @@ pub enum AreaChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Area3DChartExtensionChoice {
@@ -7763,7 +7755,7 @@ pub enum Area3DChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleChartExtensionChoice {
@@ -7775,7 +7767,7 @@ pub enum BubbleChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceChartExtensionChoice {
@@ -7787,7 +7779,7 @@ pub enum SurfaceChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Surface3DChartExtensionChoice {
@@ -7799,7 +7791,7 @@ pub enum Surface3DChartExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CatAxExtensionChoice {
@@ -7811,7 +7803,7 @@ pub enum CatAxExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxExtensionChoice {
@@ -7823,7 +7815,7 @@ pub enum DateAxExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SerAxExtensionChoice {
@@ -7835,7 +7827,7 @@ pub enum SerAxExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValAxExtensionChoice {
@@ -7847,7 +7839,7 @@ pub enum ValAxExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DisplayUnitsChoice {
@@ -7899,7 +7891,7 @@ pub enum DLblExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CategoryAxisDataChoice {
@@ -8007,7 +7999,7 @@ pub enum LineSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterSerExtensionChoice {
@@ -8061,7 +8053,7 @@ pub enum ScatterSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarSerExtensionChoice {
@@ -8115,7 +8107,7 @@ pub enum RadarSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarSerExtensionChoice {
@@ -8176,7 +8168,7 @@ pub enum BarSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaSerExtensionChoice {
@@ -8230,7 +8222,7 @@ pub enum AreaSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieSerExtensionChoice {
@@ -8284,7 +8276,7 @@ pub enum PieSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSerExtensionChoice {
@@ -8338,7 +8330,7 @@ pub enum BubbleSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceSerExtensionChoice {
@@ -8385,7 +8377,7 @@ pub enum SurfaceSerExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceTypeChoice {
@@ -8469,5 +8461,5 @@ pub enum ChartSpaceExtensionChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::PivotSource>,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }

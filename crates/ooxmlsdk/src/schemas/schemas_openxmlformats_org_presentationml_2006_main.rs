@@ -869,20 +869,8 @@ pub struct Extension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[cfg(feature = "microsoft365")]
-  /// _
-  #[sdk(child(qname = "p14:CT_Media/p14:media"))]
-  pub media: Option<
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::Media>,
-  >,
-  #[cfg(feature = "microsoft365")]
-  /// _
-  #[sdk(child(qname = "p14:CT_RandomId/p14:creationId"))]
-  pub creation_id:
-    Option<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::CreationId>,
-  /// _
   #[sdk(any)]
-  pub unknown_xml: String,
+  pub xml_children: Vec<String>,
 }
 /// Browse Slide Show Mode.
 ///
@@ -1237,6 +1225,7 @@ pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// serverZoom
   ///
   /// Available in Office2007 and above.
@@ -1364,13 +1353,8 @@ pub struct Presentation {
   /// _
   #[sdk(child(qname = "a:CT_TextListStyle/p:defaultTextStyle"))]
   pub default_text_style: Option<std::boxed::Box<DefaultTextStyle>>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "p:CT_ModifyVerifier/p:modifyVerifier"))]
+  #[sdk(child(qname = "p:CT_ModifyVerifier/p:modifyVerifier"))]
   pub modification_verifier: Option<ModificationVerifier>,
   /// _
   #[sdk(child(qname = "p:CT_PresentationExtensionList/p:extLst"))]
@@ -1417,6 +1401,7 @@ pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Show Master Shapes
   ///
   /// Available in Office2007 and above.
@@ -1444,13 +1429,8 @@ pub struct Slide {
   /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Slide Transition
-  #[sdk(mce_child(qname = "p:CT_SlideTransition/p:transition"))]
+  #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// Slide Timing Information for a Slide
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
@@ -1470,6 +1450,7 @@ pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Show Master Shapes
   ///
   /// Available in Office2007 and above.
@@ -1519,13 +1500,8 @@ pub struct SlideLayout {
   /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "p:CT_SlideTransition/p:transition"))]
+  #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// _
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
@@ -1548,6 +1524,7 @@ pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// preserve
   ///
   /// Available in Office2007 and above.
@@ -1564,13 +1541,8 @@ pub struct SlideMaster {
   /// _
   #[sdk(child(qname = "p:CT_SlideLayoutIdList/p:sldLayoutIdLst"))]
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "p:CT_SlideTransition/p:transition"))]
+  #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
   /// _
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
@@ -1972,6 +1944,7 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
+  pub xml_other_children: Vec<(usize, String)>,
   #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
@@ -2132,13 +2105,9 @@ pub struct TimeListConditionalType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeParallel/p:par")]
 pub struct ParallelTimeNode {
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Parallel TimeNode
-  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
 }
 /// Sequence Time Node.
@@ -2149,6 +2118,7 @@ pub struct ParallelTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeSequence/p:seq")]
 pub struct SequenceTimeNode {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Concurrent
   ///
   /// Available in Office2007 and above.
@@ -2172,13 +2142,8 @@ pub struct SequenceTimeNode {
   #[sdk(attr(qname = ":nextAc"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub next_action: Option<NextActionValues>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Common TimeNode Properties
-  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// Previous Conditions List
   #[sdk(child(qname = "p:CT_TLTimeConditionList/p:prevCondLst"))]
@@ -2195,13 +2160,9 @@ pub struct SequenceTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeExclusive/p:excl")]
 pub struct ExclusiveTimeNode {
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Common TimeNode Properties
-  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
 }
 /// Animate.
@@ -3160,6 +3121,7 @@ pub struct HslColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonBehaviorData/p:cBhvr")]
 pub struct CommonBehavior {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Additive
   ///
   /// Available in Office2007 and above.
@@ -3220,13 +3182,8 @@ pub struct CommonBehavior {
   #[sdk(attr(qname = ":override"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#override: Option<BehaviorOverrideValues>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// Target Element
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
@@ -3306,6 +3263,7 @@ pub struct TimeListAnimationVariantType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonMediaNodeData/p:cMediaNode")]
 pub struct CommonMediaNode {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Volume
   ///
   /// Available in Office2007 and above.
@@ -3341,13 +3299,8 @@ pub struct CommonMediaNode {
   /// Represents the following attribute in the schema: :showWhenStopped
   #[sdk(attr(qname = ":showWhenStopped"))]
   pub show_when_stopped: Option<crate::simple_type::BooleanValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Common Time Node Properties
-  #[sdk(mce_child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
+  #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// _
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
@@ -3677,6 +3630,7 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
+  pub xml_other_children: Vec<(usize, String)>,
   #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
@@ -3700,6 +3654,7 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
+  pub xml_other_children: Vec<(usize, String)>,
   #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
@@ -4792,11 +4747,6 @@ pub struct TitleStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
-  /// _
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
 }
 /// Slide Master Body Text Style.
 ///
@@ -4880,11 +4830,6 @@ pub struct BodyStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
-  /// _
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
 }
 /// Slide Master Other Text Style.
 ///
@@ -4968,11 +4913,6 @@ pub struct OtherStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
-  /// _
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
 }
 /// Defines the DefaultTextStyle Class.
 ///
@@ -5056,11 +4996,6 @@ pub struct DefaultTextStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
-  /// _
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
 }
 /// Defines the NotesStyle Class.
 ///
@@ -5144,11 +5079,6 @@ pub struct NotesStyle {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
-  /// _
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
 }
 /// Defines the TextListStyleType Class.
 ///
@@ -6005,6 +5935,7 @@ pub struct OleObjectLink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideTransition/p:transition")]
 pub struct Transition {
+  pub xml_other_children: Vec<(usize, String)>,
   /// spd
   ///
   /// Available in Office2007 and above.
@@ -6038,11 +5969,6 @@ pub struct Transition {
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub advance_after_time: Option<crate::simple_type::StringValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "p:CT_OrientationTransition/p:blinds",
     qname = "p:CT_OrientationTransition/p:checker",
@@ -6167,12 +6093,12 @@ pub struct ShapeTree {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
-    qname = "p:CT_Picture/p:pic"
+    qname = "p:CT_Picture/p:pic",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -6198,12 +6124,12 @@ pub struct GroupShape {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
-    qname = "p:CT_Picture/p:pic"
+    qname = "p:CT_Picture/p:pic",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -8767,7 +8693,7 @@ pub enum SlideExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommonSlideDataExtensionChoice {
@@ -8777,7 +8703,7 @@ pub enum CommonSlideDataExtensionChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::CreationId>,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesExtensionChoice {
@@ -8799,7 +8725,7 @@ pub enum ShowPropertiesExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TransitionChoice {
@@ -8998,13 +8924,8 @@ pub enum BackgroundChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
@@ -9021,13 +8942,8 @@ pub enum ShapeTreeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
@@ -9129,7 +9045,7 @@ pub enum CommentAuthorExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentExtensionChoice {
@@ -9141,7 +9057,7 @@ pub enum CommentExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideLayoutExtensionChoice {
@@ -9153,7 +9069,7 @@ pub enum SlideLayoutExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideMasterExtensionChoice {
@@ -9165,7 +9081,7 @@ pub enum SlideMasterExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HandoutMasterExtensionChoice {
@@ -9177,7 +9093,7 @@ pub enum HandoutMasterExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NotesMasterExtensionChoice {
@@ -9189,7 +9105,7 @@ pub enum NotesMasterExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
@@ -9206,7 +9122,7 @@ pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum IterateChoice {
@@ -9372,7 +9288,7 @@ pub enum PresentationExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HtmlPublishPropertiesChoice {
@@ -9463,7 +9379,7 @@ pub enum PresentationPropertiesExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextElementChoice {

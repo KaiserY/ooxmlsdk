@@ -5757,7 +5757,7 @@ pub enum TextBoxChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeChoice {

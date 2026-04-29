@@ -13,17 +13,13 @@
 #[sdk(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor")]
 pub struct RelativeAnchorSize {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: std::boxed::Box<FromAnchor>,
   /// Ending Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:to"))]
   pub to_anchor: std::boxed::Box<ToAnchor>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
@@ -45,17 +41,13 @@ pub struct RelativeAnchorSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: std::boxed::Box<FromAnchor>,
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/cdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
@@ -134,12 +126,12 @@ pub struct GroupShape {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/cdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
     qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic"
+    qname = "cdr:CT_Picture/cdr:pic",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -879,13 +871,8 @@ pub enum AbsoluteAnchorSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]

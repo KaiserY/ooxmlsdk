@@ -41,13 +41,13 @@ pub enum SizeRelativeVerticallyValues {
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp14:pctPosHOffset.
-pub type PercentagePositionHeightOffset = crate::simple_type::StringValue;
+pub type PercentagePositionHeightOffset = crate::simple_type::Int32Value;
 /// Defines the PercentagePositionVerticalOffset Class.
 ///
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp14:pctPosVOffset.
-pub type PercentagePositionVerticalOffset = crate::simple_type::StringValue;
+pub type PercentagePositionVerticalOffset = crate::simple_type::Int32Value;
 /// Defines the RelativeWidth Class.
 ///
 /// Available in Office2010 and above.
@@ -66,7 +66,7 @@ pub struct RelativeWidth {
   pub object_id: SizeRelativeHorizontallyValues,
   /// _
   #[sdk(text_child(qname = "a:ST_PositivePercentage/wp14:pctWidth"))]
-  pub percentage_width: crate::simple_type::StringValue,
+  pub percentage_width: crate::simple_type::Int32Value,
 }
 /// Defines the RelativeHeight Class.
 ///
@@ -86,17 +86,17 @@ pub struct RelativeHeight {
   pub relative_from: SizeRelativeVerticallyValues,
   /// _
   #[sdk(text_child(qname = "a:ST_PositivePercentage/wp14:pctHeight"))]
-  pub percentage_height: crate::simple_type::StringValue,
+  pub percentage_height: crate::simple_type::Int32Value,
 }
 /// Defines the PercentageWidth Class.
 ///
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp14:pctWidth.
-pub type PercentageWidth = crate::simple_type::StringValue;
+pub type PercentageWidth = crate::simple_type::Int32Value;
 /// Defines the PercentageHeight Class.
 ///
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is wp14:pctHeight.
-pub type PercentageHeight = crate::simple_type::StringValue;
+pub type PercentageHeight = crate::simple_type::Int32Value;

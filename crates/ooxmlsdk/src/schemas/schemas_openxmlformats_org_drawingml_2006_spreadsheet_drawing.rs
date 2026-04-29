@@ -22,6 +22,7 @@ pub enum EditAsValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")]
 pub struct TwoCellAnchor {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Positioning and Resizing Behaviors
   ///
   /// Available in Office2007 and above.
@@ -36,11 +37,6 @@ pub struct TwoCellAnchor {
   /// Ending Anchor Point
   #[sdk(child(qname = "xdr:CT_Marker/xdr:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -65,17 +61,13 @@ pub struct TwoCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor")]
 pub struct OneCellAnchor {
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
   pub from_marker: std::boxed::Box<FromMarker>,
   /// _
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -100,17 +92,13 @@ pub struct OneCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor")]
 pub struct AbsoluteAnchor {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Position
   #[sdk(child(qname = "a:CT_Point2D/xdr:pos"))]
   pub position: std::boxed::Box<Position>,
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -191,12 +179,12 @@ pub struct GroupShape {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic"
+    qname = "xdr:CT_Picture/xdr:pic",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -1085,13 +1073,8 @@ pub enum AbsoluteAnchorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]

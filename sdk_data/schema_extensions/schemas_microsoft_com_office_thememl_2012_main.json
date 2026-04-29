@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "ThemeFamily",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

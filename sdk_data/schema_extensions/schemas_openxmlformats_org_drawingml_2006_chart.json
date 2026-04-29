@@ -2,15 +2,15 @@
   "Types": [
     {
       "ClassName": "ChartSpaceExtension",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Extension",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "RadarSerExtension",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

@@ -23,13 +23,13 @@ pub struct LockedCanvas {
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::VisualGroupShapeProperties,
   >,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "a:CT_GvmlTextShape/a:txSp",
     qname = "a:CT_GvmlShape/a:sp",
     qname = "a:CT_GvmlConnector/a:cxnSp",
     qname = "a:CT_GvmlPicture/a:pic",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
-    qname = "a:CT_GvmlGroupShape/a:grpSp"
+    qname = "a:CT_GvmlGroupShape/a:grpSp",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -44,13 +44,8 @@ pub struct LockedCanvas {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LockedCanvasChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   ATxSp(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextShape>),
   #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]

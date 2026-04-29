@@ -266,12 +266,12 @@ pub enum LineSpacingRuleValues {
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TableRowAlignmentValues {
-  #[sdk(rename = "left", alias = "start")]
+  #[sdk(rename = "left")]
   #[default]
   Left,
   #[sdk(rename = "center")]
   Center,
-  #[sdk(rename = "right", alias = "end")]
+  #[sdk(rename = "right")]
   Right,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
@@ -1166,12 +1166,12 @@ pub enum CaptionPositionValues {
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LevelJustificationValues {
-  #[sdk(rename = "left", alias = "start")]
+  #[sdk(rename = "left")]
   #[default]
   Left,
   #[sdk(rename = "center")]
   Center,
-  #[sdk(rename = "right", alias = "end")]
+  #[sdk(rename = "right")]
   Right,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
@@ -1464,33 +1464,33 @@ pub enum NumberFormatValues {
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextDirectionValues {
-  #[sdk(rename = "lrTb", alias = "tb")]
+  #[sdk(rename = "lrTb")]
   #[default]
   LefToRightTopToBottom,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "tb")]
   LeftToRightTopToBottom2010,
-  #[sdk(rename = "tbRl", alias = "rl")]
+  #[sdk(rename = "tbRl")]
   TopToBottomRightToLeft,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "rl")]
   TopToBottomRightToLeft2010,
-  #[sdk(rename = "btLr", alias = "lr")]
+  #[sdk(rename = "btLr")]
   BottomToTopLeftToRight,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lr")]
   BottomToTopLeftToRight2010,
-  #[sdk(rename = "lrTbV", alias = "tbV")]
+  #[sdk(rename = "lrTbV")]
   LefttoRightTopToBottomRotated,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "tbV")]
   LeftToRightTopToBottomRotated2010,
-  #[sdk(rename = "tbRlV", alias = "rlV")]
+  #[sdk(rename = "tbRlV")]
   TopToBottomRightToLeftRotated,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "rlV")]
   TopToBottomRightToLeftRotated2010,
-  #[sdk(rename = "tbLrV", alias = "lrV")]
+  #[sdk(rename = "tbLrV")]
   TopToBottomLeftToRightRotated,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lrV")]
@@ -1527,7 +1527,7 @@ pub enum CryptProviderValues {
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum JustificationValues {
-  #[sdk(rename = "left", alias = "start")]
+  #[sdk(rename = "left")]
   #[default]
   Left,
   #[cfg(feature = "microsoft365")]
@@ -1535,7 +1535,7 @@ pub enum JustificationValues {
   Start,
   #[sdk(rename = "center")]
   Center,
-  #[sdk(rename = "right", alias = "end")]
+  #[sdk(rename = "right")]
   Right,
   #[cfg(feature = "microsoft365")]
   #[sdk(rename = "end")]
@@ -1560,13 +1560,13 @@ pub enum TabStopValues {
   #[sdk(rename = "clear")]
   #[default]
   Clear,
-  #[sdk(rename = "left", alias = "start")]
+  #[sdk(rename = "left")]
   Left,
   #[sdk(rename = "start")]
   Start,
   #[sdk(rename = "center")]
   Center,
-  #[sdk(rename = "right", alias = "end")]
+  #[sdk(rename = "right")]
   Right,
   #[sdk(rename = "end")]
   End,
@@ -6814,22 +6814,6 @@ pub struct OnOffType {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
-/// Defines the OnOffType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotEmbedSmartTags.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotEmbedSmartTags")]
-pub struct DoNotEmbedSmartTags {
-  /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
-  #[sdk(attr(qname = "w:val"))]
-  pub val: Option<crate::simple_type::OnOffValue>,
-}
 /// Defines the FrameProperties Class.
 ///
 /// Available in Office2007 and above.
@@ -7000,19 +6984,15 @@ pub struct FrameProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumPr/w:numPr")]
 pub struct NumberingProperties {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Numbering Level Reference
   #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber255/w:ilvl"))]
   pub numbering_level_reference: Option<NumberingLevelReference>,
   /// Numbering Definition Instance Reference
   #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:numId"))]
   pub numbering_id: Option<NumberingId>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Previous Paragraph Numbering Properties
-  #[sdk(mce_child(qname = "w:CT_TrackChangeNumbering/w:numberingChange"))]
+  #[sdk(child(qname = "w:CT_TrackChangeNumbering/w:numberingChange"))]
   pub numbering_change: Option<NumberingChange>,
   /// Inserted Numbering Properties
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
@@ -7238,20 +7218,6 @@ pub struct SpacingBetweenLines {
   /// Represents the following attribute in the schema: w:lineRule
   #[sdk(attr(qname = "w:lineRule"))]
   pub line_rule: Option<LineSpacingRuleValues>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:myattr
-  #[sdk(attr(qname = "w14:myattr"))]
-  pub w14_myattr: Option<crate::simple_type::StringValue>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:myanotherAttr
-  #[sdk(attr(qname = "w14:myanotherAttr"))]
-  pub w14_myanother_attr: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Indentation Class.
 ///
@@ -7836,7 +7802,6 @@ pub struct Break {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:t")]
 pub struct Text {
-  pub xml_other_attrs: Vec<(String, String)>,
   /// space
   ///
   /// Available in Office2007 and above.
@@ -10474,13 +10439,6 @@ pub struct RunPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPr/w:rPr")]
 pub struct RunProperties {
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:myanotherAttr
-  #[sdk(attr(qname = "w14:myanotherAttr"))]
-  pub w14_myanother_attr: Option<crate::simple_type::StringValue>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
   pub run_style: Option<RunStyle>,
@@ -10601,7 +10559,7 @@ pub struct RunProperties {
   pub glow:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>>,
   #[cfg(feature = "microsoft365")]
-  /// _
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "w14:CT_Shadow/w14:shadow"))]
   pub shadow14:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Shadow>>,
@@ -10962,7 +10920,6 @@ pub struct CustomXmlRuby {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -11019,7 +10976,8 @@ pub struct CustomXmlRuby {
     qname = "m:CT_SSub/m:sSub",
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
+    qname = "m:CT_R/m:r",
+    any
   ))]
   pub custom_xml_ruby_choice: Vec<CustomXmlRubyChoice>,
 }
@@ -11056,7 +11014,6 @@ pub struct SimpleFieldRuby {
   #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
   pub field_data: Option<crate::simple_type::Base64BinaryValue>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -11113,7 +11070,8 @@ pub struct SimpleFieldRuby {
     qname = "m:CT_SSub/m:sSub",
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
+    qname = "m:CT_R/m:r",
+    any
   ))]
   pub simple_field_ruby_choice: Vec<SimpleFieldRubyChoice>,
 }
@@ -11172,7 +11130,6 @@ pub struct HyperlinkRuby {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -11222,7 +11179,8 @@ pub struct HyperlinkRuby {
     qname = "m:CT_SSub/m:sSub",
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
+    qname = "m:CT_R/m:r",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -11246,7 +11204,6 @@ pub struct HyperlinkRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_R/w:r")]
 pub struct Run {
-  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Run Properties
   ///
   /// Available in Office2007 and above.
@@ -11271,13 +11228,6 @@ pub struct Run {
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_addition: Option<crate::simple_type::HexBinaryValue>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:myattr
-  #[sdk(attr(qname = "w14:myattr"))]
-  pub w14_myattr: Option<crate::simple_type::StringValue>,
   /// Run Properties
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -11313,14 +11263,8 @@ pub struct Run {
     qname = "w:CT_Markup/w:commentReference",
     qname = "w:CT_Drawing/w:drawing",
     qname = "w:CT_PTab/w:ptab",
-    qname = "w:CT_Empty/w:lastRenderedPageBreak",
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
-    text
+    qname = "w:CT_Empty/w:lastRenderedPageBreak"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "w16se:CT_SymEx/w16se:sym"))
-  )]
   pub run_choice: Vec<RunChoice>,
 }
 /// Defines the SdtRunRuby Class.
@@ -11341,7 +11285,6 @@ pub struct SdtRunRuby {
   #[sdk(child(qname = "w:CT_SdtContentRunRuby/w:sdtContent"))]
   pub sdt_content_run_ruby: Option<SdtContentRunRuby>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -11357,7 +11300,8 @@ pub struct SdtRunRuby {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -11515,7 +11459,6 @@ pub struct InsertedRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -11571,7 +11514,8 @@ pub struct InsertedRun {
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
+    qname = "w:CT_DirContentRun/w:dir",
+    any
   ))]
   pub inserted_run_choice: Vec<InsertedRunChoice>,
 }
@@ -11628,7 +11572,6 @@ pub struct DeletedRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -11684,7 +11627,8 @@ pub struct DeletedRun {
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
+    qname = "w:CT_DirContentRun/w:dir",
+    any
   ))]
   pub deleted_run_choice: Vec<DeletedRunChoice>,
 }
@@ -11741,7 +11685,6 @@ pub struct MoveFromRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -11797,7 +11740,8 @@ pub struct MoveFromRun {
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
+    qname = "w:CT_DirContentRun/w:dir",
+    any
   ))]
   pub move_from_run_choice: Vec<MoveFromRunChoice>,
 }
@@ -11854,7 +11798,6 @@ pub struct MoveToRun {
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_SdtRun/w:sdt",
     qname = "w:CT_ProofErr/w:proofErr",
     qname = "w:CT_PermStart/w:permStart",
@@ -11910,7 +11853,8 @@ pub struct MoveToRun {
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
+    qname = "w:CT_DirContentRun/w:dir",
+    any
   ))]
   pub move_to_run_choice: Vec<MoveToRunChoice>,
 }
@@ -12066,7 +12010,6 @@ pub struct SdtRun {
   #[sdk(child(qname = "w:CT_SdtContentRun/w:sdtContent"))]
   pub sdt_content_run: Option<SdtContentRun>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12082,7 +12025,8 @@ pub struct SdtRun {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12103,18 +12047,10 @@ pub struct SdtRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlBlock/w:customXml")]
 pub struct CustomXmlBlock {
-  /// Custom XML element name.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:element
-  #[sdk(attr(qname = "w:element"))]
-  pub element: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
     qname = "w:CT_P/w:p",
@@ -12148,7 +12084,8 @@ pub struct CustomXmlBlock {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub custom_xml_block_choice: Vec<CustomXmlBlockChoice>,
 }
@@ -12170,7 +12107,6 @@ pub struct SdtBlock {
   #[sdk(child(qname = "w:CT_SdtContentBlock/w:sdtContent"))]
   pub sdt_content_block: Option<SdtContentBlock>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12186,7 +12122,8 @@ pub struct SdtBlock {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12273,18 +12210,10 @@ pub struct Paragraph {
   /// Represents the following attribute in the schema: w14:noSpellErr
   #[sdk(attr(qname = "w14:noSpellErr"))]
   pub no_spell_error: Option<crate::simple_type::OnOffValue>,
-  /// Word 2010 paragraph edit identifier.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:editId
-  #[sdk(attr(qname = "w14:editId"))]
-  pub w14_edit_id: Option<crate::simple_type::HexBinaryValue>,
   /// Paragraph Properties
   #[sdk(child(qname = "w:CT_PPr/w:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -12344,7 +12273,8 @@ pub struct Paragraph {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
+    qname = "w:CT_Rel/w:subDoc",
+    any
   ))]
   pub paragraph_choice: Vec<ParagraphChoice>,
 }
@@ -12357,7 +12287,6 @@ pub struct Paragraph {
 #[sdk(qname = "w:CT_Tbl/w:tbl")]
 pub struct Table {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12373,7 +12302,8 @@ pub struct Table {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12392,7 +12322,6 @@ pub struct Table {
   #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
   pub w_tbl_grid: std::boxed::Box<TableGrid>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
     qname = "w:CT_SdtRow/w:sdt",
@@ -12418,7 +12347,8 @@ pub struct Table {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12499,7 +12429,6 @@ pub struct TableRow {
   #[sdk(child(qname = "w:CT_TrPr/w:trPr"))]
   pub table_row_properties: Option<std::boxed::Box<TableRowProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
     qname = "w:CT_SdtCell/w:sdt",
@@ -12532,7 +12461,8 @@ pub struct TableRow {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub table_row_choice: Vec<TableRowChoice>,
 }
@@ -12548,7 +12478,6 @@ pub struct CustomXmlRow {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
     qname = "w:CT_SdtRow/w:sdt",
@@ -12581,7 +12510,8 @@ pub struct CustomXmlRow {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub custom_xml_row_choice: Vec<CustomXmlRowChoice>,
 }
@@ -12603,7 +12533,6 @@ pub struct SdtRow {
   #[sdk(child(qname = "w:CT_SdtContentRow/w:sdtContent"))]
   pub sdt_content_row: Option<SdtContentRow>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12619,7 +12548,8 @@ pub struct SdtRow {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12644,7 +12574,6 @@ pub struct TableCell {
   #[sdk(child(qname = "w:CT_TcPr/w:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -12679,7 +12608,8 @@ pub struct TableCell {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub table_cell_choice: Vec<TableCellChoice>,
 }
@@ -12695,7 +12625,6 @@ pub struct CustomXmlCell {
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
     qname = "w:CT_SdtCell/w:sdt",
@@ -12728,7 +12657,8 @@ pub struct CustomXmlCell {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub custom_xml_cell_choice: Vec<CustomXmlCellChoice>,
 }
@@ -12750,7 +12680,6 @@ pub struct SdtCell {
   #[sdk(child(qname = "w:CT_SdtContentCell/w:sdtContent"))]
   pub sdt_content_cell: Option<SdtContentCell>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
@@ -12766,7 +12695,8 @@ pub struct SdtCell {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12787,18 +12717,10 @@ pub struct SdtCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRun/w:customXml")]
 pub struct CustomXmlRun {
-  /// Custom XML element name.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:element
-  #[sdk(attr(qname = "w:element"))]
-  pub element: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -12858,7 +12780,8 @@ pub struct CustomXmlRun {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
+    qname = "w:CT_Rel/w:subDoc",
+    any
   ))]
   pub custom_xml_run_choice: Vec<CustomXmlRunChoice>,
 }
@@ -12895,7 +12818,6 @@ pub struct SimpleField {
   #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
   pub field_data: Option<crate::simple_type::Base64BinaryValue>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -12955,7 +12877,8 @@ pub struct SimpleField {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
+    qname = "w:CT_Rel/w:subDoc",
+    any
   ))]
   pub simple_field_choice: Vec<SimpleFieldChoice>,
 }
@@ -13014,7 +12937,6 @@ pub struct Hyperlink {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
     qname = "w:CT_Hyperlink/w:hyperlink",
@@ -13065,7 +12987,8 @@ pub struct Hyperlink {
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
-    qname = "w:CT_Rel/w:subDoc"
+    qname = "w:CT_Rel/w:subDoc",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -13427,7 +13350,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:firstRow
   #[sdk(attr(qname = "w:firstRow"))]
-  #[sdk(bit = 2048u32)]
   pub first_row: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// lastRow
@@ -13436,7 +13358,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:lastRow
   #[sdk(attr(qname = "w:lastRow"))]
-  #[sdk(bit = 1024u32)]
   pub last_row: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// firstColumn
@@ -13445,7 +13366,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:firstColumn
   #[sdk(attr(qname = "w:firstColumn"))]
-  #[sdk(bit = 512u32)]
   pub first_column: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// lastColumn
@@ -13454,7 +13374,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:lastColumn
   #[sdk(attr(qname = "w:lastColumn"))]
-  #[sdk(bit = 256u32)]
   pub last_column: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// oddVBand
@@ -13463,7 +13382,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:oddVBand
   #[sdk(attr(qname = "w:oddVBand"))]
-  #[sdk(bit = 128u32)]
   pub odd_vertical_band: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// evenVBand
@@ -13472,7 +13390,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:evenVBand
   #[sdk(attr(qname = "w:evenVBand"))]
-  #[sdk(bit = 64u32)]
   pub even_vertical_band: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// oddHBand
@@ -13481,7 +13398,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:oddHBand
   #[sdk(attr(qname = "w:oddHBand"))]
-  #[sdk(bit = 32u32)]
   pub odd_horizontal_band: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// evenHBand
@@ -13490,7 +13406,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:evenHBand
   #[sdk(attr(qname = "w:evenHBand"))]
-  #[sdk(bit = 16u32)]
   pub even_horizontal_band: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// firstRowFirstColumn
@@ -13499,7 +13414,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:firstRowFirstColumn
   #[sdk(attr(qname = "w:firstRowFirstColumn"))]
-  #[sdk(bit = 4u32)]
   pub first_row_first_column: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// firstRowLastColumn
@@ -13508,7 +13422,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:firstRowLastColumn
   #[sdk(attr(qname = "w:firstRowLastColumn"))]
-  #[sdk(bit = 8u32)]
   pub first_row_last_column: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// lastRowFirstColumn
@@ -13517,7 +13430,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:lastRowFirstColumn
   #[sdk(attr(qname = "w:lastRowFirstColumn"))]
-  #[sdk(bit = 2u32)]
   pub last_row_first_column: Option<crate::simple_type::OnOffValue>,
   #[cfg(feature = "microsoft365")]
   /// lastRowLastColumn
@@ -13526,7 +13438,6 @@ pub struct ConditionalFormatStyle {
   ///
   /// Represents the following attribute in the schema: w:lastRowLastColumn
   #[sdk(attr(qname = "w:lastRowLastColumn"))]
-  #[sdk(bit = 1u32)]
   pub last_row_last_column: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TableCellWidth Class.
@@ -13907,20 +13818,16 @@ pub struct VerticalMerge {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcBorders/w:tcBorders")]
 pub struct TableCellBorders {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Table Cell Top Border
   #[sdk(child(qname = "w:CT_Border/w:top"))]
   pub top_border: Option<TopBorder>,
   /// Table Cell Left Border
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_Border/w:start"))]
+  #[sdk(child(qname = "w:CT_Border/w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Cell Bottom Border
   #[sdk(child(qname = "w:CT_Border/w:bottom"))]
@@ -13928,14 +13835,9 @@ pub struct TableCellBorders {
   /// Table Cell Right Border
   #[sdk(child(qname = "w:CT_Border/w:right"))]
   pub right_border: Option<RightBorder>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_Border/w:end"))]
+  #[sdk(child(qname = "w:CT_Border/w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Cell Inside Horizontal Edges Border
   #[sdk(child(qname = "w:CT_Border/w:insideH"))]
@@ -14278,20 +14180,16 @@ pub struct OnOffOnlyType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcMar/w:tcMar")]
 pub struct TableCellMargin {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Table Cell Top Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
   pub top_margin: Option<TopMargin>,
   /// Table Cell Left Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
   pub left_margin: Option<LeftMargin>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_TblWidth/w:start"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
@@ -14299,14 +14197,9 @@ pub struct TableCellMargin {
   /// Table Cell Right Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
   pub right_margin: Option<RightMargin>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_TblWidth/w:end"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Defines the TableCellVerticalAlignment Class.
@@ -14596,7 +14489,7 @@ pub struct TableIndentation {
   ///
   /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::Int32Value>,
   /// type
   ///
   /// Available in Office2007 and above.
@@ -14613,20 +14506,16 @@ pub struct TableIndentation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblBorders/w:tblBorders")]
 pub struct TableBorders {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Table Top Border
   #[sdk(child(qname = "w:CT_Border/w:top"))]
   pub top_border: Option<TopBorder>,
   /// Table Left Border
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_Border/w:start"))]
+  #[sdk(child(qname = "w:CT_Border/w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Bottom Border
   #[sdk(child(qname = "w:CT_Border/w:bottom"))]
@@ -14634,14 +14523,9 @@ pub struct TableBorders {
   /// Table Right Border
   #[sdk(child(qname = "w:CT_Border/w:right"))]
   pub right_border: Option<RightBorder>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_Border/w:end"))]
+  #[sdk(child(qname = "w:CT_Border/w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Inside Horizontal Edges Border
   #[sdk(child(qname = "w:CT_Border/w:insideH"))]
@@ -14674,20 +14558,16 @@ pub struct TableLayout {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblCellMar/w:tblCellMar")]
 pub struct TableCellMarginDefault {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Table Cell Top Margin Default
   #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
   pub top_margin: Option<TopMargin>,
   /// Table Cell Left Margin Default
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_TblWidth/w:start"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Default
   #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
@@ -14695,14 +14575,9 @@ pub struct TableCellMarginDefault {
   /// Table Cell Right Margin Default
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:right"))]
   pub table_cell_right_margin: Option<TableCellRightMargin>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_TblWidth/w:end"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Footnote and Endnote Numbering Starting Value.
@@ -14829,16 +14704,12 @@ pub struct TableLook {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnProps/w:footnotePr")]
 pub struct FootnoteProperties {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Footnote Placement
   #[sdk(child(qname = "w:CT_FtnPos/w:pos"))]
   pub footnote_position: Option<FootnotePosition>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Footnote Numbering Format
-  #[sdk(mce_child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Footnote and Endnote Numbering Starting Value
   #[sdk(child(qname = "w:CT_FtnEdnNumStart/w:numStart"))]
@@ -14855,16 +14726,12 @@ pub struct FootnoteProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EdnProps/w:endnotePr")]
 pub struct EndnoteProperties {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Endnote Placement
   #[sdk(child(qname = "w:CT_EdnPos/w:pos"))]
   pub endnote_position: Option<EndnotePosition>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Endnote Numbering Format
-  #[sdk(mce_child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Footnote and Endnote Numbering Starting Value
   #[sdk(child(qname = "w:CT_FtnEdnNumStart/w:numStart"))]
@@ -14909,7 +14776,7 @@ pub struct PageSize {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::UInt32Value>,
   /// Page Height
   ///
   /// Available in Office2007 and above.
@@ -14922,7 +14789,7 @@ pub struct PageSize {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub height: Option<crate::simple_type::StringValue>,
+  pub height: Option<crate::simple_type::UInt32Value>,
   /// Page Orientation
   ///
   /// Available in Office2007 and above.
@@ -14959,7 +14826,7 @@ pub struct PageMargin {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub top: Option<crate::simple_type::StringValue>,
+  pub top: Option<crate::simple_type::Int32Value>,
   /// Right Margin Spacing
   ///
   /// Available in Office2007 and above.
@@ -14972,7 +14839,7 @@ pub struct PageMargin {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub right: Option<crate::simple_type::StringValue>,
+  pub right: Option<crate::simple_type::UInt32Value>,
   /// Page Bottom Spacing
   ///
   /// Available in Office2007 and above.
@@ -14986,7 +14853,7 @@ pub struct PageMargin {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub bottom: Option<crate::simple_type::StringValue>,
+  pub bottom: Option<crate::simple_type::Int32Value>,
   /// Left Margin Spacing
   ///
   /// Available in Office2007 and above.
@@ -14999,7 +14866,7 @@ pub struct PageMargin {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub left: Option<crate::simple_type::StringValue>,
+  pub left: Option<crate::simple_type::UInt32Value>,
   /// Spacing to Top of Header
   ///
   /// Available in Office2007 and above.
@@ -15012,7 +14879,7 @@ pub struct PageMargin {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub header: Option<crate::simple_type::StringValue>,
+  pub header: Option<crate::simple_type::UInt32Value>,
   /// Spacing to Bottom of Footer
   ///
   /// Available in Office2007 and above.
@@ -15025,7 +14892,7 @@ pub struct PageMargin {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub footer: Option<crate::simple_type::StringValue>,
+  pub footer: Option<crate::simple_type::UInt32Value>,
   /// Page Gutter Spacing
   ///
   /// Available in Office2007 and above.
@@ -15038,7 +14905,7 @@ pub struct PageMargin {
     min_inclusive = false,
     max_inclusive = true
   ))]
-  pub gutter: Option<crate::simple_type::StringValue>,
+  pub gutter: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the PaperSource Class.
 ///
@@ -15319,7 +15186,6 @@ pub struct Recipients {
 #[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
 pub struct TextBoxContent {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -15347,7 +15213,8 @@ pub struct TextBoxContent {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15374,13 +15241,9 @@ pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  #[cfg(not(feature = "mce"))]
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "w:CT_Comment/w:comment"))]
+  #[sdk(child(qname = "w:CT_Comment/w:comment"))]
   pub w_comment: Vec<Comment>,
 }
 /// Document Footnotes.
@@ -15425,7 +15288,6 @@ pub struct Header {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -15453,7 +15315,8 @@ pub struct Header {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15481,7 +15344,6 @@ pub struct Footer {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -15509,7 +15371,8 @@ pub struct Footer {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15588,13 +15451,9 @@ pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Write Protection
-  #[sdk(mce_child(qname = "w:CT_WriteProtection/w:writeProtection"))]
+  #[sdk(child(qname = "w:CT_WriteProtection/w:writeProtection"))]
   pub write_protection: Option<WriteProtection>,
   /// Document View Setting
   #[sdk(child(qname = "w:CT_View/w:view"))]
@@ -15671,13 +15530,8 @@ pub struct Settings {
   /// _
   #[sdk(child(qname = "w:CT_OnOff/w:linkStyles"))]
   pub w_link_styles: Option<LinkStyles>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter"))]
+  #[sdk(child(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter"))]
   pub w_style_pane_format_filter: Option<StylePaneFormatFilter>,
   /// _
   #[sdk(child(qname = "w:CT_StylePaneSortMethods/w:stylePaneSortMethod"))]
@@ -15700,13 +15554,8 @@ pub struct Settings {
   /// _
   #[sdk(child(qname = "w:CT_OnOff/w:doNotTrackFormatting"))]
   pub w_do_not_track_formatting: Option<DoNotTrackFormatting>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content3:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "w:CT_DocProtect/w:documentProtection"))]
+  #[sdk(child(qname = "w:CT_DocProtect/w:documentProtection"))]
   pub w_document_protection: Option<DocumentProtection>,
   /// _
   #[sdk(child(qname = "w:CT_OnOff/w:autoFormatOverride"))]
@@ -15894,76 +15743,40 @@ pub struct Settings {
   #[sdk(child(qname = "w:CT_ShapeDefaults/w:shapeDefaults"))]
   pub w_shape_defaults: Option<ShapeDefaults>,
   /// _
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotEmbedSmartTags"))]
-  pub w_do_not_embed_smart_tags: Option<DoNotEmbedSmartTags>,
-  /// _
   #[sdk(child(qname = "w:CT_String/w:decimalSymbol"))]
   pub w_decimal_symbol: Option<DecimalSymbol>,
   /// _
   #[sdk(child(qname = "w:CT_String/w:listSeparator"))]
   pub w_list_separator: Option<ListSeparator>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content4:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w14:CT_LongHexNumber/w14:docId"))]
+  #[sdk(child(qname = "w14:CT_LongHexNumber/w14:docId"))]
   pub w14_doc_id: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DocumentId>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content5:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
+  #[sdk(child(qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
   pub w14_discard_image_editing_data:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DiscardImageEditingData>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content6:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
+  #[sdk(child(qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
   pub w14_default_image_dpi:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DefaultImageDpi>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content7:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w14:CT_OnOff/w14:conflictMode"))]
+  #[sdk(child(qname = "w14:CT_OnOff/w14:conflictMode"))]
   pub w14_conflict_mode:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictMode>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content8:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
+  #[sdk(child(qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
   pub w15_chart_tracking_ref_based:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::ChartTrackingRefBased>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content9:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w15:CT_Guid/w15:docId"))]
+  #[sdk(child(qname = "w15:CT_Guid/w15:docId"))]
   pub w15_doc_id:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::PersistentDocumentId>,
-  /// _
-  #[sdk(child(qname = "w:CT_CompatSetting/w:compatSetting"))]
-  pub w_compat_setting: Vec<CompatibilitySetting>,
 }
 /// Web Page Settings.
 ///
@@ -16124,6 +15937,7 @@ pub struct GlossaryDocument {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrExBase/w:tblPrEx")]
 pub struct PreviousTablePropertyExceptions {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Preferred Table Width Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
   pub table_width: Option<TableWidth>,
@@ -16148,13 +15962,8 @@ pub struct PreviousTablePropertyExceptions {
   /// Table Cell Margin Exceptions
   #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Table Style Conditional Formatting Settings Exception
-  #[sdk(mce_child(qname = "w:CT_TblLook/w:tblLook"))]
+  #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
 }
 /// Previous Table Cell Properties.
@@ -16243,6 +16052,7 @@ pub struct PreviousTableRowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrBase/w:tblPr")]
 pub struct PreviousTableProperties {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the TableStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:tblStyle"))]
   pub table_style: Option<TableStyle>,
@@ -16282,23 +16092,13 @@ pub struct PreviousTableProperties {
   /// Defines the TableLook Class.
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_String/w:tblCaption"))]
+  #[sdk(child(qname = "w:CT_String/w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "w:CT_String/w:tblDescription"))]
+  #[sdk(child(qname = "w:CT_String/w:tblDescription"))]
   pub table_description: Option<TableDescription>,
 }
 /// Previous Section Properties.
@@ -17072,7 +16872,7 @@ pub struct TabStop {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub position: crate::simple_type::StringValue,
+  pub position: crate::simple_type::Int32Value,
 }
 /// Run Properties for the Paragraph Mark.
 ///
@@ -17082,6 +16882,7 @@ pub struct TabStop {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPr/w:rPr")]
 pub struct ParagraphMarkRunProperties {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Inserted Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
   pub inserted: Option<Inserted>,
@@ -17224,11 +17025,6 @@ pub struct ParagraphMarkRunProperties {
   pub glow:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>>,
   #[cfg(feature = "microsoft365")]
-  /// _
-  #[sdk(child(qname = "w14:CT_Shadow/w14:shadow"))]
-  pub shadow14:
-    Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Shadow>>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
@@ -17284,13 +17080,8 @@ pub struct ParagraphMarkRunProperties {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "w:CT_OnOff/w:oMath"))]
   pub office_math: Option<OfficeMath>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "w:CT_ParaRPrChange/w:rPrChange"))]
+  #[sdk(child(qname = "w:CT_ParaRPrChange/w:rPrChange"))]
   pub w_r_pr_change: Option<std::boxed::Box<ParagraphMarkRunPropertiesChange>>,
 }
 /// Section Properties.
@@ -17301,6 +17092,7 @@ pub struct ParagraphMarkRunProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPr/w:sectPr")]
 pub struct SectionProperties {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Physical Section Mark Character Revision ID
   ///
   /// Available in Office2007 and above.
@@ -17400,13 +17192,8 @@ pub struct SectionProperties {
   #[sdk(child(qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
   pub footnote_columns:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::FootnoteColumns>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "w:CT_SectPrChange/w:sectPrChange"))]
+  #[sdk(child(qname = "w:CT_SectPrChange/w:sectPrChange"))]
   pub w_sect_pr_change: Option<std::boxed::Box<SectionPropertiesChange>>,
 }
 /// Custom Field Data.
@@ -17997,7 +17784,6 @@ pub struct RubyProperties {
 #[sdk(qname = "w:CT_RubyContent/w:rt")]
 pub struct RubyContent {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -18047,7 +17833,8 @@ pub struct RubyContent {
     qname = "m:CT_SSub/m:sSub",
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
+    qname = "m:CT_R/m:r",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18072,7 +17859,6 @@ pub struct RubyContent {
 #[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
 pub struct RubyBase {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -18122,7 +17908,8 @@ pub struct RubyBase {
     qname = "m:CT_SSub/m:sSub",
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
+    qname = "m:CT_R/m:r",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18276,7 +18063,6 @@ pub struct ListItem {
 #[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
 pub struct SdtProperties {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_RPr/w:rPr",
     qname = "w:CT_String/w:alias",
     qname = "w:CT_Lock/w:lock",
@@ -18297,7 +18083,8 @@ pub struct SdtProperties {
     qname = "w:CT_SdtText/w:text",
     qname = "w:CT_Empty/w:citation",
     qname = "w:CT_Empty/w:group",
-    qname = "w:CT_Empty/w:bibliography"
+    qname = "w:CT_Empty/w:bibliography",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18336,7 +18123,6 @@ pub struct SdtEndCharProperties {
 #[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
 pub struct SdtContentBlock {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
     qname = "w:CT_P/w:p",
@@ -18363,7 +18149,8 @@ pub struct SdtContentBlock {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18388,7 +18175,6 @@ pub struct SdtContentBlock {
 #[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
 pub struct SdtContentRun {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "m:CT_R/m:r",
     qname = "w:CT_CustomXmlRun/w:customXml",
     qname = "w:CT_SimpleField/w:fldSimple",
@@ -18439,7 +18225,8 @@ pub struct SdtContentRun {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "w:CT_R/w:r",
-    qname = "w:CT_Rel/w:subDoc"
+    qname = "w:CT_Rel/w:subDoc",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18466,7 +18253,6 @@ pub struct SdtContentRun {
 #[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
 pub struct SdtContentRunRuby {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
     qname = "w:CT_HyperlinkRuby/w:hyperlink",
@@ -18516,7 +18302,8 @@ pub struct SdtContentRunRuby {
     qname = "m:CT_SSub/m:sSub",
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
+    qname = "m:CT_R/m:r",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18541,7 +18328,6 @@ pub struct SdtContentRunRuby {
 #[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
 pub struct SdtContentCell {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
     qname = "w:CT_SdtCell/w:sdt",
@@ -18567,7 +18353,8 @@ pub struct SdtContentCell {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18592,7 +18379,6 @@ pub struct SdtContentCell {
 #[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
 pub struct SdtContentRow {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
     qname = "w:CT_SdtRow/w:sdt",
@@ -18618,7 +18404,8 @@ pub struct SdtContentRow {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -19604,15 +19391,6 @@ pub struct RunPropertiesBaseStyle {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
-  #[cfg(feature = "microsoft365")]
-  /// _
-  #[sdk(child(qname = "w14:CT_Shadow/w14:shadow"))]
-  pub shadow14:
-    Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Shadow>>,
-  #[cfg(feature = "microsoft365")]
-  /// _
-  #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
-  pub ligatures: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
 }
 /// Paragraph Properties.
 ///
@@ -19722,14 +19500,6 @@ pub struct ParagraphPropertiesBaseStyle {
 #[sdk(qname = "w:CT_RPrDefault/w:rPrDefault")]
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:attr
-  #[sdk(attr(qname = "w14:attr"))]
-  pub w14_attr: Option<crate::simple_type::StringValue>,
   /// Run Properties
   #[sdk(child(qname = "w:CT_RPrBaseStyleable/w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
@@ -20403,6 +20173,7 @@ pub struct MultiLevelType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Lvl/w:lvl")]
 pub struct Level {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Numbering Level
   ///
   /// Available in Office2007 and above.
@@ -20428,13 +20199,8 @@ pub struct Level {
   /// Starting Value
   #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:start"))]
   pub start_numbering_value: Option<StartNumberingValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Numbering Format
-  #[sdk(mce_child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Restart Numbering Level Symbol
   #[sdk(child(qname = "w:CT_DecimalNumber/w:lvlRestart"))]
@@ -20504,14 +20270,6 @@ pub struct AbstractNum {
   #[sdk(attr(qname = "w:abstractNumId"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub abstract_number_id: crate::simple_type::Int32Value,
-  #[cfg(feature = "microsoft365")]
-  ///
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: w15:restartNumberingAfterBreak
-  #[sdk(attr(qname = "w15:restartNumberingAfterBreak"))]
-  pub w15_restart_numbering_after_break: Option<crate::simple_type::StringValue>,
   /// Abstract Numbering Definition Identifier
   #[sdk(child(qname = "w:CT_LongHexNumber/w:nsid"))]
   pub nsid: Option<Nsid>,
@@ -21595,7 +21353,6 @@ pub struct Footnote {
   ))]
   pub id: crate::simple_type::IntegerValue,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -21630,7 +21387,8 @@ pub struct Footnote {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub footnote_choice: Vec<FootnoteChoice>,
 }
@@ -21664,7 +21422,6 @@ pub struct Endnote {
   ))]
   pub id: crate::simple_type::IntegerValue,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -21699,7 +21456,8 @@ pub struct Endnote {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub endnote_choice: Vec<EndnoteChoice>,
 }
@@ -22113,7 +21871,6 @@ pub struct DocPartProperties {
 #[sdk(qname = "w:CT_Body/w:docPartBody")]
 pub struct DocPartBody {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -22148,7 +21905,8 @@ pub struct DocPartBody {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub doc_part_body_choice: Vec<DocPartBodyChoice>,
   /// _
@@ -22164,7 +21922,6 @@ pub struct DocPartBody {
 #[sdk(qname = "w:CT_Body/w:body")]
 pub struct Body {
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -22199,7 +21956,8 @@ pub struct Body {
     qname = "w:CT_RunTrackChange/w:moveTo",
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
+    any
   ))]
   pub body_choice: Vec<BodyChoice>,
   /// _
@@ -22522,14 +22280,6 @@ pub struct TableRowPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPr/w:pPr")]
 pub struct ParagraphProperties {
-  pub xml_other_attrs: Vec<(String, String)>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:myattr
-  #[sdk(attr(qname = "w14:myattr"))]
-  pub w14_myattr: Option<crate::simple_type::StringValue>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:CT_String/w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -23692,13 +23442,14 @@ pub struct DocumentProtection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeShort/w:defaultTabStop")]
 pub struct DefaultTabStop {
-  ///
+  /// val
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
-  pub value: Option<crate::simple_type::StringValue>,
+  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  pub val: crate::simple_type::Int16Value,
 }
 /// Number of Pages Per Booklet.
 ///
@@ -25214,14 +24965,9 @@ pub enum CustomXmlRubyChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRubyChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the CustomXmlRuby Class.
   #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRuby>),
@@ -25524,14 +25270,9 @@ pub enum SimpleFieldRubyChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldRubyChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the CustomXmlRuby Class.
   #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRuby>),
@@ -25553,13 +25294,8 @@ pub enum SimpleFieldRubyChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkRubyChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
@@ -25882,31 +25618,12 @@ pub enum RunChoice {
   /// Position of Last Calculated Page Break.
   #[sdk(empty_child(qname = "w:CT_Empty/w:lastRenderedPageBreak"))]
   WLastRenderedPageBreak,
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
-  #[sdk(text)]
-  Text(crate::simple_type::StringValue),
-  #[cfg(feature = "microsoft365")]
-  #[sdk(child(qname = "w16se:CT_SymEx/w16se:sym"))]
-  W16seSym(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2015_wordml_symex::SymEx>,
-  ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunRubyChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -26271,14 +25988,9 @@ pub enum InsertedRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedRunChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -26580,14 +26292,9 @@ pub enum DeletedRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DeletedRunChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -26889,14 +26596,9 @@ pub enum MoveFromRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromRunChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -27198,14 +26900,9 @@ pub enum MoveToRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToRunChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -27518,14 +27215,9 @@ pub enum RunTrackChangeTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -27609,14 +27301,9 @@ pub enum SdtRunChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlBlockChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the CustomXmlBlock Class.
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -27756,14 +27443,9 @@ pub enum CustomXmlBlockChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtBlockChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -28128,14 +27810,9 @@ pub enum ParagraphChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
@@ -28168,14 +27845,9 @@ pub enum ParagraphChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -28259,14 +27931,9 @@ pub enum TableChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice2 {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Table Row.
     #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
@@ -28403,14 +28070,9 @@ pub enum TableChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Table Cell.
     #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
@@ -28547,14 +28209,9 @@ pub enum TableRowChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRowChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Table Row.
     #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
@@ -28691,14 +28348,9 @@ pub enum CustomXmlRowChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRowChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -28782,14 +28434,9 @@ pub enum SdtRowChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
@@ -28932,14 +28579,9 @@ pub enum TableCellChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlCellChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Table Cell.
     #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
@@ -29076,14 +28718,9 @@ pub enum CustomXmlCellChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtCellChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -29448,14 +29085,9 @@ pub enum CustomXmlRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRunChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
@@ -29769,14 +29401,9 @@ pub enum SimpleFieldChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
@@ -29809,13 +29436,8 @@ pub enum SimpleFieldChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRun>),
     #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
@@ -30549,13 +30171,8 @@ pub enum BidirectionalEmbeddingChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBoxContentChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
@@ -30665,13 +30282,8 @@ pub enum TextBoxContentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HeaderChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
@@ -30781,13 +30393,8 @@ pub enum HeaderChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FooterChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
@@ -31141,13 +30748,8 @@ pub enum CheckBoxChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyContentChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
@@ -31389,13 +30991,8 @@ pub enum RubyContentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyBaseChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
@@ -31930,13 +31527,8 @@ pub enum RubyContentTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtPropertiesChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   WRPr(std::boxed::Box<RunProperties>),
   #[sdk(child(qname = "w:CT_String/w:alias"))]
@@ -32037,13 +31629,8 @@ pub enum SdtPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentBlockChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
     #[sdk(child(qname = "w:CT_SdtBlock/w:sdt"))]
@@ -32151,13 +31738,8 @@ pub enum SdtContentBlockChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(
         std::boxed::Box<
@@ -32407,13 +31989,8 @@ pub enum SdtContentRunChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunRubyChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
@@ -32655,13 +32232,8 @@ pub enum SdtContentRunRubyChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentCellChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     #[sdk(child(qname = "w:CT_CustomXmlCell/w:customXml"))]
@@ -32767,13 +32339,8 @@ pub enum SdtContentCellChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRowChoice {
-  #[cfg(not(feature = "mce"))]
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  #[sdk(any)]
+    XmlOther(String),
     #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     #[sdk(child(qname = "w:CT_CustomXmlRow/w:customXml"))]
@@ -32956,14 +32523,9 @@ pub enum CommentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FootnoteChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
@@ -33106,14 +32668,9 @@ pub enum FootnoteChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndnoteChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
@@ -33395,14 +32952,9 @@ pub enum FootnoteEndnoteTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DocPartBodyChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
@@ -33545,14 +33097,9 @@ pub enum DocPartBodyChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyChoice {
-  #[cfg(not(feature = "mce"))]
-    /// Defines the AlternateContent Class.
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    McAlternateContent(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-        >,
-    ),
+  /// Defines the AlternateContent Class.
+    #[sdk(any)]
+    XmlOther(String),
     /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),

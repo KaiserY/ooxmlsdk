@@ -9,7 +9,7 @@ use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ElementKind, EnumDecl, FieldDecl, FieldWireDecl, MemberDecl,
   SchemaModuleDecl, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl, ValidatorKind, VariantDecl,
-  VariantWireDecl, XmlHeaderMode, XmlnsMode,
+  VariantWireDecl, XmlHeaderMode,
 };
 use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::helpers::{
@@ -1882,7 +1882,7 @@ fn is_empty_leaf_marker_type(type_decl: &TypeDecl) -> bool {
     && !type_decl.is_abstract
     && type_decl.xml_content.is_none()
     && type_decl.members.is_empty()
-    && type_decl.support.xmlns_mode == XmlnsMode::None
+    && !type_decl.support.have_xmlns_fields
     && type_decl.support.xml_header == XmlHeaderMode::None
     && !type_decl.support.has_extra_support_fields()
 }
@@ -1896,7 +1896,7 @@ fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
       .is_some_and(|qname| qname.ends_with('/'))
     && type_decl.xml_content.is_none()
     && type_decl.members.is_empty()
-    && type_decl.support.xmlns_mode == XmlnsMode::None
+    && !type_decl.support.have_xmlns_fields
     && type_decl.support.xml_header == XmlHeaderMode::None
     && !type_decl.support.has_extra_support_fields()
 }
@@ -3260,7 +3260,7 @@ fn direct_child_field_needs_box(
 fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   let mut fields = Vec::new();
 
-  if support.xmlns_mode == crate::sdk_code::codegen_ir::XmlnsMode::MapOnly {
+  if support.have_xmlns_fields {
     fields.push(quote! {
       pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     });
@@ -3275,6 +3275,12 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   if support.have_xml_other_attrs {
     fields.push(quote! {
       pub xml_other_attrs: Vec<(String, String)>,
+    });
+  }
+
+  if support.have_xml_other_children {
+    fields.push(quote! {
+      pub xml_other_children: Vec<(usize, String)>,
     });
   }
 
@@ -3820,7 +3826,7 @@ fn collect_resolved_sequence_leafs<'a>(
 fn can_alias_leaf_text_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldDecl]) -> bool {
   type_decl.kind == TypeKind::LeafTextAlias
     && attr_fields.is_empty()
-    && type_decl.support.xmlns_mode == crate::sdk_code::codegen_ir::XmlnsMode::None
+    && !type_decl.support.have_xmlns_fields
     && !type_decl.support.has_extra_support_fields()
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
 }

@@ -1,4 +1,5 @@
 #![cfg(feature = "parts")]
+#![allow(dead_code)]
 
 use std::{
   collections::BTreeMap,

@@ -1,16 +1,3 @@
 {
-  "Types": [
-    {
-      "ClassName": "SymEx",
-      "Name": "w16se:CT_SymEx/w16se:sym",
-      "Attributes": [
-        {
-          "QName": "w:font"
-        },
-        {
-          "QName": "w:char"
-        }
-      ]
-    }
-  ]
+  "Types": []
 }

@@ -1,30 +1,3 @@
 {
-  "Types": [
-    {
-      "ClassName": "RevisionPtr",
-      "Attributes": [
-        {
-          "QName": "xr6:coauthVersionLast",
-          "PropertyName": "xr6:coauthVersionLast",
-          "Type": "UInt64Value",
-          "PropertyComments": "Last coauthoring version.",
-          "Version": "Office2007"
-        },
-        {
-          "QName": "xr6:coauthVersionMax",
-          "PropertyName": "xr6:coauthVersionMax",
-          "Type": "UInt64Value",
-          "PropertyComments": "Maximum coauthoring version.",
-          "Version": "Office2007"
-        },
-        {
-          "QName": "xr10:uidLastSave",
-          "PropertyName": "xr10:uidLastSave",
-          "Type": "StringValue",
-          "PropertyComments": "Last save UID.",
-          "Version": "Office2007"
-        }
-      ]
-    }
-  ]
+  "Types": []
 }

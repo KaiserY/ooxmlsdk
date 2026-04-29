@@ -15,6 +15,7 @@ pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<
@@ -31,13 +32,8 @@ pub struct Macrosheet {
   pub sheet_views: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetViews>,
   >,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Sheet Format Properties
-  #[sdk(mce_child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
+  #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetFormatProperties,
   >,
@@ -62,13 +58,8 @@ pub struct Macrosheet {
   pub x_sort_state: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortState>,
   >,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
+  #[sdk(child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
   pub x_data_consolidate: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataConsolidate,
@@ -138,14 +129,9 @@ pub struct Macrosheet {
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub x_ole_objects:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::OleObjects>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content3:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_DrawingHF/x:drawingHF"))]
+  #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub x_drawing_hf:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DrawingHeaderFooter>,
   /// _

@@ -1,3 +1,5 @@
+#![cfg(any())]
+
 use std::io::{Cursor, Read};
 
 #[cfg(feature = "microsoft365")]

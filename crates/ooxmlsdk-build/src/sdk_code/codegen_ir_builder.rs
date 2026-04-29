@@ -3,7 +3,7 @@ use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ContentParticleDecl, ContentParticleKind, ElementKind, EnumDecl,
   EnumValueType, EnumVariantDecl, FieldDecl, FieldWireDecl, MemberDecl, NumberSignKind,
   SchemaModuleDecl, StringFormatKind, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl,
-  ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode, XmlnsMode,
+  ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode,
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticle, StructuredParticleKind, classify_attr_type,
@@ -25,6 +25,8 @@ use crate::sdk_data::sdk_data_model::{
 use crate::simple_type::simple_type_mapping;
 use crate::utils::escape_snake_case;
 use heck::{ToSnakeCase, ToUpperCamelCase};
+
+const MCE_ALTERNATE_CONTENT_NAME: &str = "mc:CT_AlternateContent/mc:AlternateContent";
 
 fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
   let mut counts = std::collections::HashMap::<String, usize>::new();
@@ -593,17 +595,14 @@ fn build_type_decl(
         .then(|| schema_type.base_class.clone()),
       xml_content,
       support: SystemSupportDecl {
-        xmlns_mode: if schema_type.has_xmlns_fields {
-          XmlnsMode::MapOnly
-        } else {
-          XmlnsMode::None
-        },
+        have_xmlns_fields: schema_type.has_xmlns_fields,
         xml_header: match schema_type.xml_header {
           SchemaTypeXmlHeader::None => XmlHeaderMode::None,
           SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
         have_xml_other_attrs: schema_type_have_xml_other_attrs(schema_type),
+        have_xml_other_children: schema_type_have_xml_other_children(schema_type),
       },
       content_structure: None,
       members,
@@ -1490,6 +1489,22 @@ fn schema_type_have_xml_other_attrs(schema_type: &SchemaType) -> bool {
     || schema_type.has_mc_preserve_elements_field
 }
 
+fn schema_type_have_xml_other_children(schema_type: &SchemaType) -> bool {
+  schema_type
+    .children
+    .iter()
+    .any(schema_child_has_direct_xml_other_child)
+}
+
+fn schema_child_has_direct_xml_other_child(child: &SchemaTypeChild) -> bool {
+  child.name == MCE_ALTERNATE_CONTENT_NAME
+    || (child.kind != SchemaTypeChildKind::Choice
+      && child
+        .children
+        .iter()
+        .any(schema_child_has_direct_xml_other_child))
+}
+
 fn effective_child_kind_from_name(
   child_name: &str,
   child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
@@ -1531,6 +1546,10 @@ fn build_direct_child_member_decls(
   let mut field_name_set = std::collections::HashSet::new();
 
   for child in &schema_type.children {
+    if child.name == MCE_ALTERNATE_CONTENT_NAME {
+      continue;
+    }
+
     if !matches!(
       child.kind,
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child
@@ -1904,6 +1923,19 @@ fn build_simple_one_choice_variant_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
+  if variant.name == MCE_ALTERNATE_CONTENT_NAME {
+    return Ok(MemberDecl::Variant(VariantDecl {
+      rust_name: "XmlOther".to_string(),
+      docs: variant.property_comments.to_string(),
+      version: variant.version.to_string(),
+      wire: VariantWireDecl::Any,
+      payload: TypeRefDecl {
+        rust_type: "String".to_string(),
+        module_path: None,
+      },
+    }));
+  }
+
   let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
 
   let wire = match effective_kind {
@@ -1935,7 +1967,9 @@ fn build_simple_one_choice_variant_decl(
     build_child_type_ref_from_name(variant.name, effective_kind, schema, context)?
   };
 
-  let rust_name = if variant.name.is_empty() {
+  let rust_name = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
+    "XmlOther".to_string()
+  } else if variant.name.is_empty() {
     variant.field_name.to_upper_camel_case()
   } else {
     child_variant_rust_name(variant.name)
@@ -1971,6 +2005,9 @@ fn build_flatten_one_sequence_members(
         let mut child =
           context.resolve_one_sequence_child(schema_type, child_particle.name.as_str())?;
         apply_sequence_child_overrides(&mut child, child_particle);
+        if child.name == MCE_ALTERNATE_CONTENT_NAME {
+          continue;
+        }
         if !field_name_set.insert(child.field_name.to_string()) {
           continue;
         }
@@ -2102,6 +2139,19 @@ fn build_one_sequence_choice_variant_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
+  if variant.name == MCE_ALTERNATE_CONTENT_NAME {
+    return Ok(MemberDecl::Variant(VariantDecl {
+      rust_name: "XmlOther".to_string(),
+      docs: variant.property_comments.to_string(),
+      version: variant.version.to_string(),
+      wire: VariantWireDecl::Any,
+      payload: TypeRefDecl {
+        rust_type: "String".to_string(),
+        module_path: None,
+      },
+    }));
+  }
+
   let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
 
   let wire = match effective_kind {
@@ -2134,7 +2184,9 @@ fn build_one_sequence_choice_variant_decl(
   };
 
   Ok(MemberDecl::Variant(VariantDecl {
-    rust_name: if variant.name.is_empty() {
+    rust_name: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
+      "XmlOther".to_string()
+    } else if variant.name.is_empty() {
       variant.field_name.to_upper_camel_case()
     } else {
       child_variant_rust_name(variant.name)
@@ -2166,6 +2218,9 @@ fn build_structured_one_sequence_members(
       StructuredParticleKind::Leaf(leaf) => {
         let mut child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
         apply_sequence_child_overrides(&mut child, leaf);
+        if child.name == MCE_ALTERNATE_CONTENT_NAME {
+          continue;
+        }
         if !field_name_set.insert(child.field_name.to_string()) {
           continue;
         }
@@ -3647,7 +3702,7 @@ mod tests {
     assert_eq!(ir.types[0].rust_name, "Paragraph");
     assert_eq!(ir.types[0].kind, TypeKind::ElementStruct);
     assert_eq!(ir.types[0].xml_qname.as_deref(), Some("t:CT_P/t:p"));
-    assert_eq!(ir.types[0].support.xmlns_mode, XmlnsMode::MapOnly);
+    assert!(ir.types[0].support.have_xmlns_fields);
     assert_eq!(ir.types[0].support.xml_header, XmlHeaderMode::Standalone);
     assert!(ir.types[0].support.have_xml_other_attrs);
 

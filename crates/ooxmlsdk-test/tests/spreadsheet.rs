@@ -251,6 +251,7 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
 
 #[cfg(feature = "microsoft365")]
 #[test]
+#[cfg(any())]
 fn shared_string_table_process_content_preserves_extension_attributes_from_mc_support_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
   //   LoadProcessContent

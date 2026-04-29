@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "Shape",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

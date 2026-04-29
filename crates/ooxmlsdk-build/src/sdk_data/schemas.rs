@@ -878,12 +878,6 @@ fn flatten_anonymous_choice_children(children: &mut Vec<SchemaTypeChild>) {
   *children = flattened;
 }
 
-pub(crate) fn normalize_schema_type_children(children: &mut [SchemaTypeChild]) {
-  for child in children.iter_mut() {
-    normalize_choice_wrappers(child, false);
-  }
-}
-
 fn collapse_single_anonymous_sequence_child(child: &mut SchemaTypeChild) {
   if child.kind != SchemaTypeChildKind::Sequence || child.children.len() != 1 {
     return;

@@ -2,11 +2,11 @@
   "Types": [
     {
       "ClassName": "DataModelExtensionBlock",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Drawing",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

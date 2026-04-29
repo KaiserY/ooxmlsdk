@@ -284,27 +284,6 @@ pub struct RevisionPtr {
   /// Represents the following attribute in the schema: :documentId
   #[sdk(attr(qname = ":documentId"))]
   pub document_id: crate::simple_type::StringValue,
-  /// Last coauthoring version.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr6:coauthVersionLast
-  #[sdk(attr(qname = "xr6:coauthVersionLast"))]
-  pub xr6_coauth_version_last: Option<crate::simple_type::UInt64Value>,
-  /// Maximum coauthoring version.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr6:coauthVersionMax
-  #[sdk(attr(qname = "xr6:coauthVersionMax"))]
-  pub xr6_coauth_version_max: Option<crate::simple_type::UInt64Value>,
-  /// Last save UID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr10:uidLastSave
-  #[sdk(attr(qname = "xr10:uidLastSave"))]
-  pub xr10_uid_last_save: Option<crate::simple_type::StringValue>,
 }
 /// Defines the StateBasedObject Class.
 ///

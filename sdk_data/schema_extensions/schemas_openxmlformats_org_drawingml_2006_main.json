@@ -2,235 +2,131 @@
   "Types": [
     {
       "ClassName": "RgbColorModelHex",
-      "HasXmlnsFields": true,
-      "HasMcIgnorableField": true
-    },
-    {
-      "ClassName": "PercentageType",
-      "Attributes": [
-        {
-          "QName": ":val",
-          "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "PositivePercentageType",
-      "Attributes": [
-        {
-          "QName": ":val",
-          "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "PositiveFixedPercentageType",
-      "Attributes": [
-        {
-          "QName": ":val",
-          "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "AlphaOffset",
-      "Attributes": [
-        {
-          "QName": ":val",
-          "Type": "StringValue"
-        }
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Graphic",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "GraphicData",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "GraphicFrameLocks",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Blip",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "HyperlinkOnClick",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Offset",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Extents",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Transform2D",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ShapeLocks",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Outline",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "PresetGeometry",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "AdjustValueList",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "NoFill",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "EffectList",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ShapeAutoFit",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "BodyProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "TextBody",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ListStyle",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "TextParagraphPropertiesType",
-      "HasXmlnsFields": true,
-      "Attributes": [
-        {
-          "QName": ":baseline",
-          "PropertyName": "Baseline",
-          "Type": "StringValue",
-          "PropertyComments": "baseline"
-        }
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ParagraphProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Paragraph",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Run",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "RunProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "DefaultRunProperties",
-      "HasXmlnsFields": true,
-      "Attributes": [
-        {
-          "QName": ":baseline",
-          "PropertyName": "Baseline",
-          "Type": "StringValue",
-          "PropertyComments": "baseline"
-        }
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "EndParagraphRunProperties",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "TextCharacterPropertiesType",
-      "HasXmlnsFields": true,
-      "Attributes": [
-        {
-          "QName": ":baseline",
-          "Type": "StringValue"
-        }
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "LatinFont",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "EastAsianFont",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ComplexScriptFont",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "HeadEnd",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "TailEnd",
-      "HasXmlnsFields": true
-    },
-    {
-      "ClassName": "SpacingPercent",
-      "Attributes": [
-        {
-          "QName": ":val",
-          "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "RgbColorModelPercentage",
-      "Attributes": [
-        {
-          "QName": ":r",
-          "Type": "StringValue"
-        },
-        {
-          "QName": ":g",
-          "Type": "StringValue"
-        },
-        {
-          "QName": ":b",
-          "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "Miter",
-      "Attributes": [
-        {
-          "QName": ":lim",
-          "Type": "StringValue"
-        }
-      ]
-    },
-    {
-      "ClassName": "GradientStop",
-      "Attributes": [
-        {
-          "QName": ":pos",
-          "PropertyName": "Position",
-          "Type": "StringValue"
-        }
-      ]
+      "HaveXmlnsFields": true
     }
   ]
 }

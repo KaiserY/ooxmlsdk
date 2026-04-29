@@ -1343,7 +1343,7 @@ pub enum Model3DExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

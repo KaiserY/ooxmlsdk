@@ -1,17 +1,3 @@
 {
-  "Types": [
-    {
-      "ClassName": "Anchor",
-      "Children": [
-        {
-          "Name": "wp:CT_PosH/wp:positionH",
-          "Optional": true
-        },
-        {
-          "Name": "wp:CT_PosV/wp:positionV",
-          "Optional": true
-        }
-      ]
-    }
-  ]
+  "Types": []
 }

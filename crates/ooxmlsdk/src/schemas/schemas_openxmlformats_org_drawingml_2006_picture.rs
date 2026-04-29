@@ -12,6 +12,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
@@ -21,25 +22,15 @@ pub struct Picture {
   /// Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/pic:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "a:CT_ShapeStyle/pic14:style"))]
+  #[sdk(child(qname = "a:CT_ShapeStyle/pic14:style"))]
   pub shape_style: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_picture::ShapeStyle>,
   >,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "a:CT_OfficeArtExtensionList/pic14:extLst"))]
+  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/pic14:extLst"))]
   pub office_art_extension_list: Option<
     crate::schemas::schemas_microsoft_com_office_drawing_2010_picture::OfficeArtExtensionList,
   >,

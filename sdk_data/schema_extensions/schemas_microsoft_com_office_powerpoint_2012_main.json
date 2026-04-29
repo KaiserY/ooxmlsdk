@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "ChartTrackingReferenceBased",
-      "HasXmlnsFields": true
+      "HaveXmlnsFields": true
     }
   ]
 }

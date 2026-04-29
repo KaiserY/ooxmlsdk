@@ -286,10 +286,7 @@ pub struct ChartSpace {
   pub fallback_img: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "cx:CT_ChartData/cx:chartData"))]
-  pub chart_data: Option<std::boxed::Box<ChartData>>,
-  /// _
-  #[sdk(child(qname = "cx:CT_ChartData/cx:chartDataIntentionallyChanged"))]
-  pub chart_data_intentionally_changed: Option<std::boxed::Box<ChartDataIntentionallyChanged>>,
+  pub chart_data: std::boxed::Box<ChartData>,
   /// _
   #[sdk(child(qname = "cx:CT_Chart/cx:chart"))]
   pub chart: std::boxed::Box<Chart>,
@@ -2871,24 +2868,6 @@ pub struct PageSetup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:CT_ChartData/cx:chartData")]
 pub struct ChartData {
-  /// _
-  #[sdk(child(qname = "cx:CT_ExternalData/cx:externalData"))]
-  pub external_data: Option<ExternalData>,
-  /// _
-  #[sdk(child(qname = "cx:CT_Data/cx:data"))]
-  pub cx_data: Vec<Data>,
-  /// _
-  #[sdk(child(qname = "cx:CT_ExtensionList/cx:extLst"))]
-  pub cx_ext_lst: Option<ExtensionList>,
-}
-/// Defines the ChartData Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is cx:chartDataIntentionallyChanged.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cx:CT_ChartData/cx:chartDataIntentionallyChanged")]
-pub struct ChartDataIntentionallyChanged {
   /// _
   #[sdk(child(qname = "cx:CT_ExternalData/cx:externalData"))]
   pub external_data: Option<ExternalData>,

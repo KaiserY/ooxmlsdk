@@ -2174,7 +2174,7 @@ pub struct Tint {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Shade.
 ///
@@ -2197,7 +2197,7 @@ pub struct Shade {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Alpha.
 ///
@@ -2220,7 +2220,7 @@ pub struct Alpha {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Defines the PositiveFixedPercentageType Class.
 ///
@@ -2243,7 +2243,7 @@ pub struct PositiveFixedPercentageType {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Alpha Offset.
 ///
@@ -2266,7 +2266,7 @@ pub struct AlphaOffset {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Alpha Modulation.
 ///
@@ -2283,7 +2283,7 @@ pub struct AlphaModulation {
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Hue Modulate.
 ///
@@ -2300,7 +2300,7 @@ pub struct HueModulation {
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Defines the PositivePercentageType Class.
 ///
@@ -2317,7 +2317,7 @@ pub struct PositivePercentageType {
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Hue.
 ///
@@ -2372,7 +2372,7 @@ pub struct Saturation {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Saturation Offset.
 ///
@@ -2388,7 +2388,7 @@ pub struct SaturationOffset {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Saturation Modulation.
 ///
@@ -2404,7 +2404,7 @@ pub struct SaturationModulation {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Luminance.
 ///
@@ -2420,7 +2420,7 @@ pub struct Luminance {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Luminance Offset.
 ///
@@ -2436,7 +2436,7 @@ pub struct LuminanceOffset {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Luminance Modulation.
 ///
@@ -2452,7 +2452,7 @@ pub struct LuminanceModulation {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Red.
 ///
@@ -2468,7 +2468,7 @@ pub struct Red {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Red Offset.
 ///
@@ -2484,7 +2484,7 @@ pub struct RedOffset {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Red Modulation.
 ///
@@ -2500,7 +2500,7 @@ pub struct RedModulation {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Green.
 ///
@@ -2516,7 +2516,7 @@ pub struct Green {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Green Offset.
 ///
@@ -2532,7 +2532,7 @@ pub struct GreenOffset {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Green Modification.
 ///
@@ -2548,7 +2548,7 @@ pub struct GreenModulation {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Blue.
 ///
@@ -2564,7 +2564,7 @@ pub struct Blue {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Blue Offset.
 ///
@@ -2580,7 +2580,7 @@ pub struct BlueOffset {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Blue Modification.
 ///
@@ -2596,7 +2596,7 @@ pub struct BlueModulation {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Defines the PercentageType Class.
 ///
@@ -2612,7 +2612,7 @@ pub struct PercentageType {
   ///
   /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Extension.
 ///
@@ -2647,21 +2647,21 @@ pub struct RgbColorModelPercentage {
   ///
   /// Represents the following attribute in the schema: :r
   #[sdk(attr(qname = ":r"))]
-  pub red_portion: crate::simple_type::StringValue,
+  pub red_portion: crate::simple_type::Int32Value,
   /// Green
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :g
   #[sdk(attr(qname = ":g"))]
-  pub green_portion: crate::simple_type::StringValue,
+  pub green_portion: crate::simple_type::Int32Value,
   /// Blue
   ///
   /// Available in Office2007 and above.
   ///
   /// Represents the following attribute in the schema: :b
   #[sdk(attr(qname = ":b"))]
-  pub blue_portion: crate::simple_type::StringValue,
+  pub blue_portion: crate::simple_type::Int32Value,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
     qname = "a:CT_PositiveFixedPercentage/a:shade",
@@ -2703,7 +2703,6 @@ pub struct RgbColorModelPercentage {
 #[sdk(qname = "a:CT_SRgbColor/a:srgbClr")]
 pub struct RgbColorModelHex {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
   /// Value
   ///
   /// Available in Office2007 and above.
@@ -4616,7 +4615,7 @@ pub struct Miter {
   /// Represents the following attribute in the schema: :lim
   #[sdk(attr(qname = ":lim"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
-  pub limit: Option<crate::simple_type::StringValue>,
+  pub limit: Option<crate::simple_type::Int32Value>,
 }
 /// Preset Dash.
 ///
@@ -8744,7 +8743,7 @@ pub struct GradientStop {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub position: crate::simple_type::StringValue,
+  pub position: crate::simple_type::Int32Value,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -11248,13 +11247,6 @@ pub struct ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -11412,13 +11404,6 @@ pub struct DefaultParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -11576,13 +11561,6 @@ pub struct Level1ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -11740,13 +11718,6 @@ pub struct Level2ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -11904,13 +11875,6 @@ pub struct Level3ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -12068,13 +12032,6 @@ pub struct Level4ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -12232,13 +12189,6 @@ pub struct Level5ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -12396,13 +12346,6 @@ pub struct Level6ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -12560,13 +12503,6 @@ pub struct Level7ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -12724,13 +12660,6 @@ pub struct Level8ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -12888,13 +12817,6 @@ pub struct Level9ParagraphProperties {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// Line Spacing
   #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
   pub line_spacing: Option<std::boxed::Box<LineSpacing>>,
@@ -13053,13 +12975,6 @@ pub struct TextParagraphPropertiesType {
   /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "a:CT_TextSpacing/a:lnSpc",
     qname = "a:CT_TextSpacing/a:spcBef",
@@ -13204,7 +13119,7 @@ pub struct EndParagraphRunProperties {
   ///
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
+  pub baseline: Option<crate::simple_type::Int32Value>,
   /// noProof
   ///
   /// Available in Office2007 and above.
@@ -13425,7 +13340,7 @@ pub struct RunProperties {
   ///
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
+  pub baseline: Option<crate::simple_type::Int32Value>,
   /// noProof
   ///
   /// Available in Office2007 and above.
@@ -13532,13 +13447,6 @@ pub struct RunProperties {
 #[sdk(qname = "a:CT_TextCharacterProperties/a:defRPr")]
 pub struct DefaultRunProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
   /// kumimoji
   ///
   /// Available in Office2007 and above.
@@ -13647,6 +13555,13 @@ pub struct DefaultRunProperties {
   /// Represents the following attribute in the schema: :normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
+  /// baseline
+  ///
+  /// Available in Office2007 and above.
+  ///
+  /// Represents the following attribute in the schema: :baseline
+  #[sdk(attr(qname = ":baseline"))]
+  pub baseline: Option<crate::simple_type::Int32Value>,
   /// noProof
   ///
   /// Available in Office2007 and above.
@@ -13867,7 +13782,7 @@ pub struct TextCharacterPropertiesType {
   ///
   /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::StringValue>,
+  pub baseline: Option<crate::simple_type::Int32Value>,
   /// noProof
   ///
   /// Available in Office2007 and above.
@@ -13949,10 +13864,10 @@ pub struct Paragraph {
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "a:CT_RegularTextRun/a:r",
     qname = "a:CT_TextLineBreak/a:br",
-    qname = "a:CT_TextField/a:fld"
+    qname = "a:CT_TextField/a:fld",
+    any
   ))]
   #[cfg_attr(feature = "microsoft365", sdk(choice(qname = "a14:CT_TextMath/a14:m")))]
   pub paragraph_choice: Vec<ParagraphChoice>,
@@ -14005,7 +13920,7 @@ pub struct SpacingPercent {
     min_inclusive = true,
     max_inclusive = true
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Spacing Points.
 ///
@@ -14330,13 +14245,13 @@ pub struct GroupShape {
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
   pub visual_group_shape_properties: std::boxed::Box<VisualGroupShapeProperties>,
   #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "a:CT_GvmlTextShape/a:txSp",
     qname = "a:CT_GvmlShape/a:sp",
     qname = "a:CT_GvmlConnector/a:cxnSp",
     qname = "a:CT_GvmlPicture/a:pic",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
-    qname = "a:CT_GvmlGroupShape/a:grpSp"
+    qname = "a:CT_GvmlGroupShape/a:grpSp",
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -18126,13 +18041,8 @@ pub enum TextCharacterPropertiesTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "a:CT_RegularTextRun/a:r"))]
   AR(std::boxed::Box<Run>),
   #[sdk(child(qname = "a:CT_TextLineBreak/a:br"))]
@@ -18219,7 +18129,7 @@ pub enum ShapePropertiesExtensionChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ShadowObscured>,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GvmlGroupShapeExtensionChoice {
@@ -18229,7 +18139,7 @@ pub enum GvmlGroupShapeExtensionChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::IsCanvas>,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VisualGroupShapePropertiesChoice {
@@ -18256,13 +18166,8 @@ pub enum VisualGroupShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[cfg(not(feature = "mce"))]
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   ATxSp(std::boxed::Box<TextShape>),
   #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]
@@ -18293,7 +18198,7 @@ pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeStyleSheetExtensionChoice {
@@ -18303,14 +18208,14 @@ pub enum OfficeStyleSheetExtensionChoice {
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_thememl_2012_main::ThemeFamily>,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectorLockingExtensionChoice {
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   AGraphic(std::boxed::Box<Graphic>),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkTypeChoice {
@@ -18338,7 +18243,7 @@ pub enum DataModelExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PtExtensionChoice {
@@ -18350,7 +18255,7 @@ pub enum PtExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkExtensionChoice {
@@ -18362,7 +18267,7 @@ pub enum HyperlinkExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesExtensionChoice {
@@ -18374,7 +18279,7 @@ pub enum LinePropertiesExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
@@ -18428,7 +18333,7 @@ pub enum NonVisualDrawingPropertiesExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
@@ -18464,7 +18369,7 @@ pub enum NonVisualPicturePropertiesExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipExtensionChoice {
@@ -18518,5 +18423,5 @@ pub enum BlipExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }

@@ -2773,13 +2773,7 @@ pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// Revision ID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr:uid
-  #[sdk(attr(qname = "xr:uid"))]
-  pub xr_uid: Option<crate::simple_type::StringValue>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -2789,13 +2783,8 @@ pub struct Worksheet {
   /// _
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<std::boxed::Box<SheetViews>>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
+  #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<SheetFormatProperties>,
   /// _
   #[sdk(child(qname = "x:CT_Cols/x:cols"))]
@@ -2821,13 +2810,8 @@ pub struct Worksheet {
   /// _
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub x_sort_state: Option<std::boxed::Box<SortState>>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
+  #[sdk(child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
   pub x_data_consolidate: Option<std::boxed::Box<DataConsolidate>>,
   /// _
   #[sdk(child(qname = "x:CT_CustomSheetViews/x:customSheetViews"))]
@@ -2916,6 +2900,7 @@ pub struct Chartsheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Chart Sheet Properties
   #[sdk(child(qname = "x:CT_ChartsheetPr/x:sheetPr"))]
   pub chart_sheet_properties: Option<std::boxed::Box<ChartSheetProperties>>,
@@ -2946,14 +2931,9 @@ pub struct Chartsheet {
   /// Legacy Drawing Reference in  Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_DrawingHF/x:drawingHF"))]
+  #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// _
   #[sdk(child(qname = "x:CT_SheetBackgroundPicture/x:picture"))]
@@ -2976,19 +2956,15 @@ pub struct DialogSheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
   /// Dialog Sheet Views
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<std::boxed::Box<SheetViews>>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   /// Dialog Sheet Format Properties
-  #[sdk(mce_child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
+  #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<SheetFormatProperties>,
   /// Sheet Protection
   #[sdk(child(qname = "x:CT_SheetProtection/x:sheetProtection"))]
@@ -3017,26 +2993,16 @@ pub struct DialogSheet {
   /// Legacy Drawing Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_DrawingHF/x:drawingHF"))]
+  #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// _
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub ole_objects: Option<OleObjects>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content3:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_Controls/x:controls"))]
+  #[sdk(child(qname = "x:CT_Controls/x:controls"))]
   pub controls: Option<Controls>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -3101,16 +3067,12 @@ pub struct Stylesheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_NumFmts/x:numFmts"))]
   pub numbering_formats: Option<NumberingFormats>,
-  #[cfg(not(feature = "mce"))]
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_Fonts/x:fonts"))]
+  #[sdk(child(qname = "x:CT_Fonts/x:fonts"))]
   pub fonts: Option<Fonts>,
   /// _
   #[sdk(child(qname = "x:CT_Fills/x:fills"))]
@@ -3326,13 +3288,6 @@ pub struct Table {
   /// Represents the following attribute in the schema: :connectionId
   #[sdk(attr(qname = ":connectionId"))]
   pub connection_id: Option<crate::simple_type::UInt32Value>,
-  /// Revision ID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr:uid
-  #[sdk(attr(qname = "xr:uid"))]
-  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// Table AutoFilter
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub auto_filter: Option<std::boxed::Box<AutoFilter>>,
@@ -3378,6 +3333,7 @@ pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// conformance
   ///
   /// Available in Office2007 and above.
@@ -3394,24 +3350,14 @@ pub struct Workbook {
   /// _
   #[sdk(child(qname = "x:CT_WorkbookPr/x:workbookPr"))]
   pub workbook_properties: Option<WorkbookProperties>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
+  #[sdk(child(qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
   pub absolute_path:
     Option<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_ac::AbsolutePath>,
   /// _
   #[sdk(child(qname = "x:CT_WorkbookProtection/x:workbookProtection"))]
   pub workbook_protection: Option<WorkbookProtection>,
-  #[cfg(feature = "microsoft365")]
-  /// _
-  #[sdk(child(qname = "xr:CT_RevisionPtr/xr:revisionPtr"))]
-  pub xr_revision_ptr:
-    Option<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2014_revision::RevisionPtr>,
   /// _
   #[sdk(child(qname = "x:CT_BookViews/x:bookViews"))]
   pub book_views: Option<BookViews>,
@@ -3460,6 +3406,7 @@ pub struct Workbook {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FilterColumn/x:filterColumn")]
 pub struct FilterColumn {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Filter Column Data
   ///
   /// Available in Office2007 and above.
@@ -3512,6 +3459,7 @@ pub struct FilterColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SortState/x:sortState")]
 pub struct SortState {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Sort by Columns
   ///
   /// Available in Office2007 and above.
@@ -3540,11 +3488,6 @@ pub struct SortState {
   /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(qname = "x:CT_SortCondition/x:sortCondition"))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -3661,13 +3604,9 @@ pub struct Authors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CommentList/x:commentList")]
 pub struct CommentList {
-  #[cfg(not(feature = "mce"))]
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_Comment/x:comment"))]
+  #[sdk(child(qname = "x:CT_Comment/x:comment"))]
   pub x_comment: Vec<Comment>,
 }
 /// Comment.
@@ -3678,6 +3617,7 @@ pub struct CommentList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Comment/x:comment")]
 pub struct Comment {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Cell Reference
   ///
   /// Available in Office2007 and above.
@@ -3715,14 +3655,9 @@ pub struct Comment {
   /// Comment Text
   #[sdk(child(qname = "x:CT_Rst/x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_CommentPr/x:commentPr"))]
+  #[sdk(child(qname = "x:CT_CommentPr/x:commentPr"))]
   pub comment_properties: Option<std::boxed::Box<CommentProperties>>,
 }
 /// Author.
@@ -3751,27 +3686,6 @@ pub struct Author {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:t")]
 pub struct Text {
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:a
-  #[sdk(attr(qname = "w14:a"))]
-  pub w14_a: Option<crate::simple_type::StringValue>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:b
-  #[sdk(attr(qname = "w14:b"))]
-  pub w14_b: Option<crate::simple_type::StringValue>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:c
-  #[sdk(attr(qname = "w14:c"))]
-  pub w14_c: Option<crate::simple_type::StringValue>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -7690,56 +7604,6 @@ pub struct QueryTableField {
 #[sdk(qname = "x:CT_Rst/x:si")]
 pub struct SharedStringItem {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:attr
-  #[sdk(attr(qname = "w14:attr"))]
-  pub w14_attr: Option<crate::simple_type::StringValue>,
-  /// _
-  #[sdk(child(qname = "w14:CT_Rst/w14:placeholder"))]
-  pub w14_placeholder: Option<std::boxed::Box<Placeholder>>,
-  /// No Value.
-  #[sdk(empty_child(qname = "w14:CT_Empty/w14:no"))]
-  pub w14_no: Option<()>,
-  /// Text
-  #[sdk(child(qname = "x:CT_Xstring/x:t"))]
-  pub text: Option<Text>,
-  /// _
-  #[sdk(child(qname = "x:CT_RElt/x:r"))]
-  pub x_r: Vec<Run>,
-  /// _
-  #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
-  pub x_r_ph: Vec<PhoneticRun>,
-  /// _
-  #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
-  pub x_phonetic_pr: Option<PhoneticProperties>,
-}
-/// String Item.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:placeholder.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Rst/w14:placeholder")]
-pub struct Placeholder {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  /// Preserved Word 2010 extension attribute.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:attr
-  #[sdk(attr(qname = "w14:attr"))]
-  pub w14_attr: Option<crate::simple_type::StringValue>,
-  /// _
-  #[sdk(child(qname = "w14:CT_Rst/w14:placeholder"))]
-  pub w14_placeholder: Option<std::boxed::Box<Placeholder>>,
-  /// No Value.
-  #[sdk(empty_child(qname = "w14:CT_Empty/w14:no"))]
-  pub w14_no: Option<()>,
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
@@ -10922,13 +10786,6 @@ pub struct AutoFilter {
   /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
-  /// Revision ID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr:uid
-  #[sdk(attr(qname = "xr:uid"))]
-  pub xr_uid: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
   pub x_filter_column: Vec<FilterColumn>,
@@ -11097,13 +10954,6 @@ pub struct Hyperlink {
   /// Represents the following attribute in the schema: :display
   #[sdk(attr(qname = ":display"))]
   pub display: Option<crate::simple_type::StringValue>,
-  /// Revision ID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr:uid
-  #[sdk(attr(qname = "xr:uid"))]
-  pub xr_uid: Option<crate::simple_type::StringValue>,
 }
 /// Conditional Format Value Object.
 ///
@@ -11607,6 +11457,7 @@ pub struct InputCells {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Control/x:control")]
 pub struct Control {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Shape Id
   ///
   /// Available in Office2007 and above.
@@ -11628,14 +11479,9 @@ pub struct Control {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_ControlPr/x:controlPr"))]
+  #[sdk(child(qname = "x:CT_ControlPr/x:controlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Ignored Error.
@@ -11741,6 +11587,7 @@ pub struct MergeCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataValidation/x:dataValidation")]
 pub struct DataValidation {
+  pub xml_other_children: Vec<(usize, String)>,
   /// type
   ///
   /// Available in Office2007 and above.
@@ -11832,18 +11679,6 @@ pub struct DataValidation {
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
   pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
-  /// Revision ID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr:uid
-  #[sdk(attr(qname = "xr:uid"))]
-  pub xr_uid: Option<crate::simple_type::StringValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(text_child(qname = "x:ST_Xstring/x12ac:list"))]
@@ -12201,6 +12036,7 @@ pub struct CustomSheetView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleObject/x:oleObject")]
 pub struct OleObject {
+  pub xml_other_children: Vec<(usize, String)>,
   /// OLE ProgId
   ///
   /// Available in Office2007 and above.
@@ -12250,14 +12086,9 @@ pub struct OleObject {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_ObjectPr/x:objectPr"))]
+  #[sdk(child(qname = "x:CT_ObjectPr/x:objectPr"))]
   pub embedded_object_properties: Option<std::boxed::Box<EmbeddedObjectProperties>>,
 }
 /// Metadata Types Collection.
@@ -13272,6 +13103,7 @@ pub struct Fill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Border/x:border")]
 pub struct Border {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Diagonal Up
   ///
   /// Available in Office2007 and above.
@@ -13293,23 +13125,13 @@ pub struct Border {
   /// Represents the following attribute in the schema: :outline
   #[sdk(attr(qname = ":outline"))]
   pub outline: Option<crate::simple_type::BooleanValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_BorderPr/x:start"))]
+  #[sdk(child(qname = "x:CT_BorderPr/x:start"))]
   pub start_border: Option<std::boxed::Box<StartBorder>>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content2:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[cfg(feature = "microsoft365")]
   /// _
-  #[sdk(mce_child(qname = "x:CT_BorderPr/x:end"))]
+  #[sdk(child(qname = "x:CT_BorderPr/x:end"))]
   pub end_border: Option<std::boxed::Box<EndBorder>>,
   /// Left Border
   #[sdk(child(qname = "x:CT_BorderPr/x:left"))]
@@ -13883,10 +13705,7 @@ pub struct Value {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
-  #[sdk(choice(
-    qname = "mc:CT_AlternateContent/mc:AlternateContent",
-    qname = "x:CT_OleItem/x:oleItem"
-  ))]
+  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem", any))]
   #[cfg_attr(
     feature = "microsoft365",
     sdk(choice(qname = "x14:CT_OleItem/x14:oleItem"))
@@ -13901,6 +13720,7 @@ pub struct OleItems {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalBook/x:externalBook")]
 pub struct ExternalBook {
+    pub xml_other_children: Vec<(usize, String)>,
     /// Relationship to supporting book file path
     ///
     /// Available in Office2007 and above.
@@ -13908,15 +13728,9 @@ pub struct ExternalBook {
     /// Represents the following attribute in the schema: r:id
     #[sdk(attr(qname = "r:id"))]
     pub id: crate::simple_type::StringValue,
-    #[cfg(not(feature = "mce"))]
-    /// _
-    #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-    pub mc_alternate_content: Option<
-        crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
     #[cfg(feature = "microsoft365")]
     /// Alternate URLs and identifiers of the external book
-    #[sdk(mce_child(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"))]
+    #[sdk(child(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"))]
     pub external_book_alternate_urls: Option<
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2021_extlinks2021::ExternalBookAlternateUrls,
@@ -14098,13 +13912,6 @@ pub struct TableColumn {
   /// Represents the following attribute in the schema: :totalsRowCellStyle
   #[sdk(attr(qname = ":totalsRowCellStyle"))]
   pub totals_row_cell_style: Option<crate::simple_type::StringValue>,
-  /// Revision ID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr3:uid
-  #[sdk(attr(qname = "xr3:uid"))]
-  pub xr3_uid: Option<crate::simple_type::StringValue>,
   /// Calculated Column Formula
   #[sdk(child(qname = "x:CT_TableFormula/x:calculatedColumnFormula"))]
   pub calculated_column_formula: Option<CalculatedColumnFormula>,
@@ -14730,13 +14537,6 @@ pub struct WorkbookView {
   /// Represents the following attribute in the schema: :autoFilterDateGrouping
   #[sdk(attr(qname = ":autoFilterDateGrouping"))]
   pub auto_filter_date_grouping: Option<crate::simple_type::BooleanValue>,
-  /// Revision UID.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xr2:uid
-  #[sdk(attr(qname = "xr2:uid"))]
-  pub xr2_uid: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -15955,13 +15755,9 @@ pub struct IconSet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRuleExtensionList/x:extLst")]
 pub struct ConditionalFormattingRuleExtensionList {
-  #[cfg(not(feature = "mce"))]
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_CfRuleExtension/x:ext"))]
+  #[sdk(child(qname = "x:CT_CfRuleExtension/x:ext"))]
   pub x_ext: Vec<ConditionalFormattingRuleExtension>,
 }
 /// Data Consolidation References.
@@ -16388,13 +16184,9 @@ pub struct Columns {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetData/x:sheetData")]
 pub struct SheetData {
-  #[cfg(not(feature = "mce"))]
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_Row/x:row"))]
+  #[sdk(child(qname = "x:CT_Row/x:row"))]
   pub x_row: Vec<Row>,
 }
 /// Data Consolidation.
@@ -16916,6 +16708,7 @@ pub struct DateGroupItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Filters/x:filters")]
 pub struct Filters {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Filter by Blank
   ///
   /// Available in Office2007 and above.
@@ -19106,13 +18899,9 @@ pub struct Maps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCacheDefinitionExtensionList/x:extLst")]
 pub struct PivotCacheDefinitionExtensionList {
-  #[cfg(not(feature = "mce"))]
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Vec<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
-  /// _
-  #[sdk(mce_child(qname = "x:CT_PivotCacheDefinitionExtension/x:ext"))]
+  #[sdk(child(qname = "x:CT_PivotCacheDefinitionExtension/x:ext"))]
   pub x_ext: Vec<PivotCacheDefinitionExtension>,
 }
 /// Defines the PivotCacheDefinitionExtension Class.
@@ -20291,14 +20080,9 @@ pub enum FillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleItemsChoice {
-  #[cfg(not(feature = "mce"))]
   /// Defines the AlternateContent Class.
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  McAlternateContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
-    >,
-  ),
+  #[sdk(any)]
+  XmlOther(String),
   /// OLE Link Item.
   #[sdk(child(qname = "x:CT_OleItem/x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
@@ -20332,7 +20116,7 @@ pub enum ConditionalFormattingRuleExtensionChoice {
   #[sdk(text_child(qname = "x:ST_Guid/x14:id"))]
   X14Id(crate::simple_type::StringValue),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotHierarchyExtensionChoice {
@@ -20344,7 +20128,7 @@ pub enum PivotHierarchyExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFieldExtensionChoice {
@@ -20356,7 +20140,7 @@ pub enum PivotFieldExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceExtensionChoice {
@@ -20368,7 +20152,7 @@ pub enum CacheSourceExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FiltersChoice {
@@ -20408,7 +20192,7 @@ pub enum SlicerCacheDefinitionExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFilterExtensionChoice {
@@ -20427,7 +20211,7 @@ pub enum PivotFilterExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum QueryTableExtensionChoice {
@@ -20439,7 +20223,7 @@ pub enum QueryTableExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectionExtensionChoice {
@@ -20458,7 +20242,7 @@ pub enum ConnectionExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SharedItemsChoice {
@@ -20505,7 +20289,7 @@ pub enum CacheFieldExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheHierarchyExtensionChoice {
@@ -20524,7 +20308,7 @@ pub enum CacheHierarchyExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CalculatedMemberExtensionChoice {
@@ -20543,7 +20327,7 @@ pub enum CalculatedMemberExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataFieldExtensionChoice {
@@ -20562,7 +20346,7 @@ pub enum DataFieldExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorksheetExtensionChoice {
@@ -20623,7 +20407,7 @@ pub enum WorksheetExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StylesheetExtensionChoice {
@@ -20656,7 +20440,7 @@ pub enum StylesheetExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotTableDefinitionExtensionChoice {
@@ -20689,7 +20473,7 @@ pub enum PivotTableDefinitionExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceChoice {
@@ -20765,7 +20549,7 @@ pub enum PivotCacheDefinitionExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableExtensionChoice {
@@ -20782,7 +20566,7 @@ pub enum TableExtensionChoice {
     >,
   ),
   #[sdk(any)]
-  UnknownXml(String),
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorkbookExtensionChoice {
@@ -20889,5 +20673,5 @@ pub enum WorkbookExtensionChoice {
         >,
     ),
     #[sdk(any)]
-    UnknownXml(String),
+    XmlOther(String),
 }

@@ -131,23 +131,16 @@ pub enum ContentParticleKind {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct SystemSupportDecl {
-  pub xmlns_mode: XmlnsMode,
+  pub have_xmlns_fields: bool,
   pub xml_header: XmlHeaderMode,
   pub have_xml_other_attrs: bool,
+  pub have_xml_other_children: bool,
 }
 
 impl SystemSupportDecl {
   pub fn has_extra_support_fields(&self) -> bool {
-    self.have_xml_other_attrs
+    self.have_xmlns_fields || self.have_xml_other_attrs || self.have_xml_other_children
   }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "PascalCase")]
-pub enum XmlnsMode {
-  #[default]
-  None,
-  MapOnly,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -353,9 +346,10 @@ mod tests {
         base_rust_name: None,
         xml_content: None,
         support: SystemSupportDecl {
-          xmlns_mode: XmlnsMode::MapOnly,
+          have_xmlns_fields: true,
           xml_header: XmlHeaderMode::Standalone,
           have_xml_other_attrs: true,
+          have_xml_other_children: true,
         },
         content_structure: None,
         members: vec![

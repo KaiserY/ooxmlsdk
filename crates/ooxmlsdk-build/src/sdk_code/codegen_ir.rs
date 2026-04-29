@@ -133,20 +133,12 @@ pub enum ContentParticleKind {
 pub struct SystemSupportDecl {
   pub xmlns_mode: XmlnsMode,
   pub xml_header: XmlHeaderMode,
-  pub has_mc_ignorable: bool,
-  pub has_mc_must_understand: bool,
-  pub has_mc_process_content: bool,
-  pub has_mc_preserve_attributes: bool,
-  pub has_mc_preserve_elements: bool,
+  pub have_xml_other_attrs: bool,
 }
 
 impl SystemSupportDecl {
-  pub fn has_mc_global_attrs(&self) -> bool {
-    self.has_mc_ignorable
-      || self.has_mc_must_understand
-      || self.has_mc_process_content
-      || self.has_mc_preserve_attributes
-      || self.has_mc_preserve_elements
+  pub fn has_extra_support_fields(&self) -> bool {
+    self.have_xml_other_attrs
   }
 }
 
@@ -363,11 +355,7 @@ mod tests {
         support: SystemSupportDecl {
           xmlns_mode: XmlnsMode::MapOnly,
           xml_header: XmlHeaderMode::Standalone,
-          has_mc_ignorable: true,
-          has_mc_must_understand: false,
-          has_mc_process_content: false,
-          has_mc_preserve_attributes: false,
-          has_mc_preserve_elements: false,
+          have_xml_other_attrs: true,
         },
         content_structure: None,
         members: vec![

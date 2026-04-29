@@ -1137,7 +1137,7 @@ pub struct CommentPropertiesExtension {
 pub struct CommentAuthorList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p:CT_CommentAuthor/p:cmAuthor"))]
   pub p_cm_author: Vec<CommentAuthor>,
@@ -1152,7 +1152,7 @@ pub struct CommentAuthorList {
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p:CT_Comment/p:cm"))]
   pub p_cm: Vec<Comment>,
@@ -1236,7 +1236,7 @@ pub struct OleObject {
 pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// serverZoom
   ///
   /// Available in Office2007 and above.
@@ -1386,7 +1386,7 @@ pub struct Presentation {
 pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:CT_HtmlPublishProperties/p:htmlPubPr"))]
   pub html_publish_properties: Option<std::boxed::Box<HtmlPublishProperties>>,
@@ -1416,7 +1416,7 @@ pub struct PresentationProperties {
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Show Master Shapes
   ///
   /// Available in Office2007 and above.
@@ -1469,7 +1469,7 @@ pub struct Slide {
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Show Master Shapes
   ///
   /// Available in Office2007 and above.
@@ -1547,7 +1547,7 @@ pub struct SlideLayout {
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// preserve
   ///
   /// Available in Office2007 and above.
@@ -1595,7 +1595,7 @@ pub struct SlideMaster {
 pub struct HandoutMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1619,7 +1619,7 @@ pub struct HandoutMaster {
 pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1646,7 +1646,7 @@ pub struct NotesMaster {
 pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Show Master Shapes
   ///
   /// Available in Office2007 and above.
@@ -1681,7 +1681,7 @@ pub struct NotesSlide {
 pub struct SlideSyncProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Server's Slide File ID
   ///
   /// Available in Office2007 and above.
@@ -1717,7 +1717,7 @@ pub struct SlideSyncProperties {
 pub struct TagList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p:CT_StringTag/p:tag"))]
   pub p_tag: Vec<Tag>,
@@ -1732,7 +1732,7 @@ pub struct TagList {
 pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Last View
   ///
   /// Available in Office2007 and above.

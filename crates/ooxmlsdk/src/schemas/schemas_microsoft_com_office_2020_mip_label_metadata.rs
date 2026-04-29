@@ -14,7 +14,7 @@
 pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "clbl:CT_ClassificationLabel/clbl:label"))]
   pub clbl_label: Vec<ClassificationLabel>,

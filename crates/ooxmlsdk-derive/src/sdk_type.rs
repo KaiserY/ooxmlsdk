@@ -2561,7 +2561,7 @@ fn expand_named_struct(
   let mut text_field = None;
   let mut xmlns_fields = Vec::new();
   let mut xml_header_field = None;
-  let mut mc_ignorable_field = None;
+  let mut xml_other_attrs_field = None;
   let mut ordered_field_specs = Vec::new();
 
   for field in &fields.named {
@@ -2577,8 +2577,8 @@ fn expand_named_struct(
       xml_header_field = Some(field_ident.clone());
       continue;
     }
-    if is_mc_ignorable_field(field_ident) {
-      mc_ignorable_field = Some(field_ident.clone());
+    if field_ident == "xml_other_attrs" {
+      xml_other_attrs_field = Some(field_ident.clone());
       continue;
     }
 
@@ -2656,7 +2656,7 @@ fn expand_named_struct(
 
   let has_xmlns_fields = !xmlns_fields.is_empty();
   let has_xml_header_field = xml_header_field.is_some();
-  let has_mc_ignorable_field = mc_ignorable_field.is_some();
+  let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
 
   let mut attr_decl_tokens = Vec::new();
   let mut attr_parse_tokens = Vec::new();
@@ -2849,31 +2849,35 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let mc_ignorable_parse_tokens = if has_mc_ignorable_field {
+  let xml_other_attrs_parse_tokens = if has_xml_other_attrs_field {
     quote! {
-      b"mc:Ignorable" => {
-        mc_ignorable = Some(crate::common::decode_attr_value(&attr, decoder)?);
+      b"xmlns" => {}
+      key if key.starts_with(b"xmlns:") => {}
+      key => {
+        xml_other_attrs.push((
+          String::from_utf8_lossy(key).into_owned(),
+          crate::common::decode_attr_value(&attr, decoder)?,
+        ));
       }
     }
   } else {
-    quote! {}
+    quote! { _ => {} }
   };
   let namespace_attr_parse_tokens =
-    if attr_fields.is_empty() && !has_xmlns_fields && !has_mc_ignorable_field {
+    if attr_fields.is_empty() && !has_xmlns_fields && !has_xml_other_attrs_field {
       quote! {}
     } else {
-      match (has_xmlns_fields, has_mc_ignorable_field) {
+      match (has_xmlns_fields, has_xml_other_attrs_field) {
         (true, true) => quote! {
           let mut xmlns = Vec::<crate::common::XmlNamespaceDecl>::new();
-          let mut mc_ignorable = None;
+          let mut xml_other_attrs = Vec::<(String, String)>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
               match attr.key.as_ref() {
                 #xmlns_parse_tokens
-                #mc_ignorable_parse_tokens
                 #( #attr_parse_tokens )*
-              _ => {}
+                #xml_other_attrs_parse_tokens
             }
           }
         },
@@ -2890,14 +2894,13 @@ fn expand_named_struct(
           }
         },
         (false, true) => quote! {
-          let mut mc_ignorable = None;
+          let mut xml_other_attrs = Vec::<(String, String)>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
             match attr.key.as_ref() {
-              #mc_ignorable_parse_tokens
               #( #attr_parse_tokens )*
-              _ => {}
+              #xml_other_attrs_parse_tokens
             }
           }
         },
@@ -5195,10 +5198,10 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let mc_ignorable_write_tokens = if has_mc_ignorable_field {
+  let xml_other_attrs_write_tokens = if has_xml_other_attrs_field {
     quote! {
-      if let Some(mc_ignorable) = &self.mc_ignorable {
-        crate::common::write_attr_value_str(writer, "mc:Ignorable", mc_ignorable.as_ref())?;
+      for (name, value) in &self.xml_other_attrs {
+        crate::common::write_attr_value_str(writer, name.as_str(), value.as_str())?;
       }
     }
   } else {
@@ -5211,9 +5214,9 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let mc_ignorable_init_tokens = if has_mc_ignorable_field {
+  let xml_other_attrs_init_tokens = if has_xml_other_attrs_field {
     quote! {
-      mc_ignorable,
+      xml_other_attrs,
     }
   } else {
     quote! {}
@@ -5373,7 +5376,7 @@ fn expand_named_struct(
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
           #xml_header_init_tokens
-          #mc_ignorable_init_tokens
+          #xml_other_attrs_init_tokens
         })
       }
 
@@ -5427,7 +5430,7 @@ fn expand_named_struct(
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
           #xml_header_init_tokens
-          #mc_ignorable_init_tokens
+          #xml_other_attrs_init_tokens
         })
       }
 
@@ -5457,8 +5460,8 @@ fn expand_named_struct(
         #xml_header_tokens
         crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         #special_namespace_write_tokens
-        #mc_ignorable_write_tokens
         #( #attr_write_tokens )*
+        #xml_other_attrs_write_tokens
         if #has_body {
           writer.write_all(b">")?;
           #( #ordered_write_tokens )*

@@ -170,7 +170,20 @@ pub fn apply_schema_extensions(
         schema_type.text_value_type = text_value_type.clone();
       }
 
-      merge_schema_type_attributes(&mut schema_type.attributes, &extension.attributes);
+      if extension
+        .attributes
+        .iter()
+        .any(|attribute| is_mce_attribute(&attribute.q_name))
+      {
+        schema_type.has_mc_ignorable_field = true;
+      }
+      let extension_attributes: Vec<_> = extension
+        .attributes
+        .iter()
+        .filter(|attribute| !is_mce_attribute(&attribute.q_name))
+        .cloned()
+        .collect();
+      merge_schema_type_attributes(&mut schema_type.attributes, &extension_attributes);
       let mut expanded_children =
         expand_mc_alternate_content_insert_before(&extension.mc_alternate_content_insert_before);
       expanded_children.extend(extension.children.iter().cloned());
@@ -198,6 +211,10 @@ pub fn apply_schema_extensions(
   }
 
   Ok(())
+}
+
+fn is_mce_attribute(qname: &str) -> bool {
+  qname.starts_with("mc:")
 }
 
 fn expand_mc_alternate_content_insert_before(

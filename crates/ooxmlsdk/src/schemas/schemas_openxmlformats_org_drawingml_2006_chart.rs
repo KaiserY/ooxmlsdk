@@ -2161,7 +2161,7 @@ pub struct DoubleType {
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Version number of the file, as determined by the features used by this chart
   ///
   /// Available in Office2007 and above.
@@ -2244,7 +2244,7 @@ pub struct ChartSpace {
 pub struct UserShapes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor",
     qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor"

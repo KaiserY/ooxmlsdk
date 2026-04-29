@@ -159,7 +159,7 @@ pub struct RichSortCondition {
 pub struct SupportingPropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "xlrd2:CT_SupportingPropertyBagArrayData/xlrd2:spbArrays"))]
   pub supporting_property_bag_array_data: Option<std::boxed::Box<SupportingPropertyBagArrayData>>,
@@ -177,7 +177,7 @@ pub struct SupportingPropertyBags {
 pub struct SupportingPropertyBagStructures {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// count
   ///
   /// Available in Office2019 and above.
@@ -202,7 +202,7 @@ pub struct SupportingPropertyBagStructures {
 pub struct ArrayData {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// count
   ///
   /// Available in Office2019 and above.
@@ -227,7 +227,7 @@ pub struct ArrayData {
 pub struct RichStylesheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x:CT_Dxfs/xlrd2:dxfs"))]
   pub dxfs: Option<Dxfs>,
@@ -251,7 +251,7 @@ pub struct RichStylesheet {
 pub struct RichValueTypesInfo {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "xlrd2:CT_RichValueGlobalType/xlrd2:global"))]
   pub rich_value_global_type: Option<std::boxed::Box<RichValueGlobalType>>,

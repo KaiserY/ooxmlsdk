@@ -2703,7 +2703,7 @@ pub struct RgbColorModelPercentage {
 #[sdk(qname = "a:CT_SRgbColor/a:srgbClr")]
 pub struct RgbColorModelHex {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Value
   ///
   /// Available in Office2007 and above.
@@ -6261,7 +6261,7 @@ pub struct Blip {
 pub struct Theme {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -6308,7 +6308,7 @@ pub struct Theme {
 pub struct ThemeOverride {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Scheme
   #[sdk(child(qname = "a:CT_ColorScheme/a:clrScheme"))]
   pub color_scheme: Option<std::boxed::Box<ColorScheme>>,
@@ -6347,7 +6347,7 @@ pub struct Table {
 pub struct TableStyleList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Default
   ///
   /// Available in Office2007 and above.

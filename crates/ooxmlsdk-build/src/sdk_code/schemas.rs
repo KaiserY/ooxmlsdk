@@ -1034,7 +1034,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       let mut fields: Vec<TokenStream> = vec![];
 
       fields.extend(gen_support_fields(&type_decl.support));
-      fields.extend(gen_mce_global_attr_fields(type_decl, &attr_fields)?);
 
       for attr in &attr_fields {
         fields.push(gen_attr_from_decl(attr, field_version_cfg).map_err(|err| {
@@ -1071,7 +1070,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     let items: Vec<TokenStream> = vec![];
 
     fields.extend(gen_support_fields(&type_decl.support));
-    fields.extend(gen_mce_global_attr_fields(type_decl, &attr_fields)?);
 
     if type_decl.element_kind == Some(ElementKind::LeafText) {
       for attr in &attr_fields {
@@ -1886,7 +1884,7 @@ fn is_empty_leaf_marker_type(type_decl: &TypeDecl) -> bool {
     && type_decl.members.is_empty()
     && type_decl.support.xmlns_mode == XmlnsMode::None
     && type_decl.support.xml_header == XmlHeaderMode::None
-    && !type_decl.support.has_mc_global_attrs()
+    && !type_decl.support.has_extra_support_fields()
 }
 
 fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
@@ -1900,7 +1898,7 @@ fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
     && type_decl.members.is_empty()
     && type_decl.support.xmlns_mode == XmlnsMode::None
     && type_decl.support.xml_header == XmlHeaderMode::None
-    && !type_decl.support.has_mc_global_attrs()
+    && !type_decl.support.has_extra_support_fields()
 }
 
 fn empty_leaf_marker_doc_for_ref<'a>(
@@ -3274,74 +3272,13 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
     });
   }
 
-  if support.has_mc_ignorable {
+  if support.have_xml_other_attrs {
     fields.push(quote! {
-      pub mc_ignorable: Option<String>,
+      pub xml_other_attrs: Vec<(String, String)>,
     });
   }
 
   fields
-}
-
-fn gen_mce_global_attr_fields(
-  type_decl: &TypeDecl,
-  attr_fields: &[&FieldDecl],
-) -> Result<Vec<TokenStream>> {
-  const MCE_GLOBAL_ATTRS: [(&str, &str, &str); 4] = [
-    ("mc:MustUnderstand", "mc_must_understand", "StringValue"),
-    ("mc:ProcessContent", "mc_process_content", "StringValue"),
-    (
-      "mc:PreserveAttributes",
-      "mc_preserve_attributes",
-      "StringValue",
-    ),
-    ("mc:PreserveElements", "mc_preserve_elements", "StringValue"),
-  ];
-
-  let mut fields = Vec::new();
-  for (qname, rust_name, rust_type) in MCE_GLOBAL_ATTRS {
-    let should_generate = match qname {
-      "mc:MustUnderstand" => type_decl.support.has_mc_must_understand,
-      "mc:ProcessContent" => type_decl.support.has_mc_process_content,
-      "mc:PreserveAttributes" => type_decl.support.has_mc_preserve_attributes,
-      "mc:PreserveElements" => type_decl.support.has_mc_preserve_elements,
-      _ => false,
-    };
-    if !should_generate {
-      continue;
-    }
-
-    if attr_fields.iter().any(|attr| {
-      matches!(
-        &attr.wire,
-        FieldWireDecl::Attribute {
-          qname: attr_qname,
-          ..
-        } if attr_qname == qname
-      )
-    }) {
-      continue;
-    }
-
-    let attr = FieldDecl {
-      rust_name: rust_name.to_string(),
-      docs: format!("Markup compatibility attribute {qname}."),
-      version: "Office2007".to_string(),
-      type_ref: TypeRefDecl {
-        module_path: Some("crate::simple_type".to_string()),
-        rust_type: rust_type.to_string(),
-      },
-      cardinality: Cardinality::Optional,
-      wire: FieldWireDecl::Attribute {
-        qname: qname.to_string(),
-        bit: None,
-      },
-      validators: vec![],
-    };
-    fields.push(gen_attr_from_decl(&attr, VersionCfgContext::default())?);
-  }
-
-  Ok(fields)
 }
 
 fn choice_type_accepts_text(module: &SchemaModuleDecl, rust_type: &str) -> bool {
@@ -3884,7 +3821,7 @@ fn can_alias_leaf_text_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
   type_decl.kind == TypeKind::LeafTextAlias
     && attr_fields.is_empty()
     && type_decl.support.xmlns_mode == crate::sdk_code::codegen_ir::XmlnsMode::None
-    && !type_decl.support.has_mc_global_attrs()
+    && !type_decl.support.has_extra_support_fields()
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
 }
 

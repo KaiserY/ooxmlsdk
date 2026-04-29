@@ -14,7 +14,7 @@
 pub struct DataStoreItem {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Custom XML Data ID
   ///
   /// Available in Office2007 and above.

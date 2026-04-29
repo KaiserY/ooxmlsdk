@@ -13,21 +13,7 @@
 #[sdk(qname = "mc:CT_AlternateContent/mc:AlternateContent")]
 pub struct AlternateContent {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
-  /// mc:MustUnderstand
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// mc:ProcessContent
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(qname = "mc:CT_Choice/mc:Choice", qname = "mc:CT_Fallback/mc:Fallback"))]
   pub alternate_content_choice: Vec<AlternateContentChoice>,
 }
@@ -40,28 +26,7 @@ pub struct AlternateContent {
 #[sdk(qname = "mc:CT_Choice/mc:Choice")]
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
-  /// Requires
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: Requires
-  #[sdk(attr(qname = "Requires"))]
-  pub requires: Option<crate::simple_type::StringValue>,
-  /// mc:MustUnderstand
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// mc:ProcessContent
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
@@ -74,21 +39,7 @@ pub struct Choice {
 #[sdk(qname = "mc:CT_Fallback/mc:Fallback")]
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
-  /// mc:MustUnderstand
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// mc:ProcessContent
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }

@@ -3,10 +3,9 @@ use std::path::Path;
 
 use crate::Result;
 use crate::sdk_data::open_xml::{
-  OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeAttribute, OpenXmlSchemaTypeChild,
-  OpenXmlSchemaTypeParticle,
+  OpenXmlSchema, OpenXmlSchemaType, OpenXmlSchemaTypeChild, OpenXmlSchemaTypeParticle,
 };
-use crate::sdk_data::xsd::{ParsedAttribute, ParsedXsd, parse_xsd};
+use crate::sdk_data::xsd::{ParsedXsd, parse_xsd};
 
 const MC_TARGET_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MC_PREFIX: &str = "mc";
@@ -65,7 +64,9 @@ pub(crate) fn gen_mc_schema(xsd: &ParsedXsd) -> OpenXmlSchema {
   }
 }
 
-fn gen_alternate_content_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
+fn gen_alternate_content_type(
+  _attributes: &[crate::sdk_data::xsd::ParsedAttribute],
+) -> OpenXmlSchemaType {
   OpenXmlSchemaType {
     name: format!("{MC_PREFIX}:CT_AlternateContent/{MC_PREFIX}:AlternateContent"),
     class_name: "AlternateContent".to_string(),
@@ -81,7 +82,7 @@ fn gen_alternate_content_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaTy
     has_xmlns_fields: true,
     has_mc_ignorable_field: true,
     additional_elements: vec![],
-    attributes: mc_attributes(attributes),
+    attributes: vec![],
     children: vec![
       OpenXmlSchemaTypeChild {
         name: format!("{MC_PREFIX}:CT_Choice/{MC_PREFIX}:Choice"),
@@ -99,7 +100,7 @@ fn gen_alternate_content_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaTy
   }
 }
 
-fn gen_choice_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
+fn gen_choice_type(_attributes: &[crate::sdk_data::xsd::ParsedAttribute]) -> OpenXmlSchemaType {
   OpenXmlSchemaType {
     name: format!("{MC_PREFIX}:CT_Choice/{MC_PREFIX}:Choice"),
     class_name: "Choice".to_string(),
@@ -115,14 +116,14 @@ fn gen_choice_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
     has_xmlns_fields: true,
     has_mc_ignorable_field: true,
     additional_elements: vec![],
-    attributes: mc_attributes(attributes),
+    attributes: vec![],
     children: vec![],
     particle: any_particle(),
     module_name: String::new(),
   }
 }
 
-fn gen_fallback_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
+fn gen_fallback_type(_attributes: &[crate::sdk_data::xsd::ParsedAttribute]) -> OpenXmlSchemaType {
   OpenXmlSchemaType {
     name: format!("{MC_PREFIX}:CT_Fallback/{MC_PREFIX}:Fallback"),
     class_name: "Fallback".to_string(),
@@ -138,35 +139,11 @@ fn gen_fallback_type(attributes: &[ParsedAttribute]) -> OpenXmlSchemaType {
     has_xmlns_fields: true,
     has_mc_ignorable_field: true,
     additional_elements: vec![],
-    attributes: mc_attributes(attributes),
+    attributes: vec![],
     children: vec![],
     particle: any_particle(),
     module_name: String::new(),
   }
-}
-
-fn mc_attributes(attributes: &[ParsedAttribute]) -> Vec<OpenXmlSchemaTypeAttribute> {
-  attributes
-    .iter()
-    .filter(|attribute| !matches_local_name(&attribute.q_name, "Ignorable"))
-    .map(|attribute| OpenXmlSchemaTypeAttribute {
-      q_name: attribute.q_name.clone(),
-      property_name: attribute_field_name(&attribute.q_name),
-      r#type: "StringValue".to_string(),
-      property_comments: attribute.q_name.clone(),
-      version: "Office2007".to_string(),
-      validators: vec![],
-    })
-    .collect()
-}
-
-fn attribute_field_name(name: &str) -> String {
-  match name {
-    "MustUnderstand" => "mc_must_understand",
-    "ProcessContent" => "mc_process_content",
-    _ => name,
-  }
-  .to_string()
 }
 
 fn any_particle() -> OpenXmlSchemaTypeParticle {

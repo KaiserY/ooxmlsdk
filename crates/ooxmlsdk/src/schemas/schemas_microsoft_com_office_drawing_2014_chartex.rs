@@ -262,7 +262,7 @@ pub enum PageOrientation {
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// version
   ///
   /// Available in Office2016 and above.

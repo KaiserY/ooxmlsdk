@@ -62,7 +62,7 @@ pub struct RichValueBlock {
 pub struct RichValueData {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// count
   ///
   /// Available in Office2019 and above.
@@ -87,7 +87,7 @@ pub struct RichValueData {
 pub struct RichValueStructures {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// count
   ///
   /// Available in Office2019 and above.

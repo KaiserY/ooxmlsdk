@@ -1589,7 +1589,7 @@ pub struct Extension {
 pub struct CalculationChain {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x:CT_CalcCell/x:c"))]
   pub x_c: Vec<CalculationCell>,
@@ -1607,7 +1607,7 @@ pub struct CalculationChain {
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Authors
   #[sdk(child(qname = "x:CT_Authors/x:authors"))]
   pub authors: std::boxed::Box<Authors>,
@@ -1628,7 +1628,7 @@ pub struct Comments {
 pub struct MapInfo {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Prefix Mappings for XPath Expressions
   ///
   /// Available in Office2007 and above.
@@ -1653,7 +1653,7 @@ pub struct MapInfo {
 pub struct Connections {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x:CT_Connection/x:connection"))]
   pub x_connection: Vec<Connection>,
@@ -1668,7 +1668,7 @@ pub struct Connections {
 pub struct PivotCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -1846,7 +1846,7 @@ pub struct PivotCacheDefinition {
 pub struct PivotCacheRecords {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// PivotCache Records Count
   ///
   /// Available in Office2007 and above.
@@ -1871,7 +1871,7 @@ pub struct PivotCacheRecords {
 pub struct PivotTableDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -2410,7 +2410,7 @@ pub struct PivotTableDefinition {
 pub struct QueryTable {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -2582,7 +2582,7 @@ pub struct QueryTable {
 pub struct SharedStringTable {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// String Count
   ///
   /// Available in Office2007 and above.
@@ -2614,7 +2614,7 @@ pub struct SharedStringTable {
 pub struct Headers {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Last Revision GUID
   ///
   /// Available in Office2007 and above.
@@ -2723,7 +2723,7 @@ pub struct Headers {
 pub struct Revisions {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "x:CT_RevisionRowColumn/x:rrc",
     qname = "x:CT_RevisionMove/x:rm",
@@ -2750,7 +2750,7 @@ pub struct Revisions {
 pub struct Users {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Active User Count
   ///
   /// Available in Office2007 and above.
@@ -2772,7 +2772,7 @@ pub struct Users {
 pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision ID.
   ///
   /// Available in Office2007 and above.
@@ -2915,7 +2915,7 @@ pub struct Worksheet {
 pub struct Chartsheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Chart Sheet Properties
   #[sdk(child(qname = "x:CT_ChartsheetPr/x:sheetPr"))]
   pub chart_sheet_properties: Option<std::boxed::Box<ChartSheetProperties>>,
@@ -2975,7 +2975,7 @@ pub struct Chartsheet {
 pub struct DialogSheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -3052,7 +3052,7 @@ pub struct DialogSheet {
 pub struct Metadata {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Metadata Types Collection
   #[sdk(child(qname = "x:CT_MetadataTypes/x:metadataTypes"))]
   pub metadata_types: Option<MetadataTypes>,
@@ -3085,7 +3085,7 @@ pub struct Metadata {
 pub struct SingleXmlCells {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x:CT_SingleXmlCell/x:singleXmlCell"))]
   pub x_single_xml_cell: Vec<SingleXmlCell>,
@@ -3100,7 +3100,7 @@ pub struct SingleXmlCells {
 pub struct Stylesheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x:CT_NumFmts/x:numFmts"))]
   pub numbering_formats: Option<NumberingFormats>,
@@ -3150,7 +3150,7 @@ pub struct Stylesheet {
 pub struct ExternalLink {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "x:CT_ExternalBook/x:externalBook",
     qname = "x:CT_DdeLink/x:ddeLink",
@@ -3171,7 +3171,7 @@ pub struct ExternalLink {
 pub struct Table {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Table Id
   ///
   /// Available in Office2007 and above.
@@ -3359,7 +3359,7 @@ pub struct Table {
 pub struct VolatileTypes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x:CT_VolType/x:volType"))]
   pub x_vol_type: Vec<VolatileType>,
@@ -3377,7 +3377,7 @@ pub struct VolatileTypes {
 pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// conformance
   ///
   /// Available in Office2007 and above.
@@ -7690,7 +7690,7 @@ pub struct QueryTableField {
 #[sdk(qname = "x:CT_Rst/x:si")]
 pub struct SharedStringItem {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Preserved Word 2010 extension attribute.
   ///
   /// Available in Office2007 and above.
@@ -7726,7 +7726,7 @@ pub struct SharedStringItem {
 #[sdk(qname = "w14:CT_Rst/w14:placeholder")]
 pub struct Placeholder {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Preserved Word 2010 extension attribute.
   ///
   /// Available in Office2007 and above.
@@ -7734,20 +7734,6 @@ pub struct Placeholder {
   /// Represents the following attribute in the schema: w14:attr
   #[sdk(attr(qname = "w14:attr"))]
   pub w14_attr: Option<crate::simple_type::StringValue>,
-  /// MCE process content directive.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// MCE preserve attributes directive.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "w14:CT_Rst/w14:placeholder"))]
   pub w14_placeholder: Option<std::boxed::Box<Placeholder>>,

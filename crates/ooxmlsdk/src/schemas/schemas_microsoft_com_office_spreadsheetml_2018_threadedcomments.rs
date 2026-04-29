@@ -14,7 +14,7 @@
 pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "xltc:CT_Person/xltc:person"))]
   pub xltc_person: Vec<Person>,
@@ -32,7 +32,7 @@ pub struct PersonList {
 pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "xltc:CT_ThreadedComment/xltc:threadedComment"))]
   pub xltc_threaded_comment: Vec<ThreadedComment>,

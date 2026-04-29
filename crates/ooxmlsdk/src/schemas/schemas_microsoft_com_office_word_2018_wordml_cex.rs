@@ -14,7 +14,7 @@
 pub struct CommentsExtensible {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w16cex:CT_CommentExtensible/w16cex:commentExtensible"))]
   pub w16cex_comment_extensible: Vec<CommentExtensible>,

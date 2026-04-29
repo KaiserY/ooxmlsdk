@@ -603,11 +603,7 @@ fn build_type_decl(
           SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
-        has_mc_ignorable: schema_type.has_mc_ignorable_field,
-        has_mc_must_understand: schema_type.has_mc_must_understand_field,
-        has_mc_process_content: schema_type.has_mc_process_content_field,
-        has_mc_preserve_attributes: schema_type.has_mc_preserve_attributes_field,
-        has_mc_preserve_elements: schema_type.has_mc_preserve_elements_field,
+        have_xml_other_attrs: schema_type_have_xml_other_attrs(schema_type),
       },
       content_structure: None,
       members,
@@ -1486,6 +1482,14 @@ fn build_child_type_ref_from_name(
   }
 }
 
+fn schema_type_have_xml_other_attrs(schema_type: &SchemaType) -> bool {
+  schema_type.has_mc_ignorable_field
+    || schema_type.has_mc_must_understand_field
+    || schema_type.has_mc_process_content_field
+    || schema_type.has_mc_preserve_attributes_field
+    || schema_type.has_mc_preserve_elements_field
+}
+
 fn effective_child_kind_from_name(
   child_name: &str,
   child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
@@ -1509,7 +1513,7 @@ fn effective_child_kind_from_name(
   if child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
     && child_type.attributes.is_empty()
     && !child_type.has_xmlns_fields
-    && !child_type.has_mc_ignorable_field
+    && !schema_type_have_xml_other_attrs(child_type)
     && child_type.xml_header == SchemaTypeXmlHeader::None
   {
     SchemaTypeChildKind::TextChild
@@ -1729,7 +1733,7 @@ fn build_child_type_ref(
     && child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
     && child_type.attributes.is_empty()
     && !child_type.has_xmlns_fields
-    && !child_type.has_mc_ignorable_field
+    && !schema_type_have_xml_other_attrs(child_type)
     && child_type.xml_header == SchemaTypeXmlHeader::None
   {
     return build_xml_content_type_ref(child_type, schema, context)?
@@ -3645,7 +3649,7 @@ mod tests {
     assert_eq!(ir.types[0].xml_qname.as_deref(), Some("t:CT_P/t:p"));
     assert_eq!(ir.types[0].support.xmlns_mode, XmlnsMode::MapOnly);
     assert_eq!(ir.types[0].support.xml_header, XmlHeaderMode::Standalone);
-    assert!(ir.types[0].support.has_mc_ignorable);
+    assert!(ir.types[0].support.have_xml_other_attrs);
 
     assert_eq!(ir.types[1].rust_name, "TextValue");
     assert_eq!(ir.types[1].kind, TypeKind::LeafTextAlias);

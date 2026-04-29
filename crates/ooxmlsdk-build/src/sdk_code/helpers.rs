@@ -54,6 +54,10 @@ pub fn has_xmlns_fields(schema_type: &SchemaType) -> bool {
 
 pub fn has_mce_fields(schema_type: &SchemaType) -> bool {
   schema_type.has_mc_ignorable_field
+    || schema_type.has_mc_must_understand_field
+    || schema_type.has_mc_process_content_field
+    || schema_type.has_mc_preserve_attributes_field
+    || schema_type.has_mc_preserve_elements_field
 }
 
 fn supports_extended_sequence_strategy(schema_type: &SchemaType) -> bool {

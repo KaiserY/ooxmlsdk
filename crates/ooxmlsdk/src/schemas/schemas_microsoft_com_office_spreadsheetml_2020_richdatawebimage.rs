@@ -14,7 +14,7 @@
 pub struct WebImagesSupportingRichData {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "xlrdwi:CT_WebImageSupportingRichData/xlrdwi:webImageSrd"))]
   pub xlrdwi_web_image_srd: Vec<WebImageSupportingRichData>,

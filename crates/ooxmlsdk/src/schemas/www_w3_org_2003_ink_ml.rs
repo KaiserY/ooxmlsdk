@@ -372,7 +372,7 @@ pub enum TableInterpolationValues {
 pub struct Ink {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// documentID
   ///
   /// Available in Office2007 and above.

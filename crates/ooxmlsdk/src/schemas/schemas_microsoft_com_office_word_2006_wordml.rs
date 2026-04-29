@@ -14,7 +14,7 @@
 pub struct TemplateCommandGroup {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "wne:CT_Keymaps/wne:keymaps"))]
   pub wne_keymaps: Vec<KeyMapCustomizations>,
@@ -50,7 +50,7 @@ pub struct Mcds {
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "wne:CT_DocEvents/wne:docEvents"))]
   pub doc_events: Option<DocEvents>,
@@ -68,7 +68,7 @@ pub struct VbaSuppData {
 pub struct MailMergeRecipients {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "wne:CT_HashedRecipientData/wne:recipientData"))]
   pub wne_recipient_data: Vec<SingleDataSourceRecord>,

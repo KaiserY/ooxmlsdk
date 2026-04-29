@@ -14,7 +14,7 @@
 pub struct FeaturePropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// count
   ///
   /// Available in Microsoft365 and above.

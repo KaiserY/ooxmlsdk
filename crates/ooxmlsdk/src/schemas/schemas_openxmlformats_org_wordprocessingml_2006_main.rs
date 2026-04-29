@@ -7836,7 +7836,7 @@ pub struct Break {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:t")]
 pub struct Text {
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// space
   ///
   /// Available in Office2007 and above.
@@ -11246,6 +11246,7 @@ pub struct HyperlinkRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_R/w:r")]
 pub struct Run {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Run Properties
   ///
   /// Available in Office2007 and above.
@@ -11270,13 +11271,6 @@ pub struct Run {
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_addition: Option<crate::simple_type::HexBinaryValue>,
-  /// Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// Preserved Word 2010 extension attribute.
   ///
   /// Available in Office2007 and above.
@@ -15311,7 +15305,7 @@ pub struct DocGrid {
 pub struct Recipients {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_RecipientData/w:recipientData"))]
   pub w_recipient_data: Vec<RecipientData>,
@@ -15379,7 +15373,7 @@ pub struct TextBoxContent {
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
@@ -15399,7 +15393,7 @@ pub struct Comments {
 pub struct Footnotes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_FtnEdn/w:footnote"))]
   pub w_footnote: Vec<Footnote>,
@@ -15414,7 +15408,7 @@ pub struct Footnotes {
 pub struct Endnotes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_FtnEdn/w:endnote"))]
   pub w_endnote: Vec<Endnote>,
@@ -15429,7 +15423,7 @@ pub struct Endnotes {
 pub struct Header {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
@@ -15485,7 +15479,7 @@ pub struct Header {
 pub struct Footer {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "mc:CT_AlternateContent/mc:AlternateContent",
     qname = "w:CT_AltChunk/w:altChunk",
@@ -15593,7 +15587,7 @@ pub struct HeaderFooterType {
 pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[cfg(not(feature = "mce"))]
   /// _
   #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
@@ -15981,7 +15975,7 @@ pub struct Settings {
 pub struct WebSettings {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_Frameset/w:frameset"))]
   pub frameset: Option<std::boxed::Box<Frameset>>,
@@ -16029,7 +16023,7 @@ pub struct WebSettings {
 pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_Font/w:font"))]
   pub w_font: Vec<Font>,
@@ -16044,7 +16038,7 @@ pub struct Fonts {
 pub struct Numbering {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_NumPicBullet/w:numPicBullet"))]
   pub w_num_pic_bullet: Vec<NumberingPictureBullet>,
@@ -16068,7 +16062,7 @@ pub struct Numbering {
 pub struct Styles {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Document Default Paragraph and Run Properties
   #[sdk(child(qname = "w:CT_DocDefaults/w:docDefaults"))]
   pub doc_defaults: Option<std::boxed::Box<DocDefaults>>,
@@ -16089,7 +16083,7 @@ pub struct Styles {
 pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// conformance
   ///
   /// Available in Office2007 and above.
@@ -16114,7 +16108,7 @@ pub struct Document {
 pub struct GlossaryDocument {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Document Background
   #[sdk(child(qname = "w:CT_Background/w:background"))]
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
@@ -19728,7 +19722,7 @@ pub struct ParagraphPropertiesBaseStyle {
 #[sdk(qname = "w:CT_RPrDefault/w:rPrDefault")]
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Preserved Word 2010 extension attribute.
   ///
   /// Available in Office2007 and above.
@@ -22528,35 +22522,7 @@ pub struct TableRowPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPr/w:pPr")]
 pub struct ParagraphProperties {
-  pub mc_ignorable: Option<String>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveElements.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveElements
-  #[sdk(attr(qname = "mc:PreserveElements"))]
-  pub mc_preserve_elements: Option<crate::simple_type::StringValue>,
-  /// Gets or sets a whitespace-delimited list of attribute qualified names that identify expanded names of attributes. The attributes were suggested by a markup producer for preservation by markup editors.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Preserved Word 2010 extension attribute.
   ///
   /// Available in Office2007 and above.

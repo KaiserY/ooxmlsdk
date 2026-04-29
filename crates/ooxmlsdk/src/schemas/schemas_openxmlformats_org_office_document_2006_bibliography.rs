@@ -52,7 +52,7 @@ pub enum DataSourceValues {
 pub struct Sources {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Selected Style
   ///
   /// Available in Office2007 and above.

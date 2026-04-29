@@ -7,6 +7,12 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures};
 
+fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+  attrs
+    .iter()
+    .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
+}
+
 fn doc_sample_part(file_name: &str, part_name: &str) -> String {
   let bytes = std::fs::read(fixtures::doc_sample_path(file_name)).unwrap();
   let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
@@ -56,8 +62,14 @@ fn mcsupport_load_attribute_test() {
 
   let (document, serialized, reparsed) = assert_stable_roundtrip::<Document>(&xml);
 
-  assert_eq!(document.mc_ignorable.as_deref(), Some("w14 wp14"));
-  assert_eq!(reparsed.mc_ignorable.as_deref(), Some("w14 wp14"));
+  assert_eq!(
+    xml_other_attr(&document.xml_other_attrs, "mc:Ignorable"),
+    Some("w14 wp14")
+  );
+  assert_eq!(
+    xml_other_attr(&reparsed.xml_other_attrs, "mc:Ignorable"),
+    Some("w14 wp14")
+  );
   assert!(serialized.contains(r#"mc:Ignorable="w14 wp14""#));
   assert!(serialized.contains(r#"mc:PreserveAttributes="w14:myattr""#));
   assert!(serialized.contains(r#"mc:PreserveAttributes="w14:*""#));
@@ -123,14 +135,17 @@ fn mcsupport_load_process_content() {
     .as_ref()
     .expect("expected placeholder text");
 
-  assert_eq!(item.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(
+    xml_other_attr(&item.xml_other_attrs, "mc:Ignorable"),
+    Some("w14")
+  );
   assert_eq!(item.w14_attr.as_deref(), Some("value"));
   assert_eq!(
-    placeholder.mc_process_content.as_deref(),
+    xml_other_attr(&placeholder.xml_other_attrs, "mc:ProcessContent"),
     Some("w14:placeholder")
   );
   assert_eq!(
-    placeholder.mc_preserve_attributes.as_deref(),
+    xml_other_attr(&placeholder.xml_other_attrs, "mc:PreserveAttributes"),
     Some("w14:a w14:b")
   );
   assert_eq!(text.w14_a.as_deref(), Some("a"));
@@ -146,8 +161,14 @@ fn markup_compatibility_ignore_whitespaces_full_mode() {
 
   let (text, serialized, reparsed) = assert_stable_roundtrip::<Text>(xml);
 
-  assert_eq!(text.mc_ignorable.as_deref(), Some("  \t\n\r "));
-  assert_eq!(reparsed.mc_ignorable.as_deref(), Some("  \t\n\r "));
+  assert_eq!(
+    xml_other_attr(&text.xml_other_attrs, "mc:Ignorable"),
+    Some("  \t\n\r ")
+  );
+  assert_eq!(
+    xml_other_attr(&reparsed.xml_other_attrs, "mc:Ignorable"),
+    Some("  \t\n\r ")
+  );
   assert!(serialized.contains("mc:Ignorable=\"  \t\n\r \""));
 }
 
@@ -197,9 +218,12 @@ fn markup_compatibility_process_content_ignored_unknown_element_full_mode() {
     ooxmlsdk::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent,
   >(xml);
 
-  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("uns1"));
   assert_eq!(
-    alternate_content.mc_process_content.as_deref(),
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:Ignorable"),
+    Some("uns1")
+  );
+  assert_eq!(
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:ProcessContent"),
     Some("uns1:e1uk1")
   );
   assert!(serialized.contains(r#"mc:ProcessContent="uns1:e1uk1""#));
@@ -232,7 +256,7 @@ fn markup_compatibility_process_content_xml_space_full_mode() {
   >(xml);
 
   assert_eq!(
-    alternate_content.mc_process_content.as_deref(),
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:ProcessContent"),
     Some("xml:space")
   );
   assert!(serialized.contains(r#"xml:space="preserve""#));
@@ -259,7 +283,10 @@ fn markup_compatibility_preserve_ignored_unknown_element_wildcard_full_mode() {
 
   let (properties, serialized, reparsed) = assert_stable_roundtrip::<ParagraphProperties>(xml);
 
-  assert_eq!(properties.mc_preserve_attributes.as_deref(), Some("*"));
+  assert_eq!(
+    xml_other_attr(&properties.xml_other_attrs, "mc:PreserveAttributes"),
+    Some("*")
+  );
   assert_eq!(
     properties.w14_myattr.as_deref(),
     Some("attribute1 from unknown namespace1.")

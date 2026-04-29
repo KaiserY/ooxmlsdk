@@ -789,7 +789,7 @@ pub struct Survey {
 pub struct Timelines {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "x15:CT_Timeline/x15:timeline"))]
   pub x15_timeline: Vec<Timeline>,
@@ -804,7 +804,7 @@ pub struct Timelines {
 pub struct TimelineCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// name
   ///
   /// Available in Office2013 and above.

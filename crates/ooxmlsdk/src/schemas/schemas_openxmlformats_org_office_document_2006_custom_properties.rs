@@ -14,7 +14,7 @@
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "op:CT_Property/op:property"))]
   pub op_property: Vec<CustomDocumentProperty>,

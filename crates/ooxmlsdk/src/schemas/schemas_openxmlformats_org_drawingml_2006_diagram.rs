@@ -897,7 +897,7 @@ pub enum VerticalAlignmentValues {
 pub struct ColorsDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Unique ID
   ///
   /// Available in Office2007 and above.
@@ -992,7 +992,7 @@ pub struct ColorsDefinitionHeaderList {
 pub struct DataModelRoot {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Point List
   #[sdk(child(qname = "dgm:CT_PtList/dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
@@ -1019,7 +1019,7 @@ pub struct DataModelRoot {
 pub struct LayoutDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// uniqueId
   ///
   /// Available in Office2007 and above.
@@ -1174,7 +1174,7 @@ pub struct RelationshipIds {
 pub struct StyleDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Unique Style ID
   ///
   /// Available in Office2007 and above.

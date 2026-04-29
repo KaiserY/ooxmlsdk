@@ -1465,10 +1465,6 @@ fn is_xmlns_field(ident: &Ident) -> bool {
   ident == "xmlns"
 }
 
-fn is_mc_ignorable_field(ident: &Ident) -> bool {
-  ident == "mc_ignorable"
-}
-
 fn is_option_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Option"))
 }

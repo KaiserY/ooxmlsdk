@@ -59,7 +59,7 @@ pub struct CommentPropertiesExtensionList {
 pub struct AuthorList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p188:CT_Author/p188:author"))]
   pub p188_author: Vec<Author>,
@@ -74,7 +74,7 @@ pub struct AuthorList {
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "p188:CT_Comment/p188:cm"))]
   pub p188_cm: Vec<Comment>,

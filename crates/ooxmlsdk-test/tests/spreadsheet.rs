@@ -18,6 +18,12 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
 use ooxmlsdk::simple_type::{ListValue, StringValue};
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
+fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+  attrs
+    .iter()
+    .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
+}
+
 #[cfg(feature = "microsoft365")]
 fn doc_sample_part(file_name: &str, part_name: &str) -> String {
   let bytes = std::fs::read(fixtures::doc_sample_path(file_name)).unwrap();
@@ -78,7 +84,10 @@ fn workbook_round_trip_from_complex01_part_test() {
     assert_stable_roundtrip::<Workbook>(fixtures::SPREADSHEET_WORKBOOK_COMPLEX01_XML);
 
   assert_eq!(parsed.xml_header, XmlHeaderType::Standalone);
-  assert_eq!(parsed.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(
+    xml_other_attr(&parsed.xml_other_attrs, "mc:Ignorable"),
+    Some("x15")
+  );
   assert_eq!(
     parsed
       .file_version
@@ -105,7 +114,10 @@ fn workbook_round_trip_from_complex01_part_test() {
   assert!(trim_xml_declaration(&serialized).contains("<x:calcPr"));
   assert!(trim_xml_declaration(&serialized).contains("calcId=\"152511\""));
   assert_eq!(reparsed.xml_header, XmlHeaderType::Standalone);
-  assert_eq!(reparsed.mc_ignorable.as_deref(), Some("x15"));
+  assert_eq!(
+    xml_other_attr(&reparsed.xml_other_attrs, "mc:Ignorable"),
+    Some("x15")
+  );
   assert_eq!(reparsed.sheets.x_sheet.len(), 2);
 }
 
@@ -163,7 +175,10 @@ fn worksheet_round_trip_from_complex01_part_test() {
   let (parsed, _serialized, reparsed) =
     assert_stable_roundtrip::<Worksheet>(fixtures::SPREADSHEET_WORKSHEET_COMPLEX01_SHEET1_XML);
 
-  assert_eq!(parsed.mc_ignorable.as_deref(), Some("x14ac"));
+  assert_eq!(
+    xml_other_attr(&parsed.xml_other_attrs, "mc:Ignorable"),
+    Some("x14ac")
+  );
   assert_eq!(
     parsed
       .sheet_dimension
@@ -244,18 +259,21 @@ fn shared_string_table_process_content_preserves_extension_attributes_from_mc_su
   let (parsed, serialized, _) = assert_stable_roundtrip::<SharedStringTable>(&shared_strings_xml);
 
   let item = parsed.x_si.first().expect("expected shared string item");
-  assert_eq!(item.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(
+    xml_other_attr(&item.xml_other_attrs, "mc:Ignorable"),
+    Some("w14")
+  );
   assert_eq!(item.w14_attr.as_deref(), Some("value"));
   let placeholder = item
     .w14_placeholder
     .as_ref()
     .expect("expected w14 placeholder");
   assert_eq!(
-    placeholder.mc_process_content.as_deref(),
+    xml_other_attr(&placeholder.xml_other_attrs, "mc:ProcessContent"),
     Some("w14:placeholder")
   );
   assert_eq!(
-    placeholder.mc_preserve_attributes.as_deref(),
+    xml_other_attr(&placeholder.xml_other_attrs, "mc:PreserveAttributes"),
     Some("w14:a w14:b")
   );
   let text = placeholder

@@ -16,6 +16,12 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
+fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+  attrs
+    .iter()
+    .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
+}
+
 #[cfg(not(feature = "mce"))]
 type BodyAlternateContent = AlternateContent;
 
@@ -663,9 +669,15 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
 
   let (document, serialized, _) = assert_stable_roundtrip::<Document>(xml);
 
-  assert_eq!(document.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(
+    xml_other_attr(&document.xml_other_attrs, "mc:Ignorable"),
+    Some("w14")
+  );
   let run = first_run(first_paragraph(first_body(&document)));
-  assert_eq!(run.mc_preserve_attributes.as_deref(), Some("w14:editId"));
+  assert_eq!(
+    xml_other_attr(&run.xml_other_attrs, "mc:PreserveAttributes"),
+    Some("w14:editId")
+  );
   assert_eq!(run.w14_myattr.as_deref(), Some("myattr"));
 
   let alternate_content = run
@@ -676,9 +688,12 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
       _ => None,
     })
     .expect("expected alternate content in run");
-  assert_eq!(alternate_content.mc_must_understand.as_deref(), Some("w14"));
   assert_eq!(
-    alternate_content.mc_process_content.as_deref(),
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:MustUnderstand"),
+    Some("w14")
+  );
+  assert_eq!(
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:ProcessContent"),
     Some("w14:unknown")
   );
 
@@ -690,7 +705,10 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
       _ => None,
     })
     .expect("expected mc:Choice");
-  assert_eq!(choice.requires.as_deref(), Some("w14"));
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "Requires"),
+    Some("w14")
+  );
   assert_eq!(
     choice.xml_children,
     vec![r#"<w14:unknown attr="1">choice</w14:unknown>"#.to_string()]
@@ -720,8 +738,14 @@ fn text_round_trip_preserves_ignorable_whitespace_list_from_markup_compatibility
 
   let (text, serialized, reparsed) = assert_stable_roundtrip::<Text>(xml);
 
-  assert_eq!(text.mc_ignorable.as_deref(), Some("  \t\n\r "));
-  assert_eq!(reparsed.mc_ignorable.as_deref(), Some("  \t\n\r "));
+  assert_eq!(
+    xml_other_attr(&text.xml_other_attrs, "mc:Ignorable"),
+    Some("  \t\n\r ")
+  );
+  assert_eq!(
+    xml_other_attr(&reparsed.xml_other_attrs, "mc:Ignorable"),
+    Some("  \t\n\r ")
+  );
   assert_eq!(text.xml_content.as_deref(), Some("text"));
   assert!(serialized.contains("mc:Ignorable=\"  \t\n\r \""));
 }
@@ -736,7 +760,7 @@ fn paragraph_properties_preserve_known_extension_attribute_from_markup_compatibi
   let (properties, serialized, reparsed) = assert_stable_roundtrip::<ParagraphProperties>(xml);
 
   assert_eq!(
-    properties.mc_preserve_attributes.as_deref(),
+    xml_other_attr(&properties.xml_other_attrs, "mc:PreserveAttributes"),
     Some("w14:myattr")
   );
   assert_eq!(
@@ -769,13 +793,16 @@ fn alternate_content_preserves_ignored_unknown_process_content_and_must_understa
     .iter()
     .find_map(body_choice_alternate_content)
     .expect("expected body alternate content");
-  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("uns1"));
   assert_eq!(
-    alternate_content.mc_process_content.as_deref(),
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:Ignorable"),
+    Some("uns1")
+  );
+  assert_eq!(
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:ProcessContent"),
     Some("uns1:e1uk1")
   );
   assert_eq!(
-    alternate_content.mc_must_understand.as_deref(),
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:MustUnderstand"),
     Some("uns1")
   );
 
@@ -787,9 +814,18 @@ fn alternate_content_preserves_ignored_unknown_process_content_and_must_understa
       _ => None,
     })
     .expect("expected mc:Choice");
-  assert_eq!(choice.requires.as_deref(), Some("uns1"));
-  assert_eq!(choice.mc_process_content.as_deref(), Some("*"));
-  assert_eq!(choice.mc_must_understand.as_deref(), Some("uns1"));
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "Requires"),
+    Some("uns1")
+  );
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "mc:ProcessContent"),
+    Some("*")
+  );
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "mc:MustUnderstand"),
+    Some("uns1")
+  );
   assert_eq!(
     choice.xml_children,
     vec![
@@ -828,7 +864,7 @@ fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
     .find_map(body_choice_alternate_content)
     .expect("expected body alternate content");
   assert_eq!(
-    alternate_content.mc_process_content.as_deref(),
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:ProcessContent"),
     Some("xml:space xml:lang")
   );
 
@@ -841,7 +877,7 @@ fn alternate_content_preserves_xml_space_and_lang_process_content_metadata() {
     })
     .expect("expected mc:Choice");
   assert_eq!(
-    choice.mc_process_content.as_deref(),
+    xml_other_attr(&choice.xml_other_attrs, "mc:ProcessContent"),
     Some("xml:space xml:lang")
   );
   assert_eq!(
@@ -869,8 +905,14 @@ fn alternate_content_preserves_ignored_known_process_content_metadata() {
     .iter()
     .find_map(body_choice_alternate_content)
     .expect("expected body alternate content");
-  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("w"));
-  assert_eq!(alternate_content.mc_process_content.as_deref(), Some("w:p"));
+  assert_eq!(
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:Ignorable"),
+    Some("w")
+  );
+  assert_eq!(
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:ProcessContent"),
+    Some("w:p")
+  );
 
   let choice = alternate_content
     .alternate_content_choice
@@ -880,8 +922,14 @@ fn alternate_content_preserves_ignored_known_process_content_metadata() {
       _ => None,
     })
     .expect("expected mc:Choice");
-  assert_eq!(choice.requires.as_deref(), Some("w"));
-  assert_eq!(choice.mc_process_content.as_deref(), Some("w:p"));
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "Requires"),
+    Some("w")
+  );
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "mc:ProcessContent"),
+    Some("w:p")
+  );
   assert_eq!(
     choice.xml_children,
     vec![r#"<w:p><w:r><w:t>known</w:t></w:r></w:p>"#.to_string()]
@@ -935,7 +983,10 @@ fn body_alternate_content_without_selected_content_round_trips() {
   else {
     panic!("expected mc:Choice");
   };
-  assert_eq!(choice.requires.as_deref(), Some("w13"));
+  assert_eq!(
+    xml_other_attr(&choice.xml_other_attrs, "Requires"),
+    Some("w13")
+  );
   assert!(choice.xml_children.is_empty());
   let multi_choice = alternate_content.next().unwrap();
   assert_eq!(multi_choice.alternate_content_choice.len(), 2);
@@ -944,8 +995,14 @@ fn body_alternate_content_without_selected_content_round_trips() {
   else {
     panic!("expected second mc:Choice");
   };
-  assert_eq!(second_choice.requires.as_deref(), Some("w15"));
-  assert_eq!(second_choice.mc_must_understand.as_deref(), Some("w15"));
+  assert_eq!(
+    xml_other_attr(&second_choice.xml_other_attrs, "Requires"),
+    Some("w15")
+  );
+  assert_eq!(
+    xml_other_attr(&second_choice.xml_other_attrs, "mc:MustUnderstand"),
+    Some("w15")
+  );
 
   assert!(serialized.contains("<mc:AlternateContent"));
   assert!(serialized.contains(r#"<mc:Choice Requires="w13""#));
@@ -980,7 +1037,10 @@ fn body_alternate_content_fallback_preserves_multiple_known_children() {
     .iter()
     .find_map(body_choice_alternate_content)
     .expect("expected body alternate content");
-  assert_eq!(alternate_content.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(
+    xml_other_attr(&alternate_content.xml_other_attrs, "mc:Ignorable"),
+    Some("w14")
+  );
   assert_eq!(alternate_content.alternate_content_choice.len(), 3);
   let fallback = alternate_content
     .alternate_content_choice

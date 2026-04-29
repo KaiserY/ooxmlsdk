@@ -6013,7 +6013,7 @@ pub struct MenuRoot {
 pub struct CustomUi {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// onLoad
   ///
   /// Available in Office2007 and above.

@@ -365,7 +365,7 @@ pub struct ContentPart {
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor",
     qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor",

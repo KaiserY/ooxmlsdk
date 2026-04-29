@@ -120,7 +120,7 @@ pub struct Appearance {
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w15:CT_CommentEx/w15:commentEx"))]
   pub w15_comment_ex: Vec<CommentEx>,
@@ -135,7 +135,7 @@ pub struct CommentsEx {
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub mc_ignorable: Option<String>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w15:CT_Person/w15:person"))]
   pub w15_person: Vec<Person>,

@@ -36,6 +36,12 @@ use ooxmlsdk::sdk::{
 };
 use ooxmlsdk_test::fixtures;
 
+fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+  attrs
+    .iter()
+    .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
+}
+
 macro_rules! part_ref_variant {
   ($part_ref:expr, $variant:ident) => {
     match $part_ref {
@@ -487,7 +493,10 @@ fn wordprocessing_font_table_touch_preserves_w14_namespace_from_mc_support_test(
   let main_part = package.main_document_part().unwrap();
   let font_table_part = main_part.font_table_part(&package).unwrap();
   let fonts = font_table_part.root_element(&mut package).unwrap();
-  assert_eq!(fonts.mc_ignorable.as_deref(), Some("w14"));
+  assert_eq!(
+    xml_other_attr(&fonts.xml_other_attrs, "mc:Ignorable"),
+    Some("w14")
+  );
 
   let mut saved = Cursor::new(Vec::new());
   package.save(&mut saved).unwrap();

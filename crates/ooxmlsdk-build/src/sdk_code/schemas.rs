@@ -1034,7 +1034,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       let mut fields: Vec<TokenStream> = vec![];
 
       fields.extend(gen_support_fields(&type_decl.support));
-      fields.extend(gen_mce_global_attr_fields(ir, type_decl, &attr_fields)?);
 
       for attr in &attr_fields {
         fields.push(gen_attr_from_decl(attr, field_version_cfg).map_err(|err| {
@@ -1071,7 +1070,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     let items: Vec<TokenStream> = vec![];
 
     fields.extend(gen_support_fields(&type_decl.support));
-    fields.extend(gen_mce_global_attr_fields(ir, type_decl, &attr_fields)?);
 
     if type_decl.element_kind == Some(ElementKind::LeafText) {
       for attr in &attr_fields {
@@ -1632,72 +1630,10 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       .into_iter()
       .map(|(_, _, tokens)| rename_token_stream_idents(tokens, &anonymous_type_rename_map)),
   );
-  token_stream_list.extend(mce_generic_content_tokens(ir));
 
   Ok(quote! {
     #( #token_stream_list )*
   })
-}
-
-fn mce_generic_content_tokens(ir: &SchemaModuleDecl) -> Vec<TokenStream> {
-  if ir.module_name != "schemas_openxmlformats_org_markup_compatibility_2006" {
-    return Vec::new();
-  }
-
-  vec![quote! {
-    #[cfg(feature = "mce")]
-    #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-    #[sdk(qname = "mc:CT_AlternateContent/mc:AlternateContent")]
-    pub struct AlternateContentOf<T: crate::sdk::SdkChoice> {
-      pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-      pub mc_ignorable: Option<String>,
-      #[sdk(attr(qname = "mc:MustUnderstand"))]
-      pub mc_must_understand: Option<crate::simple_type::StringValue>,
-      #[sdk(attr(qname = "mc:ProcessContent"))]
-      pub mc_process_content: Option<crate::simple_type::StringValue>,
-      #[sdk(choice(qname = "mc:CT_Choice/mc:Choice", qname = "mc:CT_Fallback/mc:Fallback"))]
-      pub alternate_content_choice: Vec<AlternateContentChoiceOf<T>>,
-    }
-
-    #[cfg(feature = "mce")]
-    #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-    #[sdk(qname = "mc:CT_Choice/mc:Choice")]
-    pub struct ChoiceOf<T: crate::sdk::SdkChoice> {
-      pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-      pub mc_ignorable: Option<String>,
-      #[sdk(attr(qname = "Requires"))]
-      pub requires: Option<crate::simple_type::StringValue>,
-      #[sdk(attr(qname = "mc:MustUnderstand"))]
-      pub mc_must_understand: Option<crate::simple_type::StringValue>,
-      #[sdk(attr(qname = "mc:ProcessContent"))]
-      pub mc_process_content: Option<crate::simple_type::StringValue>,
-      #[sdk(choice)]
-      pub children: Vec<T>,
-    }
-
-    #[cfg(feature = "mce")]
-    #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-    #[sdk(qname = "mc:CT_Fallback/mc:Fallback")]
-    pub struct FallbackOf<T: crate::sdk::SdkChoice> {
-      pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-      pub mc_ignorable: Option<String>,
-      #[sdk(attr(qname = "mc:MustUnderstand"))]
-      pub mc_must_understand: Option<crate::simple_type::StringValue>,
-      #[sdk(attr(qname = "mc:ProcessContent"))]
-      pub mc_process_content: Option<crate::simple_type::StringValue>,
-      #[sdk(choice)]
-      pub children: Vec<T>,
-    }
-
-    #[cfg(feature = "mce")]
-    #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-    pub enum AlternateContentChoiceOf<T: crate::sdk::SdkChoice> {
-      #[sdk(child(qname = "mc:CT_Choice/mc:Choice"))]
-      McChoice(std::boxed::Box<ChoiceOf<T>>),
-      #[sdk(child(qname = "mc:CT_Fallback/mc:Fallback"))]
-      McFallback(std::boxed::Box<FallbackOf<T>>),
-    }
-  }]
 }
 
 fn sdk_type_derive_tokens() -> TokenStream {
@@ -1786,7 +1722,6 @@ fn gen_choice_type_decl(
   let render_context = ChoiceVariantRenderContext {
     module,
     type_graph,
-    enum_ident: &enum_ident,
     variant_cfg,
     rendered_variant_name_map: &rendered_variant_name_map,
   };
@@ -2111,7 +2046,6 @@ fn inline_single_field_sequence_variant_tokens(
 struct ChoiceVariantRenderContext<'a> {
   module: &'a SchemaModuleDecl,
   type_graph: &'a TypeContainmentGraph,
-  enum_ident: &'a Ident,
   variant_cfg: VersionCfgContext,
   rendered_variant_name_map: &'a HashMap<String, String>,
 }
@@ -2239,39 +2173,6 @@ fn gen_choice_variant_tokens(
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
-      if is_mce_alternate_content_variant(variant) && !qnames.is_empty() {
-        let qname_attrs = qnames
-          .iter()
-          .map(|qname| quote! { #[sdk(child(qname = #qname))] })
-          .collect::<Vec<_>>();
-        let payload_type = type_from_decl_ref(&variant.payload)?;
-        let enum_ident = render_context.enum_ident;
-        return Ok(vec![
-          quote! {
-            #prefix_attrs
-            #[cfg(not(feature = "mce"))]
-            #( #variant_attrs )*
-            #variant_doc_attrs
-            #( #qname_attrs )*
-            #variant_ident(std::boxed::Box<#payload_type>),
-          },
-          quote! {
-            #prefix_attrs
-            #[cfg(feature = "mce")]
-            #( #variant_attrs )*
-            #variant_doc_attrs
-            #( #qname_attrs )*
-            #variant_ident(
-              std::boxed::Box<
-                crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContentOf<
-                  #enum_ident
-                >
-              >
-            ),
-          },
-        ]);
-      }
-
       if flatten_anonymous_choice_wrappers
         && let Some(helper_type_decl) =
           anonymous_choice_wrapper_helper_type_decl(variant, render_context.module)
@@ -2397,15 +2298,6 @@ fn gen_choice_variant_tokens(
       }])
     }
   }
-}
-
-fn is_mce_alternate_content_variant(variant: &VariantDecl) -> bool {
-  variant.rust_name == "McAlternateContent"
-    && matches!(
-      variant.payload.module_path.as_deref(),
-      Some("crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006")
-    )
-    && variant.payload.rust_type == "AlternateContent"
 }
 
 fn inline_sequence_helper_type_decl<'a>(
@@ -3353,68 +3245,6 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   }
 
   fields
-}
-
-fn gen_mce_global_attr_fields(
-  module: &SchemaModuleDecl,
-  type_decl: &TypeDecl,
-  attr_fields: &[&FieldDecl],
-) -> Result<Vec<TokenStream>> {
-  const MCE_GLOBAL_ATTRS: [(&str, &str, &str); 4] = [
-    ("mc:Ignorable", "mc_ignorable", "StringValue"),
-    ("mc:MustUnderstand", "mc_must_understand", "StringValue"),
-    ("mc:ProcessContent", "mc_process_content", "StringValue"),
-    (
-      "mc:PreserveAttributes",
-      "mc_preserve_attributes",
-      "StringValue",
-    ),
-  ];
-
-  if module
-    .target_namespace
-    .starts_with("http://schemas.openxmlformats.org/package/")
-  {
-    return Ok(Vec::new());
-  }
-
-  let mut fields = Vec::new();
-  for (qname, rust_name, rust_type) in MCE_GLOBAL_ATTRS {
-    if qname == "mc:Ignorable" && type_decl.support.has_mce {
-      continue;
-    }
-
-    if attr_fields.iter().any(|attr| {
-      matches!(
-        &attr.wire,
-        FieldWireDecl::Attribute {
-          qname: attr_qname,
-          ..
-        } if attr_qname == qname
-      )
-    }) {
-      continue;
-    }
-
-    let attr = FieldDecl {
-      rust_name: rust_name.to_string(),
-      docs: format!("Markup compatibility attribute {qname}."),
-      version: "Office2007".to_string(),
-      type_ref: TypeRefDecl {
-        module_path: Some("crate::simple_type".to_string()),
-        rust_type: rust_type.to_string(),
-      },
-      cardinality: Cardinality::Optional,
-      wire: FieldWireDecl::Attribute {
-        qname: qname.to_string(),
-        bit: None,
-      },
-      validators: vec![],
-    };
-    fields.push(gen_attr_from_decl(&attr, VersionCfgContext::default())?);
-  }
-
-  Ok(fields)
 }
 
 fn choice_type_accepts_text(module: &SchemaModuleDecl, rust_type: &str) -> bool {

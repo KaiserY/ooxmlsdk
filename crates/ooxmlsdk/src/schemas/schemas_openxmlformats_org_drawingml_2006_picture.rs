@@ -12,34 +12,6 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
@@ -74,34 +46,6 @@ pub struct Picture {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/pic:cNvPr")]
 pub struct NonVisualDrawingProperties {
-    /// Markup compatibility attribute mc:Ignorable.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:Ignorable
-    #[sdk(attr(qname = "mc:Ignorable"))]
-    pub mc_ignorable: Option<crate::simple_type::StringValue>,
-    /// Markup compatibility attribute mc:MustUnderstand.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:MustUnderstand
-    #[sdk(attr(qname = "mc:MustUnderstand"))]
-    pub mc_must_understand: Option<crate::simple_type::StringValue>,
-    /// Markup compatibility attribute mc:ProcessContent.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:ProcessContent
-    #[sdk(attr(qname = "mc:ProcessContent"))]
-    pub mc_process_content: Option<crate::simple_type::StringValue>,
-    /// Markup compatibility attribute mc:PreserveAttributes.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:PreserveAttributes
-    #[sdk(attr(qname = "mc:PreserveAttributes"))]
-    pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -165,34 +109,6 @@ pub struct NonVisualDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPictureProperties/pic:cNvPicPr")]
 pub struct NonVisualPictureDrawingProperties {
-    /// Markup compatibility attribute mc:Ignorable.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:Ignorable
-    #[sdk(attr(qname = "mc:Ignorable"))]
-    pub mc_ignorable: Option<crate::simple_type::StringValue>,
-    /// Markup compatibility attribute mc:MustUnderstand.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:MustUnderstand
-    #[sdk(attr(qname = "mc:MustUnderstand"))]
-    pub mc_must_understand: Option<crate::simple_type::StringValue>,
-    /// Markup compatibility attribute mc:ProcessContent.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:ProcessContent
-    #[sdk(attr(qname = "mc:ProcessContent"))]
-    pub mc_process_content: Option<crate::simple_type::StringValue>,
-    /// Markup compatibility attribute mc:PreserveAttributes.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: mc:PreserveAttributes
-    #[sdk(attr(qname = "mc:PreserveAttributes"))]
-    pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
     /// preferRelativeResize
     ///
     /// Available in Office2007 and above.
@@ -221,34 +137,6 @@ pub struct NonVisualPictureDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_PictureNonVisual/pic:nvPicPr")]
 pub struct NonVisualPictureProperties {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/pic:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
@@ -264,34 +152,6 @@ pub struct NonVisualPictureProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipFillProperties/pic:blipFill")]
 pub struct BlipFill {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// DPI Setting
   ///
   /// Available in Office2007 and above.
@@ -328,34 +188,6 @@ pub struct BlipFill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/pic:spPr")]
 pub struct ShapeProperties {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.

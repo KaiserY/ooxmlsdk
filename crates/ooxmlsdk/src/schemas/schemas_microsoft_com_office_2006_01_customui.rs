@@ -36,34 +36,6 @@ pub enum BoxStyleValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ControlCloneRegular/mso:control")]
 pub struct UnsizedControlClone {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// idQ
   ///
   /// Available in Office2007 and above.
@@ -289,34 +261,6 @@ pub struct UnsizedControlClone {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ButtonRegular/mso:button")]
 pub struct UnsizedButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// onAction
   ///
   /// Available in Office2007 and above.
@@ -577,34 +521,6 @@ pub struct UnsizedButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_CheckBox/mso:checkBox")]
 pub struct CheckBox {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// getPressed
   ///
   /// Available in Office2007 and above.
@@ -817,34 +733,6 @@ pub struct CheckBox {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_GalleryRegular/mso:gallery")]
 pub struct UnsizedGallery {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// description
   ///
   /// Available in Office2007 and above.
@@ -1280,34 +1168,6 @@ pub struct UnsizedGallery {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton")]
 pub struct UnsizedToggleButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// getPressed
   ///
   /// Available in Office2007 and above.
@@ -1576,34 +1436,6 @@ pub struct UnsizedToggleButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_MenuSeparator/mso:menuSeparator")]
 pub struct MenuSeparator {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -1687,34 +1519,6 @@ pub struct MenuSeparator {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_SplitButtonRegular/mso:splitButton")]
 pub struct UnsizedSplitButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// enabled
   ///
   /// Available in Office2007 and above.
@@ -1870,34 +1674,6 @@ pub struct UnsizedSplitButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_MenuRegular/mso:menu")]
 pub struct UnsizedMenu {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// itemSize
   ///
   /// Available in Office2007 and above.
@@ -2169,34 +1945,6 @@ pub struct UnsizedMenu {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu")]
 pub struct UnsizedDynamicMenu {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// description
   ///
   /// Available in Office2007 and above.
@@ -2464,34 +2212,6 @@ pub struct UnsizedDynamicMenu {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_SplitButtonWithTitle/mso:splitButton")]
 pub struct SplitButtonWithTitle {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// enabled
   ///
   /// Available in Office2007 and above.
@@ -2647,34 +2367,6 @@ pub struct SplitButtonWithTitle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_MenuWithTitle/mso:menu")]
 pub struct MenuWithTitle {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -2946,34 +2638,6 @@ pub struct MenuWithTitle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ControlClone/mso:control")]
 pub struct ControlClone {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -3230,34 +2894,6 @@ pub struct ControlClone {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_LabelControl/mso:labelControl")]
 pub struct TextLabel {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -3436,34 +3072,6 @@ pub struct TextLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Button/mso:button")]
 pub struct Button {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -3739,34 +3347,6 @@ pub struct Button {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ToggleButton/mso:toggleButton")]
 pub struct ToggleButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -4050,34 +3630,6 @@ pub struct ToggleButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_EditBox/mso:editBox")]
 pub struct EditBox {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// enabled
   ///
   /// Available in Office2007 and above.
@@ -4353,34 +3905,6 @@ pub struct EditBox {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ComboBox/mso:comboBox")]
 pub struct ComboBox {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// showItemImage
   ///
   /// Available in Office2007 and above.
@@ -4721,34 +4245,6 @@ pub struct ComboBox {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_DropDownRegular/mso:dropDown")]
 pub struct DropDown {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// onAction
   ///
   /// Available in Office2007 and above.
@@ -5085,34 +4581,6 @@ pub struct DropDown {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Gallery/mso:gallery")]
 pub struct Gallery {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -5563,34 +5031,6 @@ pub struct Gallery {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Menu/mso:menu")]
 pub struct Menu {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -5877,34 +5317,6 @@ pub struct Menu {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_DynamicMenu/mso:dynamicMenu")]
 pub struct DynamicMenu {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -6187,34 +5599,6 @@ pub struct DynamicMenu {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_SplitButton/mso:splitButton")]
 pub struct SplitButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// size
   ///
   /// Available in Office2007 and above.
@@ -6385,34 +5769,6 @@ pub struct SplitButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Box/mso:box")]
 pub struct Box {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -6519,34 +5875,6 @@ pub struct Box {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ButtonGroup/mso:buttonGroup")]
 pub struct ButtonGroup {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -6639,34 +5967,6 @@ pub struct ButtonGroup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_MenuRoot/mso:menu")]
 pub struct MenuRoot {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// title
   ///
   /// Available in Office2007 and above.
@@ -6714,27 +6014,6 @@ pub struct CustomUi {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub mc_ignorable: Option<String>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// onLoad
   ///
   /// Available in Office2007 and above.
@@ -6766,34 +6045,6 @@ pub struct CustomUi {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Item/mso:item")]
 pub struct Item {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -6856,34 +6107,6 @@ pub struct Item {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_VisibleButton/mso:button")]
 pub struct VisibleButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// onAction
   ///
   /// Available in Office2007 and above.
@@ -7129,34 +6352,6 @@ pub struct VisibleButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_VisibleToggleButton/mso:toggleButton")]
 pub struct VisibleToggleButton {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// getPressed
   ///
   /// Available in Office2007 and above.
@@ -7410,34 +6605,6 @@ pub struct VisibleToggleButton {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Separator/mso:separator")]
 pub struct VerticalSeparator {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -7520,34 +6687,6 @@ pub struct VerticalSeparator {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_DialogLauncher/mso:dialogBoxLauncher")]
 pub struct DialogBoxLauncher {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   pub unsized_button: std::boxed::Box<UnsizedButton>,
@@ -7560,34 +6699,6 @@ pub struct DialogBoxLauncher {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Group/mso:group")]
 pub struct Group {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -7800,34 +6911,6 @@ pub struct Group {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ControlCloneQat/mso:control")]
 pub struct QuickAccessToolbarControlClone {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -8086,34 +7169,6 @@ pub struct QuickAccessToolbarControlClone {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/mso:sharedControls")]
 pub struct SharedQatControls {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "mso:CT_ControlCloneQat/mso:control",
     qname = "mso:CT_ButtonRegular/mso:button",
@@ -8129,34 +7184,6 @@ pub struct SharedQatControls {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/mso:documentControls")]
 pub struct DocumentSpecificQuickAccessToolbarControls {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "mso:CT_ControlCloneQat/mso:control",
     qname = "mso:CT_ButtonRegular/mso:button",
@@ -8173,34 +7200,6 @@ pub struct DocumentSpecificQuickAccessToolbarControls {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/")]
 pub struct QatItemsType {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "mso:CT_ControlCloneQat/mso:control",
     qname = "mso:CT_ButtonRegular/mso:button",
@@ -8216,34 +7215,6 @@ pub struct QatItemsType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Tab/mso:tab")]
 pub struct Tab {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -8380,34 +7351,6 @@ pub struct Tab {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_TabSet/mso:tabSet")]
 pub struct ContextualTabSet {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// idMso
   ///
   /// Available in Office2007 and above.
@@ -8445,34 +7388,6 @@ pub struct ContextualTabSet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Command/mso:command")]
 pub struct RepurposedCommand {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// onAction
   ///
   /// Available in Office2007 and above.
@@ -8515,34 +7430,6 @@ pub struct RepurposedCommand {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_OfficeMenu/mso:officeMenu")]
 pub struct OfficeMenu {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "mso:CT_ControlCloneRegular/mso:control",
     qname = "mso:CT_ButtonRegular/mso:button",
@@ -8564,34 +7451,6 @@ pub struct OfficeMenu {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Qat/mso:qat")]
 pub struct QuickAccessToolbar {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "mso:CT_QatItems/mso:sharedControls"))]
   pub shared_qat_controls: Option<SharedQatControls>,
@@ -8608,34 +7467,6 @@ pub struct QuickAccessToolbar {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Tabs/mso:tabs")]
 pub struct Tabs {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "mso:CT_Tab/mso:tab"))]
   pub mso_tab: Vec<Tab>,
@@ -8648,34 +7479,6 @@ pub struct Tabs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_ContextualTabs/mso:contextualTabs")]
 pub struct ContextualTabSets {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "mso:CT_TabSet/mso:tabSet"))]
   pub mso_tab_set: Vec<ContextualTabSet>,
@@ -8688,34 +7491,6 @@ pub struct ContextualTabSets {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Commands/mso:commands")]
 pub struct RepurposedCommands {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "mso:CT_Command/mso:command"))]
   pub mso_command: Vec<RepurposedCommand>,
@@ -8728,34 +7503,6 @@ pub struct RepurposedCommands {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Ribbon/mso:ribbon")]
 pub struct Ribbon {
-  /// Markup compatibility attribute mc:Ignorable.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:Ignorable
-  #[sdk(attr(qname = "mc:Ignorable"))]
-  pub mc_ignorable: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:MustUnderstand.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:MustUnderstand
-  #[sdk(attr(qname = "mc:MustUnderstand"))]
-  pub mc_must_understand: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:ProcessContent.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:ProcessContent
-  #[sdk(attr(qname = "mc:ProcessContent"))]
-  pub mc_process_content: Option<crate::simple_type::StringValue>,
-  /// Markup compatibility attribute mc:PreserveAttributes.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: mc:PreserveAttributes
-  #[sdk(attr(qname = "mc:PreserveAttributes"))]
-  pub mc_preserve_attributes: Option<crate::simple_type::StringValue>,
   /// startFromScratch
   ///
   /// Available in Office2007 and above.

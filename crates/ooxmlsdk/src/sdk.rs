@@ -253,22 +253,6 @@ pub trait SdkEnum: Sized {
 pub trait SdkType: Sized {}
 
 pub trait SdkChoice: Sized {
-  fn deserialize_borrowed_inner<'de>(
-    xml_reader: &mut crate::common::SliceReader<'de>,
-    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
-  ) -> Result<Self, crate::common::SdkError>;
-
-  fn deserialize_io_inner<R: std::io::BufRead>(
-    xml_reader: &mut crate::common::IoReader<R>,
-    xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
-  ) -> Result<Self, crate::common::SdkError>;
-
-  fn write_xml<W: std::io::Write>(
-    &self,
-    writer: &mut W,
-    xmlns_prefix: &str,
-  ) -> Result<(), std::io::Error>;
-
   fn matches_specific_start_qname(name: &[u8]) -> bool;
 
   #[inline]

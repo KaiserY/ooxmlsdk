@@ -94,7 +94,7 @@ fn build_flat_choice_dispatch_match_tokens(
     (
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -106,7 +106,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -118,7 +118,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -130,7 +130,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -145,7 +145,7 @@ fn build_flat_choice_dispatch_match_tokens(
     (
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -157,7 +157,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -169,7 +169,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -181,7 +181,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -197,7 +197,6 @@ fn build_flat_choice_dispatch_match_tokens(
 
 pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
-  let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
   let Data::Struct(data_struct) = &input.data else {
     return Err(syn::Error::new_spanned(
       input,
@@ -217,33 +216,31 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
       "tuple leaf wrappers are no longer supported; use a named struct with an #[sdk(text)] xml_content field or a type alias",
     )),
     _ => Ok(quote! {
-      impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+      impl crate::sdk::SdkType for #ident {}
       #[cfg(feature = "validators")]
-      impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {}
+      impl crate::validator::SdkValidator for #ident {}
     }),
   }
 }
 
 fn sdk_type_impl_tokens(
   ident: &Ident,
-  generics: &syn::Generics,
   impl_items: proc_macro2::TokenStream,
   validate_items: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
   let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
-  let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
   quote! {
-    impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+    impl crate::sdk::SdkType for #ident {}
     #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
+    impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #validate_items
         Ok(())
       }
     }
 
-    impl #impl_generics std::str::FromStr for #ident #type_generics #where_clause {
+    impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;
 
       fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -252,7 +249,7 @@ fn sdk_type_impl_tokens(
       }
     }
 
-    impl #impl_generics #ident #type_generics #where_clause {
+    impl #ident {
       pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
         Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
@@ -859,7 +856,7 @@ fn expand_sequence_helper_struct(
           });
           child_dispatch_tokens_borrowed.push(quote! {
             if matches!(event_name, #match_target) {
-              match <#child_ty>::#deserialize_borrowed_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_borrowed_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                 }
@@ -871,7 +868,7 @@ fn expand_sequence_helper_struct(
           });
           child_dispatch_tokens_io.push(quote! {
             if matches!(event_name, #match_target) {
-              match <#child_ty>::#deserialize_io_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_io_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                 }
@@ -914,7 +911,7 @@ fn expand_sequence_helper_struct(
           }
           child_dispatch_tokens_borrowed.push(quote! {
             if matches!(event_name, #match_target) {
-              match <#child_ty>::#deserialize_borrowed_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_borrowed_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                 }
@@ -926,7 +923,7 @@ fn expand_sequence_helper_struct(
           });
           child_dispatch_tokens_io.push(quote! {
             if matches!(event_name, #match_target) {
-              match <#child_ty>::#deserialize_io_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_io_inner_ident(#xml_reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                 }
@@ -1071,7 +1068,6 @@ fn expand_sequence_helper_struct(
 
   Ok(sdk_type_impl_tokens(
     ident,
-    &input.generics,
     quote! {
       #[inline]
       pub(crate) fn matches_specific_start_qname(name: &[u8]) -> bool {
@@ -1181,7 +1177,6 @@ fn expand_helper_struct(
   fields: &syn::FieldsNamed,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
-  let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
   let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
   let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
@@ -1306,7 +1301,7 @@ fn expand_helper_struct(
         if as_result {
           quote! {
               #case_index => {
-                return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+                return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
                     Ok(true)
@@ -1319,7 +1314,7 @@ fn expand_helper_struct(
         } else {
           quote! {
               #case_index => {
-                match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+                match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
                     continue;
@@ -1334,7 +1329,7 @@ fn expand_helper_struct(
         if as_result {
           quote! {
             #case_index => {
-              return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   Ok(true)
@@ -1347,7 +1342,7 @@ fn expand_helper_struct(
         } else {
           quote! {
             #case_index => {
-              match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   continue;
@@ -1365,7 +1360,7 @@ fn expand_helper_struct(
         if as_result {
           quote! {
             #target => {
-              return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   Ok(true)
@@ -1378,7 +1373,7 @@ fn expand_helper_struct(
         } else {
           quote! {
             #target => {
-              match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   continue;
@@ -1392,7 +1387,7 @@ fn expand_helper_struct(
       } else if as_result {
         quote! {
           #target => {
-            return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+            return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
                 #field_ident = Some(#parsed_child_expr);
                 Ok(true)
@@ -1405,7 +1400,7 @@ fn expand_helper_struct(
       } else {
         quote! {
           #target => {
-            match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+            match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
                 #field_ident = Some(#parsed_child_expr);
                 continue;
@@ -1760,7 +1755,7 @@ fn expand_helper_struct(
     } else if field.repeated {
       choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -1772,7 +1767,7 @@ fn expand_helper_struct(
       });
       choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -1784,7 +1779,7 @@ fn expand_helper_struct(
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -1796,7 +1791,7 @@ fn expand_helper_struct(
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -1809,7 +1804,7 @@ fn expand_helper_struct(
       if field_accepts_any {
         choice_any_unique_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 continue;
@@ -1821,7 +1816,7 @@ fn expand_helper_struct(
         });
         choice_any_unique_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 continue;
@@ -1833,7 +1828,7 @@ fn expand_helper_struct(
         });
         choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 Ok(true)
@@ -1845,7 +1840,7 @@ fn expand_helper_struct(
         });
         choice_any_unique_visit_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 Ok(true)
@@ -1859,7 +1854,7 @@ fn expand_helper_struct(
     } else {
       choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -1871,7 +1866,7 @@ fn expand_helper_struct(
       });
       choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -1883,7 +1878,7 @@ fn expand_helper_struct(
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -1895,7 +1890,7 @@ fn expand_helper_struct(
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -1908,7 +1903,7 @@ fn expand_helper_struct(
       if field_accepts_any {
         choice_any_unique_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 continue;
@@ -1920,7 +1915,7 @@ fn expand_helper_struct(
         });
         choice_any_unique_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 continue;
@@ -1932,7 +1927,7 @@ fn expand_helper_struct(
         });
         choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 Ok(true)
@@ -1944,7 +1939,7 @@ fn expand_helper_struct(
         });
         choice_any_unique_visit_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 Ok(true)
@@ -1961,7 +1956,7 @@ fn expand_helper_struct(
       choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(quote! {
         for choice in &self.#field_ident {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+          choice.write_xml(writer, xmlns_prefix)?;
         }
       });
       choice_validate_tokens.push(quote! {
@@ -1986,7 +1981,7 @@ fn expand_helper_struct(
       if field.optional {
         choice_write_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+            choice.write_xml(writer, xmlns_prefix)?;
           }
         });
         choice_validate_tokens.push(quote! {
@@ -1996,7 +1991,7 @@ fn expand_helper_struct(
         });
       } else {
         choice_write_tokens.push(quote! {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+          self.#field_ident.write_xml(writer, xmlns_prefix)?;
         });
         choice_validate_tokens.push(quote! {
           crate::validator::SdkValidator::validate(#validate_self_tokens)?;
@@ -2313,9 +2308,9 @@ fn expand_helper_struct(
   };
 
   Ok(quote! {
-    impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+    impl crate::sdk::SdkType for #ident {}
     #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
+    impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #( #child_validate_tokens )*
         #( #choice_validate_tokens )*
@@ -2323,7 +2318,7 @@ fn expand_helper_struct(
       }
     }
 
-    impl #impl_generics std::str::FromStr for #ident #type_generics #where_clause {
+    impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;
 
       fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -2332,7 +2327,7 @@ fn expand_helper_struct(
       }
     }
 
-    impl #impl_generics #ident #type_generics #where_clause {
+    impl #ident {
       pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
         Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
@@ -2449,16 +2444,15 @@ fn expand_named_struct(
   fields: &syn::FieldsNamed,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
-  let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
   let QNameInfo {
     tag_prefix,
     local_name,
   } = parse_qname_info(schema_qname);
   if local_name.is_empty() {
     return Ok(quote! {
-      impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+      impl crate::sdk::SdkType for #ident {}
       #[cfg(feature = "validators")]
-      impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {}
+      impl crate::validator::SdkValidator for #ident {}
     });
   }
   let tag_qname = if tag_prefix.is_empty() {
@@ -2897,7 +2891,7 @@ fn expand_named_struct(
         if as_result {
           quote! {
             #case_index => {
-              return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   Ok(true)
@@ -2910,7 +2904,7 @@ fn expand_named_struct(
         } else {
           quote! {
             #case_index => {
-              match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   continue;
@@ -2925,7 +2919,7 @@ fn expand_named_struct(
         if as_result {
           quote! {
             #case_index => {
-              return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   Ok(true)
@@ -2938,7 +2932,7 @@ fn expand_named_struct(
         } else {
           quote! {
             #case_index => {
-              match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
                   continue;
@@ -2956,7 +2950,7 @@ fn expand_named_struct(
         if as_result {
           quote! {
             #target => {
-              return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   Ok(true)
@@ -2969,7 +2963,7 @@ fn expand_named_struct(
         } else {
           quote! {
             #target => {
-              match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+              match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident.push(#parsed_child_expr);
                   continue;
@@ -2983,7 +2977,7 @@ fn expand_named_struct(
       } else if as_result {
         quote! {
           #target => {
-            return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+            return match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
                 #field_ident = Some(#parsed_child_expr);
                 Ok(true)
@@ -2996,7 +2990,7 @@ fn expand_named_struct(
       } else {
         quote! {
           #target => {
-            match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
+            match #child_ty::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
                 #field_ident = Some(#parsed_child_expr);
                 continue;
@@ -3463,7 +3457,7 @@ fn expand_named_struct(
     } else if field.repeated {
       choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -3475,7 +3469,7 @@ fn expand_named_struct(
       });
       choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -3487,7 +3481,7 @@ fn expand_named_struct(
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -3499,7 +3493,7 @@ fn expand_named_struct(
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -3512,7 +3506,7 @@ fn expand_named_struct(
       if field_accepts_any {
         choice_any_unique_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 continue;
@@ -3524,7 +3518,7 @@ fn expand_named_struct(
         });
         choice_any_unique_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 continue;
@@ -3536,7 +3530,7 @@ fn expand_named_struct(
         });
         choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 Ok(true)
@@ -3548,7 +3542,7 @@ fn expand_named_struct(
         });
         choice_any_unique_visit_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident.push(parsed_choice);
                 Ok(true)
@@ -3562,7 +3556,7 @@ fn expand_named_struct(
     } else {
       choice_unique_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -3574,7 +3568,7 @@ fn expand_named_struct(
       });
       choice_unique_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               continue;
@@ -3586,7 +3580,7 @@ fn expand_named_struct(
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -3598,7 +3592,7 @@ fn expand_named_struct(
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
         if #match_ident && specific_choice_match_count == 1usize {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               Ok(true)
@@ -3611,7 +3605,7 @@ fn expand_named_struct(
       if field_accepts_any {
         choice_any_unique_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 continue;
@@ -3623,7 +3617,7 @@ fn expand_named_struct(
         });
         choice_any_unique_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 continue;
@@ -3635,7 +3629,7 @@ fn expand_named_struct(
         });
         choice_any_unique_visit_parse_tokens_borrowed.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 Ok(true)
@@ -3647,7 +3641,7 @@ fn expand_named_struct(
         });
         choice_any_unique_visit_parse_tokens_io.push(quote! {
           if #any_ident && specific_choice_match_count == 0usize && any_choice_match_count == 1usize {
-            return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+            return match #choice_ty::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
               Ok(parsed_choice) => {
                 #field_ident = Some(parsed_choice);
                 Ok(true)
@@ -3664,7 +3658,7 @@ fn expand_named_struct(
       choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(quote! {
         for choice in &self.#field_ident {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+          choice.write_xml(writer, xmlns_prefix)?;
         }
       });
       choice_validate_tokens.push(quote! {
@@ -3690,7 +3684,7 @@ fn expand_named_struct(
       if field.optional {
         choice_write_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+            choice.write_xml(writer, xmlns_prefix)?;
           }
         });
         choice_validate_tokens.push(quote! {
@@ -3700,7 +3694,7 @@ fn expand_named_struct(
         });
       } else {
         choice_write_tokens.push(quote! {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+          self.#field_ident.write_xml(writer, xmlns_prefix)?;
         });
         choice_validate_tokens.push(quote! {
           crate::validator::SdkValidator::validate(#validate_self_tokens)?;
@@ -4609,24 +4603,23 @@ fn expand_named_struct(
         ));
       }
       SdkTypeFieldKind::Choice => {
-        let choice_ty = unwrap_wrapped_type(field_ty);
         let repeated = contains_vec_type(field_ty);
         let optional = is_option_type(field_ty);
         if repeated {
           ordered_write_tokens.push(quote! {
             for choice in &self.#field_ident {
-              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+              choice.write_xml(writer, xmlns_prefix)?;
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(choice) = &self.#field_ident {
-              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+              choice.write_xml(writer, xmlns_prefix)?;
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+            self.#field_ident.write_xml(writer, xmlns_prefix)?;
           });
         }
       }
@@ -5068,9 +5061,9 @@ fn expand_named_struct(
     || !any_fields.is_empty()
     || text_field.is_some();
   Ok(quote! {
-    impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+    impl crate::sdk::SdkType for #ident {}
     #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
+    impl crate::validator::SdkValidator for #ident {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #( #attr_validate_tokens )*
         #( #child_validate_tokens )*
@@ -5079,7 +5072,7 @@ fn expand_named_struct(
       }
     }
 
-    impl #impl_generics std::str::FromStr for #ident #type_generics #where_clause {
+    impl std::str::FromStr for #ident {
       type Err = crate::common::SdkError;
 
       fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -5088,7 +5081,7 @@ fn expand_named_struct(
       }
     }
 
-    impl #impl_generics #ident #type_generics #where_clause {
+    impl #ident {
       pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
         Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
@@ -5254,7 +5247,7 @@ fn expand_named_struct(
       }
     }
 
-    impl #impl_generics ::std::fmt::Display for #ident #type_generics #where_clause {
+    impl ::std::fmt::Display for #ident {
       fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{}", self.to_xml()?)
       }

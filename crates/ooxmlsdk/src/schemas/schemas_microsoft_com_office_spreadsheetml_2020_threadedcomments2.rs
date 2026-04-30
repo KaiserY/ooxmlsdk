@@ -51,6 +51,7 @@ pub struct CommentHyperlink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xltc2:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,

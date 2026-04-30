@@ -211,6 +211,7 @@ pub struct DrawingMonikerList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/oac:xfrm")]
 pub struct Transform2D {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -791,6 +792,7 @@ pub struct Point2DType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraphProperties/oac:pPr")]
 pub struct TextParagraphPropertiesType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
   ///
   /// Available in Office2007 and above.
@@ -962,6 +964,7 @@ pub struct TextParagraphPropertiesType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBodyProperties/oac:bodyPr")]
 pub struct TextBodyProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -1250,6 +1253,7 @@ pub struct ShapePropsMonikerList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/oac:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -1423,6 +1427,8 @@ pub struct EffectRefStyleMatrixReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/")]
 pub struct StyleMatrixReferenceType {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Style Matrix Index
   ///
   /// Available in Office2007 and above.
@@ -1807,6 +1813,7 @@ pub struct ResetGroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/oac:cNvPr")]
 pub struct NonVisualDrawingProps {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -2354,6 +2361,7 @@ pub struct SvgBlipMonikerList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/oac:lineProps")]
 pub struct LinePropertiesType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   ///
   /// Available in Office2007 and above.

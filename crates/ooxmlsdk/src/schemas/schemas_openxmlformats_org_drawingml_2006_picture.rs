@@ -12,6 +12,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]
@@ -43,6 +44,7 @@ pub struct Picture {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/pic:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -185,6 +187,7 @@ pub struct BlipFill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/pic:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.

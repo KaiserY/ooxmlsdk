@@ -234,6 +234,7 @@ pub struct WrapTopBottom {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_Inline/wp:inline")]
 pub struct Inline {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Distance From Text on Top Edge
   ///
   /// Available in Office2007 and above.
@@ -306,6 +307,7 @@ pub struct Inline {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_Anchor/wp:anchor")]
 pub struct Anchor {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Distance From Text on Top Edge
   ///
@@ -691,6 +693,8 @@ pub struct WrapPolygon {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_PosH/wp:positionH")]
 pub struct HorizontalPosition {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Horizontal Position Relative Base
   ///
   /// Available in Office2007 and above.
@@ -717,6 +721,8 @@ pub struct HorizontalPosition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_PosV/wp:positionV")]
 pub struct VerticalPosition {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Vertical Position Relative Base
   ///
   /// Available in Office2007 and above.
@@ -780,6 +786,7 @@ pub struct Extent {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/wp:docPr")]
 pub struct DocProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.

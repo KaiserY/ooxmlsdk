@@ -213,11 +213,8 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 }
 
 #[cfg(not(feature = "mce"))]
-fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
-  match choice {
-    BodyChoice::XmlOther(xml) if xml.starts_with("<mc:AlternateContent") => Some(xml.as_str()),
-    _ => None,
-  }
+fn body_choice_alternate_content(_choice: &BodyChoice) -> Option<&str> {
+  None
 }
 
 #[cfg(not(feature = "mce"))]

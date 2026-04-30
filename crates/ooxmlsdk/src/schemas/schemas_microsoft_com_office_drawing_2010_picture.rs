@@ -38,6 +38,7 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/pic14:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,

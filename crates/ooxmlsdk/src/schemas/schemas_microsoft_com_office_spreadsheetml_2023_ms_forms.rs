@@ -80,6 +80,7 @@ pub type SyncedQuestionId = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/xlmsforms:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,

@@ -86,6 +86,7 @@ pub struct Style {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c14:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.

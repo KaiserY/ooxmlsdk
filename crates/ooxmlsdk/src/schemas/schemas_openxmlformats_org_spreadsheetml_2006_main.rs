@@ -1568,6 +1568,7 @@ pub enum ConformanceClass {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Extension/x:ext")]
 pub struct Extension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -1590,6 +1591,7 @@ pub struct CalculationChain {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_CalcCell/x:c"))]
   pub x_c: Vec<CalculationCell>,
@@ -1629,6 +1631,7 @@ pub struct MapInfo {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Prefix Mappings for XPath Expressions
   ///
   /// Available in Office2007 and above.
@@ -1654,6 +1657,7 @@ pub struct Connections {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_Connection/x:connection"))]
   pub x_connection: Vec<Connection>,
@@ -1847,6 +1851,7 @@ pub struct PivotCacheRecords {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// PivotCache Records Count
   ///
   /// Available in Office2007 and above.
@@ -2583,6 +2588,7 @@ pub struct SharedStringTable {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// String Count
   ///
   /// Available in Office2007 and above.
@@ -2615,6 +2621,7 @@ pub struct Headers {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Last Revision GUID
   ///
   /// Available in Office2007 and above.
@@ -2736,7 +2743,9 @@ pub struct Revisions {
     qname = "x:CT_RevisionDefinedName/x:rdn",
     qname = "x:CT_RevisionComment/x:rcmt",
     qname = "x:CT_RevisionQueryTableField/x:rqt",
-    qname = "x:CT_RevisionConflict/x:rcft"
+    qname = "x:CT_RevisionConflict/x:rcft",
+    text,
+    any
   ))]
   pub xml_children: Vec<RevisionsChoice>,
 }
@@ -2751,6 +2760,7 @@ pub struct Users {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Active User Count
   ///
   /// Available in Office2007 and above.
@@ -3019,6 +3029,7 @@ pub struct Metadata {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Metadata Types Collection
   #[sdk(child(qname = "x:CT_MetadataTypes/x:metadataTypes"))]
   pub metadata_types: Option<MetadataTypes>,
@@ -3052,6 +3063,7 @@ pub struct SingleXmlCells {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_SingleXmlCell/x:singleXmlCell"))]
   pub x_single_xml_cell: Vec<SingleXmlCell>,
@@ -3315,6 +3327,7 @@ pub struct VolatileTypes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_VolType/x:volType"))]
   pub x_vol_type: Vec<VolatileType>,
@@ -3406,6 +3419,7 @@ pub struct Workbook {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FilterColumn/x:filterColumn")]
 pub struct FilterColumn {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Filter Column Data
   ///
@@ -3428,11 +3442,6 @@ pub struct FilterColumn {
   /// Represents the following attribute in the schema: :showButton
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "x:CT_Filters/x:filters",
     qname = "x:CT_Top10/x:top10",
@@ -3459,6 +3468,7 @@ pub struct FilterColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SortState/x:sortState")]
 pub struct SortState {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Sort by Columns
   ///
@@ -3506,6 +3516,7 @@ pub struct SortState {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/x:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<Extension>,
@@ -3604,6 +3615,7 @@ pub struct Authors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CommentList/x:commentList")]
 pub struct CommentList {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_Comment/x:comment"))]
@@ -3617,6 +3629,7 @@ pub struct CommentList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Comment/x:comment")]
 pub struct Comment {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Cell Reference
   ///
@@ -3668,6 +3681,7 @@ pub struct Comment {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:author")]
 pub struct Author {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3686,6 +3700,7 @@ pub struct Author {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:t")]
 pub struct Text {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3704,6 +3719,7 @@ pub struct Text {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:v")]
 pub struct CellValue {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3722,6 +3738,7 @@ pub struct CellValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:formula")]
 pub struct Formula {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3740,6 +3757,7 @@ pub struct Formula {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:oldFormula")]
 pub struct OldFormula {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3758,6 +3776,7 @@ pub struct OldFormula {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:oddHeader")]
 pub struct OddHeader {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3776,6 +3795,7 @@ pub struct OddHeader {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:oddFooter")]
 pub struct OddFooter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3794,6 +3814,7 @@ pub struct OddFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:evenHeader")]
 pub struct EvenHeader {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3812,6 +3833,7 @@ pub struct EvenHeader {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:evenFooter")]
 pub struct EvenFooter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3830,6 +3852,7 @@ pub struct EvenFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:firstHeader")]
 pub struct FirstHeader {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3848,6 +3871,7 @@ pub struct FirstHeader {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:firstFooter")]
 pub struct FirstFooter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3866,6 +3890,7 @@ pub struct FirstFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:val")]
 pub struct DdeLinkValue {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3884,6 +3909,7 @@ pub struct DdeLinkValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:stp")]
 pub struct Subtopic {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3902,6 +3928,7 @@ pub struct Subtopic {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:formula1")]
 pub struct Formula1 {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -3920,6 +3947,7 @@ pub struct Formula1 {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:formula2")]
 pub struct Formula2 {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   ///
   /// Available in Office2007 and above.
@@ -4109,6 +4137,7 @@ pub struct DataBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Connection/x:connection")]
 pub struct Connection {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -4432,6 +4461,8 @@ pub struct TextField {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheField/x:cacheField")]
 pub struct CacheField {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -4617,6 +4648,7 @@ pub struct PageItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RangeSet/x:rangeSet")]
 pub struct RangeSet {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field Item Index Page 1
   ///
   /// Available in Office2007 and above.
@@ -5392,6 +5424,7 @@ pub struct FieldUsage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_GroupLevel/x:groupLevel")]
 pub struct GroupLevel {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Unique Name
   ///
   /// Available in Office2007 and above.
@@ -5745,6 +5778,7 @@ pub struct Query {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CalculatedItem/x:calculatedItem")]
 pub struct CalculatedItem {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field Index
   ///
   /// Available in Office2007 and above.
@@ -5774,6 +5808,7 @@ pub struct CalculatedItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotArea/x:pivotArea")]
 pub struct PivotArea {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field Index
   ///
   /// Available in Office2007 and above.
@@ -5873,6 +5908,7 @@ pub struct PivotArea {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CalculatedMember/x:calculatedMember")]
 pub struct CalculatedMember {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -5934,6 +5970,7 @@ pub struct CalculatedMember {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotField/x:pivotField")]
 pub struct PivotField {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field Name
   ///
   /// Available in Office2007 and above.
@@ -6374,6 +6411,7 @@ pub struct Item {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataField/x:dataField")]
 pub struct DataField {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// name
   ///
   /// Available in Office2007 and above.
@@ -6484,6 +6522,7 @@ pub struct Field {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Format/x:format")]
 pub struct Format {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Format Action
   ///
   /// Available in Office2007 and above.
@@ -6513,6 +6552,7 @@ pub struct Format {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ConditionalFormat/x:conditionalFormat")]
 pub struct ConditionalFormat {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Conditional Formatting Scope
   ///
   /// Available in Office2007 and above.
@@ -6601,6 +6641,8 @@ pub struct ChartFormat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotHierarchy/x:pivotHierarchy")]
 pub struct PivotHierarchy {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Outline New Levels
   ///
   /// Available in Office2007 and above.
@@ -6915,6 +6957,7 @@ pub struct MeasureDimensionMap {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotFilter/x:filter")]
 pub struct PivotFilter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// fld
   ///
   /// Available in Office2007 and above.
@@ -7007,6 +7050,7 @@ pub struct PivotFilter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheHierarchy/x:cacheHierarchy")]
 pub struct CacheHierarchy {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// uniqueName
   ///
   /// Available in Office2007 and above.
@@ -7288,6 +7332,7 @@ pub struct GroupItems {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PageField/x:pageField")]
 pub struct PageField {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field
   ///
   /// Available in Office2007 and above.
@@ -7354,6 +7399,8 @@ pub struct PivotAreaReferences {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotAreaReference/x:reference")]
 pub struct PivotAreaReference {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Field Index
   ///
   /// Available in Office2007 and above.
@@ -7542,6 +7589,7 @@ pub struct DeletedField {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_QueryTableField/x:queryTableField")]
 pub struct QueryTableField {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field Id
   ///
   /// Available in Office2007 and above.
@@ -7604,6 +7652,8 @@ pub struct QueryTableField {
 #[sdk(qname = "x:CT_Rst/x:si")]
 pub struct SharedStringItem {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
@@ -8289,6 +8339,7 @@ pub struct PhoneticProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionHeader/x:header")]
 pub struct Header {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// GUID
   ///
   /// Available in Office2007 and above.
@@ -8361,6 +8412,8 @@ pub struct Header {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionRowColumn/x:rrc")]
 pub struct RevisionRowColumn {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Id
   ///
   /// Available in Office2007 and above.
@@ -8420,7 +8473,9 @@ pub struct RevisionRowColumn {
   #[sdk(choice(
     qname = "x:CT_UndoInfo/x:undo",
     qname = "x:CT_RevisionCellChange/x:rcc",
-    qname = "x:CT_RevisionFormatting/x:rfmt"
+    qname = "x:CT_RevisionFormatting/x:rfmt",
+    text,
+    any
   ))]
   pub xml_children: Vec<RevisionRowColumnChoice>,
 }
@@ -8432,6 +8487,8 @@ pub struct RevisionRowColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionMove/x:rm")]
 pub struct RevisionMove {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Id
   ///
   /// Available in Office2007 and above.
@@ -8484,7 +8541,9 @@ pub struct RevisionMove {
   #[sdk(choice(
     qname = "x:CT_UndoInfo/x:undo",
     qname = "x:CT_RevisionCellChange/x:rcc",
-    qname = "x:CT_RevisionFormatting/x:rfmt"
+    qname = "x:CT_RevisionFormatting/x:rfmt",
+    text,
+    any
   ))]
   pub xml_children: Vec<RevisionMoveChoice>,
 }
@@ -8524,6 +8583,7 @@ pub struct RevisionCustomView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionSheetRename/x:rsnm")]
 pub struct RevisionSheetName {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Id
   ///
   /// Available in Office2007 and above.
@@ -8629,6 +8689,7 @@ pub struct RevisionInsertSheet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionCellChange/x:rcc")]
 pub struct RevisionCellChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Id
   ///
   /// Available in Office2007 and above.
@@ -8751,6 +8812,7 @@ pub struct RevisionCellChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionFormatting/x:rfmt")]
 pub struct RevisionFormat {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Sheet Id
   ///
   /// Available in Office2007 and above.
@@ -8880,6 +8942,7 @@ pub struct RevisionAutoFormat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RevisionDefinedName/x:rdn")]
 pub struct RevisionDefinedName {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Id
   ///
   /// Available in Office2007 and above.
@@ -9490,6 +9553,7 @@ pub struct Cell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Cell/")]
 pub struct CellType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Reference
   ///
   /// Available in Office2007 and above.
@@ -9548,6 +9612,7 @@ pub struct CellType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_NewCell/x:nc")]
 pub struct NewCell {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Reference
   ///
   /// Available in Office2007 and above.
@@ -9838,6 +9903,7 @@ pub struct CellFormula {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SharedUser/x:userInfo")]
 pub struct UserInfo {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// User Revisions GUID
   ///
   /// Available in Office2007 and above.
@@ -9883,6 +9949,8 @@ pub struct UserInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Row/x:row")]
 pub struct Row {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Row Index
   ///
   /// Available in Office2007 and above.
@@ -10386,6 +10454,7 @@ pub struct Break {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataRef/x:dataRef")]
 pub struct DataReference {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Reference
   ///
   /// Available in Office2007 and above.
@@ -10596,6 +10665,7 @@ pub struct PrintOptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PageSetup/x:pageSetup")]
 pub struct PageSetup {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Paper Size
   ///
   /// Available in Office2007 and above.
@@ -10779,6 +10849,8 @@ pub struct HeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_AutoFilter/x:autoFilter")]
 pub struct AutoFilter {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Cell or Range Reference
   ///
   /// Available in Office2007 and above.
@@ -10804,6 +10876,8 @@ pub struct AutoFilter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRule/x:cfRule")]
 pub struct ConditionalFormattingRule {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Type
   ///
   /// Available in Office2007 and above.
@@ -10919,6 +10993,7 @@ pub struct ConditionalFormattingRule {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Hyperlink/x:hyperlink")]
 pub struct Hyperlink {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Reference
   ///
   /// Available in Office2007 and above.
@@ -10963,6 +11038,7 @@ pub struct Hyperlink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Cfvo/x:cfvo")]
 pub struct ConditionalFormatValueObject {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Type
   ///
   /// Available in Office2007 and above.
@@ -11132,6 +11208,7 @@ pub struct CellWatch {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CsPageSetup/x:pageSetup")]
 pub struct ChartSheetPageSetup {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Paper Size
   ///
   /// Available in Office2007 and above.
@@ -11218,6 +11295,7 @@ pub struct ChartSheetPageSetup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomProperty/x:customPr")]
 pub struct CustomProperty {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Custom Property Name
   ///
   /// Available in Office2007 and above.
@@ -11306,6 +11384,7 @@ pub struct WebPublishItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TablePart/x:tablePart")]
 pub struct TablePart {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Relationship Id
   ///
   /// Available in Office2007 and above.
@@ -11322,6 +11401,7 @@ pub struct TablePart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ChartsheetView/x:sheetView")]
 pub struct ChartSheetView {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Sheet Tab Selected
   ///
   /// Available in Office2007 and above.
@@ -11457,6 +11537,7 @@ pub struct InputCells {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Control/x:control")]
 pub struct Control {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Shape Id
   ///
@@ -11587,6 +11668,7 @@ pub struct MergeCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataValidation/x:dataValidation")]
 pub struct DataValidation {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// type
   ///
@@ -11698,6 +11780,8 @@ pub struct DataValidation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetView/x:sheetView")]
 pub struct SheetView {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Window Protection
   ///
   /// Available in Office2007 and above.
@@ -11852,6 +11936,7 @@ pub struct SheetView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomSheetView/x:customSheetView")]
 pub struct CustomSheetView {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// GUID
   ///
   /// Available in Office2007 and above.
@@ -12036,6 +12121,7 @@ pub struct CustomSheetView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleObject/x:oleObject")]
 pub struct OleObject {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// OLE ProgId
   ///
@@ -12156,6 +12242,9 @@ pub struct MdxMetadata {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FutureMetadata/x:futureMetadata")]
 pub struct FutureMetadata {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Metadata Type Name
   ///
   /// Available in Office2007 and above.
@@ -12717,6 +12806,7 @@ pub struct NameIndex {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SingleXmlCell/x:singleXmlCell")]
 pub struct SingleXmlCell {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Table Id
   ///
   /// Available in Office2007 and above.
@@ -12753,6 +12843,7 @@ pub struct SingleXmlCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_XmlCellPr/x:xmlCellPr")]
 pub struct XmlCellProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Table Field Id
   ///
   /// Available in Office2007 and above.
@@ -12782,6 +12873,7 @@ pub struct XmlCellProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_XmlPr/x:xmlPr")]
 pub struct XmlProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// XML Map Id
   ///
   /// Available in Office2007 and above.
@@ -13103,6 +13195,7 @@ pub struct Fill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Border/x:border")]
 pub struct Border {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Diagonal Up
   ///
@@ -13244,6 +13337,7 @@ pub struct RgbColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CellStyle/x:cellStyle")]
 pub struct CellStyle {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// User Defined Cell Style
   ///
   /// Available in Office2007 and above.
@@ -13298,6 +13392,7 @@ pub struct CellStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xf/x:xf")]
 pub struct CellFormat {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Number Format Id
   ///
   /// Available in Office2007 and above.
@@ -13705,7 +13800,8 @@ pub struct Value {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
-  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem", any))]
+  pub xml_other_attrs: Vec<(String, String)>,
+  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem", text, any))]
   #[cfg_attr(
     feature = "microsoft365",
     sdk(choice(qname = "x14:CT_OleItem/x14:oleItem"))
@@ -13720,6 +13816,7 @@ pub struct OleItems {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalBook/x:externalBook")]
 pub struct ExternalBook {
+    pub xml_other_attrs: Vec<(String, String)>,
     pub xml_other_children: Vec<(usize, String)>,
     /// Relationship to supporting book file path
     ///
@@ -13828,6 +13925,7 @@ pub type Xstring = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableColumn/x:tableColumn")]
 pub struct TableColumn {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Table Field Id
   ///
   /// Available in Office2007 and above.
@@ -13933,6 +14031,7 @@ pub struct TableColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableFormula/x:calculatedColumnFormula")]
 pub struct CalculatedColumnFormula {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Array
   ///
   /// Available in Office2007 and above.
@@ -13958,6 +14057,7 @@ pub struct CalculatedColumnFormula {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableFormula/x:totalsRowFormula")]
 pub struct TotalsRowFormula {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Array
   ///
   /// Available in Office2007 and above.
@@ -14008,6 +14108,7 @@ pub struct TableFormulaType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_XmlColumnPr/x:xmlColumnPr")]
 pub struct XmlColumnProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// XML Map Id
   ///
   /// Available in Office2007 and above.
@@ -14048,6 +14149,9 @@ pub struct XmlColumnProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_VolType/x:volType")]
 pub struct VolatileType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Type
   ///
   /// Available in Office2007 and above.
@@ -14134,6 +14238,7 @@ pub struct TopicReferences {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCache/x:pivotCache")]
 pub struct PivotCache {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// PivotCache Id
   ///
   /// Available in Office2007 and above.
@@ -14208,6 +14313,7 @@ pub struct WebPublishObject {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalReference/x:externalReference")]
 pub struct ExternalReference {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Relationship Id
   ///
   /// Available in Office2007 and above.
@@ -14224,6 +14330,7 @@ pub struct ExternalReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomWorkbookView/x:customWorkbookView")]
 pub struct CustomWorkbookView {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Custom View Name
   ///
   /// Available in Office2007 and above.
@@ -14409,6 +14516,7 @@ pub struct CustomWorkbookView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Sheet/x:sheet")]
 pub struct Sheet {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Sheet Name
   ///
   /// Available in Office2007 and above.
@@ -14446,6 +14554,7 @@ pub struct Sheet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_BookView/x:workbookView")]
 pub struct WorkbookView {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Visibility
   ///
   /// Available in Office2007 and above.
@@ -14778,6 +14887,9 @@ pub struct MarkerType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRuleExtension/x:ext")]
 pub struct ConditionalFormattingRuleExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -14798,6 +14910,9 @@ pub struct ConditionalFormattingRuleExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotHierarchyExtension/x:ext")]
 pub struct PivotHierarchyExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -14821,6 +14936,9 @@ pub struct PivotHierarchyExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotFieldExtension/x:ext")]
 pub struct PivotFieldExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -14844,6 +14962,9 @@ pub struct PivotFieldExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheSourceExtension/x:ext")]
 pub struct CacheSourceExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -15423,6 +15544,7 @@ pub struct CustomChartsheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Drawing/x:drawing")]
 pub struct Drawing {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Relationship id
   ///
   /// Available in Office2007 and above.
@@ -15471,6 +15593,7 @@ pub struct LegacyDrawingHeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_LegacyDrawing/")]
 pub struct LegacyDrawingType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Relationship Id
   ///
   /// Available in Office2007 and above.
@@ -15487,6 +15610,7 @@ pub struct LegacyDrawingType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DrawingHF/x:drawingHF")]
 pub struct DrawingHeaderFooter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -15629,6 +15753,7 @@ pub struct DrawingHeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetBackgroundPicture/x:picture")]
 pub struct Picture {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Relationship Id
   ///
   /// Available in Office2007 and above.
@@ -15755,6 +15880,8 @@ pub struct IconSet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRuleExtensionList/x:extLst")]
 pub struct ConditionalFormattingRuleExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_CfRuleExtension/x:ext"))]
@@ -15883,6 +16010,7 @@ pub struct SheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetFormatPr/x:sheetFormatPr")]
 pub struct SheetFormatProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Base Column Width
   ///
   /// Available in Office2007 and above.
@@ -16172,6 +16300,9 @@ pub struct SheetDimension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Cols/x:cols")]
 pub struct Columns {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_Col/x:col"))]
   pub x_col: Vec<Column>,
@@ -16184,6 +16315,7 @@ pub struct Columns {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetData/x:sheetData")]
 pub struct SheetData {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_Row/x:row"))]
@@ -16197,6 +16329,7 @@ pub struct SheetData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataConsolidate/x:dataConsolidate")]
 pub struct DataConsolidate {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Function Index
   ///
   /// Available in Office2007 and above.
@@ -16245,6 +16378,9 @@ pub struct DataConsolidate {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ConditionalFormatting/x:conditionalFormatting")]
 pub struct ConditionalFormatting {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// PivotTable Conditional Formatting
   ///
   /// Available in Office2007 and above.
@@ -16332,6 +16468,7 @@ pub struct Members {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotHierarchyExtensionList/x:extLst")]
 pub struct PivotHierarchyExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_PivotHierarchyExtension/x:ext"))]
   pub x_ext: Vec<PivotHierarchyExtension>,
@@ -16375,6 +16512,7 @@ pub struct AutoSortScope {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotFieldExtensionList/x:extLst")]
 pub struct PivotFieldExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_PivotFieldExtension/x:ext"))]
   pub x_ext: Vec<PivotFieldExtension>,
@@ -16387,6 +16525,7 @@ pub struct PivotFieldExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_WorksheetSource/x:worksheetSource")]
 pub struct WorksheetSource {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Reference
   ///
   /// Available in Office2007 and above.
@@ -16446,6 +16585,7 @@ pub struct Consolidation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheSourceExtensionList/x:extLst")]
 pub struct CacheSourceExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_CacheSourceExtension/x:ext"))]
   pub x_ext: Vec<CacheSourceExtension>,
@@ -16708,6 +16848,7 @@ pub struct DateGroupItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Filters/x:filters")]
 pub struct Filters {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Filter by Blank
   ///
@@ -16723,11 +16864,6 @@ pub struct Filters {
   /// Represents the following attribute in the schema: :calendarType
   #[sdk(attr(qname = ":calendarType"))]
   pub calendar_type: Option<CalendarValues>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "x:CT_Filter/x:filter",
     qname = "x:CT_DateGroupItem/x:dateGroupItem"
@@ -16802,6 +16938,7 @@ pub struct CustomFilters {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DynamicFilter/x:dynamicFilter")]
 pub struct DynamicFilter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Dynamic filter type
   ///
   /// Available in Office2007 and above.
@@ -16894,6 +17031,9 @@ pub struct IconFilter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SlicerCacheDefinitionExtension/x:ext")]
 pub struct SlicerCacheDefinitionExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -16921,6 +17061,9 @@ pub struct SlicerCacheDefinitionExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotFilterExtension/x:ext")]
 pub struct PivotFilterExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -16947,6 +17090,9 @@ pub struct PivotFilterExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_QueryTableExtension/x:ext")]
 pub struct QueryTableExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -17325,6 +17471,7 @@ pub struct Parameters {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ConnectionExtensionList/x:extLst")]
 pub struct ConnectionExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_ConnectionExtension/x:ext"))]
   pub x_ext: Vec<ConnectionExtension>,
@@ -17337,6 +17484,9 @@ pub struct ConnectionExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ConnectionExtension/x:ext")]
 pub struct ConnectionExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -17529,6 +17679,7 @@ pub struct FieldGroup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheFieldExtensionList/x:extLst")]
 pub struct CacheFieldExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_CacheFieldExtension/x:ext"))]
   pub x_ext: Vec<CacheFieldExtension>,
@@ -17541,6 +17692,9 @@ pub struct CacheFieldExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheFieldExtension/x:ext")]
 pub struct CacheFieldExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -17605,6 +17759,7 @@ pub struct GroupLevels {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheHierarchyExtensionList/x:extLst")]
 pub struct CacheHierarchyExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_CacheHierarchyExtension/x:ext"))]
   pub x_ext: Vec<CacheHierarchyExtension>,
@@ -17617,6 +17772,9 @@ pub struct CacheHierarchyExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheHierarchyExtension/x:ext")]
 pub struct CacheHierarchyExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -17643,6 +17801,7 @@ pub struct CacheHierarchyExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CalculatedMemberExtensionList/x:extLst")]
 pub struct CalculatedMemberExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_CalculatedMemberExtension/x:ext"))]
   pub x_ext: Vec<CalculatedMemberExtension>,
@@ -17655,6 +17814,9 @@ pub struct CalculatedMemberExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CalculatedMemberExtension/x:ext")]
 pub struct CalculatedMemberExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -17681,6 +17843,7 @@ pub struct CalculatedMemberExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataFieldExtensionList/x:extLst")]
 pub struct DataFieldExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_DataFieldExtension/x:ext"))]
   pub x_ext: Vec<DataFieldExtension>,
@@ -17693,6 +17856,9 @@ pub struct DataFieldExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataFieldExtension/x:ext")]
 pub struct DataFieldExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -17719,6 +17885,7 @@ pub struct DataFieldExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotFilterExtensionList/x:extLst")]
 pub struct PivotFilterExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_PivotFilterExtension/x:ext"))]
   pub x_ext: Vec<PivotFilterExtension>,
@@ -17731,6 +17898,7 @@ pub struct PivotFilterExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_QueryTableRefresh/x:queryTableRefresh")]
 pub struct QueryTableRefresh {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Preserve Sort and Filter Layout
   ///
   /// Available in Office2007 and above.
@@ -17801,6 +17969,7 @@ pub struct QueryTableRefresh {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_QueryTableExtensionList/x:extLst")]
 pub struct QueryTableExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_QueryTableExtension/x:ext"))]
   pub x_ext: Vec<QueryTableExtension>,
@@ -17992,6 +18161,7 @@ pub struct TableParts {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_WorksheetExtensionList/x:extLst")]
 pub struct WorksheetExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_WorksheetExtension/x:ext"))]
   pub x_ext: Vec<WorksheetExtension>,
@@ -18004,6 +18174,9 @@ pub struct WorksheetExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_WorksheetExtension/x:ext")]
 pub struct WorksheetExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -18055,6 +18228,8 @@ pub struct NumberingFormats {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Fonts/x:fonts")]
 pub struct Fonts {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Font Count
   ///
   /// Available in Office2007 and above.
@@ -18244,6 +18419,7 @@ pub struct Colors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_StylesheetExtensionList/x:extLst")]
 pub struct StylesheetExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_StylesheetExtension/x:ext"))]
   pub x_ext: Vec<StylesheetExtension>,
@@ -18257,6 +18433,8 @@ pub struct StylesheetExtensionList {
 #[sdk(qname = "x:CT_StylesheetExtension/x:ext")]
 pub struct StylesheetExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -18653,6 +18831,7 @@ pub struct ColumnHierarchiesUsage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst")]
 pub struct PivotTableDefinitionExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_pivotTableDefinitionExtension/x:ext"))]
   pub x_ext: Vec<PivotTableDefinitionExtension>,
@@ -18666,6 +18845,8 @@ pub struct PivotTableDefinitionExtensionList {
 #[sdk(qname = "x:CT_pivotTableDefinitionExtension/x:ext")]
 pub struct PivotTableDefinitionExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -18694,6 +18875,7 @@ pub struct PivotTableDefinitionExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheSource/x:cacheSource")]
 pub struct CacheSource {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// type
   ///
   /// Available in Office2007 and above.
@@ -18899,6 +19081,8 @@ pub struct Maps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCacheDefinitionExtensionList/x:extLst")]
 pub struct PivotCacheDefinitionExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "x:CT_PivotCacheDefinitionExtension/x:ext"))]
@@ -18913,6 +19097,8 @@ pub struct PivotCacheDefinitionExtensionList {
 #[sdk(qname = "x:CT_PivotCacheDefinitionExtension/x:ext")]
 pub struct PivotCacheDefinitionExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -19045,6 +19231,7 @@ pub struct TableStyleInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableExtensionList/x:extLst")]
 pub struct TableExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x:CT_TableExtension/x:ext"))]
   pub x_ext: Vec<TableExtension>,
@@ -19058,6 +19245,8 @@ pub struct TableExtensionList {
 #[sdk(qname = "x:CT_TableExtension/x:ext")]
 pub struct TableExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -19192,6 +19381,7 @@ pub struct FileSharing {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_WorkbookPr/x:workbookPr")]
 pub struct WorkbookProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Date 1904
   ///
   /// Available in Office2007 and above.
@@ -19786,6 +19976,8 @@ pub struct WorkbookExtensionList {
 #[sdk(qname = "x:CT_WorkbookExtension/x:ext")]
 pub struct WorkbookExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -19854,6 +20046,12 @@ pub enum RevisionsChoice {
   /// Revision Merge Conflict.
   #[sdk(child(qname = "x:CT_RevisionConflict/x:rcft"))]
   XRcft(std::boxed::Box<RevisionConflict>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ExternalLinkChoice {
@@ -19866,32 +20064,41 @@ pub enum ExternalLinkChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FilterColumnChoice {
+  /// Filter Criteria.
   #[sdk(child(qname = "x:CT_Filters/x:filters"))]
   XFilters(std::boxed::Box<Filters>),
+  /// Top 10.
   #[sdk(child(qname = "x:CT_Top10/x:top10"))]
   XTop10(std::boxed::Box<Top10>),
   #[cfg(feature = "microsoft365")]
+  /// Defines the CustomFilters Class.
   #[sdk(child(qname = "x14:CT_CustomFilters/x14:customFilters"))]
   X14CustomFilters(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CustomFilters,
     >,
   ),
+  /// Custom Filters.
   #[sdk(child(qname = "x:CT_CustomFilters/x:customFilters"))]
   XCustomFilters(std::boxed::Box<CustomFilters>),
+  /// Dynamic Filter.
   #[sdk(child(qname = "x:CT_DynamicFilter/x:dynamicFilter"))]
   XDynamicFilter(std::boxed::Box<DynamicFilter>),
+  /// Color Filter Criteria.
   #[sdk(child(qname = "x:CT_ColorFilter/x:colorFilter"))]
   XColorFilter(std::boxed::Box<ColorFilter>),
   #[cfg(feature = "microsoft365")]
+  /// Defines the IconFilter Class.
   #[sdk(child(qname = "x14:CT_IconFilter/x14:iconFilter"))]
   X14IconFilter(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconFilter,
     >,
   ),
+  /// Icon Filter.
   #[sdk(child(qname = "x:CT_IconFilter/x:iconFilter"))]
   XIconFilter(std::boxed::Box<IconFilter>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   XExtLst(std::boxed::Box<ExtensionList>),
 }
@@ -20002,6 +20209,12 @@ pub enum RevisionRowColumnChoice {
   /// Revision Format.
   #[sdk(child(qname = "x:CT_RevisionFormatting/x:rfmt"))]
   XRfmt(std::boxed::Box<RevisionFormat>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionMoveChoice {
@@ -20014,6 +20227,12 @@ pub enum RevisionMoveChoice {
   /// Revision Format.
   #[sdk(child(qname = "x:CT_RevisionFormatting/x:rfmt"))]
   XRfmt(std::boxed::Box<RevisionFormat>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CellTypeChoice {
@@ -20080,9 +20299,6 @@ pub enum FillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleItemsChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// OLE Link Item.
   #[sdk(child(qname = "x:CT_OleItem/x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
@@ -20094,6 +20310,12 @@ pub enum OleItemsChoice {
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::OleItem,
     >,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MarkerTypeChoice {
@@ -20157,12 +20379,15 @@ pub enum CacheSourceExtensionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FiltersChoice {
   #[cfg(feature = "microsoft365")]
+  /// Defines the Filter Class.
   #[sdk(child(qname = "x14:CT_Filter/x14:filter"))]
   X14Filter(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Filter>,
   ),
+  /// Filter.
   #[sdk(child(qname = "x:CT_Filter/x:filter"))]
   XFilter(std::boxed::Box<Filter>),
+  /// Date Grouping.
   #[sdk(child(qname = "x:CT_DateGroupItem/x:dateGroupItem"))]
   XDateGroupItem(std::boxed::Box<DateGroupItem>),
 }

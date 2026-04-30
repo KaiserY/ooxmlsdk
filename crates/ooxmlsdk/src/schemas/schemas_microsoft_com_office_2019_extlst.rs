@@ -12,6 +12,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oel:CT_Extension/oel:ext")]
 pub struct Extension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   ///
   /// Available in Office2021 and above.

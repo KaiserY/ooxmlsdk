@@ -12,6 +12,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p232:CT_PlaceholderTypeExtension/p232:phTypeExt")]
 pub struct PlaceholderTypeExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p232:CT_PlaceholderTypeACB/p232:type"))]
   pub placeholder_type_acb: std::boxed::Box<PlaceholderTypeAcb>,

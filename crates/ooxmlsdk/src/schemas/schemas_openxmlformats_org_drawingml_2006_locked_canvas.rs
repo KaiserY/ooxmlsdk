@@ -12,6 +12,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShape/lc:lockedCanvas")]
 pub struct LockedCanvas {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<
@@ -29,6 +30,7 @@ pub struct LockedCanvas {
     qname = "a:CT_GvmlPicture/a:pic",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
     qname = "a:CT_GvmlGroupShape/a:grpSp",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -44,8 +46,6 @@ pub struct LockedCanvas {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LockedCanvasChoice {
-  #[sdk(any)]
-  XmlOther(String),
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   ATxSp(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextShape>),
   #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]
@@ -73,4 +73,10 @@ pub enum LockedCanvasChoice {
   AGrpSp(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupShape>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }

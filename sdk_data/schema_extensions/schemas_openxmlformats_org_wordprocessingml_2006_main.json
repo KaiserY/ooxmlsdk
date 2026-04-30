@@ -2,7 +2,16 @@
   "Types": [
     {
       "ClassName": "RunPropertiesDefault",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "RunPropertiesBaseStyle",
+      "HaveXmlOtherChildren": true
+    },
+    {
+      "ClassName": "SpacingBetweenLines",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

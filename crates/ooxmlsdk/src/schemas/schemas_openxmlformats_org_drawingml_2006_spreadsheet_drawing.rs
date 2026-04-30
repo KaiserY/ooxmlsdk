@@ -22,6 +22,7 @@ pub enum EditAsValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")]
 pub struct TwoCellAnchor {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Positioning and Resizing Behaviors
   ///
@@ -61,6 +62,7 @@ pub struct TwoCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor")]
 pub struct OneCellAnchor {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
@@ -92,6 +94,7 @@ pub struct OneCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor")]
 pub struct AbsoluteAnchor {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Position
   #[sdk(child(qname = "a:CT_Point2D/xdr:pos"))]
@@ -123,6 +126,7 @@ pub struct AbsoluteAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Shape/xdr:sp")]
 pub struct Shape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Reference to Custom Function
   ///
   /// Available in Office2007 and above.
@@ -172,6 +176,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_GroupShape/xdr:grpSp")]
 pub struct GroupShape {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "xdr:CT_GroupShapeNonVisual/xdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -184,6 +189,7 @@ pub struct GroupShape {
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
     qname = "xdr:CT_Picture/xdr:pic",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -369,6 +375,7 @@ pub struct WorksheetDrawing {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_ShapeNonVisual/xdr:nvSpPr")]
 pub struct NonVisualShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Non-Visual Drawing Properties
   #[sdk(child(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
@@ -384,6 +391,7 @@ pub struct NonVisualShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/xdr:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -472,6 +480,8 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/xdr:txBody")]
 pub struct TextBody {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -569,6 +579,7 @@ pub struct NonVisualGraphicFrameProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/xdr:xfrm")]
 pub struct Transform {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -629,6 +640,7 @@ pub type RowId = crate::simple_type::Int32Value;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/xdr:from")]
 pub struct FromMarker {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Column)
   #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::simple_type::Int32Value,
@@ -650,6 +662,7 @@ pub struct FromMarker {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/xdr:to")]
 pub struct ToMarker {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Column)
   #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::simple_type::Int32Value,
@@ -671,6 +684,7 @@ pub struct ToMarker {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_Marker/")]
 pub struct MarkerType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   #[sdk(choice(
     qname = "xdr:ST_ColID/xdr:col",
     qname = "a:ST_Coordinate/xdr:colOff",
@@ -784,6 +798,7 @@ pub struct Position {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// id
     ///
     /// Available in Office2007 and above.
@@ -847,6 +862,7 @@ pub struct NonVisualDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/xdr:cNvSpPr")]
 pub struct NonVisualShapeDrawingProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Box
   ///
   /// Available in Office2007 and above.
@@ -1073,8 +1089,6 @@ pub enum AbsoluteAnchorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[sdk(any)]
-  XmlOther(String),
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]
@@ -1092,6 +1106,12 @@ pub enum GroupShapeChoice {
       crate::schemas::schemas_microsoft_com_office_excel_2010_spreadsheet_drawing::ContentPart,
     >,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorksheetDrawingChoice {

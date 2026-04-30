@@ -26,8 +26,6 @@ use crate::simple_type::simple_type_mapping;
 use crate::utils::escape_snake_case;
 use heck::{ToSnakeCase, ToUpperCamelCase};
 
-const MCE_ALTERNATE_CONTENT_NAME: &str = "mc:CT_AlternateContent/mc:AlternateContent";
-
 fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
   let mut counts = std::collections::HashMap::<String, usize>::new();
   for member in members.iter() {
@@ -515,7 +513,7 @@ fn build_type_decl(
     .map(|attr| build_attr_member_decl(attr, schema, context))
     .collect::<Result<Vec<_>>>()?;
   let mut source_content_model = build_content_model_decl(schema_type);
-  let extra_types = if should_build_recursive_one_sequence_choices(schema_type) {
+  let mut extra_types = if should_build_recursive_one_sequence_choices(schema_type) {
     source_content_model = Some(ContentModelDecl::OneSequenceStructured);
     build_recursive_one_sequence_choice_members(schema_type, schema, context, &mut members)
       .map_err(|err| format!("recursive one-sequence choices: {err}"))?
@@ -562,6 +560,9 @@ fn build_type_decl(
     }
   };
 
+  let route_xml_other_children_to_choice =
+    add_xml_other_variants_to_single_repeated_choice(schema_type, &members, &mut extra_types);
+
   let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
   let content_model =
     refine_content_model_decl(source_content_model, &members, xml_content.as_ref());
@@ -595,20 +596,102 @@ fn build_type_decl(
         .then(|| schema_type.base_class.clone()),
       xml_content,
       support: SystemSupportDecl {
-        have_xmlns_fields: schema_type.has_xmlns_fields,
+        have_xmlns_fields: schema_type.have_xmlns_fields,
         xml_header: match schema_type.xml_header {
           SchemaTypeXmlHeader::None => XmlHeaderMode::None,
           SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
-        have_xml_other_attrs: schema_type_have_xml_other_attrs(schema_type),
-        have_xml_other_children: schema_type_have_xml_other_children(schema_type),
+        have_xml_other_attrs: schema_type.have_xml_other_attrs,
+        have_xml_other_children: schema_type.have_xml_other_children
+          && !route_xml_other_children_to_choice,
       },
       content_structure: None,
       members,
     },
     extra_types,
   ))
+}
+
+fn add_xml_other_variants_to_single_repeated_choice(
+  schema_type: &SchemaType,
+  members: &[MemberDecl],
+  extra_types: &mut [TypeDecl],
+) -> bool {
+  if !schema_type.have_xml_other_children {
+    return false;
+  }
+
+  let choice_fields = members
+    .iter()
+    .filter_map(|member| match member {
+      MemberDecl::Field(field)
+        if matches!(field.wire, FieldWireDecl::Choice)
+          && field.cardinality == Cardinality::Many =>
+      {
+        Some(field)
+      }
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+
+  let [choice_field] = choice_fields.as_slice() else {
+    return false;
+  };
+
+  let Some(choice_type) = extra_types
+    .iter_mut()
+    .find(|ty| ty.rust_name == choice_field.type_ref.rust_type && ty.kind == TypeKind::ChoiceEnum)
+  else {
+    return false;
+  };
+
+  add_choice_variant_if_missing(
+    choice_type,
+    "XmlOther",
+    "Unknown XML child.",
+    VariantWireDecl::Any,
+    TypeRefDecl {
+      rust_type: "String".to_string(),
+      module_path: None,
+    },
+  );
+  add_choice_variant_if_missing(
+    choice_type,
+    "XmlText",
+    "Unknown XML text.",
+    VariantWireDecl::Text,
+    TypeRefDecl {
+      rust_type: "StringValue".to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    },
+  );
+  true
+}
+
+fn add_choice_variant_if_missing(
+  choice_type: &mut TypeDecl,
+  rust_name: &str,
+  docs: &str,
+  wire: VariantWireDecl,
+  payload: TypeRefDecl,
+) {
+  if choice_type.members.iter().any(|member| {
+    matches!(
+      member,
+      MemberDecl::Variant(variant) if variant.rust_name == rust_name
+    )
+  }) {
+    return;
+  }
+
+  choice_type.members.push(MemberDecl::Variant(VariantDecl {
+    rust_name: rust_name.to_string(),
+    docs: docs.to_string(),
+    version: String::new(),
+    wire,
+    payload,
+  }));
 }
 
 fn should_build_recursive_one_sequence_choices(schema_type: &SchemaType) -> bool {
@@ -1481,30 +1564,6 @@ fn build_child_type_ref_from_name(
   }
 }
 
-fn schema_type_have_xml_other_attrs(schema_type: &SchemaType) -> bool {
-  schema_type.has_mc_ignorable_field
-    || schema_type.has_mc_must_understand_field
-    || schema_type.has_mc_process_content_field
-    || schema_type.has_mc_preserve_attributes_field
-    || schema_type.has_mc_preserve_elements_field
-}
-
-fn schema_type_have_xml_other_children(schema_type: &SchemaType) -> bool {
-  schema_type
-    .children
-    .iter()
-    .any(schema_child_has_direct_xml_other_child)
-}
-
-fn schema_child_has_direct_xml_other_child(child: &SchemaTypeChild) -> bool {
-  child.name == MCE_ALTERNATE_CONTENT_NAME
-    || (child.kind != SchemaTypeChildKind::Choice
-      && child
-        .children
-        .iter()
-        .any(schema_child_has_direct_xml_other_child))
-}
-
 fn effective_child_kind_from_name(
   child_name: &str,
   child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
@@ -1527,8 +1586,8 @@ fn effective_child_kind_from_name(
 
   if child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
     && child_type.attributes.is_empty()
-    && !child_type.has_xmlns_fields
-    && !schema_type_have_xml_other_attrs(child_type)
+    && !child_type.have_xmlns_fields
+    && !child_type.have_xml_other_attrs
     && child_type.xml_header == SchemaTypeXmlHeader::None
   {
     SchemaTypeChildKind::TextChild
@@ -1546,10 +1605,6 @@ fn build_direct_child_member_decls(
   let mut field_name_set = std::collections::HashSet::new();
 
   for child in &schema_type.children {
-    if child.name == MCE_ALTERNATE_CONTENT_NAME {
-      continue;
-    }
-
     if !matches!(
       child.kind,
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child
@@ -1751,8 +1806,8 @@ fn build_child_type_ref(
   if child_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
     && child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
     && child_type.attributes.is_empty()
-    && !child_type.has_xmlns_fields
-    && !schema_type_have_xml_other_attrs(child_type)
+    && !child_type.have_xmlns_fields
+    && !child_type.have_xml_other_attrs
     && child_type.xml_header == SchemaTypeXmlHeader::None
   {
     return build_xml_content_type_ref(child_type, schema, context)?
@@ -1923,19 +1978,6 @@ fn build_simple_one_choice_variant_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
-  if variant.name == MCE_ALTERNATE_CONTENT_NAME {
-    return Ok(MemberDecl::Variant(VariantDecl {
-      rust_name: "XmlOther".to_string(),
-      docs: variant.property_comments.to_string(),
-      version: variant.version.to_string(),
-      wire: VariantWireDecl::Any,
-      payload: TypeRefDecl {
-        rust_type: "String".to_string(),
-        module_path: None,
-      },
-    }));
-  }
-
   let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
 
   let wire = match effective_kind {
@@ -2005,9 +2047,6 @@ fn build_flatten_one_sequence_members(
         let mut child =
           context.resolve_one_sequence_child(schema_type, child_particle.name.as_str())?;
         apply_sequence_child_overrides(&mut child, child_particle);
-        if child.name == MCE_ALTERNATE_CONTENT_NAME {
-          continue;
-        }
         if !field_name_set.insert(child.field_name.to_string()) {
           continue;
         }
@@ -2139,19 +2178,6 @@ fn build_one_sequence_choice_variant_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
-  if variant.name == MCE_ALTERNATE_CONTENT_NAME {
-    return Ok(MemberDecl::Variant(VariantDecl {
-      rust_name: "XmlOther".to_string(),
-      docs: variant.property_comments.to_string(),
-      version: variant.version.to_string(),
-      wire: VariantWireDecl::Any,
-      payload: TypeRefDecl {
-        rust_type: "String".to_string(),
-        module_path: None,
-      },
-    }));
-  }
-
   let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
 
   let wire = match effective_kind {
@@ -2218,9 +2244,6 @@ fn build_structured_one_sequence_members(
       StructuredParticleKind::Leaf(leaf) => {
         let mut child = context.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
         apply_sequence_child_overrides(&mut child, leaf);
-        if child.name == MCE_ALTERNATE_CONTENT_NAME {
-          continue;
-        }
         if !field_name_set.insert(child.field_name.to_string()) {
           continue;
         }
@@ -3675,12 +3698,9 @@ mod tests {
           name: "t:CT_P/t:p".to_string(),
           summary: "Paragraph.".to_string(),
           version: Some("Office2007".to_string()),
-          has_xmlns_fields: true,
-          has_mc_ignorable_field: true,
-          has_mc_must_understand_field: false,
-          has_mc_process_content_field: false,
-          has_mc_preserve_attributes_field: false,
-          has_mc_preserve_elements_field: false,
+          have_xmlns_fields: true,
+          have_xml_other_attrs: true,
+          have_xml_other_children: false,
           xml_header: SchemaTypeXmlHeader::Standalone,
           ..Default::default()
         },

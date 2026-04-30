@@ -22,6 +22,7 @@ pub enum CommentStatus {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/p188:txBody")]
 pub struct TextBodyType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -43,6 +44,7 @@ pub struct TextBodyType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst")]
 pub struct CommentPropertiesExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Data for the Windows platform..
   #[sdk(child(qname = "p188:CT_CommentPropertiesExtension/p:ext"))]
   pub comment_properties_extension: Vec<
@@ -103,6 +105,7 @@ pub struct CommentRelationship {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p188:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:

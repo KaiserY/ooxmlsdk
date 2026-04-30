@@ -898,6 +898,7 @@ pub struct ColorsDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Unique ID
   ///
   /// Available in Office2007 and above.
@@ -1020,6 +1021,7 @@ pub struct LayoutDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// uniqueId
   ///
   /// Available in Office2007 and above.
@@ -1175,6 +1177,7 @@ pub struct StyleDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Unique Style ID
   ///
   /// Available in Office2007 and above.
@@ -1294,6 +1297,7 @@ pub struct ColorTransformCategory {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1316,7 +1320,9 @@ pub struct FillColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub fill_color_list_choice: Vec<FillColorListChoice>,
 }
@@ -1328,6 +1334,7 @@ pub struct FillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1350,7 +1357,9 @@ pub struct LineColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub line_color_list_choice: Vec<LineColorListChoice>,
 }
@@ -1362,6 +1371,7 @@ pub struct LineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1384,7 +1394,9 @@ pub struct EffectColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub effect_color_list_choice: Vec<EffectColorListChoice>,
 }
@@ -1396,6 +1408,7 @@ pub struct EffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1418,7 +1431,9 @@ pub struct TextLineColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub text_line_color_list_choice: Vec<TextLineColorListChoice>,
 }
@@ -1430,6 +1445,7 @@ pub struct TextLineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1452,7 +1468,9 @@ pub struct TextFillColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub text_fill_color_list_choice: Vec<TextFillColorListChoice>,
 }
@@ -1464,6 +1482,7 @@ pub struct TextFillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1486,7 +1505,9 @@ pub struct TextEffectColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub text_effect_color_list_choice: Vec<TextEffectColorListChoice>,
 }
@@ -1498,6 +1519,7 @@ pub struct TextEffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/")]
 pub struct ColorsType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   ///
   /// Available in Office2007 and above.
@@ -1520,7 +1542,9 @@ pub struct ColorsType {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub xml_children: Vec<ColorsTypeChoice>,
 }
@@ -1532,6 +1556,7 @@ pub struct ColorsType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dgm:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
@@ -3488,6 +3513,7 @@ pub struct Whole {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DataModelExtensionList/dgm:extLst")]
 pub struct DataModelExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "a:CT_DataModelExtension/a:ext"))]
   pub a_ext:
@@ -3718,6 +3744,7 @@ pub struct PropertySet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/dgm:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -3780,6 +3807,8 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -3801,6 +3830,7 @@ pub struct TextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PtExtensionList/dgm:extLst")]
 pub struct PtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "a:CT_PtExtension/a:ext"))]
   pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PtExtension>,
@@ -3813,6 +3843,9 @@ pub struct PtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext")]
 pub struct DiagramDefinitionExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -3915,6 +3948,7 @@ pub struct SampleDataType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtensionList/dgm:extLst")]
 pub struct DiagramDefinitionExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext"))]
   pub dgm_ext: Vec<DiagramDefinitionExtension>,
@@ -3949,6 +3983,12 @@ pub enum FillColorListChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineColorListChoice {
@@ -3980,6 +4020,12 @@ pub enum LineColorListChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectColorListChoice {
@@ -4011,6 +4057,12 @@ pub enum EffectColorListChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextLineColorListChoice {
@@ -4042,6 +4094,12 @@ pub enum TextLineColorListChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextFillColorListChoice {
@@ -4073,6 +4131,12 @@ pub enum TextFillColorListChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextEffectColorListChoice {
@@ -4104,6 +4168,12 @@ pub enum TextEffectColorListChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorsTypeChoice {
@@ -4141,6 +4211,12 @@ pub enum ColorsTypeChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutVariablePropertySetTypeChoice {

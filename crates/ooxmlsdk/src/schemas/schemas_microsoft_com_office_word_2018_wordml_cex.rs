@@ -64,6 +64,7 @@ pub struct CommentExtensible {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w16cur:CT_ExtensionList/w16cex:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "w16cur:CT_Extension/w16cur:ext"))]
   pub w16cur_ext: Vec<crate::schemas::schemas_microsoft_com_office_word_2018_wordml::Extension>,

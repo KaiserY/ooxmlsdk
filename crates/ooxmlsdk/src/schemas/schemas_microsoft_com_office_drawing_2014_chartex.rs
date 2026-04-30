@@ -345,6 +345,7 @@ pub type BinCountXsdunsignedInt = crate::simple_type::UInt32Value;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:CT_Extension/cx:ext")]
 pub struct Extension2 {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   ///
   /// Available in Office2016 and above.
@@ -418,6 +419,8 @@ pub struct MaxColorSolidColorFillProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SolidColorFillProperties/")]
 pub struct OpenXmlSolidColorFillPropertiesElement {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -629,6 +632,7 @@ pub struct StringDimension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:CT_ExtensionList/cx:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "cx:CT_Extension/cx:ext"))]
   pub cx_ext: Vec<Extension2>,
@@ -753,6 +757,7 @@ pub struct TextData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/cx:rich")]
 pub struct RichTextBody {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -774,6 +779,7 @@ pub struct RichTextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/cx:txPr")]
 pub struct TxPrTextBody {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -795,6 +801,7 @@ pub struct TxPrTextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/")]
 pub struct TextBodyType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   #[sdk(choice(
     qname = "a:CT_TextBodyProperties/a:bodyPr",
     qname = "a:CT_TextListStyle/a:lstStyle",
@@ -821,6 +828,7 @@ pub struct Text {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/cx:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.

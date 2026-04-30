@@ -52,6 +52,7 @@ pub struct DataModelExtensionBlock {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -115,6 +116,7 @@ pub struct NonVisualDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Box
   ///
   /// Available in Office2007 and above.
@@ -140,6 +142,7 @@ pub struct NonVisualDrawingShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr")]
 pub struct ShapeNonVisualProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
@@ -155,6 +158,7 @@ pub struct ShapeNonVisualProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/dsp:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -243,6 +247,7 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dsp:txBody")]
 pub struct TextBody {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -264,6 +269,7 @@ pub struct TextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/dsp:txXfrm")]
 pub struct Transform2D {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -300,6 +306,7 @@ pub struct Transform2D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dsp:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
@@ -395,6 +402,7 @@ pub struct GroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dsp:CT_Shape/dsp:sp")]
 pub struct Shape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// modelId
   ///
   /// Available in Office2010 and above.

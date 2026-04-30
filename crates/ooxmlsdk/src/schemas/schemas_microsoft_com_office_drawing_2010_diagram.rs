@@ -12,6 +12,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.

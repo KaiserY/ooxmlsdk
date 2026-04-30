@@ -55,6 +55,7 @@ pub struct NumberingFormat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c15:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -231,6 +232,7 @@ pub struct FilteredBubbleSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries")]
 pub struct FilteredLineSeriesExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_LineSer/c15:ser"))]
   pub line_chart_series: std::boxed::Box<LineChartSeries>,
@@ -1123,6 +1125,7 @@ pub struct Explosion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Marker/c15:marker")]
 pub struct Marker {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Symbol
   #[sdk(child(qname = "c:CT_MarkerStyle/c:symbol"))]
   pub symbol: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Symbol>,

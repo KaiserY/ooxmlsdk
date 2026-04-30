@@ -455,6 +455,7 @@ pub struct ChartShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/c:txPr")]
 pub struct TextProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -476,6 +477,7 @@ pub struct TextProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/c:rich")]
 pub struct RichText {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -497,6 +499,7 @@ pub struct RichText {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/")]
 pub struct TextBodyType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   #[sdk(choice(
     qname = "a:CT_TextBodyProperties/a:bodyPr",
     qname = "a:CT_TextListStyle/a:lstStyle",
@@ -2419,6 +2422,7 @@ pub struct NumericPoint {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ExtensionList/c:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_Extension/c:ext"))]
   pub c_ext: Vec<Extension>,
@@ -2895,6 +2899,7 @@ pub struct Size {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Marker/c:marker")]
 pub struct Marker {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Symbol
   #[sdk(child(qname = "c:CT_MarkerStyle/c:symbol"))]
   pub symbol: Option<Symbol>,
@@ -3661,6 +3666,7 @@ pub struct PageSetup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -4655,6 +4661,9 @@ pub struct Thickness {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChartExtension/c:ext")]
 pub struct StockChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4678,6 +4687,9 @@ pub struct StockChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChartExtension/c:ext")]
 pub struct PieChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4701,6 +4713,9 @@ pub struct PieChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChartExtension/c:ext")]
 pub struct Pie3DChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4724,6 +4739,9 @@ pub struct Pie3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRefExtension/c:ext")]
 pub struct NumRefExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4751,6 +4769,9 @@ pub struct NumRefExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrDataExtension/c:ext")]
 pub struct StrDataExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4774,6 +4795,9 @@ pub struct StrDataExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRefExtension/c:ext")]
 pub struct StrRefExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4801,6 +4825,9 @@ pub struct StrRefExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRefExtension/c:ext")]
 pub struct MultiLvlStrRefExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4828,6 +4855,9 @@ pub struct MultiLvlStrRefExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblsExtension/c:ext")]
 pub struct DLblsExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4859,6 +4889,9 @@ pub struct DLblsExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChartExtension/c:ext")]
 pub struct LineChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4882,6 +4915,9 @@ pub struct LineChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChartExtension/c:ext")]
 pub struct Line3DChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4905,6 +4941,9 @@ pub struct Line3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChartExtension/c:ext")]
 pub struct ScatterChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4928,6 +4967,9 @@ pub struct ScatterChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChartExtension/c:ext")]
 pub struct RadarChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4951,6 +4993,9 @@ pub struct RadarChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChartExtension/c:ext")]
 pub struct BarChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4974,6 +5019,9 @@ pub struct BarChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChartExtension/c:ext")]
 pub struct Bar3DChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -4997,6 +5045,9 @@ pub struct Bar3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChartExtension/c:ext")]
 pub struct AreaChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5020,6 +5071,9 @@ pub struct AreaChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChartExtension/c:ext")]
 pub struct Area3DChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5043,6 +5097,9 @@ pub struct Area3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChartExtension/c:ext")]
 pub struct BubbleChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5066,6 +5123,9 @@ pub struct BubbleChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChartExtension/c:ext")]
 pub struct SurfaceChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5089,6 +5149,9 @@ pub struct SurfaceChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChartExtension/c:ext")]
 pub struct Surface3DChartExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5112,6 +5175,9 @@ pub struct Surface3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtension/c:ext")]
 pub struct CatAxExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5135,6 +5201,9 @@ pub struct CatAxExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAxExtension/c:ext")]
 pub struct DateAxExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5158,6 +5227,9 @@ pub struct DateAxExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAxExtension/c:ext")]
 pub struct SerAxExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5181,6 +5253,9 @@ pub struct SerAxExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAxExtension/c:ext")]
 pub struct ValAxExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5225,6 +5300,7 @@ pub struct UpDownBars {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChartExtensionList/c:extLst")]
 pub struct StockChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_StockChartExtension/c:ext"))]
   pub c_ext: Vec<StockChartExtension>,
@@ -5237,6 +5313,7 @@ pub struct StockChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChartExtensionList/c:extLst")]
 pub struct PieChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_PieChartExtension/c:ext"))]
   pub c_ext: Vec<PieChartExtension>,
@@ -5249,6 +5326,7 @@ pub struct PieChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChartExtensionList/c:extLst")]
 pub struct Pie3DChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_Pie3DChartExtension/c:ext"))]
   pub c_ext: Vec<Pie3DChartExtension>,
@@ -5261,6 +5339,7 @@ pub struct Pie3DChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRefExtensionList/c:extLst")]
 pub struct NumRefExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_NumRefExtension/c:ext"))]
   pub c_ext: Vec<NumRefExtension>,
@@ -5273,6 +5352,7 @@ pub struct NumRefExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrDataExtensionList/c:extLst")]
 pub struct StrDataExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_StrDataExtension/c:ext"))]
   pub c_ext: Vec<StrDataExtension>,
@@ -5285,6 +5365,7 @@ pub struct StrDataExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRefExtensionList/c:extLst")]
 pub struct StrRefExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_StrRefExtension/c:ext"))]
   pub c_ext: Vec<StrRefExtension>,
@@ -5315,6 +5396,7 @@ pub struct MultiLevelStringCache {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRefExtensionList/c:extLst")]
 pub struct MultiLvlStrRefExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_MultiLvlStrRefExtension/c:ext"))]
   pub c_ext: Vec<MultiLvlStrRefExtension>,
@@ -5327,6 +5409,7 @@ pub struct MultiLvlStrRefExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblsExtensionList/c:extLst")]
 pub struct DLblsExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_DLblsExtension/c:ext"))]
   pub c_ext: Vec<DLblsExtension>,
@@ -5339,6 +5422,7 @@ pub struct DLblsExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChartExtensionList/c:extLst")]
 pub struct LineChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_LineChartExtension/c:ext"))]
   pub c_ext: Vec<LineChartExtension>,
@@ -5351,6 +5435,7 @@ pub struct LineChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChartExtensionList/c:extLst")]
 pub struct Line3DChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_Line3DChartExtension/c:ext"))]
   pub c_ext: Vec<Line3DChartExtension>,
@@ -5427,6 +5512,7 @@ pub struct ScatterChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChartExtensionList/c:extLst")]
 pub struct ScatterChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_ScatterChartExtension/c:ext"))]
   pub c_ext: Vec<ScatterChartExtension>,
@@ -5497,6 +5583,7 @@ pub struct RadarChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChartExtensionList/c:extLst")]
 pub struct RadarChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_RadarChartExtension/c:ext"))]
   pub c_ext: Vec<RadarChartExtension>,
@@ -5532,6 +5619,7 @@ pub struct Overlap {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChartExtensionList/c:extLst")]
 pub struct BarChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_BarChartExtension/c:ext"))]
   pub c_ext: Vec<BarChartExtension>,
@@ -5544,6 +5632,7 @@ pub struct BarChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Shape/c:shape")]
 pub struct Shape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Shape Value
   ///
   /// Available in Office2007 and above.
@@ -5560,6 +5649,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChartExtensionList/c:extLst")]
 pub struct Bar3DChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_Bar3DChartExtension/c:ext"))]
   pub c_ext: Vec<Bar3DChartExtension>,
@@ -5572,6 +5662,7 @@ pub struct Bar3DChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChartExtensionList/c:extLst")]
 pub struct AreaChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_AreaChartExtension/c:ext"))]
   pub c_ext: Vec<AreaChartExtension>,
@@ -5584,6 +5675,7 @@ pub struct AreaChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChartExtensionList/c:extLst")]
 pub struct Area3DChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_Area3DChartExtension/c:ext"))]
   pub c_ext: Vec<Area3DChartExtension>,
@@ -5689,6 +5781,7 @@ pub struct SizeRepresents {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChartExtensionList/c:extLst")]
 pub struct BubbleChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_BubbleChartExtension/c:ext"))]
   pub c_ext: Vec<BubbleChartExtension>,
@@ -5701,6 +5794,7 @@ pub struct BubbleChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChartExtensionList/c:extLst")]
 pub struct SurfaceChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_SurfaceChartExtension/c:ext"))]
   pub c_ext: Vec<SurfaceChartExtension>,
@@ -5713,6 +5807,7 @@ pub struct SurfaceChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChartExtensionList/c:extLst")]
 pub struct Surface3DChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_Surface3DChartExtension/c:ext"))]
   pub c_ext: Vec<Surface3DChartExtension>,
@@ -5815,6 +5910,7 @@ pub struct SkipType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtensionList/c:extLst")]
 pub struct CatAxExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_CatAxExtension/c:ext"))]
   pub c_ext: Vec<CatAxExtension>,
@@ -5942,6 +6038,7 @@ pub struct AxisUnitType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAxExtensionList/c:extLst")]
 pub struct DateAxExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_DateAxExtension/c:ext"))]
   pub c_ext: Vec<DateAxExtension>,
@@ -5954,6 +6051,7 @@ pub struct DateAxExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAxExtensionList/c:extLst")]
 pub struct SerAxExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_SerAxExtension/c:ext"))]
   pub c_ext: Vec<SerAxExtension>,
@@ -6002,6 +6100,7 @@ pub struct DisplayUnits {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAxExtensionList/c:extLst")]
 pub struct ValAxExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_ValAxExtension/c:ext"))]
   pub c_ext: Vec<ValAxExtension>,
@@ -6014,6 +6113,7 @@ pub struct ValAxExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblExtensionList/c:extLst")]
 pub struct DLblExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_DLblExtension/c:ext"))]
   pub c_ext: Vec<DLblExtension>,
@@ -6026,6 +6126,9 @@ pub struct DLblExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblExtension/c:ext")]
 pub struct DLblExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6221,6 +6324,7 @@ pub struct AxisDataSourceType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtensionList/c:extLst")]
 pub struct LineSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_LineSerExtension/c:ext"))]
   pub c_ext: Vec<LineSerExtension>,
@@ -6233,6 +6337,9 @@ pub struct LineSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtension/c:ext")]
 pub struct LineSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6264,6 +6371,7 @@ pub struct LineSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtensionList/c:extLst")]
 pub struct ScatterSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_ScatterSerExtension/c:ext"))]
   pub c_ext: Vec<ScatterSerExtension>,
@@ -6276,6 +6384,9 @@ pub struct ScatterSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtension/c:ext")]
 pub struct ScatterSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6307,6 +6418,7 @@ pub struct ScatterSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSerExtensionList/c:extLst")]
 pub struct RadarSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_RadarSerExtension/c:ext"))]
   pub c_ext: Vec<RadarSerExtension>,
@@ -6320,6 +6432,8 @@ pub struct RadarSerExtensionList {
 #[sdk(qname = "c:CT_RadarSerExtension/c:ext")]
 pub struct RadarSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6351,6 +6465,7 @@ pub struct RadarSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtensionList/c:extLst")]
 pub struct BarSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_BarSerExtension/c:ext"))]
   pub c_ext: Vec<BarSerExtension>,
@@ -6363,6 +6478,9 @@ pub struct BarSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtension/c:ext")]
 pub struct BarSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6395,6 +6513,7 @@ pub struct BarSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtensionList/c:extLst")]
 pub struct AreaSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_AreaSerExtension/c:ext"))]
   pub c_ext: Vec<AreaSerExtension>,
@@ -6407,6 +6526,9 @@ pub struct AreaSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtension/c:ext")]
 pub struct AreaSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6438,6 +6560,7 @@ pub struct AreaSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtensionList/c:extLst")]
 pub struct PieSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_PieSerExtension/c:ext"))]
   pub c_ext: Vec<PieSerExtension>,
@@ -6450,6 +6573,9 @@ pub struct PieSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtension/c:ext")]
 pub struct PieSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6481,6 +6607,7 @@ pub struct PieSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtensionList/c:extLst")]
 pub struct BubbleSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_BubbleSerExtension/c:ext"))]
   pub c_ext: Vec<BubbleSerExtension>,
@@ -6493,6 +6620,9 @@ pub struct BubbleSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtension/c:ext")]
 pub struct BubbleSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6524,6 +6654,7 @@ pub struct BubbleSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtensionList/c:extLst")]
 pub struct SurfaceSerExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_SurfaceSerExtension/c:ext"))]
   pub c_ext: Vec<SurfaceSerExtension>,
@@ -6536,6 +6667,9 @@ pub struct SurfaceSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtension/c:ext")]
 pub struct SurfaceSerExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6794,6 +6928,8 @@ pub struct DisplayBlanksAs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   #[cfg(feature = "microsoft365")]
   /// _
@@ -7096,6 +7232,7 @@ pub struct PrintSettings {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpaceExtensionList/c:extLst")]
 pub struct ChartSpaceExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "c:CT_ChartSpaceExtension/c:ext"))]
   pub c_ext: Vec<ChartSpaceExtension>,
@@ -7109,6 +7246,8 @@ pub struct ChartSpaceExtensionList {
 #[sdk(qname = "c:CT_ChartSpaceExtension/c:ext")]
 pub struct ChartSpaceExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.

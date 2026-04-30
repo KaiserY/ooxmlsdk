@@ -72,6 +72,15 @@ Full generator/feature validation:
 
 For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
 
+## Derive Macro Debugging
+When changing `crates/ooxmlsdk-derive` macro logic, dump at least one representative expansion and inspect the generated code shape before trusting tests. Use the ignored helper from the repository root:
+
+```sh
+OOXMLSDK_DUMP_KIND=SdkType OOXMLSDK_DUMP_FILE=schemas/schemas_openxmlformats_org_wordprocessingml_2006_main.rs OOXMLSDK_DUMP_TARGET=Fonts cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture
+```
+
+`OOXMLSDK_DUMP_FILE` is relative to `crates/ooxmlsdk/src`, and the expansion is written under `target/ooxmlsdk_macro_expanded/<Kind>/`. Choose targets that exercise both the changed path and a nearby non-target path; for example, after changing `xml_other_children` ordering, compare a single repeated-child type such as `Fonts` with a multi-field type such as `Numbering`.
+
 ## Testing Rules
 Place tests near the behavior they protect:
 

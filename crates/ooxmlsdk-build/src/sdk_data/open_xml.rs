@@ -65,7 +65,6 @@ pub struct OpenXmlSchemaType {
   pub is_derived: bool,
   pub is_abstract: bool,
   pub has_xmlns_fields: bool,
-  pub has_mc_ignorable_field: bool,
   pub additional_elements: Vec<String>,
   pub attributes: Vec<OpenXmlSchemaTypeAttribute>,
   pub children: Vec<OpenXmlSchemaTypeChild>,

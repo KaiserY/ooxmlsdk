@@ -13,6 +13,7 @@
 #[sdk(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor")]
 pub struct RelativeAnchorSize {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
@@ -41,6 +42,7 @@ pub struct RelativeAnchorSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
@@ -119,6 +121,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GroupShape/cdr:grpSp")]
 pub struct GroupShape {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Group Shape Properties
   #[sdk(child(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -131,6 +134,7 @@ pub struct GroupShape {
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
     qname = "cdr:CT_Connector/cdr:cxnSp",
     qname = "cdr:CT_Picture/cdr:pic",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -444,6 +448,7 @@ pub struct Style {
 #[sdk(qname = "a:CT_TextBody/cdr:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -623,6 +628,7 @@ pub struct NonVisualGraphicFrameProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/cdr:xfrm")]
 pub struct Transform {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -724,6 +730,7 @@ pub struct ToAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Marker/")]
 pub struct MarkerType {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   #[sdk(choice(
     qname = "cdr:ST_MarkerCoordinate/cdr:x",
     qname = "cdr:ST_MarkerCoordinate/cdr:y"
@@ -871,8 +878,6 @@ pub enum AbsoluteAnchorSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[sdk(any)]
-  XmlOther(String),
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
@@ -890,6 +895,12 @@ pub enum GroupShapeChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2010_chart_drawing::ContentPart,
     >,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

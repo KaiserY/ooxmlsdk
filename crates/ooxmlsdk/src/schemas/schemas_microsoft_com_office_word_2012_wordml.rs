@@ -195,6 +195,7 @@ pub struct DefaultCollapsed {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:webExtensionLinked")]
 pub struct WebExtensionLinked {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// On/Off Value
   ///
   /// Available in Office2007 and above.
@@ -211,6 +212,7 @@ pub struct WebExtensionLinked {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w15:webExtensionCreated")]
 pub struct WebExtensionCreated {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// On/Off Value
   ///
   /// Available in Office2007 and above.

@@ -178,6 +178,7 @@ pub struct Style {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_R/m:r")]
 pub struct Run {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Run Properties
   #[sdk(child(qname = "m:CT_RPR/m:rPr"))]
   pub math_run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -221,7 +222,9 @@ pub struct Run {
     qname = "w:CT_Drawing/w:drawing",
     qname = "w:CT_PTab/w:ptab",
     qname = "w:CT_Empty/w:lastRenderedPageBreak",
-    qname = "m:CT_Text/m:t"
+    qname = "m:CT_Text/m:t",
+    text,
+    any
   ))]
   pub run_choice: Vec<RunChoice>,
 }
@@ -557,6 +560,7 @@ pub struct Superscript {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathPara/m:oMathPara")]
 pub struct Paragraph {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Office Math Paragraph Properties
   #[sdk(child(qname = "m:CT_OMathParaPr/m:oMathParaPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
@@ -594,6 +598,7 @@ pub struct Paragraph {
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "w:CT_R/w:r",
+    text,
     any
   ))]
   pub paragraph_choice: Vec<ParagraphChoice>,
@@ -606,6 +611,7 @@ pub struct Paragraph {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMath/m:oMath")]
 pub struct OfficeMath {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "m:CT_Acc/m:acc",
     qname = "m:CT_Bar/m:bar",
@@ -663,6 +669,7 @@ pub struct OfficeMath {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub office_math_choice: Vec<OfficeMathChoice>,
@@ -1391,6 +1398,8 @@ pub struct CharType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_CtrlPr/m:ctrlPr")]
 pub struct ControlProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "w:CT_RPr/w:rPr",
     qname = "w:CT_MathCtrlIns/w:ins",
@@ -1423,6 +1432,7 @@ pub struct AccentProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:e")]
 pub struct Base {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1483,6 +1493,7 @@ pub struct Base {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub base_choice: Vec<BaseChoice>,
@@ -1498,6 +1509,7 @@ pub struct Base {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:num")]
 pub struct Numerator {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1558,6 +1570,7 @@ pub struct Numerator {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub numerator_choice: Vec<NumeratorChoice>,
@@ -1573,6 +1586,7 @@ pub struct Numerator {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:den")]
 pub struct Denominator {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1633,6 +1647,7 @@ pub struct Denominator {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub denominator_choice: Vec<DenominatorChoice>,
@@ -1648,6 +1663,7 @@ pub struct Denominator {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:fName")]
 pub struct FunctionName {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1708,6 +1724,7 @@ pub struct FunctionName {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub function_name_choice: Vec<FunctionNameChoice>,
@@ -1723,6 +1740,7 @@ pub struct FunctionName {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:lim")]
 pub struct Limit {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1783,6 +1801,7 @@ pub struct Limit {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub limit_choice: Vec<LimitChoice>,
@@ -1798,6 +1817,7 @@ pub struct Limit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sub")]
 pub struct SubArgument {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1858,6 +1878,7 @@ pub struct SubArgument {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub sub_argument_choice: Vec<SubArgumentChoice>,
@@ -1873,6 +1894,7 @@ pub struct SubArgument {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sup")]
 pub struct SuperArgument {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -1933,6 +1955,7 @@ pub struct SuperArgument {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub super_argument_choice: Vec<SuperArgumentChoice>,
@@ -1948,6 +1971,7 @@ pub struct SuperArgument {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:deg")]
 pub struct Degree {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
@@ -2008,6 +2032,7 @@ pub struct Degree {
     qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
+    text,
     any
   ))]
   pub degree_choice: Vec<DegreeChoice>,
@@ -3308,13 +3333,16 @@ pub enum RunChoice {
   /// Text.
   #[sdk(child(qname = "m:CT_Text/m:t"))]
   MT(std::boxed::Box<Text>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the OfficeMath Class.
+  /// Defines the OfficeMath Class.
     #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
     MOMath(std::boxed::Box<OfficeMath>),
     /// Defines the Run Class.
@@ -3547,6 +3575,12 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Run,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice2 {
@@ -3839,9 +3873,6 @@ pub enum OfficeMathChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -3931,6 +3962,12 @@ pub enum OfficeMathChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<OfficeMathChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MathPropertiesChoice {
@@ -4285,9 +4322,6 @@ pub enum BaseChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4377,6 +4411,12 @@ pub enum BaseChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<BaseChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice2 {
@@ -4669,9 +4709,6 @@ pub enum NumeratorChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4761,6 +4798,12 @@ pub enum NumeratorChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<NumeratorChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice2 {
@@ -5053,9 +5096,6 @@ pub enum DenominatorChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -5145,6 +5185,12 @@ pub enum DenominatorChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<DenominatorChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice2 {
@@ -5437,9 +5483,6 @@ pub enum FunctionNameChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -5529,6 +5572,12 @@ pub enum FunctionNameChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<FunctionNameChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice2 {
@@ -5821,9 +5870,6 @@ pub enum LimitChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -5913,6 +5959,12 @@ pub enum LimitChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<LimitChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice2 {
@@ -6205,9 +6257,6 @@ pub enum SubArgumentChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -6297,6 +6346,12 @@ pub enum SubArgumentChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<SubArgumentChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice2 {
@@ -6589,9 +6644,6 @@ pub enum SuperArgumentChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -6681,6 +6733,12 @@ pub enum SuperArgumentChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<SuperArgumentChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice2 {
@@ -6973,9 +7031,6 @@ pub enum DegreeChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -7065,6 +7120,12 @@ pub enum DegreeChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<DegreeChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathArgumentTypeChoice {

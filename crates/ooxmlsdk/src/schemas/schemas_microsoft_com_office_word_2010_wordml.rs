@@ -702,6 +702,7 @@ pub struct RunConflictDeletion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/")]
 pub struct RunTrackChangeType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -1021,6 +1022,7 @@ pub struct CustomXmlConflictDeletionRangeStart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/")]
 pub struct TrackChangeType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -2722,6 +2724,7 @@ pub struct CheckBoxSymbolType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/w14:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -2828,6 +2831,7 @@ pub struct WordNonVisualContentPartShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/w14:xfrm")]
 pub struct Transform2D {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -2864,6 +2868,7 @@ pub struct Transform2D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/w14:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,

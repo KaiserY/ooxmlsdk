@@ -62,6 +62,7 @@ pub struct NonVisualContentPartProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/p14:xfrm")]
 pub struct Transform2D {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -98,6 +99,7 @@ pub struct Transform2D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionListModify/p14:extLst")]
 pub struct ExtensionListModify {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Modify
   ///
   /// Available in Office2007 and above.
@@ -769,6 +771,7 @@ pub struct ShowEventRecordList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/p14:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -994,6 +997,7 @@ pub struct MediaBookmarkList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p14:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension:

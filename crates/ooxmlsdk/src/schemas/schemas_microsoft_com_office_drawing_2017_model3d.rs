@@ -527,6 +527,7 @@ pub struct Rotate3D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/am3d:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
@@ -733,6 +734,7 @@ pub struct PerspectiveProjection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Blip/am3d:blip")]
 pub struct Blip {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Embedded Picture Reference
   ///
   /// Available in Office2007 and above.
@@ -807,6 +809,7 @@ pub struct ColorType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DExtension/am3d:ext")]
 pub struct Model3DExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   ///
   /// Available in Office2019 and above.
@@ -830,6 +833,7 @@ pub struct Model3DExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/am3d:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -987,6 +991,7 @@ pub struct Model3DRaster {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "am3d:CT_Model3DExtensionList/am3d:extLst")]
 pub struct Model3DExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "am3d:CT_Model3DExtension/am3d:ext"))]
   pub am3d_ext: Vec<Model3DExtension>,

@@ -1267,7 +1267,6 @@ fn expand_helper_struct(
       Some(SdkTypeFieldKind::Child { qname, .. }) => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
-        mce_child_qname: None,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
@@ -2667,13 +2666,9 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         validators: parsed_attrs.validators,
       }),
-      SdkTypeFieldKind::Child {
-        qname,
-        mce_child_qname,
-      } => child_fields.push(SdkChildField {
+      SdkTypeFieldKind::Child { qname } => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
-        mce_child_qname,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
@@ -2729,6 +2724,8 @@ fn expand_named_struct(
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
   let mut xml_child_slot_count = 0usize;
+  let mut child_bearing_field_count = 0usize;
+  let mut occurrence_slot_candidate = false;
   for (field_ident, _, field_kind) in &ordered_field_specs {
     if matches!(
       field_kind,
@@ -2739,9 +2736,31 @@ fn expand_named_struct(
         | SdkTypeFieldKind::Any
     ) {
       xml_child_slot_count += 1usize;
+      child_bearing_field_count += 1usize;
       xml_child_slot_by_field.insert(field_ident.to_string(), xml_child_slot_count);
     }
   }
+  for (_, field_ty, field_kind) in &ordered_field_specs {
+    occurrence_slot_candidate |=
+      matches!(field_kind, SdkTypeFieldKind::Child { .. }) && contains_vec_type(field_ty);
+  }
+  let use_xml_other_children_occurrence_slots =
+    has_xml_other_children_field && child_bearing_field_count == 1 && occurrence_slot_candidate;
+
+  let xml_child_slot_assign_tokens = |xml_child_slot: usize| {
+    if !has_xml_other_children_field {
+      quote! {}
+    } else if use_xml_other_children_occurrence_slots {
+      quote! {
+        let _ = #xml_child_slot;
+        __xml_child_slot += 1usize;
+      }
+    } else {
+      quote! {
+        __xml_child_slot = #xml_child_slot;
+      }
+    }
+  };
 
   let mut attr_decl_tokens = Vec::new();
   let mut attr_parse_tokens = Vec::new();
@@ -3025,7 +3044,6 @@ fn expand_named_struct(
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
-  let mut mce_direct_child_entries: Vec<proc_macro2::TokenStream> = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
   let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
@@ -3034,11 +3052,7 @@ fn expand_named_struct(
       .get(&field_ident.to_string())
       .copied()
       .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
     let QNameInfo {
       tag_prefix,
       local_name,
@@ -3078,24 +3092,6 @@ fn expand_named_struct(
       );
       quote! { #tag_qname_lit | #local_name_lit }
     };
-    if let Some(mce_child_qname) = &field.mce_child_qname {
-      let mce_child_targets = qname_match_targets(std::slice::from_ref(mce_child_qname));
-      let mce_assign_tokens = if field.repeated {
-        quote! { #field_ident.push(#parsed_child_expr); }
-      } else {
-        quote! { #field_ident = Some(#parsed_child_expr); }
-      };
-      mce_direct_child_entries.push(quote! {
-        if let Some(xml) = crate::common::xml_fragment_find_start_qname_outer_xml(
-          xml_bytes,
-          &[#( (#mce_child_targets).as_ref() ),*],
-        )? {
-          let parsed_child = <#child_ty>::from_bytes(xml.as_ref())?;
-          #mce_assign_tokens
-          continue;
-        }
-      });
-    }
     let child_write_call = if is_generic_child {
       quote! { crate::sdk::SdkType::write_type_xml(child, writer, xmlns_prefix)?; }
     } else {
@@ -3376,40 +3372,8 @@ fn expand_named_struct(
     }
   }
 
-  let mce_direct_child_dispatch_tokens_borrowed = if mce_direct_child_entries.is_empty() {
-    quote! {}
-  } else {
-    quote! {
-      #[cfg(feature = "mce")]
-      if matches!(event_name, b"mc:AlternateContent" | b"AlternateContent") {
-        let xml = crate::common::read_outer_xml_borrowed(xml_reader, e.clone(), next_empty)?;
-        let xml_bytes = xml.as_bytes();
-        #( #mce_direct_child_entries )*
-        return Err(crate::common::unexpected_tag(
-          stringify!(#ident),
-          "known MCE child",
-          event_name,
-        ));
-      }
-    }
-  };
-  let mce_direct_child_dispatch_tokens_io = if mce_direct_child_entries.is_empty() {
-    quote! {}
-  } else {
-    quote! {
-      #[cfg(feature = "mce")]
-      if matches!(event_name, b"mc:AlternateContent" | b"AlternateContent") {
-        let xml = crate::common::read_outer_xml_io(xml_reader, e.clone(), next_empty)?;
-        let xml_bytes = xml.as_bytes();
-        #( #mce_direct_child_entries )*
-        return Err(crate::common::unexpected_tag(
-          stringify!(#ident),
-          "known MCE child",
-          event_name,
-        ));
-      }
-    }
-  };
+  let mce_direct_child_dispatch_tokens_borrowed = quote! {};
+  let mce_direct_child_dispatch_tokens_io = quote! {};
 
   for field in &empty_child_fields {
     let field_ident = &field.ident;
@@ -3417,11 +3381,7 @@ fn expand_named_struct(
       .get(&field_ident.to_string())
       .copied()
       .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
     let QNameInfo {
       tag_prefix,
       local_name,
@@ -3559,11 +3519,7 @@ fn expand_named_struct(
       .get(&field_ident.to_string())
       .copied()
       .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
     if field.repeated {
       child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       child_init_tokens.push(quote! { #field_ident });
@@ -3658,11 +3614,7 @@ fn expand_named_struct(
       .get(&field_ident.to_string())
       .copied()
       .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
     let choice_ty = unwrap_option_vec_type(&field.ty);
     let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
       quote! { choice.as_ref() }
@@ -4045,11 +3997,7 @@ fn expand_named_struct(
       .get(&field_ident.to_string())
       .copied()
       .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
 
     if field.repeated {
       any_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -4926,8 +4874,58 @@ fn expand_named_struct(
     }
   };
   let mut ordered_write_tokens = Vec::new();
+  let xml_other_children_write_slot_decl_tokens =
+    if has_xml_other_children_field && use_xml_other_children_occurrence_slots {
+      quote! {
+        let mut __xml_write_child_slot = 0usize;
+      }
+    } else {
+      quote! {}
+    };
+  let xml_other_children_write_current_slot_tokens =
+    if has_xml_other_children_field && use_xml_other_children_occurrence_slots {
+      quote! {
+        for (_, xml) in self
+          .xml_other_children
+          .iter()
+          .filter(|(slot, _)| *slot == __xml_write_child_slot)
+        {
+          writer.write_all(xml.as_bytes())?;
+        }
+      }
+    } else {
+      quote! {}
+    };
+  let xml_other_children_advance_slot_tokens =
+    if has_xml_other_children_field && use_xml_other_children_occurrence_slots {
+      quote! {
+        __xml_write_child_slot += 1usize;
+      }
+    } else {
+      quote! {}
+    };
+  let xml_other_children_write_trailing_tokens = if has_xml_other_children_field {
+    if use_xml_other_children_occurrence_slots {
+      quote! {
+        #xml_other_children_write_current_slot_tokens
+      }
+    } else {
+      quote! {
+        for (_, xml) in self
+          .xml_other_children
+          .iter()
+          .filter(|(slot, _)| *slot == #xml_child_slot_count)
+        {
+          writer.write_all(xml.as_bytes())?;
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
   for (field_ident, field_ty, field_kind) in &ordered_field_specs {
     if has_xml_other_children_field
+      && !use_xml_other_children_occurrence_slots
       && matches!(
         field_kind,
         SdkTypeFieldKind::Child { .. }
@@ -4952,7 +4950,6 @@ fn expand_named_struct(
         }
       });
     }
-
     match field_kind {
       SdkTypeFieldKind::Child { qname, .. } => {
         let repeated = contains_vec_type(field_ty);
@@ -4971,18 +4968,24 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for child in &self.#field_ident {
+              #xml_other_children_write_current_slot_tokens
               #child_write_call
+              #xml_other_children_advance_slot_tokens
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(child) = &self.#field_ident {
+              #xml_other_children_write_current_slot_tokens
               #child_write_call
+              #xml_other_children_advance_slot_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
+            #xml_other_children_write_current_slot_tokens
             #self_write_call
+            #xml_other_children_advance_slot_tokens
           });
         }
       }
@@ -5010,18 +5013,24 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for choice in &self.#field_ident {
+              #xml_other_children_write_current_slot_tokens
               <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+              #xml_other_children_advance_slot_tokens
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(choice) = &self.#field_ident {
+              #xml_other_children_write_current_slot_tokens
               <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+              #xml_other_children_advance_slot_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
+            #xml_other_children_write_current_slot_tokens
             <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+            #xml_other_children_advance_slot_tokens
           });
         }
       }
@@ -5031,18 +5040,24 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for value in &self.#field_ident {
+              #xml_other_children_write_current_slot_tokens
               writer.write_all(value.as_bytes())?;
+              #xml_other_children_advance_slot_tokens
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(value) = &self.#field_ident {
+              #xml_other_children_write_current_slot_tokens
               writer.write_all(value.as_bytes())?;
+              #xml_other_children_advance_slot_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
+            #xml_other_children_write_current_slot_tokens
             writer.write_all(self.#field_ident.as_bytes())?;
+            #xml_other_children_advance_slot_tokens
           });
         }
       }
@@ -5091,13 +5106,7 @@ fn expand_named_struct(
   }
   if has_xml_other_children_field {
     ordered_write_tokens.push(quote! {
-      for (_, xml) in self
-        .xml_other_children
-        .iter()
-        .filter(|(slot, _)| *slot == #xml_child_slot_count)
-      {
-        writer.write_all(xml.as_bytes())?;
-      }
+      #xml_other_children_write_trailing_tokens
     });
   }
   let text_finish_tokens = if let Some(text_field) = &text_field {
@@ -5696,6 +5705,7 @@ fn expand_named_struct(
         #xml_other_attrs_write_tokens
         if #has_body {
           writer.write_all(b">")?;
+          #xml_other_children_write_slot_decl_tokens
           #( #ordered_write_tokens )*
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {

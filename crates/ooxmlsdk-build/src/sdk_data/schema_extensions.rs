@@ -18,6 +18,8 @@ pub struct SchemaExtensions {
 pub struct SchemaTypeExtension {
   pub class_name: String,
   pub have_xmlns_fields: Option<bool>,
+  pub have_xml_other_attrs: Option<bool>,
+  pub have_xml_other_children: Option<bool>,
 }
 
 pub fn read_schema_extensions(dir: &Path) -> Result<Vec<(String, SchemaExtensions)>> {
@@ -78,7 +80,13 @@ pub fn apply_schema_extensions(
       };
 
       if let Some(have_xmlns_fields) = extension.have_xmlns_fields {
-        schema_type.has_xmlns_fields = have_xmlns_fields;
+        schema_type.have_xmlns_fields = have_xmlns_fields;
+      }
+      if let Some(have_xml_other_attrs) = extension.have_xml_other_attrs {
+        schema_type.have_xml_other_attrs = have_xml_other_attrs;
+      }
+      if let Some(have_xml_other_children) = extension.have_xml_other_children {
+        schema_type.have_xml_other_children = have_xml_other_children;
       }
     }
   }

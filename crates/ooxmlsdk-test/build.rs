@@ -86,7 +86,7 @@ fn is_invalid(file_name: &str) -> bool {
 
 fn is_round_trip_supported(file_name: &str) -> bool {
   let _ = file_name;
-  false
+  true
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {

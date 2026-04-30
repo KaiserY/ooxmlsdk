@@ -861,6 +861,7 @@ pub struct CustomShowReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Extension/p:ext")]
 pub struct Extension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -1077,6 +1078,8 @@ pub struct BackgroundProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/p:bgRef")]
 pub struct BackgroundStyleReference {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Style Matrix Index
   ///
   /// Available in Office2007 and above.
@@ -1103,6 +1106,7 @@ pub struct BackgroundStyleReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p188:CT_CommentPropertiesExtension/p:ext")]
 pub struct CommentPropertiesExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p228:CT_TaskDetails/p228:taskDetails"))]
   pub task_details: Option<
@@ -1126,6 +1130,7 @@ pub struct CommentAuthorList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "p:CT_CommentAuthor/p:cmAuthor"))]
   pub p_cm_author: Vec<CommentAuthor>,
@@ -1141,6 +1146,7 @@ pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "p:CT_Comment/p:cm"))]
   pub p_cm: Vec<Comment>,
@@ -1690,6 +1696,7 @@ pub struct TagList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "p:CT_StringTag/p:tag"))]
   pub p_tag: Vec<Tag>,
@@ -1944,12 +1951,8 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "p:CT_Empty/p:sldTgt",
     qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt",
@@ -2105,6 +2108,7 @@ pub struct TimeListConditionalType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeParallel/p:par")]
 pub struct ParallelTimeNode {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Parallel TimeNode
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
@@ -2118,6 +2122,7 @@ pub struct ParallelTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeSequence/p:seq")]
 pub struct SequenceTimeNode {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Concurrent
   ///
@@ -2160,6 +2165,7 @@ pub struct SequenceTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeExclusive/p:excl")]
 pub struct ExclusiveTimeNode {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
@@ -2173,6 +2179,7 @@ pub struct ExclusiveTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateBehavior/p:anim")]
 pub struct Animate {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// by
   ///
   /// Available in Office2007 and above.
@@ -2315,6 +2322,7 @@ pub struct AnimateEffect {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion")]
 pub struct AnimateMotion {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// origin
   ///
   /// Available in Office2007 and above.
@@ -2392,6 +2400,7 @@ pub struct AnimateMotion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateRotationBehavior/p:animRot")]
 pub struct AnimateRotation {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// by
   ///
   /// Available in Office2007 and above.
@@ -2441,6 +2450,7 @@ pub struct AnimateRotation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateScaleBehavior/p:animScale")]
 pub struct AnimateScale {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// zoomContents
   ///
   /// Available in Office2007 and above.
@@ -2565,6 +2575,7 @@ pub struct Video {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonTimeNodeData/p:cTn")]
 pub struct CommonTimeNode {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// id
   ///
   /// Available in Office2007 and above.
@@ -2937,6 +2948,8 @@ pub struct StringVariantValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:clrVal")]
 pub struct ColorValue {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2955,6 +2968,8 @@ pub struct ColorValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:penClr")]
 pub struct PenColor {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2973,6 +2988,8 @@ pub struct PenColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/")]
 pub struct ColorType {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3121,6 +3138,7 @@ pub struct HslColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonBehaviorData/p:cBhvr")]
 pub struct CommonBehavior {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Additive
   ///
@@ -3263,6 +3281,7 @@ pub struct TimeListAnimationVariantType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonMediaNodeData/p:cMediaNode")]
 pub struct CommonMediaNode {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Volume
   ///
@@ -3597,6 +3616,7 @@ pub struct BuildList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionListModify/p:extLst")]
 pub struct ExtensionListWithModification {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Modify
   ///
   /// Available in Office2007 and above.
@@ -3630,12 +3650,8 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3654,12 +3670,8 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  #[cfg(not(feature = "mce"))]
-  /// _
-  #[sdk(child(qname = "mc:CT_AlternateContent/mc:AlternateContent"))]
-  pub mc_alternate_content:
-    Option<crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006::AlternateContent>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3678,6 +3690,8 @@ pub struct ToColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/")]
 pub struct Color3Type {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3830,6 +3844,7 @@ pub struct Comment {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ExtensionList/p:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension: Vec<Extension>,
@@ -4188,6 +4203,7 @@ pub struct CustomShow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/p:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -4251,6 +4267,7 @@ pub struct NonVisualDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingShapeProps/p:cNvSpPr")]
 pub struct NonVisualShapeDrawingProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Box
   ///
   /// Available in Office2007 and above.
@@ -4336,6 +4353,7 @@ pub struct NonVisualShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/p:spPr")]
 pub struct ShapeProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   ///
   /// Available in Office2007 and above.
@@ -4424,6 +4442,8 @@ pub struct ShapeStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/p:txBody")]
 pub struct TextBody {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties:
@@ -4616,6 +4636,7 @@ pub struct NonVisualGraphicFrameProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/p:xfrm")]
 pub struct Transform {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.
@@ -4673,6 +4694,7 @@ pub struct NonVisualGroupShapeDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:titleStyle")]
 pub struct TitleStyle {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
@@ -4756,6 +4778,7 @@ pub struct TitleStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:bodyStyle")]
 pub struct BodyStyle {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
@@ -4839,6 +4862,7 @@ pub struct BodyStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:otherStyle")]
 pub struct OtherStyle {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
@@ -4922,6 +4946,7 @@ pub struct OtherStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:defaultTextStyle")]
 pub struct DefaultTextStyle {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
@@ -5005,6 +5030,7 @@ pub struct DefaultTextStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:notesStyle")]
 pub struct NotesStyle {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties: Option<
@@ -5795,6 +5821,9 @@ pub struct PositiveSize2DType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideExtension/p:ext")]
 pub struct SlideExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5822,6 +5851,9 @@ pub struct SlideExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommonSlideDataExtension/p:ext")]
 pub struct CommonSlideDataExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5845,6 +5877,9 @@ pub struct CommonSlideDataExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ShowPropertiesExtension/p:ext")]
 pub struct ShowPropertiesExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -5935,6 +5970,7 @@ pub struct OleObjectLink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideTransition/p:transition")]
 pub struct Transition {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// spd
   ///
@@ -6051,6 +6087,7 @@ pub struct Timing {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideExtensionList/p:extLst")]
 pub struct SlideExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_SlideExtension/p:ext"))]
   pub p_ext: Vec<SlideExtension>,
@@ -6086,6 +6123,7 @@ pub struct Background {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:spTree")]
 pub struct ShapeTree {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -6098,6 +6136,7 @@ pub struct ShapeTree {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -6117,6 +6156,7 @@ pub struct ShapeTree {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:grpSp")]
 pub struct GroupShape {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -6129,6 +6169,7 @@ pub struct GroupShape {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -6199,6 +6240,7 @@ pub struct ControlList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommonSlideDataExtensionList/p:extLst")]
 pub struct CommonSlideDataExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_CommonSlideDataExtension/p:ext"))]
   pub p_ext: Vec<CommonSlideDataExtension>,
@@ -6351,6 +6393,7 @@ pub struct ConnectionShape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ShowPropertiesExtensionList/p:extLst")]
 pub struct ShowPropertiesExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_ShowPropertiesExtension/p:ext"))]
   pub p_ext: Vec<ShowPropertiesExtension>,
@@ -6441,6 +6484,9 @@ pub struct TimeListSubShapeIdType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommentAuthorExtension/p:ext")]
 pub struct CommentAuthorExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6464,6 +6510,9 @@ pub struct CommentAuthorExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommentExtension/p:ext")]
 pub struct CommentExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6487,6 +6536,9 @@ pub struct CommentExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideLayoutExtension/p:ext")]
 pub struct SlideLayoutExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6510,6 +6562,9 @@ pub struct SlideLayoutExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideMasterExtension/p:ext")]
 pub struct SlideMasterExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6533,6 +6588,9 @@ pub struct SlideMasterExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_HandoutMasterExtension/p:ext")]
 pub struct HandoutMasterExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6556,6 +6614,9 @@ pub struct HandoutMasterExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_NotesMasterExtension/p:ext")]
 pub struct NotesMasterExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6629,6 +6690,7 @@ pub struct PlaceholderShape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst")]
 pub struct ApplicationNonVisualDrawingPropertiesExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtension/p:ext"))]
   pub p_ext: Vec<ApplicationNonVisualDrawingPropertiesExtension>,
@@ -6641,6 +6703,9 @@ pub struct ApplicationNonVisualDrawingPropertiesExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ApplicationNonVisualDrawingPropsExtension/p:ext")]
 pub struct ApplicationNonVisualDrawingPropertiesExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -6693,6 +6758,7 @@ pub struct Iterate {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:childTnLst")]
 pub struct ChildTimeNodeList {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
     qname = "p:CT_TLTimeNodeSequence/p:seq",
@@ -6706,7 +6772,9 @@ pub struct ChildTimeNodeList {
     qname = "p:CT_TLCommandBehavior/p:cmd",
     qname = "p:CT_TLSetBehavior/p:set",
     qname = "p:CT_TLMediaNodeAudio/p:audio",
-    qname = "p:CT_TLMediaNodeVideo/p:video"
+    qname = "p:CT_TLMediaNodeVideo/p:video",
+    text,
+    any
   ))]
   pub xml_children: Vec<ChildTimeNodeListChoice>,
 }
@@ -6718,6 +6786,7 @@ pub struct ChildTimeNodeList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:subTnLst")]
 pub struct SubTimeNodeList {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
     qname = "p:CT_TLTimeNodeSequence/p:seq",
@@ -6731,7 +6800,9 @@ pub struct SubTimeNodeList {
     qname = "p:CT_TLCommandBehavior/p:cmd",
     qname = "p:CT_TLSetBehavior/p:set",
     qname = "p:CT_TLMediaNodeAudio/p:audio",
-    qname = "p:CT_TLMediaNodeVideo/p:video"
+    qname = "p:CT_TLMediaNodeVideo/p:video",
+    text,
+    any
   ))]
   pub xml_children: Vec<SubTimeNodeListChoice>,
 }
@@ -6743,6 +6814,7 @@ pub struct SubTimeNodeList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/")]
 pub struct TimeTypeListType {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
     qname = "p:CT_TLTimeNodeSequence/p:seq",
@@ -6756,7 +6828,9 @@ pub struct TimeTypeListType {
     qname = "p:CT_TLCommandBehavior/p:cmd",
     qname = "p:CT_TLSetBehavior/p:set",
     qname = "p:CT_TLMediaNodeAudio/p:audio",
-    qname = "p:CT_TLMediaNodeVideo/p:video"
+    qname = "p:CT_TLMediaNodeVideo/p:video",
+    text,
+    any
   ))]
   pub xml_children: Vec<TimeTypeListTypeChoice>,
 }
@@ -6895,6 +6969,7 @@ pub struct TimeListType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommentAuthorExtensionList/p:extLst")]
 pub struct CommentAuthorExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_CommentAuthorExtension/p:ext"))]
   pub p_ext: Vec<CommentAuthorExtension>,
@@ -6907,6 +6982,7 @@ pub struct CommentAuthorExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommentExtensionList/p:extLst")]
 pub struct CommentExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_CommentExtension/p:ext"))]
   pub p_ext: Vec<CommentExtension>,
@@ -7108,6 +7184,7 @@ pub struct Kinsoku {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ModifyVerifier/p:modifyVerifier")]
 pub struct ModificationVerifier {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Cryptographic Provider Type
   ///
   /// Available in Office2007 and above.
@@ -7233,6 +7310,7 @@ pub struct ModificationVerifier {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PresentationExtensionList/p:extLst")]
 pub struct PresentationExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_PresentationExtension/p:ext"))]
   pub p_ext: Vec<PresentationExtension>,
@@ -7245,6 +7323,9 @@ pub struct PresentationExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PresentationExtension/p:ext")]
 pub struct PresentationExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -7494,13 +7575,16 @@ pub struct ShowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMRU/p:clrMru")]
 pub struct ColorMostRecentlyUsed {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
+    qname = "a:CT_PresetColor/a:prstClr",
+    text,
+    any
   ))]
   pub color_most_recently_used_choice: Vec<ColorMostRecentlyUsedChoice>,
 }
@@ -7512,6 +7596,7 @@ pub struct ColorMostRecentlyUsed {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PresentationPropertiesExtensionList/p:extLst")]
 pub struct PresentationPropertiesExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_PresentationPropertiesExtension/p:ext"))]
   pub p_ext: Vec<PresentationPropertiesExtension>,
@@ -7524,6 +7609,9 @@ pub struct PresentationPropertiesExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PresentationPropertiesExtension/p:ext")]
 pub struct PresentationPropertiesExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// URI
   ///
   /// Available in Office2007 and above.
@@ -7592,6 +7680,7 @@ pub struct HeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideLayoutExtensionList/p:extLst")]
 pub struct SlideLayoutExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_SlideLayoutExtension/p:ext"))]
   pub p_ext: Vec<SlideLayoutExtension>,
@@ -7637,6 +7726,7 @@ pub struct TextStyles {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideMasterExtensionList/p:extLst")]
 pub struct SlideMasterExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_SlideMasterExtension/p:ext"))]
   pub p_ext: Vec<SlideMasterExtension>,
@@ -7649,6 +7739,7 @@ pub struct SlideMasterExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_HandoutMasterExtensionList/p:extLst")]
 pub struct HandoutMasterExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_HandoutMasterExtension/p:ext"))]
   pub p_ext: Vec<HandoutMasterExtension>,
@@ -7661,6 +7752,7 @@ pub struct HandoutMasterExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_NotesMasterExtensionList/p:extLst")]
 pub struct NotesMasterExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "p:CT_NotesMasterExtension/p:ext"))]
   pub p_ext: Vec<NotesMasterExtension>,
@@ -8050,6 +8142,7 @@ pub struct SoundAction {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PlaceholderExtension/p:ext")]
 pub struct PlaceholderExtension {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// _
     #[sdk(child(qname = "p232:CT_PlaceholderTypeExtension/p232:phTypeExt"))]
     pub placeholder_type_extension: Option<
@@ -8152,13 +8245,17 @@ pub enum TargetElementChoice {
   /// Slide Target.
   #[sdk(empty_child(qname = "p:CT_Empty/p:sldTgt"))]
   PSldTgt,
+  /// Sound Target.
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt"))]
   PSndTgt(std::boxed::Box<SoundTarget>),
+  /// Shape Target.
   #[sdk(child(qname = "p:CT_TLShapeTargetElement/p:spTgt"))]
   PSpTgt(std::boxed::Box<ShapeTarget>),
+  /// Ink Target.
   #[sdk(child(qname = "p:CT_TLSubShapeId/p:inkTgt"))]
   PInkTgt(std::boxed::Box<InkTarget>),
   #[cfg(feature = "microsoft365")]
+  /// Defines the BookmarkTarget Class.
   #[sdk(child(qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"))]
   P14BmkTgt(
     std::boxed::Box<
@@ -8415,30 +8512,36 @@ pub enum ByColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FromColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8446,30 +8549,36 @@ pub enum FromColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ToColorChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -8924,8 +9033,6 @@ pub enum BackgroundChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
-  #[sdk(any)]
-  XmlOther(String),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
@@ -8939,11 +9046,15 @@ pub enum ShapeTreeChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[sdk(any)]
-  XmlOther(String),
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
@@ -8957,6 +9068,12 @@ pub enum GroupShapeChoice {
   #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeTypeChoice {
@@ -9174,6 +9291,12 @@ pub enum ChildTimeNodeListChoice {
   /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
   PVideo(std::boxed::Box<Video>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubTimeNodeListChoice {
@@ -9216,6 +9339,12 @@ pub enum SubTimeNodeListChoice {
   /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
   PVideo(std::boxed::Box<Video>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TimeTypeListTypeChoice {
@@ -9258,6 +9387,12 @@ pub enum TimeTypeListTypeChoice {
   /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
   PVideo(std::boxed::Box<Video>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationExtensionChoice {
@@ -9350,6 +9485,12 @@ pub enum ColorMostRecentlyUsedChoice {
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationPropertiesExtensionChoice {

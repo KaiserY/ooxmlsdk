@@ -30,6 +30,7 @@ pub struct ClassificationLabelList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "clbl:CT_ClassificationExtension/clbl:ext")]
 pub struct ClassificationExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   ///
   /// Available in Office2021 and above.
@@ -126,6 +127,7 @@ pub struct ClassificationLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "clbl:CT_ClassificationExtensionList/clbl:extLst")]
 pub struct ClassificationExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "clbl:CT_ClassificationExtension/clbl:ext"))]
   pub clbl_ext: Vec<ClassificationExtension>,

@@ -35,6 +35,7 @@ pub struct CameraTool {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:CT_CompatExt/a14:compatExt")]
 pub struct CompatExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// spid
   ///
   /// Available in Office2010 and above.
@@ -135,6 +136,7 @@ pub struct HiddenFillProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineProperties/a14:hiddenLine")]
 pub struct HiddenLineProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   ///
   /// Available in Office2007 and above.
@@ -366,6 +368,7 @@ pub struct UseLocalDpi {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/a14:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
@@ -1632,6 +1635,7 @@ pub struct ImageLayer {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/a14:cNvPr")]
 pub struct NonVisualDrawingProperties {
+    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
     ///
     /// Available in Office2007 and above.
@@ -1733,6 +1737,7 @@ pub struct NonVisualContentPartProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Transform2D/a14:xfrm")]
 pub struct Transform2D {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   ///
   /// Available in Office2007 and above.

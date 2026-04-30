@@ -56,6 +56,7 @@ pub struct WebExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_WebExtensionPartRef/we:webextensionref")]
 pub struct WebExtensionReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   ///
   /// Available in Office2013 and above.
@@ -72,6 +73,7 @@ pub struct WebExtensionReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionProperty/we:property")]
 pub struct WebExtensionProperty {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// name
   ///
   /// Available in Office2013 and above.
@@ -95,6 +97,7 @@ pub struct WebExtensionProperty {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/we:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
@@ -107,6 +110,7 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionBinding/we:binding")]
 pub struct WebExtensionBinding {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   ///
   /// Available in Office2013 and above.
@@ -140,6 +144,7 @@ pub struct WebExtensionBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionReference/we:reference")]
 pub struct WebExtensionStoreReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   ///
   /// Available in Office2013 and above.
@@ -180,6 +185,7 @@ pub struct WebExtensionStoreReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences")]
 pub struct WebExtensionReferenceList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "we:CT_OsfWebExtensionReference/we:reference"))]
   pub we_reference: Vec<WebExtensionStoreReference>,
@@ -192,6 +198,7 @@ pub struct WebExtensionReferenceList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionPropertyBag/we:properties")]
 pub struct WebExtensionPropertyBag {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "we:CT_OsfWebExtensionProperty/we:property"))]
   pub we_property: Vec<WebExtensionProperty>,
@@ -204,6 +211,7 @@ pub struct WebExtensionPropertyBag {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_OsfWebExtensionBindingList/we:bindings")]
 pub struct WebExtensionBindingList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "we:CT_OsfWebExtensionBinding/we:binding"))]
   pub we_binding: Vec<WebExtensionBinding>,

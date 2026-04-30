@@ -22,7 +22,7 @@ use crate::sdk_data::{
   opc_schemas::read_opc_schemas,
   parts::gen_parts,
   schema_extensions::{apply_schema_extensions, read_schema_extensions},
-  schemas::{assign_mce_alternate_content_property_names, assign_schema_particle_ids, gen_schemas},
+  schemas::{assign_schema_particle_ids, gen_schemas},
 };
 
 pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
@@ -61,7 +61,6 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   schemas.sort_by(|left, right| left.module_name.cmp(&right.module_name));
   let schema_extensions = read_schema_extensions(&out_dir.join("schema_extensions"))?;
   apply_schema_extensions(&mut schemas, &schema_extensions)?;
-  assign_mce_alternate_content_property_names(&mut schemas);
   assign_schema_particle_ids(&mut schemas);
   let codegen_context = CodegenContext::new(&schemas);
 

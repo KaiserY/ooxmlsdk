@@ -2596,6 +2596,7 @@ pub struct MoveTo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/")]
 pub struct TrackChangeType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -2649,6 +2650,7 @@ pub struct TrackChangeType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CellMergeTrackChange/w:cellMerge")]
 pub struct CellMerge {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// vMerge
   ///
   /// Available in Office2007 and above.
@@ -6984,6 +6986,7 @@ pub struct FrameProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumPr/w:numPr")]
 pub struct NumberingProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Numbering Level Reference
   #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber255/w:ilvl"))]
@@ -7141,6 +7144,7 @@ pub struct Tabs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Spacing/w:spacing")]
 pub struct SpacingBetweenLines {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Spacing Above Paragraph
   ///
   /// Available in Office2007 and above.
@@ -7227,6 +7231,7 @@ pub struct SpacingBetweenLines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Ind/w:ind")]
 pub struct Indentation {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Left Indentation
   ///
   /// Available in Office2007 and above.
@@ -7654,6 +7659,7 @@ pub struct DecimalNumberType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrChange/w:pPrChange")]
 pub struct ParagraphPropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -7802,6 +7808,7 @@ pub struct Break {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:t")]
 pub struct Text {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// space
   ///
   /// Available in Office2007 and above.
@@ -7820,6 +7827,7 @@ pub struct Text {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:delText")]
 pub struct DeletedText {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// space
   ///
   /// Available in Office2007 and above.
@@ -7838,6 +7846,7 @@ pub struct DeletedText {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:instrText")]
 pub struct FieldCode {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// space
   ///
   /// Available in Office2007 and above.
@@ -7856,6 +7865,7 @@ pub struct FieldCode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:delInstrText")]
 pub struct DeletedFieldCode {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// space
   ///
   /// Available in Office2007 and above.
@@ -7917,6 +7927,7 @@ pub struct SymbolChar {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Object/w:object")]
 pub struct EmbeddedObject {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// dxaOrig
   ///
   /// Available in Office2007 and above.
@@ -7973,6 +7984,7 @@ pub struct EmbeddedObject {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Picture/w:pict")]
 pub struct Picture {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[cfg(feature = "microsoft365")]
   /// anchorId
   ///
@@ -8012,6 +8024,8 @@ pub struct Picture {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FldChar/w:fldChar")]
 pub struct FieldChar {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Field Character Type
   ///
   /// Available in Office2007 and above.
@@ -8156,6 +8170,8 @@ pub struct FootnoteEndnoteReferenceType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Drawing/w:drawing")]
 pub struct Drawing {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(qname = "wp:CT_Anchor/wp:anchor", qname = "wp:CT_Inline/wp:inline"))]
   pub xml_children: Option<DrawingChoice>,
 }
@@ -10383,6 +10399,7 @@ pub struct EastAsianLayout {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrChange/w:rPrChange")]
 pub struct RunPropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -10439,6 +10456,8 @@ pub struct RunPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPr/w:rPr")]
 pub struct RunProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
   pub run_style: Option<RunStyle>,
@@ -10628,6 +10647,8 @@ pub struct RunProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlIns/w:ins")]
 pub struct InsertedMathControl {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -10683,6 +10704,7 @@ pub struct InsertedMathControl {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlDel/w:del")]
 pub struct DeletedMathControl {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -10739,6 +10761,8 @@ pub struct DeletedMathControl {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlMove/w:moveFrom")]
 pub struct MoveFromMathControl {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -10798,6 +10822,8 @@ pub struct MoveFromMathControl {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlMove/w:moveTo")]
 pub struct MoveToMathControl {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -10857,6 +10883,7 @@ pub struct MoveToMathControl {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlMove/")]
 pub struct MathControlMoveType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -10904,7 +10931,9 @@ pub struct MathControlMoveType {
   #[sdk(choice(
     qname = "w:CT_RPr/w:rPr",
     qname = "w:CT_MathCtrlIns/w:ins",
-    qname = "w:CT_MathCtrlDel/w:del"
+    qname = "w:CT_MathCtrlDel/w:del",
+    text,
+    any
   ))]
   pub xml_children: Vec<MathControlMoveTypeChoice>,
 }
@@ -10916,6 +10945,7 @@ pub struct MathControlMoveType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRuby/w:customXml")]
 pub struct CustomXmlRuby {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -10977,6 +11007,7 @@ pub struct CustomXmlRuby {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
+    text,
     any
   ))]
   pub custom_xml_ruby_choice: Vec<CustomXmlRubyChoice>,
@@ -10989,6 +11020,7 @@ pub struct CustomXmlRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SimpleFieldRuby/w:fldSimple")]
 pub struct SimpleFieldRuby {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// instr
   ///
   /// Available in Office2007 and above.
@@ -11071,6 +11103,7 @@ pub struct SimpleFieldRuby {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
+    text,
     any
   ))]
   pub simple_field_ruby_choice: Vec<SimpleFieldRubyChoice>,
@@ -11083,6 +11116,7 @@ pub struct SimpleFieldRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HyperlinkRuby/w:hyperlink")]
 pub struct HyperlinkRuby {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// tgtFrame
   ///
   /// Available in Office2007 and above.
@@ -11180,6 +11214,7 @@ pub struct HyperlinkRuby {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -11204,6 +11239,7 @@ pub struct HyperlinkRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_R/w:r")]
 pub struct Run {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Run Properties
   ///
   /// Available in Office2007 and above.
@@ -11263,7 +11299,9 @@ pub struct Run {
     qname = "w:CT_Markup/w:commentReference",
     qname = "w:CT_Drawing/w:drawing",
     qname = "w:CT_PTab/w:ptab",
-    qname = "w:CT_Empty/w:lastRenderedPageBreak"
+    qname = "w:CT_Empty/w:lastRenderedPageBreak",
+    text,
+    any
   ))]
   pub run_choice: Vec<RunChoice>,
 }
@@ -11275,6 +11313,7 @@ pub struct Run {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtRunRuby/w:sdt")]
 pub struct SdtRunRuby {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
@@ -11301,6 +11340,7 @@ pub struct SdtRunRuby {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -11414,6 +11454,7 @@ pub struct PermEnd {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:ins")]
 pub struct InsertedRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -11515,6 +11556,7 @@ pub struct InsertedRun {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
+    text,
     any
   ))]
   pub inserted_run_choice: Vec<InsertedRunChoice>,
@@ -11527,6 +11569,7 @@ pub struct InsertedRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:del")]
 pub struct DeletedRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -11628,6 +11671,7 @@ pub struct DeletedRun {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
+    text,
     any
   ))]
   pub deleted_run_choice: Vec<DeletedRunChoice>,
@@ -11640,6 +11684,7 @@ pub struct DeletedRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:moveFrom")]
 pub struct MoveFromRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -11741,6 +11786,7 @@ pub struct MoveFromRun {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
+    text,
     any
   ))]
   pub move_from_run_choice: Vec<MoveFromRunChoice>,
@@ -11753,6 +11799,7 @@ pub struct MoveFromRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:moveTo")]
 pub struct MoveToRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -11854,6 +11901,7 @@ pub struct MoveToRun {
     qname = "w:CT_R/w:r",
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
+    text,
     any
   ))]
   pub move_to_run_choice: Vec<MoveToRunChoice>,
@@ -11866,6 +11914,7 @@ pub struct MoveToRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/")]
 pub struct RunTrackChangeType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -12000,6 +12049,7 @@ pub struct ContentPart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtRun/w:sdt")]
 pub struct SdtRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
@@ -12026,6 +12076,7 @@ pub struct SdtRun {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -12047,6 +12098,7 @@ pub struct SdtRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlBlock/w:customXml")]
 pub struct CustomXmlBlock {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -12085,6 +12137,7 @@ pub struct CustomXmlBlock {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub custom_xml_block_choice: Vec<CustomXmlBlockChoice>,
@@ -12097,6 +12150,7 @@ pub struct CustomXmlBlock {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtBlock/w:sdt")]
 pub struct SdtBlock {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
@@ -12123,6 +12177,7 @@ pub struct SdtBlock {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -12144,6 +12199,7 @@ pub struct SdtBlock {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_P/w:p")]
 pub struct Paragraph {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Paragraph Glyph Formatting
   ///
   /// Available in Office2007 and above.
@@ -12274,6 +12330,7 @@ pub struct Paragraph {
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
     qname = "w:CT_Rel/w:subDoc",
+    text,
     any
   ))]
   pub paragraph_choice: Vec<ParagraphChoice>,
@@ -12286,6 +12343,8 @@ pub struct Paragraph {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tbl/w:tbl")]
 pub struct Table {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   #[sdk(choice(
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
@@ -12302,8 +12361,7 @@ pub struct Table {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    any
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12347,8 +12405,7 @@ pub struct Table {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    any
+    qname = "w:CT_RunTrackChange/w:moveTo"
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -12372,6 +12429,7 @@ pub struct Table {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Row/w:tr")]
 pub struct TableRow {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Table Row Glyph Formatting
   ///
   /// Available in Office2007 and above.
@@ -12462,6 +12520,7 @@ pub struct TableRow {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub table_row_choice: Vec<TableRowChoice>,
@@ -12474,6 +12533,7 @@ pub struct TableRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRow/w:customXml")]
 pub struct CustomXmlRow {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -12511,6 +12571,7 @@ pub struct CustomXmlRow {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub custom_xml_row_choice: Vec<CustomXmlRowChoice>,
@@ -12523,6 +12584,7 @@ pub struct CustomXmlRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtRow/w:sdt")]
 pub struct SdtRow {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
@@ -12549,6 +12611,7 @@ pub struct SdtRow {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -12570,6 +12633,7 @@ pub struct SdtRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tc/w:tc")]
 pub struct TableCell {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Table Cell Properties
   #[sdk(child(qname = "w:CT_TcPr/w:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
@@ -12609,6 +12673,7 @@ pub struct TableCell {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub table_cell_choice: Vec<TableCellChoice>,
@@ -12621,6 +12686,7 @@ pub struct TableCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlCell/w:customXml")]
 pub struct CustomXmlCell {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -12658,6 +12724,7 @@ pub struct CustomXmlCell {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub custom_xml_cell_choice: Vec<CustomXmlCellChoice>,
@@ -12670,6 +12737,7 @@ pub struct CustomXmlCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtCell/w:sdt")]
 pub struct SdtCell {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
@@ -12696,6 +12764,7 @@ pub struct SdtCell {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -12717,6 +12786,7 @@ pub struct SdtCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRun/w:customXml")]
 pub struct CustomXmlRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// _
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -12781,6 +12851,7 @@ pub struct CustomXmlRun {
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
     qname = "w:CT_Rel/w:subDoc",
+    text,
     any
   ))]
   pub custom_xml_run_choice: Vec<CustomXmlRunChoice>,
@@ -12793,6 +12864,7 @@ pub struct CustomXmlRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SimpleField/w:fldSimple")]
 pub struct SimpleField {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Field Codes
   ///
   /// Available in Office2007 and above.
@@ -12878,6 +12950,7 @@ pub struct SimpleField {
     qname = "w:CT_BdoContentRun/w:bdo",
     qname = "w:CT_DirContentRun/w:dir",
     qname = "w:CT_Rel/w:subDoc",
+    text,
     any
   ))]
   pub simple_field_choice: Vec<SimpleFieldChoice>,
@@ -12890,6 +12963,7 @@ pub struct SimpleField {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Hyperlink/w:hyperlink")]
 pub struct Hyperlink {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Hyperlink Target Frame
   ///
   /// Available in Office2007 and above.
@@ -12988,6 +13062,7 @@ pub struct Hyperlink {
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
     qname = "w:CT_Rel/w:subDoc",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -13334,6 +13409,7 @@ pub struct RelationshipType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Cnf/w:cnfStyle")]
 pub struct ConditionalFormatStyle {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Conditional Formatting Bit Mask
   ///
   /// Available in Office2007 and above.
@@ -13818,6 +13894,7 @@ pub struct VerticalMerge {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcBorders/w:tcBorders")]
 pub struct TableCellBorders {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Table Cell Top Border
   #[sdk(child(qname = "w:CT_Border/w:top"))]
@@ -14180,6 +14257,7 @@ pub struct OnOffOnlyType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcMar/w:tcMar")]
 pub struct TableCellMargin {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Table Cell Top Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
@@ -14506,6 +14584,7 @@ pub struct TableIndentation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblBorders/w:tblBorders")]
 pub struct TableBorders {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Table Top Border
   #[sdk(child(qname = "w:CT_Border/w:top"))]
@@ -14558,6 +14637,7 @@ pub struct TableLayout {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblCellMar/w:tblCellMar")]
 pub struct TableCellMarginDefault {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Table Cell Top Margin Default
   #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
@@ -14639,6 +14719,7 @@ pub struct AltChunk {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblLook/w:tblLook")]
 pub struct TableLook {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// val
   ///
   /// Available in Office2007 and above.
@@ -14704,6 +14785,7 @@ pub struct TableLook {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnProps/w:footnotePr")]
 pub struct FootnoteProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Footnote Placement
   #[sdk(child(qname = "w:CT_FtnPos/w:pos"))]
@@ -14726,6 +14808,7 @@ pub struct FootnoteProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EdnProps/w:endnotePr")]
 pub struct EndnoteProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Endnote Placement
   #[sdk(child(qname = "w:CT_EdnPos/w:pos"))]
@@ -15173,6 +15256,7 @@ pub struct Recipients {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "w:CT_RecipientData/w:recipientData"))]
   pub w_recipient_data: Vec<RecipientData>,
@@ -15185,6 +15269,7 @@ pub struct Recipients {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
 pub struct TextBoxContent {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
@@ -15214,6 +15299,7 @@ pub struct TextBoxContent {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -15316,6 +15402,7 @@ pub struct Header {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -15372,6 +15459,7 @@ pub struct Footer {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -15396,6 +15484,7 @@ pub struct Footer {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtr/")]
 pub struct HeaderFooterType {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
@@ -15424,7 +15513,9 @@ pub struct HeaderFooterType {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -15837,6 +15928,7 @@ pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "w:CT_Font/w:font"))]
   pub w_font: Vec<Font>,
@@ -15852,6 +15944,7 @@ pub struct Numbering {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// _
   #[sdk(child(qname = "w:CT_NumPicBullet/w:numPicBullet"))]
   pub w_num_pic_bullet: Vec<NumberingPictureBullet>,
@@ -15876,6 +15969,7 @@ pub struct Styles {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Document Default Paragraph and Run Properties
   #[sdk(child(qname = "w:CT_DocDefaults/w:docDefaults"))]
   pub doc_defaults: Option<std::boxed::Box<DocDefaults>>,
@@ -15937,6 +16031,7 @@ pub struct GlossaryDocument {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrExBase/w:tblPrEx")]
 pub struct PreviousTablePropertyExceptions {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Preferred Table Width Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
@@ -15974,6 +16069,8 @@ pub struct PreviousTablePropertyExceptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPrInner/w:tcPr")]
 pub struct PreviousTableCellProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the ConditionalFormatStyle Class.
   #[sdk(child(qname = "w:CT_Cnf/w:cnfStyle"))]
   pub conditional_format_style: Option<ConditionalFormatStyle>,
@@ -16028,6 +16125,7 @@ pub struct PreviousTableCellProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBase/w:trPr")]
 pub struct PreviousTableRowProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_Cnf/w:cnfStyle",
     qname = "w:CT_NonZeroDecimalNumber/w:divId",
@@ -16040,7 +16138,9 @@ pub struct PreviousTableRowProperties {
     qname = "w:CT_OnOffOnly/w:cantSplit",
     qname = "w:CT_OnOffOnly/w:tblHeader",
     qname = "w:CT_TblWidth/w:tblCellSpacing",
-    qname = "w:CT_TblJc/w:jc"
+    qname = "w:CT_TblJc/w:jc",
+    text,
+    any
   ))]
   pub xml_children: Vec<PreviousTableRowPropertiesChoice>,
 }
@@ -16052,6 +16152,7 @@ pub struct PreviousTableRowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrBase/w:tblPr")]
 pub struct PreviousTableProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Defines the TableStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:tblStyle"))]
@@ -16109,6 +16210,8 @@ pub struct PreviousTableProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPrBase/w:sectPr")]
 pub struct PreviousSectionProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Physical Section Mark Character Revision ID
   ///
   /// Available in Office2007 and above.
@@ -16212,6 +16315,8 @@ pub struct PreviousSectionProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrExtended/w:pPr")]
 pub struct ParagraphPropertiesExtended {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:CT_String/w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -16320,6 +16425,8 @@ pub struct ParagraphPropertiesExtended {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrOriginal/w:rPr")]
 pub struct PreviousRunProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
   pub run_style: Vec<RunStyle>,
@@ -16494,6 +16601,8 @@ pub struct PreviousRunProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPrOriginal/w:rPr")]
 pub struct PreviousParagraphMarkRunProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Inserted Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
   pub inserted: Option<Inserted>,
@@ -16785,6 +16894,7 @@ pub struct NonNegativeDecimalNumberType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChangeNumbering/w:numberingChange")]
 pub struct NumberingChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// original
   ///
   /// Available in Office2007 and above.
@@ -16882,6 +16992,7 @@ pub struct TabStop {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPr/w:rPr")]
 pub struct ParagraphMarkRunProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Inserted Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
@@ -17092,7 +17203,7 @@ pub struct ParagraphMarkRunProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPr/w:sectPr")]
 pub struct SectionProperties {
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Physical Section Mark Character Revision ID
   ///
   /// Available in Office2007 and above.
@@ -17127,7 +17238,9 @@ pub struct SectionProperties {
   pub rsid_sect: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(choice(
     qname = "w:CT_HdrFtrRef/w:headerReference",
-    qname = "w:CT_HdrFtrRef/w:footerReference"
+    qname = "w:CT_HdrFtrRef/w:footerReference",
+    text,
+    any
   ))]
   pub eg_hdr_ftr_references: Vec<SectionPropertiesChoice>,
   /// Defines the FootnoteProperties Class.
@@ -17583,6 +17696,7 @@ pub struct Column {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPrChange/w:sectPrChange")]
 pub struct SectionPropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -17639,6 +17753,7 @@ pub struct SectionPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPrChange/w:rPrChange")]
 pub struct ParagraphMarkRunPropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -17783,6 +17898,7 @@ pub struct RubyProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rt")]
 pub struct RubyContent {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
@@ -17834,6 +17950,7 @@ pub struct RubyContent {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -17858,6 +17975,7 @@ pub struct RubyContent {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
 pub struct RubyBase {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
@@ -17909,6 +18027,7 @@ pub struct RubyBase {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18062,6 +18181,7 @@ pub struct ListItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
 pub struct SdtProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_RPr/w:rPr",
     qname = "w:CT_String/w:alias",
@@ -18084,6 +18204,7 @@ pub struct SdtProperties {
     qname = "w:CT_Empty/w:citation",
     qname = "w:CT_Empty/w:group",
     qname = "w:CT_Empty/w:bibliography",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18122,6 +18243,7 @@ pub struct SdtEndCharProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
 pub struct SdtContentBlock {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_CustomXmlBlock/w:customXml",
     qname = "w:CT_SdtBlock/w:sdt",
@@ -18150,6 +18272,7 @@ pub struct SdtContentBlock {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18174,6 +18297,7 @@ pub struct SdtContentBlock {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
 pub struct SdtContentRun {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "m:CT_R/m:r",
     qname = "w:CT_CustomXmlRun/w:customXml",
@@ -18226,6 +18350,7 @@ pub struct SdtContentRun {
     qname = "m:CT_SSup/m:sSup",
     qname = "w:CT_R/w:r",
     qname = "w:CT_Rel/w:subDoc",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18252,6 +18377,7 @@ pub struct SdtContentRun {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
 pub struct SdtContentRunRuby {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_CustomXmlRuby/w:customXml",
     qname = "w:CT_SimpleFieldRuby/w:fldSimple",
@@ -18303,6 +18429,7 @@ pub struct SdtContentRunRuby {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18327,6 +18454,7 @@ pub struct SdtContentRunRuby {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
 pub struct SdtContentCell {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_Tc/w:tc",
     qname = "w:CT_CustomXmlCell/w:customXml",
@@ -18354,6 +18482,7 @@ pub struct SdtContentCell {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18378,6 +18507,7 @@ pub struct SdtContentCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
 pub struct SdtContentRow {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
@@ -18405,6 +18535,7 @@ pub struct SdtContentRow {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
     any
   ))]
   #[cfg_attr(
@@ -18533,6 +18664,7 @@ pub struct TableGridChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPrChange/w:tcPrChange")]
 pub struct TableCellPropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -18589,6 +18721,8 @@ pub struct TableCellPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPr/w:tcPr")]
 pub struct TableCellProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the ConditionalFormatStyle Class.
   #[sdk(child(qname = "w:CT_Cnf/w:cnfStyle"))]
   pub conditional_format_style: Option<ConditionalFormatStyle>,
@@ -18646,6 +18780,7 @@ pub struct TableCellProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrChange/w:tblPrChange")]
 pub struct TablePropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -18702,6 +18837,7 @@ pub struct TablePropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrExChange/w:tblPrExChange")]
 pub struct TablePropertyExceptionsChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -18758,6 +18894,8 @@ pub struct TablePropertyExceptionsChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPr/w:tblPr")]
 pub struct TableProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the TableStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:tblStyle"))]
   pub table_style: Option<TableStyle>,
@@ -18848,6 +18986,7 @@ pub struct FootnotePosition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumFmt/w:numFmt")]
 pub struct NumberingFormat {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Numbering Format Type
   ///
   /// Available in Office2007 and above.
@@ -19289,6 +19428,7 @@ pub struct LongHexNumberType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrBaseStyleable/w:rPr")]
 pub struct RunPropertiesBaseStyle {
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -19400,6 +19540,8 @@ pub struct RunPropertiesBaseStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrBaseStyleable/w:pPr")]
 pub struct ParagraphPropertiesBaseStyle {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the KeepNext Class.
   #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
   pub keep_next: Option<KeepNext>,
@@ -19500,6 +19642,7 @@ pub struct ParagraphPropertiesBaseStyle {
 #[sdk(qname = "w:CT_RPrDefault/w:rPrDefault")]
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Run Properties
   #[sdk(child(qname = "w:CT_RPrBaseStyleable/w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
@@ -19938,6 +20081,8 @@ pub struct LevelJustification {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrBase/w:pPr")]
 pub struct PreviousParagraphProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:CT_String/w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -20173,6 +20318,7 @@ pub struct MultiLevelType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Lvl/w:lvl")]
 pub struct Level {
+  pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Numbering Level
   ///
@@ -20241,6 +20387,7 @@ pub struct Level {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumPicBullet/w:numPicBullet")]
 pub struct NumberingPictureBullet {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// numPicBulletId
   ///
   /// Available in Office2007 and above.
@@ -20262,6 +20409,8 @@ pub struct NumberingPictureBullet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_AbstractNum/w:abstractNum")]
 pub struct AbstractNum {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Abstract Numbering Definition ID
   ///
   /// Available in Office2007 and above.
@@ -20300,6 +20449,8 @@ pub struct AbstractNum {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Num/w:num")]
 pub struct NumberingInstance {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// numId
   ///
   /// Available in Office2007 and above.
@@ -20329,6 +20480,8 @@ pub struct NumberingInstance {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrStyle/w:pPr")]
 pub struct StyleParagraphProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the KeepNext Class.
   #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
   pub keep_next: Option<KeepNext>,
@@ -20539,6 +20692,8 @@ pub struct UiPriority {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrStyle/w:rPr")]
 pub struct StyleRunProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -21255,6 +21410,7 @@ pub struct Div {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Comment/w:comment")]
 pub struct Comment {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// initials
   ///
   /// Available in Office2007 and above.
@@ -21319,7 +21475,9 @@ pub struct Comment {
     qname = "w:CT_Bookmark/w:bookmarkStart",
     qname = "w:CT_MarkupRange/w:bookmarkEnd",
     qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd"
+    qname = "w:CT_MarkupRange/w:commentRangeEnd",
+    text,
+    any
   ))]
   pub comment_choice: Vec<CommentChoice>,
 }
@@ -21331,6 +21489,7 @@ pub struct Comment {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdn/w:footnote")]
 pub struct Footnote {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Footnote/Endnote Type
   ///
   /// Available in Office2007 and above.
@@ -21388,6 +21547,7 @@ pub struct Footnote {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub footnote_choice: Vec<FootnoteChoice>,
@@ -21400,6 +21560,7 @@ pub struct Footnote {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdn/w:endnote")]
 pub struct Endnote {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Footnote/Endnote Type
   ///
   /// Available in Office2007 and above.
@@ -21457,6 +21618,7 @@ pub struct Endnote {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub endnote_choice: Vec<EndnoteChoice>,
@@ -21469,6 +21631,7 @@ pub struct Endnote {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdn/")]
 pub struct FootnoteEndnoteType {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Footnote/Endnote Type
   ///
   /// Available in Office2007 and above.
@@ -21518,7 +21681,9 @@ pub struct FootnoteEndnoteType {
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    text,
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -21870,6 +22035,7 @@ pub struct DocPartProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:docPartBody")]
 pub struct DocPartBody {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
@@ -21906,6 +22072,7 @@ pub struct DocPartBody {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub doc_part_body_choice: Vec<DocPartBodyChoice>,
@@ -21921,6 +22088,7 @@ pub struct DocPartBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:body")]
 pub struct Body {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
@@ -21957,6 +22125,7 @@ pub struct Body {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
+    text,
     any
   ))]
   pub body_choice: Vec<BodyChoice>,
@@ -21972,6 +22141,7 @@ pub struct Body {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/")]
 pub struct BodyType {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_AltChunk/w:altChunk",
     qname = "w:CT_CustomXmlBlock/w:customXml",
@@ -22001,7 +22171,9 @@ pub struct BodyType {
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_SectPr/w:sectPr"
+    qname = "w:CT_SectPr/w:sectPr",
+    text,
+    any
   ))]
   #[cfg_attr(
     feature = "microsoft365",
@@ -22142,6 +22314,8 @@ pub struct TableWidthDxaNilType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrEx/w:tblPrEx")]
 pub struct TablePropertyExceptions {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Preferred Table Width Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
   pub table_width: Option<TableWidth>,
@@ -22181,6 +22355,7 @@ pub struct TablePropertyExceptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPr/w:trPr")]
 pub struct TableRowProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
   #[sdk(choice(
     qname = "w:CT_Cnf/w:cnfStyle",
     qname = "w:CT_NonZeroDecimalNumber/w:divId",
@@ -22193,7 +22368,9 @@ pub struct TableRowProperties {
     qname = "w:CT_OnOffOnly/w:cantSplit",
     qname = "w:CT_OnOffOnly/w:tblHeader",
     qname = "w:CT_TblWidth/w:tblCellSpacing",
-    qname = "w:CT_TblJc/w:jc"
+    qname = "w:CT_TblJc/w:jc",
+    text,
+    any
   ))]
   pub table_row_properties_choice1: Vec<TableRowPropertiesChoice>,
   /// Inserted Paragraph.
@@ -22224,6 +22401,7 @@ pub struct TableRowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrChange/w:trPrChange")]
 pub struct TableRowPropertiesChange {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// author
   ///
   /// Available in Office2007 and above.
@@ -22280,6 +22458,8 @@ pub struct TableRowPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPr/w:pPr")]
 pub struct ParagraphProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:CT_String/w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -22733,6 +22913,7 @@ pub struct SdtContentText {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_WriteProtection/w:writeProtection")]
 pub struct WriteProtection {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Recommend Write Protection in User Interface
   ///
   /// Available in Office2007 and above.
@@ -22993,6 +23174,7 @@ pub struct ProofState {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter")]
 pub struct StylePaneFormatFilter {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// val
   ///
   /// Available in Office2007 and above.
@@ -23288,6 +23470,7 @@ pub struct RevisionView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocProtect/w:documentProtection")]
 pub struct DocumentProtection {
+  pub xml_other_attrs: Vec<(String, String)>,
   /// Document Editing Restrictions
   ///
   /// Available in Office2007 and above.
@@ -23732,6 +23915,8 @@ pub struct ShapeDefaultsType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnDocProps/w:footnotePr")]
 pub struct FootnoteDocumentWideProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Footnote Placement
   #[sdk(child(qname = "w:CT_FtnPos/w:pos"))]
   pub footnote_position: Option<FootnotePosition>,
@@ -23756,6 +23941,8 @@ pub struct FootnoteDocumentWideProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EdnDocProps/w:endnotePr")]
 pub struct EndnoteDocumentWideProperties {
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// Endnote Placement
   #[sdk(child(qname = "w:CT_EdnPos/w:pos"))]
   pub endnote_position: Option<EndnotePosition>,
@@ -24681,6 +24868,12 @@ pub enum MathControlMoveTypeChoice {
   /// Defines the DeletedMathControl Class.
   #[sdk(child(qname = "w:CT_MathCtrlDel/w:del"))]
   WDel(std::boxed::Box<DeletedMathControl>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRubyChoice2 {
@@ -24965,9 +25158,6 @@ pub enum CustomXmlRubyChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRubyChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the CustomXmlRuby Class.
   #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRuby>),
@@ -24986,6 +25176,12 @@ pub enum CustomXmlRubyChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<CustomXmlRubyChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldRubyChoice2 {
@@ -25270,9 +25466,6 @@ pub enum SimpleFieldRubyChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldRubyChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the CustomXmlRuby Class.
   #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRuby>),
@@ -25291,12 +25484,16 @@ pub enum SimpleFieldRubyChoice {
   /// Choice of choice1, choice2
   #[sdk(choice)]
   EgRunLevelElts(std::boxed::Box<SimpleFieldRubyChoice2>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkRubyChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -25534,6 +25731,12 @@ pub enum HyperlinkRubyChoice {
             crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunChoice {
@@ -25618,13 +25821,16 @@ pub enum RunChoice {
   /// Position of Last Calculated Page Break.
   #[sdk(empty_child(qname = "w:CT_Empty/w:lastRenderedPageBreak"))]
   WLastRenderedPageBreak,
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunRubyChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the BookmarkStart Class.
+  /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     /// Defines the BookmarkEnd Class.
@@ -25704,6 +25910,12 @@ pub enum SdtRunRubyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedRunChoice2 {
@@ -25988,9 +26200,6 @@ pub enum InsertedRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedRunChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -26008,6 +26217,12 @@ pub enum InsertedRunChoice {
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DeletedRunChoice2 {
@@ -26292,9 +26507,6 @@ pub enum DeletedRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DeletedRunChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -26312,6 +26524,12 @@ pub enum DeletedRunChoice {
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromRunChoice2 {
@@ -26596,9 +26814,6 @@ pub enum MoveFromRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromRunChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -26616,6 +26831,12 @@ pub enum MoveFromRunChoice {
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToRunChoice2 {
@@ -26900,9 +27121,6 @@ pub enum MoveToRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToRunChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
@@ -26920,6 +27138,12 @@ pub enum MoveToRunChoice {
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunTrackChangeTypeChoice {
@@ -27215,10 +27439,7 @@ pub enum RunTrackChangeTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the BookmarkStart Class.
+  /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     /// Defines the BookmarkEnd Class.
@@ -27298,13 +27519,16 @@ pub enum SdtRunChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlBlockChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the CustomXmlBlock Class.
+  /// Defines the CustomXmlBlock Class.
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
     /// Defines the SdtBlock Class.
@@ -27440,13 +27664,16 @@ pub enum CustomXmlBlockChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtBlockChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the BookmarkStart Class.
+  /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     /// Defines the BookmarkEnd Class.
@@ -27526,6 +27753,12 @@ pub enum SdtBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice2 {
@@ -27810,9 +28043,6 @@ pub enum ParagraphChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
@@ -27842,13 +28072,16 @@ pub enum ParagraphChoice {
   /// Anchor for Subdocument Location.
   #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
   WSubDoc(std::boxed::Box<SubDocumentReference>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the BookmarkStart Class.
+  /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     /// Defines the BookmarkEnd Class.
@@ -27931,10 +28164,7 @@ pub enum TableChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice2 {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Table Row.
+  /// Table Row.
     #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     /// Row-Level Custom XML Element.
@@ -28070,10 +28300,7 @@ pub enum TableChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Table Cell.
+  /// Table Cell.
     #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     /// Cell-Level Custom XML Element.
@@ -28206,13 +28433,16 @@ pub enum TableRowChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRowChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Table Row.
+  /// Table Row.
     #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     /// Row-Level Custom XML Element.
@@ -28345,13 +28575,16 @@ pub enum CustomXmlRowChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRowChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the BookmarkStart Class.
+  /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     /// Defines the BookmarkEnd Class.
@@ -28431,13 +28664,16 @@ pub enum SdtRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the AltChunk Class.
+  /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     /// Defines the CustomXmlBlock Class.
@@ -28576,13 +28812,16 @@ pub enum TableCellChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlCellChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Table Cell.
+  /// Table Cell.
     #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     /// Cell-Level Custom XML Element.
@@ -28715,13 +28954,16 @@ pub enum CustomXmlCellChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtCellChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the BookmarkStart Class.
+  /// Defines the BookmarkStart Class.
     #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
     WBookmarkStart(std::boxed::Box<BookmarkStart>),
     /// Defines the BookmarkEnd Class.
@@ -28801,6 +29043,12 @@ pub enum SdtCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRunChoice2 {
@@ -29085,9 +29333,6 @@ pub enum CustomXmlRunChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRunChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
@@ -29117,6 +29362,12 @@ pub enum CustomXmlRunChoice {
   /// Anchor for Subdocument Location.
   #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
   WSubDoc(std::boxed::Box<SubDocumentReference>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldChoice2 {
@@ -29401,9 +29652,6 @@ pub enum SimpleFieldChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleFieldChoice {
-  /// Defines the AlternateContent Class.
-  #[sdk(any)]
-  XmlOther(String),
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<CustomXmlRun>),
@@ -29433,12 +29681,16 @@ pub enum SimpleFieldChoice {
   /// Anchor for Subdocument Location.
   #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
   WSubDoc(std::boxed::Box<SubDocumentReference>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRun>),
     #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleField>),
@@ -29684,6 +29936,12 @@ pub enum HyperlinkChoice {
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -30171,9 +30429,7 @@ pub enum BidirectionalEmbeddingChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBoxContentChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -30279,12 +30535,16 @@ pub enum TextBoxContentChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HeaderChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -30390,12 +30650,16 @@ pub enum HeaderChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FooterChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
+  #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
@@ -30501,6 +30765,12 @@ pub enum FooterChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HeaderFooterTypeChoice {
@@ -30640,6 +30910,12 @@ pub enum HeaderFooterTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousTableCellPropertiesChoice {
@@ -30676,6 +30952,12 @@ pub enum PreviousTableRowPropertiesChoice {
   WTblCellSpacing(std::boxed::Box<TableCellSpacing>),
   #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
   WJc(std::boxed::Box<TableJustification>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -30715,6 +30997,12 @@ pub enum SectionPropertiesChoice {
   WHeaderReference(std::boxed::Box<HeaderReference>),
   #[sdk(child(qname = "w:CT_HdrFtrRef/w:footerReference"))]
   WFooterReference(std::boxed::Box<FooterReference>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FormFieldDataChoice {
@@ -30748,9 +31036,7 @@ pub enum CheckBoxChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyContentChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -30988,12 +31274,16 @@ pub enum RubyContentChoice {
             crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyBaseChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -31231,6 +31521,12 @@ pub enum RubyBaseChoice {
             crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RubyContentTypeChoice {
@@ -31527,8 +31823,6 @@ pub enum RubyContentTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtPropertiesChoice {
-  #[sdk(any)]
-  XmlOther(String),
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   WRPr(std::boxed::Box<RunProperties>),
   #[sdk(child(qname = "w:CT_String/w:alias"))]
@@ -31626,12 +31920,16 @@ pub enum SdtPropertiesChoice {
   /// Defines the SdtRepeatedSectionItem Class.
   #[sdk(empty_child(qname = "w:CT_Empty/w15:repeatingSectionItem"))]
   W15RepeatingSectionItem,
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentBlockChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
+  #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlBlock>),
     #[sdk(child(qname = "w:CT_SdtBlock/w:sdt"))]
     WSdt(std::boxed::Box<SdtBlock>),
@@ -31735,12 +32033,16 @@ pub enum SdtContentBlockChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:CT_R/m:r"))]
     MR(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
@@ -31986,12 +32288,16 @@ pub enum SdtContentRunChoice {
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunRubyChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRuby>),
     #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
     WFldSimple(std::boxed::Box<SimpleFieldRuby>),
@@ -32229,12 +32535,16 @@ pub enum SdtContentRunRubyChoice {
             crate::schemas::schemas_openxmlformats_org_office_document_2006_math::Run,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentCellChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_Tc/w:tc"))]
+  #[sdk(child(qname = "w:CT_Tc/w:tc"))]
     WTc(std::boxed::Box<TableCell>),
     #[sdk(child(qname = "w:CT_CustomXmlCell/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlCell>),
@@ -32336,12 +32646,16 @@ pub enum SdtContentCellChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRowChoice {
-  #[sdk(any)]
-    XmlOther(String),
-    #[sdk(child(qname = "w:CT_Row/w:tr"))]
+  #[sdk(child(qname = "w:CT_Row/w:tr"))]
     WTr(std::boxed::Box<TableRow>),
     #[sdk(child(qname = "w:CT_CustomXmlRow/w:customXml"))]
     WCustomXml(std::boxed::Box<CustomXmlRow>),
@@ -32443,6 +32757,12 @@ pub enum SdtContentRowChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellPropertiesChoice {
@@ -32520,13 +32840,16 @@ pub enum CommentChoice {
   /// Defines the CommentRangeEnd Class.
   #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
   WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FootnoteChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the AltChunk Class.
+  /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     /// Defines the CustomXmlBlock Class.
@@ -32665,13 +32988,16 @@ pub enum FootnoteChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndnoteChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the AltChunk Class.
+  /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     /// Defines the CustomXmlBlock Class.
@@ -32810,6 +33136,12 @@ pub enum EndnoteChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FootnoteEndnoteTypeChoice {
@@ -32949,13 +33281,16 @@ pub enum FootnoteEndnoteTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
         >,
     ),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DocPartBodyChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the AltChunk Class.
+  /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     /// Defines the CustomXmlBlock Class.
@@ -33094,13 +33429,16 @@ pub enum DocPartBodyChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyChoice {
-  /// Defines the AlternateContent Class.
-    #[sdk(any)]
-    XmlOther(String),
-    /// Defines the AltChunk Class.
+  /// Defines the AltChunk Class.
     #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
     WAltChunk(std::boxed::Box<AltChunk>),
     /// Defines the CustomXmlBlock Class.
@@ -33239,6 +33577,12 @@ pub enum BodyChoice {
             >,
         >,
     },
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyTypeChoice {
@@ -33381,6 +33725,12 @@ pub enum BodyTypeChoice {
     /// Section Properties.
     #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
     WSectPr(std::boxed::Box<SectionProperties>),
+    /// Unknown XML child.
+    #[sdk(any)]
+    XmlOther(String),
+    /// Unknown XML text.
+    #[sdk(text)]
+    XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowPropertiesChoice {
@@ -33420,6 +33770,12 @@ pub enum TableRowPropertiesChoice {
   /// Defines the TableJustification Class.
   #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
   WJc(std::boxed::Box<TableJustification>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
+  /// Unknown XML text.
+  #[sdk(text)]
+  XmlText(crate::simple_type::StringValue),
 }
 #[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

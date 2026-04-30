@@ -60,6 +60,7 @@ pub struct Task {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "oel:CT_ExtensionList/t:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "oel:CT_Extension/oel:ext"))]
   pub oel_ext: Vec<crate::schemas::schemas_microsoft_com_office_2019_extlst::Extension>,

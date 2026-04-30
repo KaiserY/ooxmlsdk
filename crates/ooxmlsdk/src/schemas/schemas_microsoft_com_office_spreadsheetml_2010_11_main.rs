@@ -207,6 +207,7 @@ pub struct QueryTable {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_WebExtensions/x15:webExtensions")]
 pub struct WebExtensions {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
   #[sdk(child(qname = "x15:CT_WebExtension/x15:webExtension"))]
   pub x15_web_extension: Vec<WebExtension>,
@@ -853,6 +854,7 @@ pub struct PivotTableReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x15:CT_WebExtension/x15:webExtension")]
 pub struct WebExtension {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// appRef
   ///
   /// Available in Office2013 and above.
@@ -1224,6 +1226,7 @@ pub struct FieldListActiveTabTopLevelEntity {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExtensionList/x15:extLst")]
 pub struct ExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,

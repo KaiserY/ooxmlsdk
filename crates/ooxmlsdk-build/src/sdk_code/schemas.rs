@@ -2172,22 +2172,6 @@ fn gen_choice_variant_tokens(
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
-      if is_mce_alternate_content_variant(variant) && !qnames.is_empty() {
-        let qname_attrs = qnames
-          .iter()
-          .map(|qname| quote! { #[sdk(child(qname = #qname))] })
-          .collect::<Vec<_>>();
-        let payload_type = type_from_decl_ref(&variant.payload)?;
-        return Ok(vec![quote! {
-          #prefix_attrs
-          #[cfg(not(feature = "mce"))]
-          #( #variant_attrs )*
-          #variant_doc_attrs
-          #( #qname_attrs )*
-          #variant_ident(std::boxed::Box<#payload_type>),
-        }]);
-      }
-
       if flatten_anonymous_choice_wrappers
         && let Some(helper_type_decl) =
           anonymous_choice_wrapper_helper_type_decl(variant, render_context.module)
@@ -2313,25 +2297,6 @@ fn gen_choice_variant_tokens(
       }])
     }
   }
-}
-
-fn is_mce_alternate_content_variant(variant: &VariantDecl) -> bool {
-  variant.rust_name == "McAlternateContent"
-    && matches!(
-      variant.payload.module_path.as_deref(),
-      Some("crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006")
-    )
-    && variant.payload.rust_type == "AlternateContent"
-}
-
-fn is_mce_alternate_content_field(field: &FieldDecl) -> bool {
-  matches!(
-    &field.wire,
-    FieldWireDecl::Child { qname } if qname == "mc:CT_AlternateContent/mc:AlternateContent"
-  ) && matches!(
-    field.type_ref.module_path.as_deref(),
-    Some("crate::schemas::schemas_openxmlformats_org_markup_compatibility_2006")
-  ) && field.type_ref.rust_type == "AlternateContent"
 }
 
 fn inline_sequence_helper_type_decl<'a>(
@@ -3424,7 +3389,6 @@ fn gen_direct_child_fields_from_decl(
 ) -> Result<Vec<TokenStream>> {
   gen_direct_child_fields_from_decl_with_context(
     fields,
-    fields,
     owner_rust_name,
     module,
     type_graph,
@@ -3435,7 +3399,6 @@ fn gen_direct_child_fields_from_decl(
 
 fn gen_direct_child_fields_from_decl_with_context(
   fields: &[&FieldDecl],
-  mce_context_fields: &[&FieldDecl],
   owner_rust_name: &str,
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
@@ -3443,14 +3406,12 @@ fn gen_direct_child_fields_from_decl_with_context(
   force_optional_when_not_repeated: bool,
 ) -> Result<Vec<TokenStream>> {
   let mut tokens = Vec::new();
-  let mce_payload_field_ptrs = mce_payload_field_ptrs(mce_context_fields);
 
   for field in fields {
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
     let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
     let field_type = type_from_decl_ref(&field.type_ref)?;
-    let is_mce_payload_field = mce_payload_field_ptrs.contains(&(*field as *const FieldDecl));
     let property_comments_owned = empty_leaf_marker_doc
       .and_then(meaningful_doc_text)
       .or_else(|| meaningful_doc_text(&field.docs))
@@ -3460,32 +3421,10 @@ fn gen_direct_child_fields_from_decl_with_context(
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
         quote! { #[sdk(empty_child(qname = #qname))] }
       }
-      FieldWireDecl::Child { qname } if is_mce_payload_field => {
-        quote! { #[sdk(mce_child(qname = #qname))] }
-      }
       FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
       FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
-
-    if is_mce_alternate_content_field(field) {
-      let effective_cardinality =
-        if force_optional_when_not_repeated && !matches!(field.cardinality, Cardinality::Many) {
-          Cardinality::Optional
-        } else {
-          field.cardinality
-        };
-      tokens.push(field_decl_tokens_for_type(
-        &field_name_ident,
-        &attr,
-        quote! { #[cfg(not(feature = "mce"))] },
-        sdk_field_attrs,
-        property_comments,
-        &field_type,
-        effective_cardinality,
-      ));
-      continue;
-    }
 
     let field_type = if empty_leaf_marker_doc.is_some() {
       parse_str("()")?
@@ -3545,55 +3484,6 @@ fn gen_direct_child_fields_from_decl_with_context(
   }
 
   Ok(tokens)
-}
-
-fn mce_payload_field_ptrs(fields: &[&FieldDecl]) -> HashSet<*const FieldDecl> {
-  fields
-    .iter()
-    .enumerate()
-    .filter(|(_, field)| is_mce_alternate_content_field(field))
-    .filter_map(|(index, _)| {
-      fields
-        .iter()
-        .skip(index + 1)
-        .find(|field| !is_mce_alternate_content_field(field))
-        .map(|field| *field as *const FieldDecl)
-    })
-    .collect()
-}
-
-fn field_decl_tokens_for_type(
-  field_name_ident: &Ident,
-  attr: &[Attribute],
-  cfg_attr: TokenStream,
-  sdk_field_attrs: TokenStream,
-  property_comments: &str,
-  field_type: &Type,
-  cardinality: Cardinality,
-) -> TokenStream {
-  match cardinality {
-    Cardinality::Many => quote! {
-      #( #attr )*
-      #cfg_attr
-      #[doc = #property_comments]
-      #sdk_field_attrs
-      pub #field_name_ident: Vec<#field_type>,
-    },
-    Cardinality::Optional => quote! {
-      #( #attr )*
-      #cfg_attr
-      #[doc = #property_comments]
-      #sdk_field_attrs
-      pub #field_name_ident: Option<#field_type>,
-    },
-    Cardinality::One => quote! {
-      #( #attr )*
-      #cfg_attr
-      #[doc = #property_comments]
-      #sdk_field_attrs
-      pub #field_name_ident: #field_type,
-    },
-  }
 }
 
 fn gen_inline_sequence_variant_fields_from_decl(
@@ -3728,7 +3618,6 @@ fn gen_flatten_one_sequence_fields_from_decl(
       FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } => {
         tokens.extend(gen_direct_child_fields_from_decl_with_context(
           std::slice::from_ref(field),
-          fields,
           owner_rust_name,
           module,
           type_graph,
@@ -3852,7 +3741,7 @@ fn choice_child_display_name<'a>(child: &'a ResolvedOneSequenceChild<'a>) -> &'a
 fn child_kind_for_schema_type(schema_type: &SchemaType) -> SchemaTypeChildKind {
   if schema_type.base_class == "OpenXmlLeafTextElement"
     && schema_type.attributes.is_empty()
-    && !schema_type.has_xmlns_fields
+    && !schema_type.have_xmlns_fields
   {
     SchemaTypeChildKind::TextChild
   } else {

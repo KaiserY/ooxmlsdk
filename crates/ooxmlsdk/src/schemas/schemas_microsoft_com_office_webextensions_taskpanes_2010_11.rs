@@ -27,6 +27,7 @@ pub struct Taskpanes {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "we:CT_WebExtensionPartRef/wetp:webextensionref")]
 pub struct WebExtensionPartReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   ///
   /// Available in Office2013 and above.
@@ -43,6 +44,7 @@ pub struct WebExtensionPartReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/wetp:extLst")]
 pub struct OfficeArtExtensionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
@@ -55,6 +57,7 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wetp:CT_OsfTaskpane/wetp:taskpane")]
 pub struct WebExtensionTaskpane {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// dockstate
   ///
   /// Available in Office2013 and above.
